@@ -39,16 +39,16 @@
 
 URLS
 ---------------------------
- base.com/
+- base.com/
    - sign in
    - view games
    - game/round editor
    - play now
- base.com/:game_uuid
+- base.com/:game_uuid
    - in lobby, show join button + teams
    - in game, show spectator mode
    - after game, show archived game
-base.com/:game_uuid?id=:uuid
+- base.com/:game_uuid?id=:uuid
    - in lobby, show teams + edit team name area
    - in game, regular gameplay
    - after game, ignore id & show archived game
