@@ -11,6 +11,7 @@ import uuid
 import yaml
 
 from pprint import pprint
+from mongo_manager import GameEditor
 from flask import Flask, jsonify
 app = Flask(__name__)
 
@@ -27,11 +28,76 @@ CATEGORY = "category"
 QUESTION = "question"
 ANSWER = "answer"
 
-def write_category(category, game_id):
-    print("writing category {}".format(category))
+MONGO_HOST = "localhost"
+MONGO_DB = "trivia"
 
-def write_question(question, game_id):
-    print("writing question {}".format(question))
+editor = GameEditor(MONGO_HOST, MONGO_DB)
+
+def create_question(question):
+	"""
+	returns 
+		False, error message if question is invalid
+		True, created_object if question is valid
+	"""
+	valid, error = valid_question(question)
+	if not valid:
+		return False, error
+
+	created = editor.create_question(question)
+	if not created:
+		return False, "Failed to create question"
+
+	return True, fix_id(created)
+
+def delete_question(question_id):
+	"""
+	returns True if deleted
+	"""
+	return editor.delete_question(question_id)
+
+def get_question(question_id):
+	"""
+	returns
+	 	question as dict if ID is valid
+	 	None if question_id is invalid
+	"""
+	return fix_id(editor.get_question(question_id))
+
+def update_question(question_id, data):
+	"""
+	returns
+	 	True/false if update successful
+	"""
+	return editor.update_question(question_id, data)
+
+def get_questions():
+	ret = []
+	questions = editor.get_questions()
+	for q in questions:
+		ret.append(fix_id(q))
+	return ret
+
+
+
+def fix_id(data):
+	new = {}
+	for key in data:
+		if key == "_id":
+			new["id"]= str(data[key])
+		else:
+			new[key] = data[key]
+	return new
+
+def valid_question(q):
+	"""
+	is this question valid?
+	"""
+	for attribute_name in [QUESTION, ANSWER, CATEGORY]:
+		valid, error = exists_and_str(q, attribute_name)
+		if not valid:
+			return False, error
+
+	return True, None
 
 def write_round(round, game_id):
     print("writing round {}".format(round))
@@ -93,27 +159,15 @@ def is_valid_game(game_dict):
 
     return True, None
 
-def valid_question(q):
-	"""
-	is this question valid?
-	"""
-	for attribute_name in [QUESTION, ANSWER, CATEGORY]:
-		attribute = q.get(attribute_name, None)
-		valid, error = exists_and_str(q, attribute)
-		if not valid, 
-			return False, error
-
-	return True, None
-
 
 def exists_and_str(question, attribute):
-	attr = q.get(attribute, None)
+	attr = question.get(attribute, None)
 
 	if attr is None:
-		return False, "Missing attribute '{}'".format(attribute)
+		return False, "Missing attribute '{}' (data: {})".format(attribute, question)
 
-	if not question isinstance(question, str):
-		return False, "Question is not str. ({})".format(q)
+	if not isinstance(attr, str):
+		return False, "Attribute '{}' is not str. (data: {})".format(attribute, question)
 
 	return True, None
 

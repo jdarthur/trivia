@@ -5,6 +5,10 @@
 import os
 from pprint import pprint
 from pymongo import MongoClient
+from bson.objectid import ObjectId
+
+def id_equals(object_id):
+    return {"_id" : ObjectId(object_id)}
 
 class GameEditor(object):
     """
@@ -14,20 +18,28 @@ class GameEditor(object):
         self.db = MongoClient(host)[database]
 
     def get_questions(self):
-        return [{}]
+        questions = self.db.question.find()
+        if questions:
+            return questions
+        return None
 
     def get_question(self, question_id):
-        return {}
+        data = self.db.question.find_one(id_equals(question_id))
+        if data:
+            return data
+        return None
 
     def create_question(self, data):
-        return {}
+        status = self.db.question.insert_one(data)
+        return data
 
     def update_question(self, question_id, data):
+        result = self.db.question.update_one(id_equals(question_id), {"$set" : data})
         return True
 
     def delete_question(self, question_id):
-        return
-
+        self.db.question.delete_one(id_equals(question_id))
+        return True
 
 
     def get_rounds(self, ):
