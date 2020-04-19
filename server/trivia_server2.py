@@ -92,6 +92,31 @@ def is_valid_game(game_dict):
 
 	return True, None
 
+def valid_question(q):
+	"""
+	is this question valid?
+	"""
+	for attribute_name in [QUESTION, ANSWER, CATEGORY]:
+		attribute = q.get(attribute_name, None)
+		valid, error = exists_and_str(q, attribute)
+		if not valid, 
+			return False, error
+
+	return True, None
+
+
+def exists_and_str(question, attribute):
+	attr = q.get(attribute, None)
+
+	if attr is None:
+		return False, "Missing attribute '{}'".format(attribute)
+
+	if not question isinstance(question, str):
+		return False, "Question is not str. ({})".format(q)
+
+	return True, None
+
+
 def bad_attr(question, round_index, question_index, attr):
 	data = question.get(attr, None)
 	if not data:
