@@ -42,20 +42,34 @@ class GameEditor(object):
         return True
 
 
-    def get_rounds(self, ):
-        return [{}]
+    """
+    ===================
+          ROUNDS
+    ===================
+    """
+    def get_rounds(self):
+        rounds = self.db.round.find()
+        if rounds:
+            return rounds
+        return None
 
     def get_round(self, round_id):
-        return {}
+        data = self.db.round.find_one(id_equals(round_id))
+        if data:
+            return data
+        return None
 
     def create_round(self, data):
-        return {}
+        self.db.round.insert_one(data)
+        return data
 
     def update_round(self, round_id, data):
+        result = self.db.round.update_one(id_equals(round_id), {"$set" : data})
         return True
 
     def delete_round(self, round_id):
-        return
+        self.db.round.delete_one(id_equals(round_id))
+        return True
 
 
 

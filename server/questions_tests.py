@@ -45,6 +45,9 @@ def crud():
 		success = delete_question(question_id)
 		print("   deleted: {}".format(success))
 
+		questions = get_questions()
+		print("   all questions: {}".format(questions))
+
 
 
 if __name__ == "__main__":
