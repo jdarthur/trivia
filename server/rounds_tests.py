@@ -111,6 +111,36 @@ def crud():
 
 		delete_question(question_id)
 
+def round_used_added_to_question():
+	"""
+	when I add a question to a round, 
+	the round_id should be stored in the
+	questions rounds_used list
+	"""
+	pass
+
+def round_removed_from_question_when_round_deleted():
+	"""
+	when I delete a round, it should be removed from 
+	the rounds_used list on each question in round
+	"""
+	pass
+
+def question_removed_from_round_when_question_is_deleted():
+	"""
+	when I delete a question, it should be deleted from
+	each round that it is used in
+	"""
+	pass
+
+def round_removed_from_question_when_question_removed_from_round():
+	"""
+	when I remove a question from a round, the round
+	should be removed from this questions rounds_used list
+	"""
+	pass
+
+
 
 if __name__ == "__main__":
 	missing_name()
