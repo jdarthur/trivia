@@ -74,18 +74,27 @@ class GameEditor(object):
 
 
     def get_games(self, ):
-        return [{}]
+        games = self.db.game.find()
+        if games:
+            return games
+        return None
 
     def get_game(self, game_id):
-        return {}
+        game = self.db.game.find_one(id_equals(game_id))
+        if game:
+            return game
+        return None
 
     def create_game(self, data):
-        return {}
+        self.db.game.insert_one(data)
+        return True
 
     def update_game(self, game_id, data):
+        self.db.game.update_one(id_equals(game_id), {"$set" : data})
         return True
 
     def delete_game(self, game_id):
+        self.db.game.delete_one(id_equals(game_id))
         return
 
 

@@ -102,28 +102,28 @@ def crud():
 		if created:
 			round_id = obj.get("id")
 
-			obj  = get_round(round_id)
+			obj = get_round(round_id)
 			print("   got: {}".format(obj))
 
 			updated = update_round(round_id, {"name" : "ffff"})
 
-			rounds =  get_rounds()
+			rounds = get_rounds()
 			print("   all rounds: {}".format(rounds))
 
-			questions =  get_questions()
+			questions = get_questions()
 			print("   all questions: {}".format(questions))
 
 			success = delete_round(round_id)
 			print("   deleted: {} {}".format(success, round_id))
 
-			rounds =  get_rounds()
+			rounds = get_rounds()
 			print("all rounds: {}".format(rounds))
 
 		delete_question(question_id)
 
 def round_used_added_to_question():
 	"""
-	when I add a question to a round, 
+	when I add a question to a round,
 	the round_id should be stored in the
 	questions rounds_used list
 	"""
@@ -156,7 +156,7 @@ def round_used_added_to_question():
 
 def round_removed_from_question_when_round_deleted():
 	"""
-	when I delete a round, it should be removed from 
+	when I delete a round, it should be removed from
 	the rounds_used list on each question in round
 	"""
 	print("\nTEST: round deleted from question when round deleted")
@@ -222,7 +222,7 @@ def question_removed_from_round_when_question_is_deleted():
 			round_obj = get_round(round_id)
 			print("   questions after delete: {}".format(round_obj.get("questions", [])))
 
-			delete_round(round_id)	
+			delete_round(round_id)
 
 def round_removed_from_question_when_question_removed_from_round():
 	"""
