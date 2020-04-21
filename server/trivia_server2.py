@@ -31,6 +31,7 @@ QUESTION = "question"
 ANSWER = "answer"
 QUESTIONS = "questions"
 WAGERS = "wagers"
+ROUNDS_USED = "rounds_used"
 
 MONGO_HOST = "localhost"
 MONGO_DB = "trivia"
@@ -73,6 +74,7 @@ def update_question(question_id, data):
 	 	True/false if update successful
 	"""
 	return editor.update_question(question_id, data)
+	
 
 def get_questions():
 	ret = []
@@ -146,15 +148,17 @@ def valid_round(data):
 
 	for question_id in data[QUESTIONS]:
 
+		if data[QUESTIONS].count(question_id) > 1:
+			return False, "question id '{}' used more than once (data: {})".format(question_id, data)
+
 		valid, err = valid_question_id(question_id, data)
 		if not valid:
 		 	return False, err
 
-
-
 	return True, None
 
 def valid_question_id(question_id, data):
+
 	if not isinstance(question_id, str):
 		return False, "question_id '{}' is not str (data: {})".format(question_id, data)
 
@@ -166,6 +170,20 @@ def valid_question_id(question_id, data):
 
 	return True, None
 
+def set_round_in_questions(round_obj):
+
+	round_id = str(round_obj.get("_id"))
+	questions = round_obj.get(QUESTIONS, [])
+	
+	for question_id in questions:
+
+		rounds_used = get_question(question_id).get(ROUNDS_USED, [])
+		if round_id not in rounds_used:
+			rounds_used.append(round_id)
+			update_question(question_id, {ROUNDS_USED: rounds_used})
+		else:
+			print("Round {} is already added to question {}".format(round_id, question_id))
+	
 
 def create_round(data):
 	valid, err = valid_round(data)
@@ -176,13 +194,19 @@ def create_round(data):
 	if not created:
 		return False, "Failed to create round"
 
+	set_round_in_questions(created)
+
 	return True, fix_id(created)
 
 def delete_round(round_id):
 	return editor.delete_round(round_id)
 
 def update_round(round_id, data):
-	return editor.update_round(round_id, data)
+	success = editor.update_round(round_id, data)
+	if success:
+		set_round_in_questions(data)
+		return True
+	return False
 
 def get_round(round_id):
 	return fix_id(editor.get_round(round_id))
@@ -193,6 +217,12 @@ def get_rounds():
 	for r in rounds:
 		ret.append(fix_id(r))
 	return ret
+
+def delete_round_from_question(round_id, question_id):
+	pass
+
+def delete_question_from_round(question_id, round_id):
+	pass
 
 
 

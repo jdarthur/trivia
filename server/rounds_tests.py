@@ -1,4 +1,5 @@
-from  trivia_server2 import create_round, delete_round, get_round, update_round, get_rounds, create_question, delete_question
+from trivia_server2 import create_round, delete_round, get_round, update_round, get_rounds
+from trivia_server2 import create_question, delete_question, get_question
 
 def missing_name():
 	print("\nTEST: round is missing name attribute")
@@ -51,6 +52,12 @@ def question_id_is_invalid():
 def question_id_is_valid_but_nonexistent():
 	print("\nTEST: question ID is valid but nonexistent")
 	data = {"name": "f", "questions": ["5e9c82c83e9f1b817df277aa"], "wagers" : [1]}
+	created, msg = create_round(data)
+	print("   {}".format(msg))
+
+def question_id_is_duplicate():
+	print("\nTEST: question ID is duplicated")
+	data = {"name": "f", "questions": ["5e9c82c83e9f1b817df277aa", "5e9c82c83e9f1b817df277aa"], "wagers" : [1, 2]}
 	created, msg = create_round(data)
 	print("   {}".format(msg))
 
@@ -117,7 +124,32 @@ def round_used_added_to_question():
 	the round_id should be stored in the
 	questions rounds_used list
 	"""
-	pass
+	print("\nTEST: rounds_used added to question")
+	qdata = {
+		"question": "a",
+		"answer": "b",
+		"category" : "c"
+	}
+	created, obj = create_question(qdata)
+	if created:
+		question_id = obj.get("id")
+		rdata = {
+			"name": "test round",
+			"questions": [question_id],
+			"wagers": [3]
+		}
+		created, obj = create_round(rdata)
+		if created:
+			round_id = obj.get("id")
+			print("   round ID: {}".format(round_id))
+
+			question = get_question(question_id)
+			print("   rounds_used: {} (question: {})".format(question.get("rounds_used", []), question))
+
+			delete_round(round_id)
+
+		delete_question(question_id)
+
 
 def round_removed_from_question_when_round_deleted():
 	"""
@@ -143,18 +175,20 @@ def round_removed_from_question_when_question_removed_from_round():
 
 
 if __name__ == "__main__":
-	missing_name()
-	name_not_str()
-	missing_questions()
-	questions_not_list()
-	missing_wagers()
-	wagers_not_list()
-	question_id_is_not_str()
-	question_id_is_invalid()
-	question_id_is_valid_but_nonexistent()
-	wager_is_not_int()
-	wager_is_negative()
-	wager_is_zero()
-	wagers_list_is_not_the_same_length_as_questions_list()
-	crud()
+	# missing_name()
+	# name_not_str()
+	# missing_questions()
+	# questions_not_list()
+	# missing_wagers()
+	# wagers_not_list()
+	# question_id_is_not_str()
+	# question_id_is_invalid()
+	# question_id_is_valid_but_nonexistent()
+	# question_id_is_duplicate()
+	# wager_is_not_int()
+	# wager_is_negative()
+	# wager_is_zero()
+	# wagers_list_is_not_the_same_length_as_questions_list()
+	# crud()
+	round_used_added_to_question()
 
