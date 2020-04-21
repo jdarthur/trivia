@@ -58,7 +58,13 @@ def delete_question(question_id):
 	"""
 	returns True if deleted
 	"""
-	return editor.delete_question(question_id)
+	exists = get_question(question_id)
+	if exists:
+		success = editor.delete_question(question_id)
+		if success:
+			remove_question_from_all_rounds(exists)
+
+	return True
 
 def get_question(question_id):
 	"""
@@ -170,20 +176,46 @@ def valid_question_id(question_id, data):
 
 	return True, None
 
-def set_round_in_questions(round_obj):
+def add_round_to_question(question_id, round_id):
+	
+	rounds_used = get_question(question_id).get(ROUNDS_USED, [])
+	if round_id in rounds_used: 
+	    raise RuntimeError("Round {} is already added to question {}".format(round_id, question_id))
+	
+	rounds_used.append(round_id)
+	update_question(question_id,  {ROUNDS_USED: rounds_used})
+		
+
+def remove_round_from_question(question_id, round_id):
+	rounds_used = get_question(question_id).get(ROUNDS_USED, [])
+	if round_id not in rounds_used: 
+	    raise RuntimeError("Round {} is not added to question {}".format(round_id, question_id))
+	
+	rounds_used.remove(round_id)
+	update_question(question_id, {ROUNDS_USED: rounds_used})
+
+def remove_question_from_all_rounds(question):
+	rounds_used = question.get(ROUNDS_USED, [])
+
+	question_id = question.get("id")
+	for round_id in rounds_used:
+		questions = get_round(round_id).get(QUESTIONS)
+		questions.remove(question_id)
+		update_round(round_id, {QUESTIONS: questions}, False)
+
+def set_round_in_questions(round_obj, orig_questions=[]):
 
 	round_id = str(round_obj.get("_id"))
 	questions = round_obj.get(QUESTIONS, [])
 	
 	for question_id in questions:
+		if question_id not in orig_questions:
+			add_round_to_question(question_id, round_id)
 
-		rounds_used = get_question(question_id).get(ROUNDS_USED, [])
-		if round_id not in rounds_used:
-			rounds_used.append(round_id)
-			update_question(question_id, {ROUNDS_USED: rounds_used})
-		else:
-			print("Round {} is already added to question {}".format(round_id, question_id))
-	
+	for question_id in orig_questions:
+
+		if question_id not in questions:
+			remove_round_from_question(question_id, round_id)
 
 def create_round(data):
 	valid, err = valid_round(data)
@@ -194,17 +226,34 @@ def create_round(data):
 	if not created:
 		return False, "Failed to create round"
 
-	set_round_in_questions(created)
+	set_round_in_questions(created, []) #no original questions, new round
 
 	return True, fix_id(created)
 
 def delete_round(round_id):
-	return editor.delete_round(round_id)
+	exists = get_round(round_id)
+	if exists:
+		success = editor.delete_round(round_id)
 
-def update_round(round_id, data):
-	success = editor.update_round(round_id, data)
-	if success:
-		set_round_in_questions(data)
+		if success:
+			questions = exists.get(QUESTIONS, [])
+			for question_id in questions:
+				remove_round_from_question(question_id, round_id)
+		else:
+			return False
+
+	return True
+
+
+def update_round(round_id, data, set_questions=True):
+	exists = editor.get_round(round_id)
+	if exists:
+		orig_questions = exists.get(QUESTIONS, [])
+		success = editor.update_round(round_id, data)
+
+		if success and set_questions:
+			exists[QUESTIONS] = data.get(QUESTIONS, orig_questions)
+			set_round_in_questions(exists, orig_questions)
 		return True
 	return False
 

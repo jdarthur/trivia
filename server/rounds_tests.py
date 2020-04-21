@@ -1,5 +1,5 @@
 from trivia_server2 import create_round, delete_round, get_round, update_round, get_rounds
-from trivia_server2 import create_question, delete_question, get_question
+from trivia_server2 import create_question, delete_question, get_question, get_questions
 
 def missing_name():
 	print("\nTEST: round is missing name attribute")
@@ -108,7 +108,10 @@ def crud():
 			updated = update_round(round_id, {"name" : "ffff"})
 
 			rounds =  get_rounds()
-			print("all rounds: {}".format(rounds))
+			print("   all rounds: {}".format(rounds))
+
+			questions =  get_questions()
+			print("   all questions: {}".format(questions))
 
 			success = delete_round(round_id)
 			print("   deleted: {} {}".format(success, round_id))
@@ -156,39 +159,127 @@ def round_removed_from_question_when_round_deleted():
 	when I delete a round, it should be removed from 
 	the rounds_used list on each question in round
 	"""
-	pass
+	print("\nTEST: round deleted from question when round deleted")
+	qdata = {
+		"question": "a",
+		"answer": "b",
+		"category" : "c"
+	}
+	created, obj = create_question(qdata)
+	if created:
+		question_id = obj.get("id")
+		rdata = {
+			"name": "test round",
+			"questions": [question_id],
+			"wagers": [3]
+		}
+		created, obj = create_round(rdata)
+		if created:
+			round_id = obj.get("id")
+			print("   round ID: {}".format(round_id))
+
+			question = get_question(question_id)
+			print("   rounds_used: {} (question: {})".format(question.get("rounds_used", []), question))
+
+			delete_round(round_id)
+
+			question = get_question(question_id)
+			print("   rounds_used after delete: {}".format(question.get("rounds_used", [])))
+
+
+		delete_question(question_id)
 
 def question_removed_from_round_when_question_is_deleted():
 	"""
 	when I delete a question, it should be deleted from
 	each round that it is used in
 	"""
-	pass
+
+	print("\nTEST: question removed from round when question deleted")
+	qdata = {
+		"question": "a",
+		"answer": "b",
+		"category" : "c"
+	}
+	created, obj = create_question(qdata)
+	if created:
+		question_id = obj.get("id")
+		rdata = {
+			"name": "test round",
+			"questions": [question_id],
+			"wagers": [3]
+		}
+		created, obj = create_round(rdata)
+		if created:
+			round_id = obj.get("id")
+			print("   round ID: {}".format(round_id))
+
+			round_obj = get_round(round_id)
+			print("   questions before delete: {} (round: {})".format(round_obj.get("questions", []), round_obj))
+
+			delete_question(question_id)
+
+			round_obj = get_round(round_id)
+			print("   questions after delete: {}".format(round_obj.get("questions", [])))
+
+			delete_round(round_id)	
 
 def round_removed_from_question_when_question_removed_from_round():
 	"""
 	when I remove a question from a round, the round
 	should be removed from this questions rounds_used list
 	"""
-	pass
+	print("\nTEST: round deleted from question when question removed from round")
+	qdata = {
+		"question": "a",
+		"answer": "b",
+		"category" : "c"
+	}
+	created, obj = create_question(qdata)
+	if created:
+		question_id = obj.get("id")
+		rdata = {
+			"name": "test round",
+			"questions": [question_id],
+			"wagers": [3]
+		}
+		created, obj = create_round(rdata)
+		if created:
+			round_id = obj.get("id")
+			print("   round ID: {}".format(round_id))
+
+			question = get_question(question_id)
+			print("   rounds_used: {} (question: {})".format(question.get("rounds_used", []), question))
+
+			success = update_round(round_id, {"questions": []})
+
+			question = get_question(question_id)
+			print("   rounds_used after update: {}".format(question.get("rounds_used", [])))
+
+			delete_round(round_id)
+
+		delete_question(question_id)
 
 
 
 if __name__ == "__main__":
-	# missing_name()
-	# name_not_str()
-	# missing_questions()
-	# questions_not_list()
-	# missing_wagers()
-	# wagers_not_list()
-	# question_id_is_not_str()
-	# question_id_is_invalid()
-	# question_id_is_valid_but_nonexistent()
-	# question_id_is_duplicate()
-	# wager_is_not_int()
-	# wager_is_negative()
-	# wager_is_zero()
-	# wagers_list_is_not_the_same_length_as_questions_list()
-	# crud()
+	missing_name()
+	name_not_str()
+	missing_questions()
+	questions_not_list()
+	missing_wagers()
+	wagers_not_list()
+	question_id_is_not_str()
+	question_id_is_invalid()
+	question_id_is_valid_but_nonexistent()
+	question_id_is_duplicate()
+	wager_is_not_int()
+	wager_is_negative()
+	wager_is_zero()
+	wagers_list_is_not_the_same_length_as_questions_list()
+	crud()
 	round_used_added_to_question()
+	round_removed_from_question_when_round_deleted()
+	round_removed_from_question_when_question_removed_from_round()
+	question_removed_from_round_when_question_is_deleted()
 
