@@ -1,3 +1,28 @@
+.question_container {
+	background: #d1d1d1;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	border-radius: 5px;
+	width:200px;
+	border: 1px solid #9c9c9c;
+}
+
 .question {
-	
+	padding: 20px;
+	border-bottom: 1px solid #9c9c9c;
+}
+
+.category {
+	padding: 10px;
+	align-self: flex-start;
+	border-right: 1px solid #9c9c9c;
+	border-bottom: 1px solid #9c9c9c;
+	border-radius: 0px 0px 5px 0px;
+}
+
+.answer {
+   align-self: flex-end;
+   padding: 10px;
+   /*color: #9c9c9c;;*/
 }
