@@ -76,6 +76,9 @@ def update_question(question_id, data):
 	"""
 	return editor.update_question(question_id, data)
 
+@app.route('/api/questions', methods=['GET'])
+def get_all_question():
+	return jsonify({"questions" : get_questions()})
 
 def get_questions():
 	ret = []
@@ -336,3 +339,7 @@ def valid_round_id(round_id, game):
 		return False, "round_id '{}' is not valid (data: {})".format(round_id, game)
 
 	return True, None
+
+if __name__ == "__main__":
+
+	app.run(host="0.0.0.0", debug=True)

@@ -1,12 +1,11 @@
 import React from 'react';
 import './App.css';
-import Round from "./Round.jsx"
+import Round from "./round/Round.jsx"
 
 function App() {
   return (
     <div className="App">
     <Round />
-        hello
     </div>
   );
 }
