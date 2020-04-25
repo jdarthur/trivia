@@ -9,6 +9,10 @@
 	margin: 10px;
 }
 
+.selected {
+	outline: 5px solid blue;
+}
+
 .question {
 	padding: 20px;
 	border-bottom: 1px solid #9c9c9c;
