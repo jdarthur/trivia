@@ -33,6 +33,19 @@ MONGO_DB = "trivia"
 
 editor = GameEditor(MONGO_HOST, MONGO_DB)
 
+@app.route('/api/question', methods=['POST'])
+def create_one_question():
+	data = {
+		QUESTION: request.json['question'],
+		ANSWER: request.json["answer"],
+		CATEGORY: request.json["category"]
+	}
+	success, resp = create_question(data)
+	if success:
+		return jsonify(resp)
+
+	return jsonify({"error" : resp})
+
 def create_question(question):
 	"""
 	returns
@@ -49,19 +62,30 @@ def create_question(question):
 
 	return True, fix_id(created)
 
+@app.route('/api/question/<question_id>', methods=['DELETE'])
+def delete_one_question(question_id):
+	success, resp = delete_question(question_id)
+	if success:
+		return jsonify(resp)
+	return jsonify({"error" : resp})
+
+
+
 def delete_question(question_id):
 	"""
 	returns True if deleted
 	"""
-	exists = get_question(question_id)
+	exists, resp = get_question(question_id)
 	if exists:
 		success = editor.delete_question(question_id)
 		if success:
-			success, err = remove_question_from_all_rounds(exists)
+			success, err = remove_question_from_all_rounds(resp)
 			if not success:
 				return False, err
+			return True, resp
+		return False, "Failed to delete"
 
-	return True
+	return True, None
 
 def get_question(question_id):
 	"""

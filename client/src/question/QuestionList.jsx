@@ -4,14 +4,11 @@ import './QuestionList.css';
 import Question from "./Question.jsx"
 
 
-// const questions = [
-//   {
-//     question: "q",
-//     answer: "a",
-//     category: "c",
-//     id: 1234
-//   }
-// ]
+//JSON keys
+const CATEGORY = "category"
+const QUESTION = "question"
+const ANSWER = "answer"
+const ID = "id"
 
 class QuestionList extends React.Component {
   constructor(props) {
@@ -21,14 +18,18 @@ class QuestionList extends React.Component {
       unused_only: true,
       text_filter: "",
       selected: "",
-      dirty: ""
+      dirty: "",
     }
   }
 
   componentDidMount() {
     fetch("/api/questions")
       .then(response => response.json())
-      .then(state => this.setState({questions: state.questions}));
+      .then(state => {
+        console.log("got questions")
+        console.log(state)
+        this.setState({questions: state.questions})
+      })
   }
 
   set_unused_only = (event) => {
@@ -45,7 +46,7 @@ class QuestionList extends React.Component {
     switch(this.state.selected) {
       case "":
       case question_id: break
-      case "new": break //create a new question
+      case "new":
       default: this.save(this.state.selected)
     }
 
@@ -84,21 +85,23 @@ class QuestionList extends React.Component {
 
       for (const qindex in this.state.questions) {
         const question = this.state.questions[qindex]
-
         if (question.id === question_id) {
 
           if (question_id === "new") { //create new question
+            console.log("create question", question)
             sendData(null, "POST", question)
              .then((data) => {
-               console.log(data)
-               this.setState({dirty: ""})
+               // console.log(data)
+               question.id = data.id
+               this.setState({questions: this.state.questions, dirty: ""})
              })
           }
 
           else { //update existing question
+            console.log("save question", question)
             sendData(question_id, "PUT", question)
              .then((data) => {
-               console.log(data)
+               // console.log(data)
                this.setState({dirty: ""})
              })
           }
@@ -109,22 +112,72 @@ class QuestionList extends React.Component {
     }
   }
 
+  delete = (question_id) => {
+    for (const qindex in this.state.questions) {
+      const question = this.state.questions[qindex]
+      if (question.id === question_id) {
+
+        if (question_id === "new") {
+          delete this.state.questions[qindex]
+          this.setState({questions: this.state.questions})
+        }
+        else {
+          console.log("delete question", question)
+          sendData(question_id, "DELETE")
+           .then((data) => {
+             delete this.state.questions[qindex]
+             this.setState({questions: this.state.questions, dirty: ""})
+          })
+        }
+        return
+      }
+    }
+    console.log("could not delete (question_id " + question_id + " not found)")
+  }
+
+  add_newquestion_button = () => {
+    for (const qindex in this.state.questions) {
+        const question = this.state.questions[qindex]
+        if (question.id === "new") {
+          return false
+        }
+    }
+    return true
+  }
+
+  add_new_question = () => {
+    const question = {
+      [QUESTION]: "",
+      [ANSWER]: "",
+      [CATEGORY]: "",
+      [ID]: "new"
+    }
+    this.state.questions.push(question)
+    this.setState({questions : this.state.questions}, () => {
+      this.set_selected("new")
+    })
+  }
+
 
   render() {
     const questions = this.state.questions.map((question, index) => (
+
             <Question key={question.id} id={question.id} category={question.category}
                   answer={question.answer} question={question.question}
                   selected={(this.state.selected === question.id) ? true : false}
-                  set_selected={this.set_selected} set={this.set_value} />))
+                  set_selected={this.set_selected} set={this.set_value} delete={this.delete} />))
 
+    const nqb = this.add_newquestion_button() ? <div className="new_question_button" onClick={this.add_new_question}>+</div> : null
     return (
       <div>
         <input name="text_filter" value={this.state.text_filter} onChange={this.set_text_filter} placeholder="Text filters"/>
         <input type="checkbox" name="text_filter" checked={this.state.unused_only} onChange={this.set_unused_only} />
         <div className="question_list">
-          {questions}
-  		  </div>
-  	  </div>
+        {questions}
+        {nqb}
+        </div>
+
+      </div>
     );
   }
 }

@@ -1,3 +1,18 @@
 .question_list {
 	display: flex;
+    flex-wrap: wrap;
+}
+
+.new_question_button {
+    background: #d1d1d1;
+    font-size: 4em;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    border-radius: 5px;
+    width:100px;
+    border: 1px solid #9c9c9c;
+    margin: 10px;
+    align-self: center;
+    cursor: pointer;
 }

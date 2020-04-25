@@ -24,17 +24,22 @@ class Question extends React.Component {
     this.props.set(this.props.id, ANSWER, event.target.value)
   }
 
+  delete_self = (event) => {
+    this.props.delete(this.props.id)
+  }
+
   render() {
     if (this.props.selected) {
       const containerClass = "question_container selected"
       return (
         <div className={containerClass} onClick={this.set_selected}>
           <input className="category" value={this.props.category}
-            onChange={this.set_category} />
+            onChange={this.set_category} placeholder="Category"/>
           <input className="question" value={this.props.question}
-            onChange={this.set_question}/>
+            onChange={this.set_question} placeholder="Question"/>
           <input className="answer"   value={this.props.answer}
-            onChange={this.set_answer}/>
+            onChange={this.set_answer} placeholder="answer"/>
+          <button onClick={this.delete_self}> Delete </button>
         </div>
       );
     }
@@ -51,4 +56,4 @@ class Question extends React.Component {
   }
 }
 
-export default Question;
+export default Question
