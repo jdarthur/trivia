@@ -8,7 +8,7 @@ Trivia server mark II
 import bson
 
 from mongo_manager import GameEditor
-from flask import Flask, jsonify
+from flask import Flask, jsonify, request
 app = Flask(__name__)
 
 ROUND_FILENAME = "round.txt"
@@ -57,7 +57,9 @@ def delete_question(question_id):
 	if exists:
 		success = editor.delete_question(question_id)
 		if success:
-			remove_question_from_all_rounds(exists)
+			success, err = remove_question_from_all_rounds(exists)
+			if not success:
+				return False, err
 
 	return True
 
@@ -67,14 +69,39 @@ def get_question(question_id):
 	 	question as dict if ID is valid
 	 	None if question_id is invalid
 	"""
-	return fix_id(editor.get_question(question_id))
+	valid, resp = valid_question_id(question_id, None)
+	if valid:
+		return True, fix_id(resp)
+	return False, resp
+
+@app.route('/api/question/<question_id>', methods=['PUT'])
+def update_one_question(question_id):
+	data = {
+		QUESTION: request.json['question'],
+		ANSWER: request.json["answer"],
+		CATEGORY: request.json["category"]
+	}
+	valid, invalid_question_err = valid_question(data)
+	if valid:
+		success, resp = update_question(question_id, data)
+		if success:
+			return jsonify(resp)
+		return jsonify({"error" : resp})
+	return jsonify({"error" : invalid_question_err})
 
 def update_question(question_id, data):
 	"""
 	returns
 	 	True/false if update successful
 	"""
-	return editor.update_question(question_id, data)
+	exists, resp = get_question(question_id)
+	if exists:
+		success = editor.update_question(question_id, data)
+		if success:
+			return True, data
+		return False, "unable to update question"
+
+	return False, resp
 
 @app.route('/api/questions', methods=['GET'])
 def get_all_question():
@@ -86,8 +113,6 @@ def get_questions():
 	for q in questions:
 		ret.append(fix_id(q))
 	return ret
-
-
 
 def fix_id(data):
 	if data is None:
@@ -137,7 +162,7 @@ def valid_round(data):
 	if not valid:
 		return False, error
 
-	if len(data[QUESTIONS]) !=  len(data[WAGERS]):
+	if len(data[QUESTIONS]) != len(data[WAGERS]):
 		return False, "{} length ({}) does not equal "\
 		"{} length ({}). (data: {})".format(WAGERS, len(data[WAGERS]),
 			QUESTIONS, len(data[QUESTIONS]), data)
@@ -167,30 +192,40 @@ def valid_question_id(question_id, data):
 		return False, "question_id '{}' is not str (data: {})".format(question_id, data)
 
 	try:
-		if get_question(question_id) is None:
+		question = editor.get_question(question_id)
+		if question is None:
 			return False, "question with ID '{}' does not exist (data: {})".format(question_id, data)
+
+		return True, question
+
 	except bson.errors.InvalidId:
 		return False, "question_id '{}' is not valid (data: {})".format(question_id, data)
 
-	return True, None
+	return False, None
 
 def add_round_to_question(question_id, round_id):
 
-	rounds_used = get_question(question_id).get(ROUNDS_USED, [])
-	if round_id in rounds_used:
-	    raise RuntimeError("Round {} is already added to question {}".format(round_id, question_id))
+	exists, question = get_question(question_id)
+	if exists:
+		rounds_used = question.get(ROUNDS_USED, [])
+		if round_id in rounds_used:
+		    raise RuntimeError("Round {} is already added to question {}".format(round_id, question_id))
 
-	rounds_used.append(round_id)
-	update_question(question_id,  {ROUNDS_USED: rounds_used})
+		rounds_used.append(round_id)
+		return update_question(question_id, {ROUNDS_USED: rounds_used})
+	return False
 
 
 def remove_round_from_question(question_id, round_id):
-	rounds_used = get_question(question_id).get(ROUNDS_USED, [])
-	if round_id not in rounds_used:
-	    raise RuntimeError("Round {} is not added to question {}".format(round_id, question_id))
+	exists, question = get_question(question_id)
+	if exists:
+		rounds_used = question.get(ROUNDS_USED, [])
+		if round_id not in rounds_used:
+			raise RuntimeError("Round {} is not added to question {}".format(round_id, question_id))
 
-	rounds_used.remove(round_id)
-	update_question(question_id, {ROUNDS_USED: rounds_used})
+		rounds_used.remove(round_id)
+		return update_question(question_id, {ROUNDS_USED: rounds_used})
+	return False
 
 def remove_question_from_all_rounds(question):
 	rounds_used = question.get(ROUNDS_USED, [])
@@ -199,7 +234,10 @@ def remove_question_from_all_rounds(question):
 	for round_id in rounds_used:
 		questions = get_round(round_id).get(QUESTIONS)
 		questions.remove(question_id)
-		update_round(round_id, {QUESTIONS: questions}, False)
+		success, err = update_round(round_id, {QUESTIONS: questions}, False)
+		if not success:
+			return False, err
+	return True, rounds_used
 
 def set_round_in_questions(round_obj, orig_questions=[]):
 

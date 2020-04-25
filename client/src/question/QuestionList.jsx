@@ -20,7 +20,8 @@ class QuestionList extends React.Component {
       questions: [],
       unused_only: true,
       text_filter: "",
-      selected: ""
+      selected: "",
+      dirty: ""
     }
   }
 
@@ -41,14 +42,28 @@ class QuestionList extends React.Component {
   }
 
   set_selected = (question_id) => {
+    switch(this.state.selected) {
+      case "":
+      case question_id: break
+      case "new": break //create a new question
+      default: this.save(this.state.selected)
+    }
+
     this.setState({selected: question_id});
+  }
+
+  select_none = (event) => {
+    console.log(event)
+    if (event.target.id === "background") {
+        event.stopPropagation();
+        this.set_selected("")
+    }
   }
 
   set_value = (question_id, key, value) => {
     let q = null
     for (const qindex in this.state.questions) {
       const question = this.state.questions[qindex]
-      console.log(question)
       if (question.id === question_id) {
         q = question
         break
@@ -60,10 +75,38 @@ class QuestionList extends React.Component {
     }
     else {
       q[key] = value
-      this.setState({questions: this.state.questions});
+      this.setState({questions: this.state.questions, dirty: question_id});
     }
+  }
 
+  save = (question_id) => {
+    if (this.state.dirty !== "") {
 
+      for (const qindex in this.state.questions) {
+        const question = this.state.questions[qindex]
+
+        if (question.id === question_id) {
+
+          if (question_id === "new") { //create new question
+            sendData(null, "POST", question)
+             .then((data) => {
+               console.log(data)
+               this.setState({dirty: ""})
+             })
+          }
+
+          else { //update existing question
+            sendData(question_id, "PUT", question)
+             .then((data) => {
+               console.log(data)
+               this.setState({dirty: ""})
+             })
+          }
+          return
+        }
+      }
+      console.log("could not save data (question_id " + question_id + " not found)")
+    }
   }
 
 
@@ -84,6 +127,17 @@ class QuestionList extends React.Component {
   	  </div>
     );
   }
+}
+
+async function sendData(question_id, method, question_data) {
+  const url = "/api/question" + (question_id != null ? "/" + question_id : "")
+  const body = (question_data === undefined) ? "" : JSON.stringify(question_data)
+  const response = await fetch(url, {
+            method: method,
+            headers: {'Content-Type': 'application/json'},
+            body: body
+          })
+  return response.json()
 }
 
 export default QuestionList;
