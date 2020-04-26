@@ -52,6 +52,7 @@ def create_question(question):
 		False, error message if question is invalid
 		True, created_object if question is valid
 	"""
+
 	valid, error = valid_question(question)
 	if not valid:
 		return False, error
@@ -128,15 +129,43 @@ def update_question(question_id, data):
 	return False, resp
 
 @app.route('/api/questions', methods=['GET'])
-def get_all_question():
-	return jsonify({"questions" : get_questions()})
+def get_all_questions():
+	text_filter = request.args.get("text_filter", None)
+	unused_only = request.args.get("unused_only", False)
 
-def get_questions():
+	return jsonify({"questions" : get_questions(text_filter, unused_only)})
+
+def get_questions(text_filter=None, unused_only=True):
 	ret = []
 	questions = editor.get_questions()
 	for q in questions:
-		ret.append(fix_id(q))
+		if matches(q, text_filter, unused_only): 
+			ret.append(fix_id(q))
 	return ret
+
+def matches(question, text_filter, unused_only):
+	return matches_text_filter(question, text_filter) and matches_unused_only(question, unused_only)
+
+def matches_text_filter(question, text_filter):
+	if text_filter is None:
+		return True
+
+	for field in [QUESTION, ANSWER, CATEGORY]:
+		if text_filter in question[field]:
+			return True
+
+	print("does not match text_filter '{}': {}".format(text_filter, question))
+	return False
+
+def matches_unused_only(question, unused_only):
+	if not unused_only:
+		return True
+
+	match = len(question.get(ROUNDS_USED, [])) == 0
+	if not match:
+		print("does not match unused_only '{}': {}".format(unused_only, question))
+		return False
+	return True
 
 def fix_id(data):
 	if data is None:

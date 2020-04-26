@@ -23,7 +23,21 @@ class QuestionList extends React.Component {
   }
 
   componentDidMount() {
-    fetch("/api/questions")
+    this.get_questions()
+  }
+
+  get_questions = () =>  {
+    let url = "/api/questions?"
+    if (this.state.text_filter !== "") {
+      url += "text_filter=" + this.state.text_filter
+    }
+
+    if (this.state.unused_only === true) {
+      url += "&unused_only=true"
+    }
+
+
+    fetch(url)
       .then(response => response.json())
       .then(state => {
         console.log("got questions")
@@ -34,12 +48,12 @@ class QuestionList extends React.Component {
 
   set_unused_only = (event) => {
     const value = event.target.checked
-    this.setState({unused_only: value})
+    this.setState({unused_only: value}, () => { this.get_questions() })
   }
 
   set_text_filter = (event) => {
     const value = event.target.value
-    this.setState({text_filter: value})
+    this.setState({text_filter: value}, () => { this.get_questions() })
   }
 
   set_selected = (question_id) => {
@@ -169,9 +183,21 @@ class QuestionList extends React.Component {
 
     const nqb = this.add_newquestion_button() ? <div className="new_question_button" onClick={this.add_new_question}>+</div> : null
     return (
-      <div>
-        <input name="text_filter" value={this.state.text_filter} onChange={this.set_text_filter} placeholder="Text filters"/>
-        <input type="checkbox" name="text_filter" checked={this.state.unused_only} onChange={this.set_unused_only} />
+      <div className="ql_and_filter">
+        Questions:
+        <div className="filter_holder"> 
+
+          <div className='filter'>
+            <label htmlFor="text_filter"> Text filter: </label>
+            <input name="text_filter" value={this.state.text_filter} onChange={this.set_text_filter} placeholder="Text filters"/>
+          </div>
+
+          <div className ="filter"> 
+            <label htmlFor="unused_only"> Show unused questions only? </label>
+            <input type="checkbox" name="unused_only" checked={this.state.unused_only} onChange={this.set_unused_only} />
+          </div>
+        </div>
+        
         <div className="question_list">
         {questions}
         {nqb}
