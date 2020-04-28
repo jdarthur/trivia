@@ -87,7 +87,7 @@ class GameEditor(object):
 
     def create_game(self, data):
         self.db.game.insert_one(data)
-        return True
+        return data
 
     def update_game(self, game_id, data):
         self.db.game.update_one(id_equals(game_id), {"$set" : data})
@@ -95,7 +95,7 @@ class GameEditor(object):
 
     def delete_game(self, game_id):
         self.db.game.delete_one(id_equals(game_id))
-        return
+        return True
 
 
 class GamePlayer(object):
@@ -103,22 +103,28 @@ class GamePlayer(object):
     Manages gameplay, scoring
     """
     def __init__(self, host, database):
-        self.database = MongoClient(host)[database]
+        self.db = MongoClient(host)[database]
 
-    def start_session(self, data):
-        return {}
+    def create_session(self, data):
+        self.db.session.insert_one(data)
+        return data
 
     def get_session(self, session_id):
-        return {}
+        return self.db.session.find_one(id_equals(session_id))
 
-
-    def create_team(self, session_id, team_name):
-        return {}
-
-    def update_team(self, session_id, team_id, team_name):
+    def delete_session(self, session_id):
+        self.db.session.delete_one(id_equals(session_id))
         return True
 
-    def delete_team(self, team_id):
+    def create_player(self, session_id, data):
+        data["session_id"] = session_id
+        self.db.player.insert_one(data)
+        return data
+
+    def update_player(self, session_id, player_id, data):
+        return True
+
+    def delete_player(self, player_id):
         return True
 
 

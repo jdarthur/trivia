@@ -370,7 +370,10 @@ def get_games():
 	return ret
 
 def get_game(game_id):
-	return fix_id(editor.get_game(game_id))
+	valid, resp = valid_game_id(game_id, None)
+	if valid:
+		return True, fix_id(resp)
+	return False, resp
 
 def create_game(data):
 	valid, err = valid_game(data)
@@ -389,7 +392,7 @@ def update_game(game_id, data):
 		return editor.update_game(game_id, data)
 
 def delete_game(game_id):
-	exists = editor.get_game(game_id)
+	exists, error = get_game(game_id)
 	if exists:
 		return editor.delete_game(game_id)
 
@@ -425,6 +428,22 @@ def valid_round_id(round_id, game):
 
 	except bson.errors.InvalidId:
 		return False, "round_id '{}' is not valid (data: {})".format(round_id, game)
+
+	return True, None
+
+def valid_game_id(game_id, session):
+
+	if not isinstance(game_id, str):
+		return False, "game_id '{}' is not str (data: {})".format(game_id, session)
+
+	try:
+		game = editor.get_game(game_id)
+		if game is None:
+			return False, "game with ID '{}' does not exist (data: {})".format(game_id, session)
+		return True, game
+
+	except bson.errors.InvalidId:
+		return False, "game_id '{}' is not valid (data: {})".format(game_id, session)
 
 	return True, None
 

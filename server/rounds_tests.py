@@ -1,5 +1,5 @@
-from trivia_server2 import create_round, delete_round, get_round, update_round, get_rounds
-from trivia_server2 import create_question, delete_question, get_question, get_questions
+from editor_server import create_round, delete_round, get_round, update_round, get_rounds
+from editor_server import create_question, delete_question, get_question, get_questions
 
 def missing_name():
 	print("\nTEST: round is missing name attribute")
