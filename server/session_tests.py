@@ -1,4 +1,4 @@
-from gameplay_server import create_session, delete_session
+from gameplay_server import create_session, delete_session, get_session, get_sessions
 from editor_server import create_game, delete_game
 
 def missing_name():
@@ -57,9 +57,13 @@ def crud():
         created, session = create_session(sdata)
         if created:
             session_id = session["id"]
-            print("   session created: {}".format(session))
+            valid, session = get_session(session_id)
+            print("   get session after create: {}".format(session))
 
             delete_session(session_id)
+
+            sessions = get_sessions()
+            print("   get sessions after delete: {}".format(sessions))
 
         delete_game(game_id)
 

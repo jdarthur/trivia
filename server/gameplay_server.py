@@ -23,6 +23,9 @@ PLAYERS = "players"
 PLAYER_NAME = "player_name"
 PLAYER_ID = "player_id"
 
+SESSION_ID = "session_id"
+CREATE_DATE = "create_date"
+
 ROUNDS = "rounds"
 ID = "id"
 ROUND = "round"
@@ -80,9 +83,11 @@ def create_session(data):
 	if session:
 		session_id = str(session["_id"])
 		mod = create_player(session_id)
-		session[MODERATOR] = mod[ID]
-
-	return True, fix_id(session)
+		success, err = set_mod(session_id, mod[ID])
+		if success:
+			return True, fix_id(session)
+		return False, err
+	return False, "Failed to create session"
 
 def session_is_valid(session):
 
@@ -108,12 +113,19 @@ def get_session(session_id, player_id=None):
 	if not valid:
 		return False, resp
 
-	print(resp)
 	if player_id != resp[MODERATOR]:
 		for player in resp.get(PLAYERS, []):
 			del player[PLAYER_ID]
 
 	return True, resp
+
+def get_sessions():
+	ret = []
+	sessions = player.get_sessions()
+	for s in sessions:
+		ret.append(fix_id(s))
+	return ret
+
 
 def valid_session_id(session_id):
 	if not isinstance(session_id, str):
@@ -127,6 +139,26 @@ def valid_session_id(session_id):
 	except bson.errors.InvalidId:
 		return False, "session_id '{}' is not valid".format(session_id)
 
+def valid_player_id(player_id):
+	if not isinstance(player_id, str):
+		return False, "player_id '{}' is not str".format(session_id)
+	try:
+		p = player.get_player(player_id)
+		if p is None:
+			return False, "player with ID '{}' does not exist".format(player_id)
+		return True, p
+
+	except bson.errors.InvalidId:
+		return False, "session_id '{}' is not valid".format(player_id)
+
+def set_mod(session_id, mod_id):
+	valid, err = valid_player_id(mod_id)
+	if not valid:
+		return False, err
+	success = player.update_session(session_id, {MODERATOR: mod_id})
+	if success:
+		return True, None
+	return False, "Failed to set mod"
 
 def delete_session(session_id):
 	exists, err = get_session(session_id)
@@ -136,7 +168,20 @@ def delete_session(session_id):
 
 def create_player(session_id):
 	timestamp = datetime.utcnow()
-	return fix_id(player.create_player(session_id, {"create_date": timestamp}))
+	return fix_id(player.create_player({SESSION_ID: session_id, CREATE_DATE: timestamp}))
+
+def update_player(player_id, data):
+	valid, err = valid_player_id(player_id)
+	if not valid: 
+		return False, err
+
+	session_id = data.get(session_id, None)
+	if session_id in data:
+		valid, err = valid_session_id(session_id)
+		if not valid:
+			return False, err
+
+	return player.update_player(player_id, data)
 
 def join_session(session_id):
 	"""

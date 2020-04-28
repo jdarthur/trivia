@@ -109,24 +109,32 @@ class GamePlayer(object):
         self.db.session.insert_one(data)
         return data
 
+    def update_session(self, session_id, data):
+        self.db.session.update_one(id_equals(session_id), {"$set" : data})
+        return True
+
     def get_session(self, session_id):
         return self.db.session.find_one(id_equals(session_id))
+
+    def get_sessions(self):
+        return self.db.session.find()
 
     def delete_session(self, session_id):
         self.db.session.delete_one(id_equals(session_id))
         return True
 
-    def create_player(self, session_id, data):
-        data["session_id"] = session_id
+    def get_player(self, player_id):
+        return self.db.player.find_one(id_equals(player_id))
+
+    def create_player(self, data):
         self.db.player.insert_one(data)
         return data
 
-    def update_player(self, session_id, player_id, data):
+    def update_player(self, player_id, data):
         return True
 
     def delete_player(self, player_id):
         return True
-
 
     def get_all_questions(self, session_id):
         return {}
