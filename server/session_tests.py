@@ -49,20 +49,19 @@ def crud():
             "game_id" : game_id
         }
 
+        print("creating session")
         created = create_session(sdata)
         if created["success"]:
             session = created["object"]
             session_id = session["id"]
 
             gotten = get_session(session_id)
-            if gotten["success"]:
-                print("get session after create:")
-                pprint(gotten['object'])
+            print("get session after create:")
+            pprint(gotten)
 
             gotten = update_session(session_id, {"name" : "updated_name"})
-            if gotten["success"]:
-                print("get session after update:")
-                pprint(gotten['object'])
+            print("get session after update:")
+            print(gotten)
 
             delete_session(session_id)
 
@@ -70,15 +69,18 @@ def crud():
             print("get sessions after delete:")
             pprint(sessions['object'])
 
+        else:
+            print(created["errors"])
+
         delete_game(game_id)
 
 
 if __name__ =="__main__":
-    missing_name()
-    name_is_not_str()
-    missing_game_id()
-    game_id_is_not_str()
-    game_id_is_not_valid()
-    game_id_is_valid_but_nonexistent()
+    # missing_name()
+    # name_is_not_str()
+    # missing_game_id()
+    # game_id_is_not_str()
+    # game_id_is_not_valid()
+    # game_id_is_valid_but_nonexistent()
     crud()
 

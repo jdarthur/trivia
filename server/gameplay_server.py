@@ -10,7 +10,7 @@ from datetime import datetime
 
 from mongo_manager import GamePlayer
 
-from validator import model, succeed, fail, get, FIELD, OPTIONAL, TYPE
+from validator import model, succeed, fail, FIELD, OPTIONAL, TYPE, RestField, IdField
 from validator import SUCCESS, ERROR, ERRORS, OBJECT, CREATE, UPDATE, DELETE, GET_ONE, GET_ALL
 
 from flask import Flask, jsonify, request
@@ -42,36 +42,36 @@ ROUNDS_USED = "rounds_used"
 MONGO_HOST = "localhost"
 MONGO_DB = "trivia"
 
-player = GamePlayer(MONGO_HOST, MONGO_DB)
+mongo = GamePlayer(MONGO_HOST, MONGO_DB)
 
 smodel = [
-	{ FIELD: NAME, TYPE: str },
-	{ FIELD: GAME_ID, TYPE: str },
-	{ FIELD: MODERATOR, TYPE: str, OPTIONAL: True},
+	RestField(NAME),
+	IdField(GAME_ID, "game"),
+	IdField(MODERATOR, "player", optional=True)
 ]
-@model(smodel, CREATE)
+@model(smodel, CREATE, "session")
 def create_session(data):
 	"""
 	POST /session
 	"""
-	#game ID must be legit
-	resp = get("game", data[GAME_ID])
-	if not resp[SUCCESS]:
-		return fail(errors=[resp[ERROR]])
-
-
-	session = player.create("session", data)
-	session_id = str(session["_id"])
-
-	mod = create_player_in_session(session_id)
+	mod = create_player({})
 	if not mod[SUCCESS]:
 		return fail(errors=mod[ERRORS])
 
-	resp = set_mod(session_id, mod[OBJECT][ID])
+	mod_id = str(mod[OBJECT][ID])
+
+	#create session with this moderator ID
+	data[MODERATOR] = mod_id
+	created = mongo.create("session", data)
+	if not created:
+		return fail(errors=[f"Failed to create session"])
+	created = fix_id(created)
+
+	resp = update_player(mod_id, {SESSION_ID: created[ID]})
 	if not resp[SUCCESS]:
 		return fail(errors=resp[ERRORS])
 
-	return succeed(fix_id(resp[OBJECT]))
+	return succeed(created)
 
 @model(smodel, GET_ONE, "session")
 def get_session(session_id, session={}):
@@ -82,7 +82,7 @@ def get_session(session_id, session={}):
 
 @model(smodel, UPDATE, "session")
 def update_session(session_id, data, session={}):
-	success = player.update_session(session_id, data)
+	success = mongo.update("session", session_id, data)
 	if success:
 		session.update(data)
 		return succeed(session)
@@ -90,23 +90,16 @@ def update_session(session_id, data, session={}):
 
 @model(smodel, DELETE, "session")
 def delete_session(session_id, session={}):
-	player.delete("session", session_id)
+	mongo.delete("session", session_id)
 	return session
 
 def get_sessions():
 	ret = []
-	sessions = player.get_all("session")
+	sessions = mongo.get_all("session")
 	if sessions:
 		for s in sessions:
 			ret.append(fix_id(s))
 	return succeed(ret)
-
-def set_mod(session_id, mod_id):
-	resp = get("player", mod_id)
-	if not resp[SUCCESS]:
-		return fail(errors=[resp[ERROR]])
-
-	return update_session(session_id, {MODERATOR: mod_id})
 
 """
 =====================================
@@ -115,56 +108,22 @@ def set_mod(session_id, mod_id):
 """
 
 pmodel = [
-	{ FIELD: SESSION_ID, TYPE: str },
-	{ FIELD: CREATE_DATE, TYPE: datetime },
+	RestField(PLAYER_NAME, optional=True),
+	IdField(SESSION_ID, "session", optional=True)
 ]
-
-def create_player_in_session(session_id):
-	timestamp = datetime.utcnow()
-	obj = create_player({SESSION_ID: session_id, CREATE_DATE: timestamp})
-	return obj
-
-@model(pmodel, CREATE)
+@model(pmodel, CREATE, "player")
 def create_player(data):
-	obj = player.create("player", data)
+	data[CREATE_DATE] = datetime.utcnow()
+	obj = mongo.create("player", data)
 	return succeed(fix_id(obj))
 
 @model(pmodel, UPDATE, "player")
-def update_player(player_id, data):
-
-	resp = get("session", data[GAME_ID])
-	if not resp[SUCCESS]:
-		return fail(errors=[resp[ERROR]])
-
-	session_id = data.get(session_id, None)
-	if session_id in data:
-		resp = get("session", session_id)
-		if not resp[SUCCESS]:
-			return fail(errors=[resp[ERROR]])
-
-
-	success = player.update("session", session_id, data)
+def update_player(player_id, data, player={}):
+	success = mongo.update("player", player_id, data)
 	if success:
-		session.update(data)
-		return succeed(session)
-
-	return fail(errors=[f"Failed to update session with data {data}"])
-
-def join_session(session_id):
-	"""
-	POST /session/:id/player
-	"""
-
-
-def update_player(session_id, player_id):
-	"""
-	PUT /session/:id/player/:id
-	"""
-
-def remove_player(session_id, player_id):
-	"""
-	DELETE /session/:id/player/:id
-	"""
+		player.update(data)
+		return succeed(player)
+	return fail(errors=[f"Failed to update player with data {data}"])
 
 def fix_id(data):
 	if data is None:
