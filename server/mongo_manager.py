@@ -161,7 +161,6 @@ class GamePlayer(object):
     def get_question_status_scored(self, session_id, question_id):
         return {}
 
-
     def score_question(self, session_id, question_id, data):
 
         for team_uuid in data:
@@ -174,6 +173,27 @@ class GamePlayer(object):
 
     def set_score(self, session_id, team_id, points):
         return True
+
+    def get(self, object_type, object_id):
+        return self.db[object_type].find_one(id_equals(object_id))
+
+    def create(self, object_type, data):
+        self.db[object_type].insert_one(data)
+        return data
+
+    def update(self, object_type, object_id, data):
+        self.db[object_type].update_one(id_equals(object_id), {"$set" : data})
+        return True
+
+    def delete(self, object_type, object_id):
+        self.db[object_type].delete_one(id_equals(object_id))
+        return True
+
+    def get_all(self, object_type):
+        self.db[object_type].find()
+
+
+
 
 
 """

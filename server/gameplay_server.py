@@ -9,7 +9,10 @@ import bson
 from datetime import datetime
 
 from mongo_manager import GamePlayer
-from editor_server import get_game
+
+from validator import model, succeed, fail, get, FIELD, OPTIONAL, TYPE
+from validator import SUCCESS, ERROR, ERRORS, OBJECT, CREATE, UPDATE, DELETE, GET_ONE, GET_ALL
+
 from flask import Flask, jsonify, request
 
 
@@ -41,147 +44,111 @@ MONGO_DB = "trivia"
 
 player = GamePlayer(MONGO_HOST, MONGO_DB)
 
-@app.route('/api/question', methods=['POST'])
-def create_one_question():
-	data = {
-		QUESTION: request.json['question'],
-		ANSWER: request.json["answer"],
-		CATEGORY: request.json["category"]
-	}
-	success, resp = create_question(data)
-	if success:
-		return jsonify(resp)
-
-	return jsonify({"error" : resp})
-
-def create_question(question):
-	"""
-	returns
-		False, error message if question is invalid
-		True, created_object if question is valid
-	"""
-
-	valid, error = valid_question(question)
-	if not valid:
-		return False, error
-
-	created = editor.create_question(question)
-	if not created:
-		return False, "Failed to create question"
-
-	return True, fix_id(created)
-
+smodel = [
+	{ FIELD: NAME, TYPE: str },
+	{ FIELD: GAME_ID, TYPE: str },
+	{ FIELD: MODERATOR, TYPE: str, OPTIONAL: True},
+]
+@model(smodel, CREATE)
 def create_session(data):
 	"""
 	POST /session
 	"""
-	valid, err = session_is_valid(data)
-	if not valid:
-		return False, err
+	#game ID must be legit
+	resp = get("game", data[GAME_ID])
+	if not resp[SUCCESS]:
+		return fail(errors=[resp[ERROR]])
 
-	session = player.create_session(data)
-	if session:
-		session_id = str(session["_id"])
-		mod = create_player(session_id)
-		success, err = set_mod(session_id, mod[ID])
-		if success:
-			return True, fix_id(session)
-		return False, err
-	return False, "Failed to create session"
 
-def session_is_valid(session):
+	session = player.create("session", data)
+	session_id = str(session["_id"])
 
-	valid, err = exists_and_type(session, NAME, str)
-	if not valid:
-		return False, err
+	mod = create_player_in_session(session_id)
+	if not mod[SUCCESS]:
+		return fail(errors=mod[ERRORS])
 
-	valid, err = exists_and_type(session, GAME_ID, str)
-	if not valid:
-		return False, err
+	resp = set_mod(session_id, mod[OBJECT][ID])
+	if not resp[SUCCESS]:
+		return fail(errors=resp[ERRORS])
 
-	valid, resp = get_game(session[GAME_ID])
-	if not valid:
-		return False, resp
+	return succeed(fix_id(resp[OBJECT]))
 
-	return True, None
-
-def get_session(session_id, player_id=None):
+@model(smodel, GET_ONE, "session")
+def get_session(session_id, session={}):
 	"""
 	GET /session/:id?player_id=<mod_or_player_id>
 	"""
-	valid, resp = valid_session_id(session_id)
-	if not valid:
-		return False, resp
+	return succeed(fix_id(session))
 
-	if player_id != resp[MODERATOR]:
-		for player in resp.get(PLAYERS, []):
-			del player[PLAYER_ID]
+@model(smodel, UPDATE, "session")
+def update_session(session_id, data, session={}):
+	success = player.update_session(session_id, data)
+	if success:
+		session.update(data)
+		return succeed(session)
+	return fail(errors=[f"Failed to update session with data {data}"])
 
-	return True, resp
+@model(smodel, DELETE, "session")
+def delete_session(session_id, session={}):
+	player.delete("session", session_id)
+	return session
 
 def get_sessions():
 	ret = []
-	sessions = player.get_sessions()
-	for s in sessions:
-		ret.append(fix_id(s))
-	return ret
-
-
-def valid_session_id(session_id):
-	if not isinstance(session_id, str):
-		return False, "session_id '{}' is not str".format(session_id)
-	try:
-		game = player.get_session(session_id)
-		if game is None:
-			return False, "session with ID '{}' does not exist".format(session_id)
-		return True, game
-
-	except bson.errors.InvalidId:
-		return False, "session_id '{}' is not valid".format(session_id)
-
-def valid_player_id(player_id):
-	if not isinstance(player_id, str):
-		return False, "player_id '{}' is not str".format(session_id)
-	try:
-		p = player.get_player(player_id)
-		if p is None:
-			return False, "player with ID '{}' does not exist".format(player_id)
-		return True, p
-
-	except bson.errors.InvalidId:
-		return False, "session_id '{}' is not valid".format(player_id)
+	sessions = player.get_all("session")
+	if sessions:
+		for s in sessions:
+			ret.append(fix_id(s))
+	return succeed(ret)
 
 def set_mod(session_id, mod_id):
-	valid, err = valid_player_id(mod_id)
-	if not valid:
-		return False, err
-	success = player.update_session(session_id, {MODERATOR: mod_id})
-	if success:
-		return True, None
-	return False, "Failed to set mod"
+	resp = get("player", mod_id)
+	if not resp[SUCCESS]:
+		return fail(errors=[resp[ERROR]])
 
-def delete_session(session_id):
-	exists, err = get_session(session_id)
-	if exists:
-		return player.delete_session(session_id)
+	return update_session(session_id, {MODERATOR: mod_id})
 
+"""
+=====================================
+               PLAYER
+=====================================
+"""
 
-def create_player(session_id):
+pmodel = [
+	{ FIELD: SESSION_ID, TYPE: str },
+	{ FIELD: CREATE_DATE, TYPE: datetime },
+]
+
+def create_player_in_session(session_id):
 	timestamp = datetime.utcnow()
-	return fix_id(player.create_player({SESSION_ID: session_id, CREATE_DATE: timestamp}))
+	obj = create_player({SESSION_ID: session_id, CREATE_DATE: timestamp})
+	return obj
 
+@model(pmodel, CREATE)
+def create_player(data):
+	obj = player.create("player", data)
+	return succeed(fix_id(obj))
+
+@model(pmodel, UPDATE, "player")
 def update_player(player_id, data):
-	valid, err = valid_player_id(player_id)
-	if not valid: 
-		return False, err
+
+	resp = get("session", data[GAME_ID])
+	if not resp[SUCCESS]:
+		return fail(errors=[resp[ERROR]])
 
 	session_id = data.get(session_id, None)
 	if session_id in data:
-		valid, err = valid_session_id(session_id)
-		if not valid:
-			return False, err
+		resp = get("session", session_id)
+		if not resp[SUCCESS]:
+			return fail(errors=[resp[ERROR]])
 
-	return player.update_player(player_id, data)
+
+	success = player.update("session", session_id, data)
+	if success:
+		session.update(data)
+		return succeed(session)
+
+	return fail(errors=[f"Failed to update session with data {data}"])
 
 def join_session(session_id):
 	"""
@@ -210,17 +177,6 @@ def fix_id(data):
 		else:
 			new[key] = data[key]
 	return new
-
-def exists_and_type(question, attribute, expected_type):
-	attr = question.get(attribute, None)
-
-	if attr is None:
-		return False, "Missing attribute '{}' (data: {})".format(attribute, question)
-
-	if not isinstance(attr, expected_type):
-		return False, "Attribute '{}' is not {}. (data: {})".format(attribute, expected_type, question)
-
-	return True, None
 
 
 if __name__ == "__main__":
