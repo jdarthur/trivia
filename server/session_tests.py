@@ -1,5 +1,5 @@
 from pprint import pprint
-from gameplay_server import create_session, delete_session, get_session, get_sessions, update_session
+from gameplay_server import create_session, delete_session, get_session, get_sessions, update_session, add_to_session, create_player
 from editor_server import create_game, delete_game
 
 def missing_name():
@@ -74,6 +74,46 @@ def crud():
 
         delete_game(game_id)
 
+def add_player_to_session():
+    print("\nTEST: add player to session")
+    gdata = {
+        "name" : "test game",
+        "rounds" : []
+    }
+
+    created, game_obj = create_game(gdata)
+    if created:
+        game_id = game_obj["id"]
+
+        sdata = {
+            "name" : "test session",
+            "game_id" : game_id
+        }
+
+        created = create_session(sdata)
+        if created["success"]:
+            session = created["object"]
+            session_id = session["id"]
+
+            pdata = {"player_name": "test team"}
+            player = create_player(pdata)
+            print("created player")
+            pprint(player)
+            if player["success"]:
+                add = add_to_session(session_id, {"player_id": player["object"]["id"]})
+                pprint(add)
+
+                gotten = get_session(session_id)
+                print("get session after player add:")
+                pprint(gotten)
+
+            delete_session(session_id)
+
+        else:
+            print(created["errors"])
+
+        delete_game(game_id)
+
 
 if __name__ =="__main__":
     # missing_name()
@@ -82,5 +122,6 @@ if __name__ =="__main__":
     # game_id_is_not_str()
     # game_id_is_not_valid()
     # game_id_is_valid_but_nonexistent()
-    crud()
+    # crud()
+    add_player_to_session()
 

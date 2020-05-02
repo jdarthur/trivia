@@ -67,9 +67,9 @@ def create_session(data):
 		return fail(errors=[f"Failed to create session"])
 	created = fix_id(created)
 
-	resp = update_player(mod_id, {SESSION_ID: created[ID]})
-	if not resp[SUCCESS]:
-		return fail(errors=resp[ERRORS])
+	# resp = update_player(mod_id, {SESSION_ID: created[ID]})
+	# if not resp[SUCCESS]:
+	# 	return fail(errors=resp[ERRORS])
 
 	return succeed(created)
 
@@ -124,6 +124,37 @@ def update_player(player_id, data, player={}):
 		player.update(data)
 		return succeed(player)
 	return fail(errors=[f"Failed to update player with data {data}"])
+
+@model(pmodel, DELETE, "player")
+def delete_player(player_id, player={}):
+	mongo.delete("player", player_id)
+	return player
+
+
+join_model = [
+	IdField(PLAYER_ID, "player"),
+]
+
+@model(join_model, UPDATE, "session")
+def add_to_session(session_id, data, player={}):
+	"""
+	POST /session/:id/join
+	"""
+	player_id = data[PLAYER_ID]
+	success = mongo.push("session", session_id, PLAYERS, player_id)
+	if not success:
+		return fail(error="Failed to add player to session")
+
+	data[SESSION_ID] = session_id
+	return succeed(data)
+
+def get_players(session_id):
+	ret = []
+	sessions = mongo.get_all("session")
+	if sessions:
+		for s in sessions:
+			ret.append(fix_id(s))
+	return succeed(ret)
 
 def fix_id(data):
 	if data is None:

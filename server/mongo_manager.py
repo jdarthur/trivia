@@ -185,6 +185,10 @@ class GamePlayer(object):
         self.db[object_type].update_one(id_equals(object_id), {"$set" : data})
         return True
 
+    def push(self, object_type, object_id, array, value):
+        self.db[object_type].update_one(id_equals(object_id), {"$push" : {array: value}})
+        return True
+
     def delete(self, object_type, object_id):
         self.db[object_type].delete_one(id_equals(object_id))
         return True
