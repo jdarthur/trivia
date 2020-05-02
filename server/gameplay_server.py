@@ -128,7 +128,11 @@ def update_player(player_id, data, player={}):
 @model(pmodel, DELETE, "player")
 def delete_player(player_id, player={}):
 	mongo.delete("player", player_id)
-	return player
+	return succeed(player)
+
+@model(pmodel, GET_ONE, "player")
+def get_player(player_id, player={}):
+	return succeed(fix_id(player))
 
 
 join_model = [
@@ -148,13 +152,38 @@ def add_to_session(session_id, data, player={}):
 	data[SESSION_ID] = session_id
 	return succeed(data)
 
+@model(join_model, UPDATE, "session")
+def remove_from_session(session_id, data, player={}):
+	"""
+	POST /session/:id/remove
+	"""
+	player_id = data[PLAYER_ID]
+	success = mongo.pull("session", session_id, PLAYERS, player_id)
+	if not success:
+		return fail(error="Failed to remove player from session")
+
+	#delete player?
+	data[SESSION_ID] = session_id
+	return succeed(data)
+
 def get_players(session_id):
-	ret = []
-	sessions = mongo.get_all("session")
-	if sessions:
-		for s in sessions:
-			ret.append(fix_id(s))
-	return succeed(ret)
+	session = get_session(session_id)
+	if session[SUCCESS]:
+		session = session[OBJECT]
+		players = session.get(PLAYERS, [])
+
+		ret = []
+		for player_id in players:
+			player = get_player(player_id)
+			if player[SUCCESS]:
+				player = player[OBJECT]
+				ret.append(player)
+			else:
+				print(f"Failed to get player {player_id}")
+
+		return succeed(ret)
+
+	return fail("Failed to get session")
 
 def fix_id(data):
 	if data is None:

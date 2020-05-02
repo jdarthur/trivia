@@ -1,6 +1,50 @@
 from pprint import pprint
-from gameplay_server import create_session, delete_session, get_session, get_sessions, update_session, add_to_session, create_player
+from random import randint
+from gameplay_server import (create_session, delete_session, get_session, get_sessions,
+update_session, add_to_session, remove_from_session, create_player, delete_player, get_players)
 from editor_server import create_game, delete_game
+
+"""
+===============================
+            HELPERS
+===============================
+"""
+
+def dummy_game():
+    gdata = {
+        "name" : "test game",
+        "rounds" : []
+    }
+
+    created, game_obj = create_game(gdata)
+    if created:
+        return game_obj["id"]
+
+    return None
+
+def dummy_session(game_id):
+    sdata = {
+        "name" : "test session",
+        "game_id" : game_id
+    }
+
+    created = create_session(sdata)
+    if created["success"]:
+        return created["object"]["id"]
+    return None
+
+def dummy_player():
+    pdata = {"player_name": f"test team {randint(1, 100000)}"}
+    created = create_player(pdata)
+    if created["success"]:
+        return created["object"]["id"]
+    return None
+
+"""
+===============================
+            TESTS
+===============================
+"""
 
 def missing_name():
     print("\nTEST: session is missing name attribute")
@@ -27,7 +71,6 @@ def game_id_is_not_valid():
     data = {"name": "f", "game_id":"f"}
     pprint(create_session(data))
 
-
 def game_id_is_valid_but_nonexistent():
     print("\nTEST: game_id is valid but nonexistent")
     data = {"name": "f", "game_id":"5e9c82c83e9f1b817df277aa"}
@@ -35,84 +78,75 @@ def game_id_is_valid_but_nonexistent():
 
 def crud():
     print("\nTEST: crud path")
-    gdata = {
-        "name" : "test game",
-        "rounds" : []
-    }
+    game_id = dummy_game()
+    session_id = dummy_session(game_id)
 
-    created, game_obj = create_game(gdata)
-    if created:
-        game_id = game_obj["id"]
+    gotten = get_session(session_id)
+    print("get session after create:")
+    pprint(gotten)
 
-        sdata = {
-            "name" : "test session",
-            "game_id" : game_id
-        }
+    gotten = update_session(session_id, {"name" : "updated_name"})
+    print("get session after update:")
+    print(gotten)
 
-        print("creating session")
-        created = create_session(sdata)
-        if created["success"]:
-            session = created["object"]
-            session_id = session["id"]
+    delete_session(session_id)
 
-            gotten = get_session(session_id)
-            print("get session after create:")
-            pprint(gotten)
+    sessions = get_sessions()
+    print("get sessions after delete:")
+    pprint(sessions['object'])
 
-            gotten = update_session(session_id, {"name" : "updated_name"})
-            print("get session after update:")
-            print(gotten)
-
-            delete_session(session_id)
-
-            sessions = get_sessions()
-            print("get sessions after delete:")
-            pprint(sessions['object'])
-
-        else:
-            print(created["errors"])
-
-        delete_game(game_id)
+    delete_game(game_id)
 
 def add_player_to_session():
     print("\nTEST: add player to session")
-    gdata = {
-        "name" : "test game",
-        "rounds" : []
-    }
+    game_id = dummy_game()
+    session_id = dummy_session(game_id)
+    player_id = dummy_player()
 
-    created, game_obj = create_game(gdata)
-    if created:
-        game_id = game_obj["id"]
+    add = add_to_session(session_id, {"player_id": player_id})
+    print(add)
 
-        sdata = {
-            "name" : "test session",
-            "game_id" : game_id
-        }
+    gotten = get_session(session_id)
+    print("get session after player add:")
+    pprint(gotten)
 
-        created = create_session(sdata)
-        if created["success"]:
-            session = created["object"]
-            session_id = session["id"]
+    remove = remove_from_session(session_id, {"player_id": player_id})
 
-            pdata = {"player_name": "test team"}
-            player = create_player(pdata)
-            print("created player")
-            pprint(player)
-            if player["success"]:
-                add = add_to_session(session_id, {"player_id": player["object"]["id"]})
-                pprint(add)
+    gotten = get_session(session_id)
+    print("get session after player delete:")
+    pprint(gotten)
 
-                gotten = get_session(session_id)
-                print("get session after player add:")
-                pprint(gotten)
+    delete_player(player_id)
+    delete_session(session_id)
+    delete_game(game_id)
 
-            delete_session(session_id)
+def add_players_and_get():
+    print("\nTEST: add player to session")
+    game_id = dummy_game()
+    session_id = dummy_session(game_id)
+    for i in range(0, 4):
+        player_id = dummy_player()
+        add_to_session(session_id, {"player_id": player_id})
 
-        else:
-            print(created["errors"])
+    players = get_players(session_id)
+    if players["success"]:
+        players = players["object"]
+        print(f"players in session '{session_id}':")
+        pprint(players)
 
-        delete_game(game_id)
+    for player in players:
+        player_id = player["id"]
+        remove_from_session(session_id, {"player_id": player_id})
+        delete_player(player_id)
+
+    players = get_players(session_id)
+    if players["success"]:
+        players = players["object"]
+        print(f"players in session '{session_id}' after delete:")
+        pprint(players)
+
+    delete_session(session_id)
+    delete_game(game_id)
 
 
 if __name__ =="__main__":
@@ -123,5 +157,7 @@ if __name__ =="__main__":
     # game_id_is_not_valid()
     # game_id_is_valid_but_nonexistent()
     # crud()
-    add_player_to_session()
+    # add_player_to_session()
+    add_players_and_get()
+
 
