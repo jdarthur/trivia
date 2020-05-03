@@ -1,7 +1,8 @@
 from pprint import pprint
 from random import randint
 from gameplay_server import (create_session, delete_session, get_session, get_sessions,
-update_session, add_to_session, remove_from_session, create_player, delete_player, get_players)
+update_session, add_to_session, remove_from_session, create_player, delete_player,
+get_players, start_session)
 from editor_server import create_game, delete_game
 
 """
@@ -148,6 +149,26 @@ def add_players_and_get():
     delete_session(session_id)
     delete_game(game_id)
 
+def add_after_starting():
+    print("\nTEST: add player to session")
+    game_id = dummy_game()
+    session_id = dummy_session(game_id)
+    player_id = dummy_player()
+
+    print("Starting session")
+    started = start_session(session_id, {"started": True})
+    pprint(started)
+
+    print(f"adding player {player_id} to started session")
+    added = add_to_session(session_id, {"player_id": player_id})
+    pprint(added)
+
+    delete_player(player_id)
+    delete_session(session_id)
+    delete_game(game_id)
+
+
+
 
 if __name__ =="__main__":
     # missing_name()
@@ -158,6 +179,7 @@ if __name__ =="__main__":
     # game_id_is_valid_but_nonexistent()
     # crud()
     # add_player_to_session()
-    add_players_and_get()
+    # add_players_and_get()
+    add_after_starting()
 
 

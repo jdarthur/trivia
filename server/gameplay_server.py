@@ -21,6 +21,7 @@ app = Flask(__name__)
 NAME = "name"
 GAME_ID = "game_id"
 MODERATOR = "mod"
+STARTED = "started"
 
 PLAYERS = "players"
 PLAYER_NAME = "player_name"
@@ -61,6 +62,7 @@ def create_session(data):
 	mod_id = str(mod[OBJECT][ID])
 
 	#create session with this moderator ID
+	data[STARTED] = False
 	data[MODERATOR] = mod_id
 	created = mongo.create("session", data)
 	if not created:
@@ -101,6 +103,23 @@ def get_sessions():
 			ret.append(fix_id(s))
 	return succeed(ret)
 
+start_model = [
+	RestField(STARTED, bool),
+]
+@model(start_model, UPDATE, "session")
+def start_session(session_id, data, session={}):
+	start = data[STARTED]
+	if start:
+		success = mongo.update("session", session_id, data)
+		if success:
+			session.update(data)
+			return succeed(session)
+
+		return fail(errors=[f"Failed to update session with data {data}"])
+	else:
+		fail(errors=[f"Cannot start session with data {data}"])
+
+
 """
 =====================================
                PLAYER
@@ -140,10 +159,13 @@ join_model = [
 ]
 
 @model(join_model, UPDATE, "session")
-def add_to_session(session_id, data, player={}):
+def add_to_session(session_id, data, session={}):
 	"""
 	POST /session/:id/join
 	"""
+	if session[STARTED]:
+		return fail(error="Cannot add player to already-started session")
+
 	player_id = data[PLAYER_ID]
 	success = mongo.push("session", session_id, PLAYERS, player_id)
 	if not success:
