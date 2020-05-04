@@ -1,6 +1,6 @@
 import bson
 import inspect
-from mongo_manager import GamePlayer
+from mongo_manager import MongoManager
 
 CREATE = "create"
 UPDATE = "update"
@@ -20,7 +20,7 @@ TYPE = "type"
 
 MONGO_HOST = "localhost"
 MONGO_DB = "trivia"
-mongo = GamePlayer(MONGO_HOST, MONGO_DB)
+mongo = MongoManager(MONGO_HOST, MONGO_DB)
 
 def fail(**kwargs):
     resp = {
@@ -118,6 +118,7 @@ class RestField(object):
 
         return succeed(data)
 
+
 class IdField(RestField):
     def __init__(self, field_name, object_type, optional=False):
         super().__init__(field_name, str, optional)
@@ -132,6 +133,46 @@ class IdField(RestField):
             return id_is_valid(self.object_type, data[self.field_name])
         return succeed(data)
 
+
+def ListOfIds(RestField):
+    def __init__(self, field_name, object_type, optional=False):
+        super().__init__(field_name, list, optional)
+        self.object_type = object_type
+
+    def validate(self, data, method):
+        validation = super().validate(data, method)
+        if not validation[SUCCESS]:
+            return validation
+
+        if super().has_this_field(data):
+            id_list = data[self.field_name]
+            for object_id in id_list:
+                obj = id_is_valid(object_id)
+                if not obj[SUCCESS]:
+                    return fail(errors=[obj[ERROR]])
+
+        return succeed(data)
+
+
+def ListOfType(RestField):
+    def __init__(self, field_name, object_type, optional=False):
+        super().__init__(field_name, list, optional)
+        self.object_type = object_type
+
+    def validate(self, data, method):
+        validation = super().validate(data, method)
+        if not validation[SUCCESS]:
+            return validation
+
+        if super().has_this_field(data):
+            obj_list = data[self.field_name]
+            for obj in obj_list:
+                if not isinstance(obj, self.expected_type):
+                    return fail(error=f"Value '{obj}' in field {self.field_name} is not type {self.object_type}")
+
+        return succeed(data)
+
+
 def id_is_valid(object_type, object_id):
     try:
         obj = mongo.get(object_type, object_id)
@@ -139,5 +180,5 @@ def id_is_valid(object_type, object_id):
             return fail(error=f"{object_type} with id '{object_id}' does not exist")
         return succeed(obj)
 
-    except bson.errors.InvalidId:
+    except ValueError:
         return fail(error=f"{object_type}_id '{object_id}' is not valid")

@@ -3,12 +3,18 @@
 @date 18 Apr 2020
 """
 import os
+import uuid
 from pprint import pprint
 from pymongo import MongoClient
 from bson.objectid import ObjectId
 
 def id_equals(object_id):
-    return {"_id" : ObjectId(object_id)}
+    print(object_id)
+    return {"_id" : uuid.UUID(object_id, version=4)}
+
+def add_id(data):
+    data["_id"] = uuid.uuid4()
+    return data
 
 class GameEditor(object):
     """
@@ -98,86 +104,18 @@ class GameEditor(object):
         return True
 
 
-class GamePlayer(object):
+class MongoManager(object):
     """
     Manages gameplay, scoring
     """
     def __init__(self, host, database):
         self.db = MongoClient(host)[database]
 
-    def create_session(self, data):
-        self.db.session.insert_one(data)
-        return data
-
-    def update_session(self, session_id, data):
-        self.db.session.update_one(id_equals(session_id), {"$set" : data})
-        return True
-
-    def get_session(self, session_id):
-        return self.db.session.find_one(id_equals(session_id))
-
-    def get_sessions(self):
-        return self.db.session.find()
-
-    def delete_session(self, session_id):
-        self.db.session.delete_one(id_equals(session_id))
-        return True
-
-    def get_player(self, player_id):
-        return self.db.player.find_one(id_equals(player_id))
-
-    def create_player(self, data):
-        self.db.player.insert_one(data)
-        return data
-
-    def update_player(self, player_id, data):
-        return True
-
-    def delete_player(self, player_id):
-        return True
-
-    def get_all_questions(self, session_id):
-        return {}
-
-    def get_current_question(self, session_id):
-        return {}
-
-    def get_current_question_and_answer(self, session_id):
-        return {}
-
-    def set_question(self, session_id, question_id):
-        return True
-
-    def answer_question(self, session_id, team_id, question_id, answer, wager):
-        return True
-
-    def update_answer(self, session_id, team_id, question_id, answer, wager):
-        return True
-
-
-    def get_question_status_unscored(self, session_id, question_id):
-        return {}
-
-    def get_question_status_scored(self, session_id, question_id):
-        return {}
-
-    def score_question(self, session_id, question_id, data):
-
-        for team_uuid in data:
-            answer_data = data[team_uuid]
-            # set answer data in DB
-            # update scoreboard
-
-    def get_scoreboard(self, session_id):
-        return {}
-
-    def set_score(self, session_id, team_id, points):
-        return True
-
     def get(self, object_type, object_id):
         return self.db[object_type].find_one(id_equals(object_id))
 
     def create(self, object_type, data):
+        data = add_id(data)
         self.db[object_type].insert_one(data)
         return data
 
@@ -191,7 +129,7 @@ class GamePlayer(object):
 
     def pull(self, object_type, object_id, array, value):
         self.db[object_type].update_one(id_equals(object_id),
-            {"$pull" : { array: value } } )
+            {"$pull":{array: value}})
         return True
 
     def delete(self, object_type, object_id):
@@ -200,30 +138,3 @@ class GamePlayer(object):
 
     def get_all(self, object_type):
         self.db[object_type].find()
-
-
-
-
-
-"""
-    def get_stock(self, symbol):
-        data = self.db.stock.find_one({"symbol" : symbol}, {'_id': False})
-        if data:
-            return data
-        return None
-
-    def create_stock(self, data):
-        self.db.stock.insert_one(data)
-        del data["_id"]
-        return data
-
-    def update_stock(self, data):
-        symbol = data['symbol']
-        # stock =  self.db.stock.find_one({"symbol" : symbol})
-
-        result = self.db.stock.update_one({"symbol" : symbol}, {"$set" : data})
-        return data
-
-    def delete_stock(self, symbol):
-        self.db.stock.delete_one({"symbol" : symbol})
-"""

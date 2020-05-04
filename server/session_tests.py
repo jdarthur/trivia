@@ -1,3 +1,4 @@
+import uuid
 from pprint import pprint
 from random import randint
 from gameplay_server import (create_session, delete_session, get_session, get_sessions,
@@ -30,6 +31,7 @@ def dummy_session(game_id):
     }
 
     created = create_session(sdata)
+    print(created)
     if created["success"]:
         return created["object"]["id"]
     return None
@@ -74,13 +76,14 @@ def game_id_is_not_valid():
 
 def game_id_is_valid_but_nonexistent():
     print("\nTEST: game_id is valid but nonexistent")
-    data = {"name": "f", "game_id":"5e9c82c83e9f1b817df277aa"}
+    data = {"name": "f", "game_id": uuid.uuid4()}
     pprint(create_session(data))
 
 def crud():
     print("\nTEST: crud path")
     game_id = dummy_game()
     session_id = dummy_session(game_id)
+    print(session_id)
 
     gotten = get_session(session_id)
     print("get session after create:")
@@ -171,15 +174,15 @@ def add_after_starting():
 
 
 if __name__ =="__main__":
-    # missing_name()
-    # name_is_not_str()
-    # missing_game_id()
-    # game_id_is_not_str()
-    # game_id_is_not_valid()
-    # game_id_is_valid_but_nonexistent()
-    # crud()
-    # add_player_to_session()
-    # add_players_and_get()
+    missing_name()
+    name_is_not_str()
+    missing_game_id()
+    game_id_is_not_str()
+    game_id_is_not_valid()
+    game_id_is_valid_but_nonexistent()
+    crud()
+    add_player_to_session()
+    add_players_and_get()
     add_after_starting()
 
 
