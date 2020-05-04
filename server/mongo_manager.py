@@ -2,19 +2,32 @@
 @author JD
 @date 18 Apr 2020
 """
-import os
 import uuid
-from pprint import pprint
 from pymongo import MongoClient
-from bson.objectid import ObjectId
+
+ID = "id"
 
 def id_equals(object_id):
-    print(object_id)
     return {"_id" : uuid.UUID(object_id, version=4)}
+
 
 def add_id(data):
     data["_id"] = uuid.uuid4()
     return data
+
+
+def fix_id(data):
+    if data is None:
+        return None
+
+    new = {}
+    for key in data:
+        if key == "_id":
+            new[ID] = str(data[key])
+        else:
+            new[key] = data[key]
+    return new
+
 
 class GameEditor(object):
     """
@@ -117,19 +130,20 @@ class MongoManager(object):
     def create(self, object_type, data):
         data = add_id(data)
         self.db[object_type].insert_one(data)
-        return data
+        return fix_id(data)
 
     def update(self, object_type, object_id, data):
         self.db[object_type].update_one(id_equals(object_id), {"$set" : data})
         return True
 
     def push(self, object_type, object_id, array, value):
-        self.db[object_type].update_one(id_equals(object_id), {"$push" : {array: value}})
+        self.db[object_type].update_one(id_equals(object_id),
+                                        {"$push": {array: value}})
         return True
 
     def pull(self, object_type, object_id, array, value):
         self.db[object_type].update_one(id_equals(object_id),
-            {"$pull":{array: value}})
+                                        {"$pull": {array: value}})
         return True
 
     def delete(self, object_type, object_id):
@@ -137,4 +151,4 @@ class MongoManager(object):
         return True
 
     def get_all(self, object_type):
-        self.db[object_type].find()
+        return self.db[object_type].find()

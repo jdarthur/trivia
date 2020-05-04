@@ -1,6 +1,4 @@
-import bson
-import inspect
-from mongo_manager import MongoManager
+from mongo_manager import MongoManager, fix_id
 
 CREATE = "create"
 UPDATE = "update"
@@ -16,11 +14,13 @@ OBJECT = "object"
 FIELD = "field"
 OPTIONAL = "optional"
 TYPE = "type"
+ID = "id"
 
 
 MONGO_HOST = "localhost"
 MONGO_DB = "trivia"
 mongo = MongoManager(MONGO_HOST, MONGO_DB)
+
 
 def fail(**kwargs):
     resp = {
@@ -31,11 +31,13 @@ def fail(**kwargs):
 
     return resp
 
+
 def succeed(obj):
     return {
         SUCCESS: True,
         OBJECT: obj
     }
+
 
 class model(object):
 
@@ -91,7 +93,7 @@ class model(object):
 
             #if no errors, return whatever our call actually does
             if self.request_type in [GET_ONE, UPDATE, DELETE]:
-                args = args + (validation[OBJECT],)
+                args = args + (fix_id(validation[OBJECT]),)
 
             return f(*args)
 
@@ -134,7 +136,7 @@ class IdField(RestField):
         return succeed(data)
 
 
-def ListOfIds(RestField):
+class ListOfIds(RestField):
     def __init__(self, field_name, object_type, optional=False):
         super().__init__(field_name, list, optional)
         self.object_type = object_type
@@ -147,14 +149,20 @@ def ListOfIds(RestField):
         if super().has_this_field(data):
             id_list = data[self.field_name]
             for object_id in id_list:
-                obj = id_is_valid(object_id)
+                if not isinstance(object_id, str):
+                    return fail(error=f"{self.object_type}_id is not type {str}")
+
+                if id_list.count(object_id) > 1:
+                    return fail(error=f"{self.object_type}_id {object_id} is used more than once.")
+
+                obj = id_is_valid(self.object_type, object_id)
                 if not obj[SUCCESS]:
-                    return fail(errors=[obj[ERROR]])
+                    return fail(error=obj[ERROR])
 
         return succeed(data)
 
 
-def ListOfType(RestField):
+class ListOfType(RestField):
     def __init__(self, field_name, object_type, optional=False):
         super().__init__(field_name, list, optional)
         self.object_type = object_type
@@ -167,7 +175,7 @@ def ListOfType(RestField):
         if super().has_this_field(data):
             obj_list = data[self.field_name]
             for obj in obj_list:
-                if not isinstance(obj, self.expected_type):
+                if not isinstance(obj, self.object_type):
                     return fail(error=f"Value '{obj}' in field {self.field_name} is not type {self.object_type}")
 
         return succeed(data)
@@ -182,3 +190,12 @@ def id_is_valid(object_type, object_id):
 
     except ValueError:
         return fail(error=f"{object_type}_id '{object_id}' is not valid")
+
+
+def get_all(object_type):
+    ret = []
+    games = mongo.get_all(object_type)
+    if games:
+        for g in games:
+            ret.append(fix_id(g))
+    return ret
