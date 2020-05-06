@@ -1,4 +1,5 @@
 from pprint import pprint
+from random import randint
 from editor_server import (create_question, delete_question, get_question,
                            update_question, get_questions)
 
@@ -8,6 +9,19 @@ def create_and_print(data):
     print("created:")
     pprint(created)
     return created
+
+
+def dummy_question():
+    qdata = {
+        "question": f"test question {randint(1, 100000)}",
+        "answer": "answer",
+        "category": "category"
+    }
+
+    created = create_question(qdata)
+    if created["success"]:
+        return created["object"]["id"]
+    return None
 
 
 def missing_question():
@@ -36,27 +50,22 @@ def question_is_dict():
 
 def crud():
     print("\nTEST: valid question create, read, update, delete")
-    q = {"question": "test", "answer": "123", "category": "birds"}
-    created = create_and_print(q)
+    question_id = dummy_question()
 
-    if created["success"]:
-        obj = created["object"]
-        question_id = obj.get("id")
+    obj = get_question(question_id)
+    print("   got: {}".format(obj))
 
-        obj = get_question(question_id)
-        print("   got: {}".format(obj))
+    updated = update_question(question_id, {"answer": "ffff"})
+    print("   updated: {}".format(updated))
 
-        updated = update_question(question_id, {"answer": "ffff"})
-        print("   updated: {}".format(updated))
+    questions = get_questions()
+    print("   all questions: {}".format(questions))
 
-        questions = get_questions()
-        print("   all questions: {}".format(questions))
+    success = delete_question(question_id)
+    print("   deleted: {}".format(success))
 
-        success = delete_question(question_id)
-        print("   deleted: {}".format(success))
-
-        questions = get_questions()
-        print("   all questions: {}".format(questions))
+    questions = get_questions()
+    print("   all questions: {}".format(questions))
 
 
 if __name__ == "__main__":

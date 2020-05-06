@@ -7,7 +7,6 @@ DELETE = "delete"
 GET_ALL = "get all"
 
 SUCCESS = "success"
-ERROR = "error"
 ERRORS = "errors"
 OBJECT = "object"
 
@@ -22,12 +21,17 @@ MONGO_DB = "trivia"
 mongo = MongoManager(MONGO_HOST, MONGO_DB)
 
 
-def fail(**kwargs):
+def fail(errors):
     resp = {
         SUCCESS: False
     }
-    for arg in kwargs:
-        resp[arg] = kwargs[arg]
+
+    if isinstance(errors, list):
+        resp[ERRORS] = errors
+    elif isinstance(errors, str):
+        resp[ERRORS] = [errors]
+    else:
+        raise RuntimeError(f"Bad 'errors' type {type(errors)}... must be {list} or {str}")
 
     return resp
 
@@ -64,40 +68,43 @@ class model(object):
 
             errors = []
 
-            #validate each field in model for create/update calls
+            # validate each field in model for create/update calls
             if self.request_type in [CREATE, UPDATE]:
                 for rest_field in self.model:
                     validation = rest_field.validate(given_data, self.request_type)
                     if not validation[SUCCESS]:
-                        errors.append(validation[ERROR])
+                        for error in validation[ERRORS]:
+                            errors.append(error)
 
-                #disallow fields that are not in model
+                # disallow fields that are not in model
                 for field in given_data:
                     if field not in self.legal_keys:
                         errors.append(f"Illegal key '{field}'")
 
-                #if we have any errors, short-circuit before hitting DB
+                # if we have any errors, short-circuit before hitting DB
                 if len(errors) > 0:
-                    return fail(errors=errors)
+                    return fail(errors)
 
             # make sure the supplied ID is valid for get/update/delete
             if self.request_type in [GET_ONE, UPDATE, DELETE]:
-                #object ID must exist on these calls
+                # object ID must exist on these calls
                 validation = id_is_valid(self.object_type, object_id)
                 if not validation[SUCCESS]:
-                    errors.append(validation[ERROR])
+                    for error in validation[ERRORS]:
+                        errors.append(error)
 
-            #if we have any errors, return failure with error list
+            # if we have any errors, return failure with error list
             if len(errors) > 0:
-                return fail(errors=errors)
+                return fail(errors)
 
-            #if no errors, return whatever our call actually does
+            # if no errors, return whatever our call actually does
             if self.request_type in [GET_ONE, UPDATE, DELETE]:
                 args = args + (fix_id(validation[OBJECT]),)
 
             return f(*args)
 
         return wrapped_f
+
 
 class RestField(object):
     def __init__(self, field_name, expected_type=str, optional=False):
@@ -113,10 +120,10 @@ class RestField(object):
 
     def validate(self, data, method):
         if not self.has_this_field(data) and not self.optional and method != UPDATE:
-            return fail(error=f"Missing required field '{self.field_name}'")
+            return fail(f"Missing required field '{self.field_name}'")
 
         if self.has_this_field(data) and not self.is_correct_type(data):
-            return fail(error=f"Field '{self.field_name}' (with value '{data[self.field_name]}') is not type {self.expected_type}")
+            return fail(f"Field '{self.field_name}' (with value '{data[self.field_name]}') is not type {self.expected_type}")
 
         return succeed(data)
 
@@ -150,14 +157,14 @@ class ListOfIds(RestField):
             id_list = data[self.field_name]
             for object_id in id_list:
                 if not isinstance(object_id, str):
-                    return fail(error=f"{self.object_type}_id is not type {str}")
+                    return fail(f"{self.object_type}_id is not type {str}")
 
                 if id_list.count(object_id) > 1:
-                    return fail(error=f"{self.object_type}_id {object_id} is used more than once.")
+                    return fail(f"{self.object_type}_id {object_id} is used more than once.")
 
                 obj = id_is_valid(self.object_type, object_id)
                 if not obj[SUCCESS]:
-                    return fail(error=obj[ERROR])
+                    return obj
 
         return succeed(data)
 
@@ -176,7 +183,7 @@ class ListOfType(RestField):
             obj_list = data[self.field_name]
             for obj in obj_list:
                 if not isinstance(obj, self.object_type):
-                    return fail(error=f"Value '{obj}' in field {self.field_name} is not type {self.object_type}")
+                    return fail(f"Value '{obj}' in field {self.field_name} is not type {self.object_type}")
 
         return succeed(data)
 
@@ -185,11 +192,11 @@ def id_is_valid(object_type, object_id):
     try:
         obj = mongo.get(object_type, object_id)
         if obj is None:
-            return fail(error=f"{object_type} with id '{object_id}' does not exist")
+            return fail(f"{object_type} with id '{object_id}' does not exist")
         return succeed(obj)
 
     except ValueError:
-        return fail(error=f"{object_type}_id '{object_id}' is not valid")
+        return fail(f"{object_type}_id '{object_id}' is not valid")
 
 
 def get_all(object_type):

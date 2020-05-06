@@ -1,8 +1,9 @@
 from editor_server import (create_round, delete_round)
 from editor_server import (create_game, delete_game, get_game,
-                           update_game, get_games)
+                           update_game, get_games, delete_question)
 
 from rounds_tests import indentprint
+from questions_tests import dummy_question
 
 
 def create_and_print(data):
@@ -12,27 +13,28 @@ def create_and_print(data):
     return created
 
 
-def dummy_round():
+def dummy_round(question_id):
     rdata = {
         "name": "test round",
-        "questions": [],
-        "wagers": []
+        "questions": [question_id],
+        "wagers": [3]
     }
     created = create_round(rdata)
     if created["success"]:
         return created["object"]["id"]
+    print(created)
     return None
 
 
 def dummy_game(rounds):
     gdata = {
         "name": "test game",
-        "rounds": rounds
+        "rounds": [rounds]
     }
     created = create_game(gdata)
     if created["success"]:
         return created["object"]["id"]
-
+    print(created)
     return None
 
 
@@ -79,15 +81,10 @@ def round_id_duplicated():
     create_and_print(data)
 
 
-def rounds_empty():
-    print("\nTEST: rounds list empty")
-    data = {"name": "f", "rounds": []}
-    create_and_print(data)
-
-
 def crud():
     print("\nTEST: crud path")
-    round_id = dummy_round()
+    question_id = dummy_question()
+    round_id = dummy_round(question_id)
 
     game_id = dummy_game([round_id])
     game = get_game(game_id)
@@ -107,11 +104,13 @@ def crud():
         print("   all games after delete: {}".format(all_games))
 
     delete_round(round_id)
+    delete_question(question_id)
 
 
 def round_removed_from_game_when_deleted():
     print("\nTEST: round is removed from games when round is deleted")
-    round_id = dummy_round()
+    question_id = dummy_question()
+    round_id = dummy_round(question_id)
     game_id = dummy_game(rounds=[round_id])
 
     game = get_game(game_id)
@@ -125,6 +124,7 @@ def round_removed_from_game_when_deleted():
     indentprint(game)
 
     delete_game(game_id)
+    delete_question(question_id)
 
 
 if __name__ == "__main__":

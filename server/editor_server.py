@@ -7,9 +7,9 @@ Trivia server mark II
 
 from mongo_manager import MongoManager
 
-from validator import (model, succeed, fail, RestField, IdField,
+from validator import (model, succeed, fail, RestField,
                        ListOfIds, ListOfType, get_all)
-from validator import (SUCCESS, ERROR, ERRORS, OBJECT, CREATE,
+from validator import (SUCCESS, ERRORS, OBJECT, CREATE,
                        UPDATE, DELETE, GET_ONE, ID)
 
 from flask import Flask, jsonify, request
@@ -55,16 +55,16 @@ qmodel = [
 def create_question(data):
     created = mongo.create("question", data)
     if not created:
-        return fail(errors="Failed to create question")
+        return fail("Failed to create question")
     return succeed(created)
 
 
 @app.route('/api/question/<question_id>', methods=['DELETE'])
 def delete_one_question(question_id):
-    success, resp = delete_question(question_id)
-    if success:
-        return jsonify(resp)
-    return jsonify({ERROR: resp})
+    resp = delete_question(question_id)
+    if resp[SUCCESS]:
+        return jsonify(resp[OBJECT])
+    return jsonify({ERRORS: resp[ERRORS]})
 
 
 @model(qmodel, DELETE, "question")
@@ -97,7 +97,7 @@ def update_question(question_id, data, question={}):
     if success:
         question.update(data)
         return succeed(question)
-    return fail(errors=[f"Failed to update {QUESTION} with data {data}"])
+    return fail(f"Failed to update {QUESTION} with data {data}")
 
 
 @app.route('/api/questions', methods=['GET'])
@@ -156,7 +156,7 @@ def add_round_to_question(question_id, data, question={}):
 
     success = mongo.push("question", question_id, ROUNDS_USED, round_id)
     if not success:
-        return fail(error=f"Failed to add {ROUND} to {QUESTION}")
+        return fail(f"Failed to add {ROUND} to {QUESTION}")
 
     rounds_used.append(round_id)
     question[ROUNDS_USED] = rounds_used
@@ -172,7 +172,7 @@ def remove_round_from_question(question_id, data, question={}):
 
     success = mongo.pull("question", question_id, ROUNDS_USED, round_id)
     if not success:
-        return fail(error=f"Failed to remove {ROUND} from {QUESTION}")
+        return fail(f"Failed to remove {ROUND} from {QUESTION}")
 
     rounds_used.remove(round_id)
     question[ROUNDS_USED] = rounds_used
@@ -185,7 +185,7 @@ def remove_question_from_all_rounds(question):
     for round_id in rounds_used:
         modified_count = mongo.pull("round", round_id, QUESTIONS, question_id)
         if modified_count == 0:
-            return fail(error=f"Failed to remove {QUESTION} {question_id} from {ROUND} {round_id}")
+            return fail(f"Failed to remove {QUESTION} {question_id} from {ROUND} {round_id}")
 
     return succeed(question)
 
@@ -216,15 +216,15 @@ def create_round(data):
     wlen = len(data.get(WAGERS, []))
     if qlen != wlen:
         error = f"{WAGERS} length ({wlen}) does not equal {QUESTIONS} length ({qlen}) (data: {data}))"
-        return fail(errors=[error])
+        return fail(error)
 
     for wager in data.get(WAGERS, []):
         if wager <= 0:
-            return fail(errors=[f"Wager '{wager}' is not positive int"])
+            return fail(f"Wager '{wager}' is not positive int")
 
     created = mongo.create("round", data)
     if not created:
-        return fail(ERRORS=["Failed to create round"])
+        return fail("Failed to create round")
 
     set_round_in_questions(created, [])  # no original questions, new round
     return succeed(created)
@@ -238,13 +238,13 @@ def delete_round(round_id, round_obj={}):
 
         deleted = delete_round_from_all_games(round_id)
         if not deleted[SUCCESS]:
-            return deleted[ERROR]
+            return deleted
 
         questions = round_obj.get(QUESTIONS, [])
         for question_id in questions:
             removed = remove_round_from_question(question_id, {ROUND_ID: round_id})
             if not removed[SUCCESS]:
-                return removed[ERRORS]
+                return removed
 
         return succeed(round_obj)
 
@@ -301,7 +301,7 @@ def get_game(game_id, game={}):
 def create_game(data):
     created = mongo.create("game", data)
     if not created:
-        return fail(errors=["Failed to create game"])
+        return fail("Failed to create game")
 
     return succeed(created)
 
@@ -312,7 +312,7 @@ def update_game(game_id, data, game={}):
     if success:
         game.update(data)
         return succeed(game)
-    return fail(errors=[f"Failed to update game with data {data}"])
+    return fail(f"Failed to update game with data {data}")
 
 
 @model(gmodel, DELETE, "game")

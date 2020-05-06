@@ -66,7 +66,7 @@ def create_session(data):
     """
     mod = create_player({})
     if not mod[SUCCESS]:
-        return fail(errors=mod[ERRORS])
+        return mod
 
     mod_id = str(mod[OBJECT][ID])
 
@@ -75,7 +75,7 @@ def create_session(data):
     data[MODERATOR] = mod_id
     created = mongo.create("session", data)
     if not created:
-        return fail(errors=["Failed to create session"])
+        return fail("Failed to create session")
     created = fix_id(created)
 
     # resp = update_player(mod_id, {SESSION_ID: created[ID]})
@@ -99,7 +99,7 @@ def update_session(session_id, data, session={}):
     if success:
         session.update(data)
         return succeed(session)
-    return fail(errors=[f"Failed to update session with data {data}"])
+    return fail(f"Failed to update session with data {data}")
 
 
 @model(smodel, DELETE, "session")
@@ -140,7 +140,7 @@ def update_player(player_id, data, player={}):
     if success:
         player.update(data)
         return succeed(player)
-    return fail(errors=[f"Failed to update player with data {data}"])
+    return fail(f"Failed to update player with data {data}")
 
 
 @model(pmodel, DELETE, "player")
@@ -163,12 +163,12 @@ def add_to_session(session_id, data, session={}):
     POST /session/:id/join
     """
     if session[STARTED]:
-        return fail(error="Cannot add player to already-started session")
+        return fail("Cannot add player to already-started session")
 
     player_id = data[PLAYER_ID]
     success = mongo.push("session", session_id, PLAYERS, player_id)
     if not success:
-        return fail(error="Failed to add player to session")
+        return fail("Failed to add player to session")
 
     data[SESSION_ID] = session_id
     return succeed(data)
@@ -182,7 +182,7 @@ def remove_from_session(session_id, data, session={}):
     player_id = data[PLAYER_ID]
     success = mongo.pull("session", session_id, PLAYERS, player_id)
     if not success:
-        return fail(error="Failed to remove player from session")
+        return fail("Failed to remove player from session")
 
     # delete player?
     data[SESSION_ID] = session_id
@@ -216,31 +216,64 @@ start_model = [
 def start_session(session_id, data, session={}):
     start = data[STARTED]
     if start:
-        data[QUESTIONS] = {}
-        data[ROUNDS] = {}
+        startable = game_has_round_and_question(session)
+        if not startable[SUCCESS]:
+            return startable
+        
+        first_round = startable[OBJECT][ROUND_ID]
+        first_question = startable[OBJECT][QUESTION_ID]
+
         success = mongo.update("session", session_id, data)
         if success:
             session.update(data)
-            game = get_game(session[GAME_ID])
-            print(game)
-            if game[SUCCESS]:
-                game = game[OBJECT]
-            first_round = set_current_round(game[ROUND_ID])
-            if not first_round[SUCCESS]:
-                return fail(f"Failed to set first {ROUND}")
 
-            first_round = first_round[OBJECT]
-            question_id = first_round.get(QUESTIONS, [])[0]
+            set_round = set_current_round(session_id, {ROUND_ID: first_round})
+            if not set_round[SUCCESS]:
+                return set_round
 
-            first_question = set_current_question(question_id)
-            if not first_question[SUCCESS]:
-                return fail(f"Failed to set first {QUESTION}")
+            set_question = set_current_question(session_id, {QUESTION_ID: first_question})
+            if not set_question[SUCCESS]:
+                return set_question
 
             return succeed(session)
 
-        return fail(errors=[f"Failed to update session with data {data}"])
+        return fail(f"Failed to update session with data {data}")
+
     else:
-        fail(errors=[f"Cannot start session with data {data}"])
+        fail("Cannot start session with data {data}")
+
+
+def game_has_round_and_question(session):
+    """
+    verify that this session has at least one round and question
+    """
+    game_id = session.get(GAME_ID, None)
+    if not game_id:
+        return fail(f"Session {session[ID]} does not have a {GAME}_id")
+
+    game = get_game(game_id)  # probably don't need to test validity because setting game_id illegal is prevented
+    if not game[SUCCESS]:
+        return game
+    
+    game = game[OBJECT]
+
+    rounds = game.get(ROUNDS, [])
+    if len(rounds) == 0:
+        return fail(f"{GAME}_id {game_id} does not have any {ROUNDS}")
+    
+    first_round_id = rounds[0]
+    round_obj = get_round(first_round_id)
+    if not round_obj[SUCCESS]:
+        return round_obj
+    round_obj = round_obj[OBJECT]
+    
+    questions = round_obj.get(QUESTIONS, [])
+    if len(questions) == 0:
+        return fail(f"{ROUND}_id {first_round_id} does not have any {QUESTIONS}")
+    
+    first_question_id = questions[0]
+
+    return succeed({ROUND_ID: first_round_id, QUESTION_ID: first_question_id})
 
 
 def get_scoreboard(session_id):
@@ -260,24 +293,23 @@ def get_current_question(session_id, session={}):
 
 
 cq_model = [
-    IdField(QUESTION_ID, "question"),
-    IdField(MODERATOR, "player")
+    IdField(QUESTION_ID, "question")
 ]
 @model(cq_model, UPDATE, "session")
 def set_current_question(session_id, data, session={}):
     """
-    validate that mod = session.mod_id
     validate that question ID in round
     set question.open = True
     set session.current_question = question_id
     return new question_id
     """
-    session_mod = session[MODERATOR]
-    if data[MODERATOR] != session_mod:
-        return fail(f"Cannot set mod using ID {data[MODERATOR]}")
+    # session_mod = session[MODERATOR]
+    # if data[MODERATOR] != session_mod:
+    #     return fail(f"Cannot set mod using ID {data[MODERATOR]}")
 
     r = get_current_round(session_id)
     if r[SUCCESS]:
+        r = r[OBJECT]
         question_id = data[QUESTION_ID]
         if question_id not in r.get(QUESTIONS, []):
             return fail(f"{QUESTION} with id {question_id} is not in current round {r}.")
@@ -310,12 +342,11 @@ def get_current_round(session_id, session={}):
     return round_name, list of questions, list of wagers
     """
     round_id = session.get(CURRENT_ROUND)
-    return session.get(ROUNDS, {}).get(round_id, None)
+    return succeed(session.get(ROUNDS, {}).get(round_id, None))
 
 
 cq_model = [
-    IdField(ROUND_ID, "round"),
-    IdField(MODERATOR, "player")
+    IdField(ROUND_ID, "round")
 ]
 @model(cq_model, UPDATE, "session")
 def set_current_round(session_id, data, session={}):
@@ -332,8 +363,9 @@ def set_current_round(session_id, data, session={}):
         # get round from DB and set in session obj
         r = get_round(round_id)
         if r[SUCCESS]:
+            r = r[OBJECT]
             data_to_update = {
-                 f"{ROUNDS}.{round_id}": {WAGERS: r.wagers, QUESTIONS: r.questions},
+                 f"{ROUNDS}.{round_id}": {WAGERS: r[WAGERS], QUESTIONS: r[QUESTIONS]},
                  CURRENT_ROUND: round_id
             }
             success = mongo.update("session", session_id, data_to_update)
