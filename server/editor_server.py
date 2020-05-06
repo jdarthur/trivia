@@ -5,23 +5,19 @@ Trivia server mark II
 @date 12 Apr 2020
 """
 
-import bson
-
-from mongo_manager import MongoManager
-from flask import Flask, jsonify, request
-app = Flask(__name__)
-
 from mongo_manager import MongoManager
 
 from validator import (model, succeed, fail, RestField, IdField,
                        ListOfIds, ListOfType, get_all)
 from validator import (SUCCESS, ERROR, ERRORS, OBJECT, CREATE,
-                       UPDATE, DELETE, GET_ONE, GET_ALL)
+                       UPDATE, DELETE, GET_ONE, ID)
+
+from flask import Flask, jsonify, request
+app = Flask(__name__)
 
 
 NAME = "name"
 ROUNDS = "rounds"
-ID = "id"
 ROUND = "round"
 GAME = "game"
 CATEGORY = "category"
@@ -30,7 +26,6 @@ ANSWER = "answer"
 QUESTIONS = "questions"
 WAGERS = "wagers"
 ROUNDS_USED = "rounds_used"
-ERROR = "error"
 TEXT_FILTER = "text_filter"
 UNUSED_ONLY = "unused_only"
 
@@ -41,6 +36,7 @@ MONGO_HOST = "localhost"
 MONGO_DB = "trivia"
 
 mongo = MongoManager(MONGO_HOST, MONGO_DB)
+
 
 @app.route('/api/question', methods=['POST'])
 def create_one_question():
@@ -74,7 +70,7 @@ def delete_one_question(question_id):
 @model(qmodel, DELETE, "question")
 def delete_question(question_id, question={}):
     mongo.delete("question", question_id)
-    remove_question_from_all_rounds(question_id)
+    remove_question_from_all_rounds(question)
     return question
 
 
@@ -133,7 +129,7 @@ def matches_text_filter(question, text_filter):
         if text_filter in question[field]:
             return True
 
-    print("does not match {} '{}': {}".format(TEXT_FILTER, text_filter, question))
+    # print("does not match {} '{}': {}".format(TEXT_FILTER, text_filter, question))
     return False
 
 
@@ -149,7 +145,7 @@ def matches_unused_only(question, unused_only):
 
 
 add_r2q_model = [
-    IdField(ROUND_ID, "round")
+    RestField(ROUND_ID,)
 ]
 @model(add_r2q_model, UPDATE, "question")
 def add_round_to_question(question_id, data, question={}):
@@ -183,16 +179,12 @@ def remove_round_from_question(question_id, data, question={}):
     return succeed(question)
 
 
-def remove_question_from_all_rounds(question_id):
-    _remove_question_from_all_rounds(question_id, {})
-
-
-@model([], UPDATE, "question")
-def _remove_question_from_all_rounds(question_id, data, question={}):
+def remove_question_from_all_rounds(question):
     rounds_used = question.get(ROUNDS_USED, [])
+    question_id = question.get(ID)
     for round_id in rounds_used:
-        success = mongo.pull("round", round_id, QUESTIONS, question_id)
-        if not success:
+        modified_count = mongo.pull("round", round_id, QUESTIONS, question_id)
+        if modified_count == 0:
             return fail(error=f"Failed to remove {QUESTION} {question_id} from {ROUND} {round_id}")
 
     return succeed(question)
@@ -291,6 +283,7 @@ def delete_round_from_all_games(round_id):
             return fail(error=f"Failed to remove {ROUND} {round_id} from {GAME} {game_id}")
     return succeed({})
 
+
 def get_games():
     return get_all("game")
 
@@ -312,7 +305,7 @@ def create_game(data):
     if not created:
         return fail(errors=["Failed to create game"])
 
-    return succeed(data)
+    return succeed(created)
 
 
 @model(gmodel, UPDATE, "game")

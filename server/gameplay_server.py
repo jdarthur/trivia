@@ -289,7 +289,7 @@ def set_current_question(session_id, data, session={}):
     return fail(f"Failed to get round with ID {session.get(ROUND_ID)}")
 
 
-def get_question(session_id, question_id):
+def get_question_by_id(session_id, question_id):
     """
     if not open: (i.e. question not in session.answers)
         return category
@@ -343,6 +343,7 @@ def set_current_round(session_id, data, session={}):
 
     return fail(f"Failed to get game with id '{session[GAME_ID]}'")
 
+
 def get_answer_status(session_id, question_id):
     """
     if not open:
@@ -357,6 +358,7 @@ def get_answer_status(session_id, question_id):
                 points_awarded: n
     """
     pass
+
 
 def get_answers(session_id, question_id):
     """

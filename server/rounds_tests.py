@@ -1,12 +1,18 @@
-from pprint import pprint
+import pprint
 from editor_server import create_round, delete_round, get_round, update_round, get_rounds
 from editor_server import create_question, delete_question, get_question, get_questions
+
+
+def indentprint(data):
+    formatted = pprint.pformat(data).splitlines()
+    for line in formatted:
+        print(f"   {line}")
 
 
 def create_and_print(data):
     created = create_round(data)
     print("created:")
-    pprint(created)
+    indentprint(created)
     return created
 
 
@@ -19,6 +25,21 @@ def dummy_question():
     created = create_question(qdata)
     if created["success"]:
         return created["object"]["id"]
+
+
+def dummy_round(question_id):
+    data = {
+        "name": "test round",
+        "questions": [question_id],
+        "wagers": [3]
+    }
+    created = create_and_print(data)
+    if created["success"]:
+        created = created["object"]
+        round_id = created.get("id")
+        return round_id
+
+    return None
 
 
 def missing_name():
@@ -111,35 +132,27 @@ def crud():
     print("\nTEST: successful crud")
     question_id = dummy_question()
 
-    data = {
-        "name": "test round",
-        "questions": [question_id],
-        "wagers": [3]
-    }
-    created = create_and_print(data)
-    if created["success"]:
-        created = created["object"]
-        round_id = created.get("id")
+    round_id = dummy_round(question_id)
 
-        obj = get_round(round_id)
-        print("got:")
-        pprint(obj)
+    obj = get_round(round_id)
+    print("got:")
+    indentprint(obj)
 
-        update_round(round_id, {"name": "ffff"})
+    update_round(round_id, {"name": "ffff"})
 
-        rounds = get_rounds()
-        print("all rounds:")
-        pprint(rounds)
+    rounds = get_rounds()
+    print("all rounds:")
+    indentprint(rounds)
 
-        questions = get_questions()
-        print("all questions")
-        pprint(questions)
+    questions = get_questions()
+    print("all questions")
+    indentprint(questions)
 
-        success = delete_round(round_id)
-        print("deleted: {} {}".format(success, round_id))
+    success = delete_round(round_id)
+    print("deleted: {} {}".format(success, round_id))
 
-        rounds = get_rounds()
-        print("all rounds: {}".format(rounds))
+    rounds = get_rounds()
+    print("all rounds: {}".format(rounds))
 
     delete_question(question_id)
 
@@ -152,20 +165,13 @@ def round_used_added_to_question():
     """
     print("\nTEST: rounds_used added to question")
     question_id = dummy_question()
-    rdata = {
-        "name": "test round",
-        "questions": [question_id],
-        "wagers": [3]
-    }
-    created, obj = create_round(rdata)
-    if created:
-        round_id = obj.get("id")
-        print("   round ID: {}".format(round_id))
+    round_id = dummy_round(question_id)
+    print("   round ID: {}".format(round_id))
 
-        question = get_question(question_id)
-        ru = question.get("rounds_used", [])
-        print(f"   rounds_used: {ru} (question: {question})")
-        delete_round(round_id)
+    question = get_question(question_id)
+    ru = question.get("rounds_used", [])
+    print(f"   rounds_used: {ru} (question: {question})")
+    delete_round(round_id)
 
     delete_question(question_id)
 
@@ -177,53 +183,20 @@ def round_removed_from_question_when_round_deleted():
     """
     print("\nTEST: round deleted from question when round deleted")
     question_id = dummy_question()
-    rdata = {
-        "name": "test round",
-        "questions": [question_id],
-        "wagers": [3]
-    }
-    created, obj = create_round(rdata)
-    if created:
-        round_id = obj.get("id")
-        print("   round ID: {}".format(round_id))
+    round_id = dummy_round(question_id)
+    print("round ID: {}".format(round_id))
 
-        question = get_question(question_id)
-        ru = question.get("rounds_used", [])
-        print(f"   rounds_used: {ru} (question: {question})")
+    question = get_question(question_id)["object"]
+    print(f"question after round created:")
+    indentprint(question)
 
-        delete_round(round_id)
+    delete_round(round_id)
 
-        question = get_question(question_id)
-        ru = question.get("rounds_used", [])
-        print(f"   rounds_used after delete: {ru} (question: {question})")
+    question = get_question(question_id)
+    ru = question.get("rounds_used", [])
+    print(f"rounds_used after round delete: {ru}")
 
     delete_question(question_id)
-
-
-def question_removed_from_round_when_question_is_deleted():
-    print("\nTEST: question removed from round when question deleted")
-    question_id = dummy_question()
-    rdata = {
-        "name": "test round",
-        "questions": [question_id],
-        "wagers": [3]
-    }
-    created, obj = create_round(rdata)
-    if created:
-        round_id = obj.get("id")
-        print("   round ID: {}".format(round_id))
-
-        round_obj = get_round(round_id)
-        qs = round_obj.get("questions", [])
-        print(f"   questions before delete: {qs} (round: {round_obj})")
-
-        delete_question(question_id)
-
-        round_obj = get_round(round_id)
-        qs = round_obj.get("questions", [])
-        print(f"   questions after delete: {qs} (round: {round_obj})")
-
-        delete_round(round_id)
 
 
 def round_removed_from_question_when_question_removed_from_round():
@@ -233,29 +206,41 @@ def round_removed_from_question_when_question_removed_from_round():
     """
     print("\nTEST: round deleted from question when question removed from round")
     question_id = dummy_question()
-    rdata = {
-        "name": "test round",
-        "questions": [question_id],
-        "wagers": [3]
-    }
-    created, obj = create_round(rdata)
-    if created:
-        round_id = obj.get("id")
-        print("   round ID: {}".format(round_id))
+    round_id = dummy_round(question_id)
+    print("round ID: {}".format(round_id))
 
-        question = get_question(question_id)
-        ru = question.get("rounds_used", [])
-        print(f"   rounds_used: {ru} (question: {question})")
+    question = get_question(question_id)["object"]
+    print(f"question after round create:")
+    indentprint(question)
 
-        success = update_round(round_id, {"questions": []})
+    update_round(round_id, {"questions": []})
 
-        question = get_question(question_id)
-        ru = question.get("rounds_used", [])
-        print(f"   rounds_used after update: {ru} (question: {question})")
+    question = get_question(question_id)["object"]
+    print(f"question after removal from round:")
+    indentprint(question)
 
-        delete_round(round_id)
+    delete_round(round_id)
 
     delete_question(question_id)
+
+
+def question_removed_from_round_when_question_is_deleted():
+    print("\nTEST: question removed from round when question deleted")
+    question_id = dummy_question()
+    round_id = dummy_round(question_id)
+    indentprint("   round ID: {}".format(round_id))
+
+    round_obj = get_round(round_id)["object"]
+    print("round before question delete")
+    indentprint(round_obj)
+
+    delete_question(question_id)
+
+    round_obj = get_round(round_id)["object"]
+    print("round after question delete")
+    indentprint(round_obj)
+
+    delete_round(round_id)
 
 
 if __name__ == "__main__":
