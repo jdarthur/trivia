@@ -227,11 +227,11 @@ def start_session(session_id, data, session={}):
         if success:
             session.update(data)
 
-            set_round = set_current_round(session_id, {ROUND_ID: first_round})
+            set_round = set_current_round(session_id, first_round)
             if not set_round[SUCCESS]:
                 return set_round
 
-            set_question = set_current_question(session_id, {QUESTION_ID: first_question})
+            set_question = set_current_question(session_id, first_question)
             if not set_question[SUCCESS]:
                 return set_question
 
@@ -292,11 +292,15 @@ def get_current_question(session_id, session={}):
     return session.get(QUESTIONS).get(question_id)
 
 
+def set_current_question(session_id, question_id):
+    return _set_current_question(session_id, {QUESTION_ID: question_id})
+
+
 cq_model = [
     IdField(QUESTION_ID, "question")
 ]
 @model(cq_model, UPDATE, "session")
-def set_current_question(session_id, data, session={}):
+def _set_current_question(session_id, data, session={}):
     """
     validate that question ID in round
     set question.open = True
@@ -336,8 +340,12 @@ def get_question_by_id(session_id, question_id):
     pass
 
 
+def set_current_round(session_id, round_id):
+    return _set_current_question(session_id, {ROUND_ID: round_id})
+
+
 @model(smodel, GET_ONE, "session")
-def get_current_round(session_id, session={}):
+def _get_current_round(session_id, session={}):
     """
     return round_name, list of questions, list of wagers
     """

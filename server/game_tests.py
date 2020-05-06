@@ -13,11 +13,14 @@ def create_and_print(data):
     return created
 
 
-def dummy_round(question_id):
+def dummy_round(question_ids):
+    wagers = []
+    for i in range(0, len(question_ids)):
+        wagers.append(i + 1)
     rdata = {
         "name": "test round",
-        "questions": [question_id],
-        "wagers": [3]
+        "questions": question_ids,
+        "wagers": wagers
     }
     created = create_round(rdata)
     if created["success"]:
@@ -29,7 +32,7 @@ def dummy_round(question_id):
 def dummy_game(rounds):
     gdata = {
         "name": "test game",
-        "rounds": [rounds]
+        "rounds": rounds
     }
     created = create_game(gdata)
     if created["success"]:

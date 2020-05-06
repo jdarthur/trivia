@@ -46,16 +46,39 @@ def create_and_print(data):
 
 
 class DummyGame(object):
+    def __init__(self, rounds=1, questions_per_round=1, return_class=False):
+        self.rcount = rounds
+        self.qcount = questions_per_round
+        self.return_class = return_class
+
     def __enter__(self):
-        self.question_id = dummy_question()
-        self.round_id = dummy_round(self.question_id)
-        self.game_id = dummy_game(self.round_id)
+        self.rounds = []
+        self.questions = []
+        for i in range(0, self.rcount):
+            rqs = []
+            for j in range(0, self.qcount):
+                question_id = dummy_question()
+                self.questions.append(question_id)
+                rqs.append(question_id)
+
+            r = dummy_round(rqs)
+            print(r)
+            self.rounds.append(r)
+
+        self.game_id = dummy_game(self.rounds)
+        if self.return_class:
+            return self
         return self.game_id
 
     def __exit__(self, type, value, traceback):
+
         delete_game(self.game_id)
-        delete_round(self.round_id)
-        delete_question(self.question_id)
+
+        for round_id in self.rounds:
+            delete_round(round_id)
+
+        for question_id in self.questions:
+            delete_question(question_id)
 
 
 """
@@ -103,7 +126,7 @@ def game_id_is_valid_but_nonexistent():
 
 def crud():
     print("\nTEST: crud path")
-    with DummyGame as game_id:
+    with DummyGame() as game_id:
         session_id = dummy_session(game_id)
 
         gotten = get_session(session_id)
@@ -172,32 +195,13 @@ def add_players_and_get():
         delete_session(session_id)
 
 
-def add_after_starting():
-    print("\nTEST: add player to session after starting")
-    with DummyGame() as game_id:
-        session_id = dummy_session(game_id)
-        player_id = dummy_player()
-
-        print("Starting session")
-        start_session(session_id, {"started": True})
-        indentprint(get_session(session_id))
-        
-        print(f"adding player {player_id} to started session")
-        added = add_to_session(session_id, {"player_id": player_id})
-        pprint(added)
-
-        delete_player(player_id)
-        delete_session(session_id)
-
-
 if __name__ == "__main__":
-    # missing_name()
-    # name_is_not_str()
-    # missing_game_id()
-    # game_id_is_not_str()
-    # game_id_is_not_valid()
-    # game_id_is_valid_but_nonexistent()
-    # crud()
+    missing_name()
+    name_is_not_str()
+    missing_game_id()
+    game_id_is_not_str()
+    game_id_is_not_valid()
+    game_id_is_valid_but_nonexistent()
+    crud()
     add_player_to_session()
     add_players_and_get()
-    add_after_starting()
