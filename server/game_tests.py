@@ -24,7 +24,7 @@ def dummy_round():
     return None
 
 
-def dummy_game(rounds=[]):
+def dummy_game(rounds):
     gdata = {
         "name": "test game",
         "rounds": rounds
@@ -79,11 +79,17 @@ def round_id_duplicated():
     create_and_print(data)
 
 
+def rounds_empty():
+    print("\nTEST: rounds list empty")
+    data = {"name": "f", "rounds": []}
+    create_and_print(data)
+
+
 def crud():
     print("\nTEST: crud path")
     round_id = dummy_round()
 
-    game_id = dummy_game()
+    game_id = dummy_game([round_id])
     game = get_game(game_id)
 
     print("game created:")
@@ -129,5 +135,6 @@ if __name__ == "__main__":
     round_id_not_valid()
     round_id_valid_but_nonexistent()
     round_id_duplicated()
+    rounds_empty()
     crud()
     round_removed_from_game_when_deleted()

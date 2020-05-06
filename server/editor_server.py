@@ -238,7 +238,7 @@ def delete_round(round_id, round_obj={}):
 
         deleted = delete_round_from_all_games(round_id)
         if not deleted[SUCCESS]:
-            return deleted[ERRORS]
+            return deleted[ERROR]
 
         questions = round_obj.get(QUESTIONS, [])
         for question_id in questions:
@@ -278,9 +278,7 @@ def delete_round_from_all_games(round_id):
     games = get_games()
     for game in games:
         game_id = game[ID]
-        success = mongo.pull("game", game_id, ROUNDS, round_id)
-        if not success:
-            return fail(error=f"Failed to remove {ROUND} {round_id} from {GAME} {game_id}")
+        mongo.pull("game", game_id, ROUNDS, round_id)
     return succeed({})
 
 

@@ -222,6 +222,9 @@ def start_session(session_id, data, session={}):
         if success:
             session.update(data)
             game = get_game(session[GAME_ID])
+            print(game)
+            if game[SUCCESS]:
+                game = game[OBJECT]
             first_round = set_current_round(game[ROUND_ID])
             if not first_round[SUCCESS]:
                 return fail(f"Failed to set first {ROUND}")
