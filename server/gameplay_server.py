@@ -10,10 +10,10 @@ from datetime import datetime
 from mongo_manager import MongoManager
 
 from validator import model, succeed, fail, RestField, IdField
-from validator import SUCCESS, ERROR, ERRORS, OBJECT, CREATE, UPDATE, DELETE, GET_ONE, GET_ALL
-from editor_server import get_game, get_round, get_question
+from validator import SUCCESS, ERRORS, OBJECT, CREATE, UPDATE, DELETE, GET_ONE
+from editor_server import get_game, get_round
 
-from flask import Flask, jsonify, request
+from flask import Flask
 
 
 app = Flask(__name__)
@@ -280,7 +280,7 @@ def set_current_question(session_id, data, session={}):
             return fail(f"{QUESTION} with id {question_id} is not in current round {r}.")
 
         # set session.answers.question_id = {}
-        data_to_update = { f"{QUESTIONS}.{question_id}": {ANSWERS: {}}, CURRENT_QUESTION: question_id}
+        data_to_update = {f"{QUESTIONS}.{question_id}": {ANSWERS: {}}, CURRENT_QUESTION: question_id}
         success = mongo.update("session", session_id, data_to_update)
         if success:
             return succeed({CURRENT_QUESTION: question_id})
@@ -391,6 +391,7 @@ def score_question(session_id, data):
     set question.scored = true
     """
 
+
 answer_model = (
     IdField(SESSION_ID, "session"),
     IdField(QUESTION_ID, "question"),
@@ -398,6 +399,8 @@ answer_model = (
     RestField(ANSWER),
     RestField(WAGER, int),
 )
+
+
 def answer_question(data):
     """
     validate wager is legal

@@ -65,7 +65,7 @@ class MongoManager(object):
         returns:
             created object, with new ID
         """
-        
+
         data = add_id(data)
         # print(f"MONGO: create {object_type} {data[_ID]}")
         self.db[object_type].insert_one(data)
@@ -99,7 +99,7 @@ class MongoManager(object):
             modified count
         """
         result = self.db[object_type].update_one(id_equals(object_id),
-                                        {"$push": {array: value}})
+                                                 {"$push": {array: value}})
         return result.modified_count
 
     def pull(self, object_type, object_id, array, value):
@@ -115,7 +115,7 @@ class MongoManager(object):
             modified count
         """
         result = self.db[object_type].update_one(id_equals(object_id),
-                                        {"$pull": {array: value}})
+                                                 {"$pull": {array: value}})
         return result.modified_count
 
     def delete(self, object_type, object_id):

@@ -1,6 +1,6 @@
 from editor_server import (create_round, delete_round)
 from editor_server import (create_game, delete_game, get_game,
-                            update_game, get_games)
+                           update_game, get_games)
 
 from rounds_tests import indentprint
 
@@ -24,7 +24,7 @@ def dummy_round():
     return None
 
 
-def dummy_game(rounds = []):
+def dummy_game(rounds=[]):
     gdata = {
         "name": "test game",
         "rounds": rounds
@@ -32,7 +32,7 @@ def dummy_game(rounds = []):
     created = create_game(gdata)
     if created["success"]:
         return created["object"]["id"]
-    
+
     return None
 
 
@@ -74,7 +74,7 @@ def round_id_valid_but_nonexistent():
 
 def round_id_duplicated():
     print("\nTEST: round ID is duplicated")
-    data = {"name": "f", "rounds": ["5e9c82c83e9f1b817df277aa", 
+    data = {"name": "f", "rounds": ["5e9c82c83e9f1b817df277aa",
                                     "5e9c82c83e9f1b817df277aa"]}
     create_and_print(data)
 

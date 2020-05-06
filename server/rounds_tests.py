@@ -1,6 +1,8 @@
 import pprint
-from editor_server import create_round, delete_round, get_round, update_round, get_rounds
-from editor_server import create_question, delete_question, get_question, get_questions
+from editor_server import (create_round, delete_round, get_round,
+                           update_round, get_rounds)
+from editor_server import (create_question, delete_question,
+                           get_question, get_questions)
 
 
 def indentprint(data):
@@ -74,31 +76,34 @@ def missing_wagers():
 
 def wagers_not_list():
     print("\nTEST: attr 'wagers' is not list")
-    data = {"name": "f", "questions": [], "wagers" : "f"}
+    data = {"name": "f", "questions": [], "wagers": "f"}
     create_and_print(data)
 
 
 def question_id_is_not_str():
     print("\nTEST: question ID is not str")
-    data = {"name": "f", "questions": [{}, ""], "wagers" : [1, 2]}
+    data = {"name": "f", "questions": [{}, ""], "wagers": [1, 2]}
     create_and_print(data)
 
 
 def question_id_is_invalid():
     print("\nTEST: question ID is not valid")
-    data = {"name": "f", "questions": ["L"], "wagers" : [1]}
+    data = {"name": "f", "questions": ["L"], "wagers": [1]}
     create_and_print(data)
 
 
 def question_id_is_valid_but_nonexistent():
     print("\nTEST: question ID is valid but nonexistent")
-    data = {"name": "f", "questions": ["5e9c82c83e9f1b817df277aa"], "wagers" : [1]}
+    data = {"name": "f", "questions": ["5e9c82c83e9f1b817df277aa"],
+            "wagers": [1]}
     create_and_print(data)
 
 
 def question_id_is_duplicate():
     print("\nTEST: question ID is duplicated")
-    data = {"name": "f", "questions": ["5e9c82c83e9f1b817df277aa", "5e9c82c83e9f1b817df277aa"], "wagers" : [1, 2]}
+    data = {"name": "f", "questions": ["5e9c82c83e9f1b817df277aa",
+                                       "5e9c82c83e9f1b817df277aa"],
+            "wagers": [1, 2]}
     create_and_print(data)
 
 
@@ -263,4 +268,3 @@ if __name__ == "__main__":
     round_removed_from_question_when_round_deleted()
     round_removed_from_question_when_question_removed_from_round()
     question_removed_from_round_when_question_is_deleted()
-
