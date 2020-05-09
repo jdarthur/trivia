@@ -1,13 +1,14 @@
 import uuid
 from pprint import pprint
+import unittest
 from random import randint
 from gameplay_server import (create_session, delete_session, get_session, get_sessions,
                              update_session, add_to_session, remove_from_session,
-                             create_player, delete_player, get_players, start_session)
+                             create_player, delete_player, get_players)
 from editor_server import delete_game, delete_round, delete_question
-from game_tests import dummy_game, dummy_round
-from rounds_tests import indentprint
-from questions_tests import dummy_question
+from .game_tests import dummy_game, dummy_round, DummyGame
+from .rounds_tests import indentprint
+from .questions_tests import dummy_question
 
 """
 ===============================
@@ -44,43 +45,6 @@ def create_and_print(data):
         session = session['object']
     indentprint(session)
 
-
-class DummyGame(object):
-    def __init__(self, rounds=1, questions_per_round=1, return_class=False):
-        self.rcount = rounds
-        self.qcount = questions_per_round
-        self.return_class = return_class
-
-    def __enter__(self):
-        self.rounds = []
-        self.questions = []
-        for i in range(0, self.rcount):
-            rqs = []
-            for j in range(0, self.qcount):
-                question_id = dummy_question()
-                self.questions.append(question_id)
-                rqs.append(question_id)
-
-            r = dummy_round(rqs)
-            print(r)
-            self.rounds.append(r)
-
-        self.game_id = dummy_game(self.rounds)
-        if self.return_class:
-            return self
-        return self.game_id
-
-    def __exit__(self, type, value, traceback):
-
-        delete_game(self.game_id)
-
-        for round_id in self.rounds:
-            delete_round(round_id)
-
-        for question_id in self.questions:
-            delete_question(question_id)
-
-
 """
 ===============================
             TESTS
@@ -88,7 +52,7 @@ class DummyGame(object):
 """
 
 
-def missing_name():
+def test_missing_name():
     print("\nTEST: session is missing name attribute")
     data = {}
     create_and_print(data)
