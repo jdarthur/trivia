@@ -1,8 +1,7 @@
 from pprint import pprint
 from gameplay_server import (delete_session, start_session, set_current_question,
                              get_current_question, get_session, delete_player, add_to_session)
-from session_tests import dummy_session, dummy_player
-from session_tests import DummyGame, indentprint
+from .session_test import dummy_session, dummy_player, DummyGame, indentprint
 
 
 def start_game_without_rounds():
@@ -18,29 +17,31 @@ def start_session_game_id_nonexistent():
     # create session(game_id)
     # delete game
     # start_session
-        # fail
+    # fail
     pass
 
 
-def add_after_starting():
+def test_add_after_starting():
     print("\nTEST: add player to session after starting")
     with DummyGame() as game_id:
         session_id = dummy_session(game_id)
         player_id = dummy_player()
 
         print("Starting session")
-        start_session(session_id, {"started": True})
+        started = start_session(session_id)
+        assert started['success'] is True
         indentprint(get_session(session_id))
-        
+
         print(f"adding player {player_id} to started session")
         added = add_to_session(session_id, {"player_id": player_id})
         pprint(added)
+        assert added['success'] is False
 
         delete_player(player_id)
         delete_session(session_id)
 
 
-def set_question_and_get():
+def test_set_question_and_get():
     print("\nTEST: set question and get current question")
     with DummyGame(rounds=1, questions_per_round=5, return_class=True) as game:
         game_id = game.game_id
@@ -48,21 +49,26 @@ def set_question_and_get():
         session_id = dummy_session(game_id)
 
         print("Starting session")
-        started = start_session(session_id, {"started": True})
-        pprint(started)
+        started = start_session(session_id)
+        assert started['success']
 
-        set_current_question(session_id, question2)
+        newq = set_current_question(session_id, question2)
+        assert newq['success']
+
         session = get_session(session_id)
-        print("session")
-        indentprint(session)
+        assert session['object']['current_question'] == question2
 
-        print("current question")
         question = get_current_question(session_id)
-        indentprint(question)
+        assert question['success']
 
         delete_session(session_id)
 
+def answer_question():
+    with DummyGame() as game_id:
+        session_id = dummy_session(game_id)
+        player_id = dummy_player()
+        added = add_to_session(session_id, player_id)
+        assert added['success']
 
-if __name__ == "__main__":
-    add_after_starting()
-    set_question_and_get()
+        question = get_current_question(session_id)
+        assert question['success']

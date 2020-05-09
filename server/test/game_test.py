@@ -3,7 +3,7 @@ from editor_server import (create_game, delete_game, get_game,
                            update_game, get_games, delete_question)
 
 from .rounds_test import indentprint
-from .questions_test import dummy_question
+from .questions_test import dummy_question, object_with_id_in_list
 
 
 class DummyGame(object):
@@ -144,14 +144,14 @@ def test_crud():
 
         all_games = get_games()
         print("   all games after update: {}".format(all_games))
-        assert len(all_games) > 0
+        assert object_with_id_in_list(all_games, game_id, True)
 
         success = delete_game(game_id)
         assert success
 
         all_games = get_games()
         print("   all games after delete: {}".format(all_games))
-        assert len(all_games) == 0
+        assert object_with_id_in_list(all_games, game_id, False)
 
 
 def test_round_removed_from_game_when_deleted():

@@ -46,28 +46,28 @@ def test_missing_question():
     print("\nTEST: question is missing 'question' attr")
     q = {"answer": "a complicated mating dance", "category": "birds"}
     created = create_and_print(q)
-    assert created["success"] == False
+    assert created["success"] is False
 
 
 def test_missing_answer():
     print("\nTEST: question is missing 'answer' attr")
     q = {"question": "what's a computer", "category": "commercials"}
     created = create_and_print(q)
-    assert created["success"] == False
+    assert created["success"] is False
 
 
 def test_missing_category():
     print("\nTEST: question is missing 'category' attr")
     q = {"question": "what's 2+2", "answer": "6"}
     created = create_and_print(q)
-    assert created["success"] == False
+    assert created["success"] is False
 
 
 def test_question_is_dict():
     print("\nTEST: question is dict")
     q = {"question": {"test": "123"}, "answer": "answer", "category": "birds"}
     created = create_and_print(q)
-    assert created["success"] == False
+    assert created["success"] is False
 
 
 def test_crud():

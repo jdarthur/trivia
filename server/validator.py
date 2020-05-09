@@ -46,6 +46,12 @@ def succeed(obj):
 class model(object):
 
     def __init__(self, model, request_type, object_type):
+        """
+        args:
+            model: list of Validation objects
+            request_type: [CREATE, UPDATE, GET_ONE, DELETE]
+            object_type: data collection name e.g. "session", "player", "question"
+        """
         self.model = model
         self.request_type = request_type
         self.object_type = object_type

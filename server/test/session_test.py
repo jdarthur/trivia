@@ -1,14 +1,11 @@
 import uuid
 from pprint import pprint
-import unittest
 from random import randint
 from gameplay_server import (create_session, delete_session, get_session, get_sessions,
                              update_session, add_to_session, remove_from_session,
                              create_player, delete_player, get_players)
-from editor_server import delete_game, delete_round, delete_question
-from .game_tests import dummy_game, dummy_round, DummyGame
-from .rounds_tests import indentprint
-from .questions_tests import dummy_question
+from .game_test import DummyGame
+from .rounds_test import indentprint
 
 """
 ===============================
@@ -44,6 +41,8 @@ def create_and_print(data):
     if session['success']:
         session = session['object']
     indentprint(session)
+    return session
+
 
 """
 ===============================
@@ -55,40 +54,46 @@ def create_and_print(data):
 def test_missing_name():
     print("\nTEST: session is missing name attribute")
     data = {}
-    create_and_print(data)
+    created = create_and_print(data)
+    assert created['success'] is False
 
 
-def name_is_not_str():
+def test_name_is_not_str():
     print("\nTEST: name attribute is not str")
     data = {"name": []}
-    create_and_print(data)
+    created = create_and_print(data)
+    assert created['success'] is False
 
 
-def missing_game_id():
+def test_missing_game_id():
     print("\nTEST: session is missing game_id")
     data = {"name": "f"}
-    create_and_print(data)
+    created = create_and_print(data)
+    assert created['success'] is False
 
 
-def game_id_is_not_str():
+def test_game_id_is_not_str():
     print("\nTEST: game_id is not str")
     data = {"name": "f", "game_id": []}
-    create_and_print(data)
+    created = create_and_print(data)
+    assert created['success'] is False
 
 
-def game_id_is_not_valid():
+def test_game_id_is_not_valid():
     print("\nTEST: game_id is not valid")
     data = {"name": "f", "game_id": "f"}
-    create_and_print(data)
+    created = create_and_print(data)
+    assert created['success'] is False
 
 
-def game_id_is_valid_but_nonexistent():
+def test_game_id_is_valid_but_nonexistent():
     print("\nTEST: game_id is valid but nonexistent")
     data = {"name": "f", "game_id": uuid.uuid4()}
-    create_and_print(data)
+    created = create_and_print(data)
+    assert created['success'] is False
 
 
-def crud():
+def test_crud():
     print("\nTEST: crud path")
     with DummyGame() as game_id:
         session_id = dummy_session(game_id)
@@ -108,7 +113,7 @@ def crud():
         pprint(sessions['object'])
 
 
-def add_player_to_session():
+def test_add_player_to_session():
     print("\nTEST: add player to session")
     with DummyGame() as game_id:
         session_id = dummy_session(game_id)
@@ -131,7 +136,7 @@ def add_player_to_session():
         delete_session(session_id)
 
 
-def add_players_and_get():
+def test_add_players_and_get():
     print("\nTEST: add player to session and get, the nremove")
     with DummyGame() as game_id:
         session_id = dummy_session(game_id)
@@ -158,14 +163,3 @@ def add_players_and_get():
 
         delete_session(session_id)
 
-
-if __name__ == "__main__":
-    missing_name()
-    name_is_not_str()
-    missing_game_id()
-    game_id_is_not_str()
-    game_id_is_not_valid()
-    game_id_is_valid_but_nonexistent()
-    crud()
-    add_player_to_session()
-    add_players_and_get()
