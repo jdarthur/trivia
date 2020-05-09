@@ -2,8 +2,8 @@ from editor_server import (create_round, delete_round)
 from editor_server import (create_game, delete_game, get_game,
                            update_game, get_games, delete_question)
 
-from .rounds_tests import indentprint
-from .questions_tests import dummy_question
+from .rounds_test import indentprint
+from .questions_test import dummy_question
 
 
 class DummyGame(object):
@@ -87,45 +87,51 @@ def test_missing_name():
 def test_missing_rounds():
     print("\nTEST: game is missing rounds attribute")
     data = {"name": "f"}
-    create_and_print(data)
+    created = create_and_print(data)
+    assert created["success"] is False
 
 
 def test_rounds_is_not_list():
     print("\nTEST: rounds attribute is not list")
     data = {"name": "f", "rounds": "f"}
-    create_and_print(data)
+    created = create_and_print(data)
+    assert created["success"] is False
 
 
 def test_round_id_not_str():
     print("\nTEST: round ID is not str")
     data = {"name": "f", "rounds": [1]}
-    create_and_print(data)
+    created = create_and_print(data)
+    assert created["success"] is False
 
 
 def test_round_id_not_valid():
     print("\nTEST: round ID is not valid")
     data = {"name": "f", "rounds": ["fff"]}
-    create_and_print(data)
+    created = create_and_print(data)
+    assert created["success"] is False
 
 
 def test_round_id_valid_but_nonexistent():
     print("\nTEST: round ID is valid but nonexistent")
     data = {"name": "f", "rounds": ["5e9c82c83e9f1b817df277aa"]}
-    create_and_print(data)
+    created = create_and_print(data)
+    assert created["success"] is False
 
 
 def test_round_id_duplicated():
     print("\nTEST: round ID is duplicated")
     data = {"name": "f", "rounds": ["5e9c82c83e9f1b817df277aa",
                                     "5e9c82c83e9f1b817df277aa"]}
-    create_and_print(data)
+    created = create_and_print(data)
+    assert created["success"] is False
 
 
 def test_crud():
     print("\nTEST: crud path")
-    with DummyGame(return_class=True) as game:
+    with DummyGame(rounds=2, return_class=True) as game:
         game_id = game.game_id
-        round_id = game.rounds[0]
+        round_id = game.rounds[1]
 
         game = get_game(game_id)
 
@@ -133,16 +139,19 @@ def test_crud():
         assert game["success"]
         print(game)
 
-        updated = update_game(game_id, {"game": []})
+        updated = update_game(game_id, {"rounds": [round_id]})
         assert updated["success"]
 
         all_games = get_games()
         print("   all games after update: {}".format(all_games))
+        assert len(all_games) > 0
 
         success = delete_game(game_id)
+        assert success
 
         all_games = get_games()
         print("   all games after delete: {}".format(all_games))
+        assert len(all_games) == 0
 
 
 def test_round_removed_from_game_when_deleted():
@@ -154,9 +163,11 @@ def test_round_removed_from_game_when_deleted():
         gotten = get_game(game_id)
         print("game before round delete:")
         indentprint(gotten)
+        assert gotten['object']['rounds'][0] == round_id
 
         delete_round(round_id)
 
         gotten = get_game(game_id)
         print("game after round delete:")
         indentprint(game)
+        assert len(gotten['object']['rounds']) == 0
