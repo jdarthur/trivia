@@ -1,7 +1,7 @@
 from pprint import pprint
 from gameplay_server import (delete_session, start_session, set_current_question,
                              get_current_question, get_session, delete_player, add_to_session)
-from .session_test import dummy_session, dummy_player, DummyGame, indentprint
+from .test_helpers import DummyGame, dummy_session, dummy_player, indentprint
 
 
 def start_game_without_rounds():
@@ -62,13 +62,3 @@ def test_set_question_and_get():
         assert question['success']
 
         delete_session(session_id)
-
-def answer_question():
-    with DummyGame() as game_id:
-        session_id = dummy_session(game_id)
-        player_id = dummy_player()
-        added = add_to_session(session_id, player_id)
-        assert added['success']
-
-        question = get_current_question(session_id)
-        assert question['success']

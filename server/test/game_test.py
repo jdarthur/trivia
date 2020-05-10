@@ -1,45 +1,7 @@
-from editor_server import (create_round, delete_round)
+from editor_server import delete_round
 from editor_server import (create_game, delete_game, get_game,
-                           update_game, get_games, delete_question)
-
-from .rounds_test import indentprint
-from .questions_test import dummy_question, object_with_id_in_list
-
-
-class DummyGame(object):
-    def __init__(self, rounds=1, questions_per_round=1, return_class=False):
-        self.rcount = rounds
-        self.qcount = questions_per_round
-        self.return_class = return_class
-
-    def __enter__(self):
-        self.rounds = []
-        self.questions = []
-        for i in range(0, self.rcount):
-            rqs = []
-            for j in range(0, self.qcount):
-                question_id = dummy_question()
-                self.questions.append(question_id)
-                rqs.append(question_id)
-
-            r = dummy_round(rqs)
-            print(r)
-            self.rounds.append(r)
-
-        self.game_id = dummy_game(self.rounds)
-        if self.return_class:
-            return self
-        return self.game_id
-
-    def __exit__(self, type, value, traceback):
-
-        delete_game(self.game_id)
-
-        for round_id in self.rounds:
-            delete_round(round_id)
-
-        for question_id in self.questions:
-            delete_question(question_id)
+                           update_game, get_games)
+from .test_helpers import object_with_id_in_list, indentprint, DummyGame
 
 
 def create_and_print(data):
@@ -47,34 +9,6 @@ def create_and_print(data):
     print("created:")
     indentprint(created)
     return created
-
-
-def dummy_round(question_ids):
-    wagers = []
-    for i in range(0, len(question_ids)):
-        wagers.append(i + 1)
-    rdata = {
-        "name": "test round",
-        "questions": question_ids,
-        "wagers": wagers
-    }
-    created = create_round(rdata)
-    if created["success"]:
-        return created["object"]["id"]
-    print(created)
-    return None
-
-
-def dummy_game(rounds):
-    gdata = {
-        "name": "test game",
-        "rounds": rounds
-    }
-    created = create_game(gdata)
-    if created["success"]:
-        return created["object"]["id"]
-    print(created)
-    return None
 
 
 def test_missing_name():

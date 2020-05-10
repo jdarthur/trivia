@@ -10,7 +10,7 @@ from datetime import datetime
 from mongo_manager import MongoManager
 
 from validator import model, succeed, fail, RestField, IdField
-from validator import SUCCESS, OBJECT, CREATE, UPDATE, DELETE, GET_ONE
+from validator import SUCCESS, OBJECT, CREATE, UPDATE, DELETE, GET_ONE, SUBCREATE
 from editor_server import get_game, get_round, get_question
 
 from flask import Flask
@@ -48,6 +48,7 @@ WAGERS = "wagers"
 ROUNDS_USED = "rounds_used"
 GAME = "game"
 SESSION = "session"
+CORRECT = "correct"
 
 MONGO_HOST = "localhost"
 MONGO_DB = "trivia"
@@ -305,7 +306,7 @@ def set_current_question(session_id, question_id):
 cq_model = [
     IdField(QUESTION_ID, "question")
 ]
-@model(cq_model, UPDATE, "session")
+@model(cq_model, SUBCREATE, "session")
 def _set_current_question(session_id, data, session={}):
     """
     validate that question ID in round
@@ -361,7 +362,9 @@ def _get_question_by_id(session_id, data, session={}):
     questions = session.get(QUESTIONS)
     if question_id not in questions:
         return fail(f"{QUESTION}_id {question_id} not found in session {session_id}")
-    return succeed(questions[question_id])
+    question = questions[question_id]
+    question[ID] = question_id
+    return succeed(question)
 
 
 @model(smodel, GET_ONE, "session")
@@ -370,7 +373,9 @@ def get_current_round(session_id, session={}):
     return round_name, list of questions, list of wagers
     """
     round_id = session.get(CURRENT_ROUND)
-    return succeed(session.get(ROUNDS, {}).get(round_id, None))
+    r = session.get(ROUNDS, {}).get(round_id, None)
+    r[ID] = round_id
+    return succeed(r)
 
 
 def set_current_round(session_id, round_id):
@@ -380,7 +385,7 @@ def set_current_round(session_id, round_id):
 cr_model = [
     IdField(ROUND_ID, "round")
 ]
-@model(cr_model, UPDATE, "session")
+@model(cr_model, SUBCREATE, "session")
 def _set_current_round(session_id, data, session={}):
     round_id = data[ROUND_ID]
 
@@ -443,6 +448,7 @@ def get_answer_status(session_id, question_id):
     """
     pass
 
+
 @model(cq_model, UPDATE, "session")
 def get_answers(session_id, question_id, session={}):
     """
@@ -459,11 +465,17 @@ def get_answers(session_id, question_id, session={}):
     if answers is None:
         return fail(f"{QUESTION}_id {question_id} is not open")
 
+    for player_id in answers:
+        answer_ids = answers[player_id]
+        for answer in answer_ids:
+            pass
+
 
 score_model = [
     IdField(QUESTION_ID, "question"),
     RestField(PLAYERS, dict)
 ]
+
 
 @model(score_model, UPDATE, "session")
 def score_question(session_id, data, session={}):
@@ -494,31 +506,53 @@ def score_question(session_id, data, session={}):
     for player_id in session_players:
         if player_id not in given_players:
             return fail(f"{PLAYER_ID} {player_id} was not scored.")
-    
+
     for player_id in given_players:
         answer_ids = answers.get(player_id, [])
         if len(answer_ids) == 0:
             return fail(f"{PLAYER_ID} {player_id} has not answered question {question_id}")
-        
-        answer = get_answer(answer_id)
+
+        # last answer is the one scored
+        answer = get_answer(answer_ids[-1])
         if not answer[SUCCESS]:
             return answer
-        
+
         answer = answer[OBJECT]
         wager = answer[WAGER]
-        points = {
-            "points": {
-                "player_id"
-            }
-        }
-    
 
-def get_legal_bets(session, round_id, player_id):
+        is_correct = given_players[player_id].get(CORRECT, None)
+        if is_correct is None:
+            return fail(f"Did not set correct True/False for {PLAYER_ID} {player_id}")
+
+        points_awarded = wager if is_correct else 0
+        award_points(session_id, player_id, points_awarded)
+
+
+def get_legal_wagers(session, round_id, player_id):
     """
     must not
     """
+    r = session[ROUNDS][round_id]
+    all_wagers = r[WAGERS].copy()
+    questions_in_round = r[QUESTIONS]
 
-    return []
+    for question_id in questions_in_round:
+        question = session[QUESTIONS][question_id]
+        if question.get(SCORED, False):
+            answer_id = question[ANSWERS][player_id][-1]
+            answer = get_answer(answer_id)
+            if not answer[SUCCESS]:
+                raise RuntimeError("failed to get answer")
+            answer = answer[OBJECT]
+            wager = answer[WAGER]
+            all_wagers.remove(wager)
+
+    return all_wagers
+
+
+def award_points(session_id, player_id, points):
+    # update_scoreboard -> $inc session.points[player_id]: points_awarded
+    pass
 
 
 answer_model = (
@@ -529,7 +563,8 @@ answer_model = (
     RestField(WAGER, int),
 )
 
-@model(answer_model, UPDATE, "answer")
+
+@model(answer_model, SUBCREATE, "session")
 def answer_question(session_id, data, session={}):
     """
     validate wager is legal
@@ -541,26 +576,37 @@ def answer_question(session_id, data, session={}):
     """
     player_id = data[PLAYER_ID]
     round_id = data[ROUND_ID]
+    question_id = data[QUESTION_ID]
 
     legal_wagers = get_legal_wagers(session, round_id, player_id)
     wager = data[WAGER]
     if wager not in legal_wagers:
         return fail(f"Wager {wager} is illegal")
-    
-    answers = session.get(QUESTIONS).get(question_id, {}).get(ANSWERS, None)
-    if answers is None:
-        return fail(f"{QUESTION}_id {question_id} is not open")
 
     answers = session.get(QUESTIONS).get(question_id, {}).get(ANSWERS, None)
     if answers is None:
         return fail(f"{QUESTION}_id {question_id} is not open")
-    
-    
 
-def create_answer(session_id, data, session):
+    answer = create_answer(data)
+    if not answer[SUCCESS]:
+        return answer
+    answer = answer[OBJECT]
 
-    if 
-    
+    answer_id = answer[ID]
+    array = f"{QUESTIONS}.{question_id}.{ANSWERS}.{player_id}"
+    success = mongo.push("session", session_id, array, answer_id)
+    if not success:
+        return fail(f"Failed to add add {answer_id} for player {player_id}")
+
+    return succeed(answer)
+
+
+def create_answer(data):
+    success = mongo.create("answer", data)
+    if not success:
+        return fail("Failed to create answer")
+    return succeed(success)
+
 
 @model(answer_model, GET_ONE, "answer")
 def get_answer(answer_id, answer={}):

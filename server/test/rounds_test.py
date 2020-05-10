@@ -5,44 +5,11 @@ from editor_server import (create_question, delete_question,
                            get_question, get_questions)
 
 
-def indentprint(data):
-    formatted = pprint.pformat(data).splitlines()
-    for line in formatted:
-        print(f"   {line}")
-
-
 def create_and_print(data):
     created = create_round(data)
     print("created:")
     indentprint(created)
     return created
-
-
-def dummy_question():
-    qdata = {
-        "question": "a",
-        "answer": "b",
-        "category": "c"
-    }
-    created = create_question(qdata)
-    if created["success"]:
-        return created["object"]["id"]
-
-
-def dummy_round(question_id):
-    data = {
-        "name": "test round",
-        "questions": [question_id],
-        "wagers": [3]
-    }
-    created = create_and_print(data)
-    if created["success"]:
-        created = created["object"]
-        round_id = created.get("id")
-        return round_id
-
-    return None
-
 
 def missing_name():
     print("\nTEST: round is missing name attribute")

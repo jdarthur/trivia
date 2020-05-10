@@ -5,6 +5,7 @@ UPDATE = "update"
 GET_ONE = "get one"
 DELETE = "delete"
 GET_ALL = "get all"
+SUBCREATE = "subcreate"
 
 SUCCESS = "success"
 ERRORS = "errors"
@@ -49,7 +50,7 @@ class model(object):
         """
         args:
             model: list of Validation objects
-            request_type: [CREATE, UPDATE, GET_ONE, DELETE]
+            request_type: [CREATE, UPDATE, GET_ONE, SUBCREATE, DELETE]
             object_type: data collection name e.g. "session", "player", "question"
         """
         self.model = model
@@ -68,14 +69,14 @@ class model(object):
                 object_id = args[0]
                 given_data = None
 
-            elif self.request_type == UPDATE:
+            elif self.request_type in [UPDATE, SUBCREATE]:
                 object_id = args[0]
                 given_data = args[1]
 
             errors = []
 
             # validate each field in model for create/update calls
-            if self.request_type in [CREATE, UPDATE]:
+            if self.request_type in [CREATE, UPDATE, SUBCREATE]:
                 for rest_field in self.model:
                     validation = rest_field.validate(given_data, self.request_type)
                     if not validation[SUCCESS]:
@@ -92,7 +93,7 @@ class model(object):
                     return fail(errors)
 
             # make sure the supplied ID is valid for get/update/delete
-            if self.request_type in [GET_ONE, UPDATE, DELETE]:
+            if self.request_type in [GET_ONE, UPDATE, SUBCREATE, DELETE]:
                 # object ID must exist on these calls
                 validation = id_is_valid(self.object_type, object_id)
                 if not validation[SUCCESS]:
@@ -104,7 +105,7 @@ class model(object):
                 return fail(errors)
 
             # if no errors, return whatever our call actually does
-            if self.request_type in [GET_ONE, UPDATE, DELETE]:
+            if self.request_type in [GET_ONE, UPDATE, SUBCREATE, DELETE]:
                 args = args + (fix_id(validation[OBJECT]),)
 
             return f(*args)

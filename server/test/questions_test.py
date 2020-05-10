@@ -1,25 +1,7 @@
 from pprint import pprint
-from random import randint
 from editor_server import (create_question, delete_question, get_question,
                            update_question, get_questions)
-
-
-def object_with_id_in_list(list, object_id, is_present):
-    """
-    Test if object with ID x is found in list
-
-    args:
-        list: list of dicts from get_all(object_type)
-        object_id: expected object id
-        is_present: True if object should be in list, False if not
-    """
-    found = False
-    for item in list:
-        item_id = item['id']
-        if item_id == object_id:
-            found = True
-            break
-    return found == is_present
+from .test_helpers import dummy_question, object_with_id_in_list
 
 
 def create_and_print(data):
@@ -27,19 +9,6 @@ def create_and_print(data):
     print("created:")
     pprint(created)
     return created
-
-
-def dummy_question():
-    qdata = {
-        "question": f"test question {randint(1, 100000)}",
-        "answer": "answer",
-        "category": "category"
-    }
-
-    created = create_question(qdata)
-    if created["success"]:
-        return created["object"]["id"]
-    return None
 
 
 def test_missing_question():

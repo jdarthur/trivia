@@ -1,39 +1,15 @@
 import uuid
-from pprint import pprint
-from random import randint
 from gameplay_server import (create_session, delete_session, get_session, get_sessions,
                              update_session, add_to_session, remove_from_session,
-                             create_player, delete_player, get_players)
-from .game_test import DummyGame
-from .rounds_test import indentprint
+                             delete_player, get_players)
+from .test_helpers import (indentprint, DummyGame, dummy_session,
+                           object_with_id_in_list, dummy_player)
 
 """
 ===============================
             HELPERS
 ===============================
 """
-
-
-def dummy_session(game_id):
-    sdata = {
-        "name": "test session",
-        "game_id": game_id
-    }
-
-    created = create_session(sdata)
-    if created["success"]:
-        return created["object"]["id"]
-    print(created)
-    return None
-
-
-def dummy_player():
-    pdata = {"player_name": f"test team {randint(1, 100000)}"}
-    created = create_player(pdata)
-    if created["success"]:
-        return created["object"]["id"]
-    print(created)
-    return None
 
 
 def create_and_print(data):
@@ -100,17 +76,17 @@ def test_crud():
 
         gotten = get_session(session_id)
         print("get session after create:")
-        pprint(gotten)
+        assert gotten["success"]
 
         gotten = update_session(session_id, {"name": "updated_name"})
         print("get session after update:")
-        print(gotten)
+        assert gotten['object']['name'] == 'updated_name'
 
         delete_session(session_id)
 
         sessions = get_sessions()
         print("get sessions after delete:")
-        pprint(sessions['object'])
+        assert object_with_id_in_list(sessions['object'], session_id, False)
 
 
 def test_add_player_to_session():
@@ -145,10 +121,11 @@ def test_add_players_and_get():
             add_to_session(session_id, {"player_id": player_id})
 
         players = get_players(session_id)
-        if players["success"]:
-            players = players["object"]
-            print(f"players in session '{session_id}':")
-            pprint(players)
+        assert players['success']
+
+        players = players["object"]
+        print(f"players in session '{session_id}':")
+        assert len(players) == 4
 
         for player in players:
             player_id = player["id"]
@@ -156,10 +133,10 @@ def test_add_players_and_get():
             delete_player(player_id)
 
         players = get_players(session_id)
-        if players["success"]:
-            players = players["object"]
-            print(f"players in session '{session_id}' after delete:")
-            pprint(players)
+        assert players['success']
+        players = players["object"]
+
+        print(f"players in session '{session_id}' after delete:")
+        assert len(players) == 0
 
         delete_session(session_id)
-
