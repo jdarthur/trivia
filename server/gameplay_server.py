@@ -10,7 +10,7 @@ from datetime import datetime
 from mongo_manager import MongoManager
 
 from validator import model, succeed, fail, RestField, IdField
-from validator import SUCCESS, OBJECT, CREATE, UPDATE, DELETE, GET_ONE, SUBCREATE
+from validator import SUCCESS, OBJECT, CREATE, UPDATE, DELETE, GET_ONE, SUBOP
 from editor_server import get_game, get_round, get_question
 
 from flask import Flask
@@ -306,7 +306,7 @@ def set_current_question(session_id, question_id):
 cq_model = [
     IdField(QUESTION_ID, "question")
 ]
-@model(cq_model, SUBCREATE, "session")
+@model(cq_model, SUBOP, "session")
 def _set_current_question(session_id, data, session={}):
     """
     validate that question ID in round
@@ -344,11 +344,11 @@ def _set_current_question(session_id, data, session={}):
     return fail(f"Failed to get round with ID {session.get(ROUND_ID)}")
 
 
-def get_question_by_id(session_id,  question_id):
+def get_question_by_id(session_id, question_id):
     return _get_question_by_id(session_id, {QUESTION_ID: question_id})
 
 
-@model(cq_model, UPDATE, "session")
+@model(cq_model, SUBOP, "session")
 def _get_question_by_id(session_id, data, session={}):
     """
     if not open: (i.e. question not in session.answers)
@@ -385,7 +385,7 @@ def set_current_round(session_id, round_id):
 cr_model = [
     IdField(ROUND_ID, "round")
 ]
-@model(cr_model, SUBCREATE, "session")
+@model(cr_model, SUBOP, "session")
 def _set_current_round(session_id, data, session={}):
     round_id = data[ROUND_ID]
 
@@ -449,8 +449,12 @@ def get_answer_status(session_id, question_id):
     pass
 
 
-@model(cq_model, UPDATE, "session")
-def get_answers(session_id, question_id, session={}):
+def get_answers(session_id, question_id):
+    return _get_answers(session_id, {QUESTION_ID: question_id})
+
+
+@model(cq_model, SUBOP, "session")
+def _get_answers(session_id, data, session={}):
     """
     if not is_current_question and not scored:
         return failure
@@ -461,14 +465,24 @@ def get_answers(session_id, question_id, session={}):
             answer: x
             wager: n
     """
-    answers = session.get(QUESTIONS).get(question_id, {}).get(ANSWERS, None)
-    if answers is None:
-        return fail(f"{QUESTION}_id {question_id} is not open")
+    question_id = data[QUESTION_ID]
+    answers = get_question_by_id(session_id, question_id)
+    if not answers[SUCCESS]:
+        return answers
 
+    answers = answers[OBJECT][ANSWERS]
+
+    composed = {}
     for player_id in answers:
+        composed[player_id] = []
         answer_ids = answers[player_id]
-        for answer in answer_ids:
-            pass
+        for answer_id in answer_ids:
+            answer = get_answer(answer_id)
+            if not answer[SUCCESS]:
+                return answer
+            composed[player_id].append(answer[OBJECT])
+
+    return succeed(composed)
 
 
 score_model = [
@@ -564,7 +578,7 @@ answer_model = (
 )
 
 
-@model(answer_model, SUBCREATE, "session")
+@model(answer_model, SUBOP, "session")
 def answer_question(session_id, data, session={}):
     """
     validate wager is legal

@@ -1,4 +1,4 @@
-from gameplay_server import (get_current_question, answer_question, get_current_round)
+from gameplay_server import (get_current_question, answer_question, get_current_round, get_answers)
 from .test_helpers import DummySessionWithPlayers
 
 
@@ -74,6 +74,8 @@ def test_successful_answer():
         answer = answer_question(session_id, answer_body)
         assert answer["success"]
 
+        answers = get_answers(session_id, question_id)
+        assert answers['object'][player_id][-1]["id"] == answer['object']["id"]
 
 
 def answer_twice():
