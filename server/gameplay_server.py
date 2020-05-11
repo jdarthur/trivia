@@ -49,6 +49,7 @@ ROUNDS_USED = "rounds_used"
 GAME = "game"
 SESSION = "session"
 CORRECT = "correct"
+SCOREBOARD = "scoreboard"
 
 MONGO_HOST = "localhost"
 MONGO_DB = "trivia"
@@ -191,6 +192,15 @@ def remove_from_session(session_id, data, session={}):
 
 
 def get_players(session_id):
+    """
+    args: session_id
+    returns:
+        [
+            {player_name: name, player_id: uuid4},
+            {player_name: name, player_id: uuid4},
+            ...
+        ]
+    """
     session = get_session(session_id)
     if session[SUCCESS]:
         session = session[OBJECT]
@@ -281,13 +291,6 @@ def game_has_round_and_question(session):
     first_question_id = questions[0]
 
     return succeed({ROUND_ID: first_round_id, QUESTION_ID: first_question_id})
-
-
-def get_scoreboard(session_id):
-    """
-    return map player_name -> score
-    """
-    pass
 
 
 @model(smodel, GET_ONE, "session")
@@ -539,34 +542,35 @@ def score_question(session_id, data, session={}):
             return fail(f"Did not set correct True/False for {PLAYER_ID} {player_id}")
 
         points_awarded = wager if is_correct else 0
-        award_points(session_id, player_id, points_awarded)
+        awarded = award_points(session_id, player_id, points_awarded)
+        if not awarded[SUCCESS]:
+            return awarded
 
-
-def get_legal_wagers(session, round_id, player_id):
-    """
-    must not
-    """
-    r = session[ROUNDS][round_id]
-    all_wagers = r[WAGERS].copy()
-    questions_in_round = r[QUESTIONS]
-
-    for question_id in questions_in_round:
-        question = session[QUESTIONS][question_id]
-        if question.get(SCORED, False):
-            answer_id = question[ANSWERS][player_id][-1]
-            answer = get_answer(answer_id)
-            if not answer[SUCCESS]:
-                raise RuntimeError("failed to get answer")
-            answer = answer[OBJECT]
-            wager = answer[WAGER]
-            all_wagers.remove(wager)
-
-    return all_wagers
+    return succeed(data)
 
 
 def award_points(session_id, player_id, points):
     # update_scoreboard -> $inc session.points[player_id]: points_awarded
-    pass
+    success = mongo.increment("session", session_id, f"{SCOREBOARD}.{player_id}", points)
+    if not success:
+        return fail(f"Failed to award {points} points for player {player_id}")
+    return succeed({PLAYER_ID: player_id})
+
+
+@model([], GET_ONE, "session")
+def get_scoreboard(session_id, session={}):
+    scoreboard = session.get(SCOREBOARD, None)
+    if scoreboard is None:
+        scoreboard = {}
+        players = get_players(session_id)
+        if not players[SUCCESS]:
+            return players
+        players = players[OBJECT]
+        for player in players:
+            player_id = player[ID]
+            scoreboard[player_id] = 0
+
+    return succeed(scoreboard)
 
 
 answer_model = (
@@ -601,6 +605,7 @@ def answer_question(session_id, data, session={}):
     if answers is None:
         return fail(f"{QUESTION}_id {question_id} is not open")
 
+
     answer = create_answer(data)
     if not answer[SUCCESS]:
         return answer
@@ -615,7 +620,30 @@ def answer_question(session_id, data, session={}):
     return succeed(answer)
 
 
+def get_legal_wagers(session, round_id, player_id):
+    """
+    must not
+    """
+    r = session[ROUNDS][round_id]
+    all_wagers = r[WAGERS].copy()
+    questions_in_round = r[QUESTIONS]
+
+    for question_id in questions_in_round:
+        question = session[QUESTIONS][question_id]
+        if question.get(SCORED, False):
+            answer_id = question[ANSWERS][player_id][-1]
+            answer = get_answer(answer_id)
+            if not answer[SUCCESS]:
+                raise RuntimeError("failed to get answer")
+            answer = answer[OBJECT]
+            wager = answer[WAGER]
+            all_wagers.remove(wager)
+
+    return all_wagers
+
+
 def create_answer(data):
+    data[CREATE_DATE] = datetime.utcnow()
     success = mongo.create("answer", data)
     if not success:
         return fail("Failed to create answer")

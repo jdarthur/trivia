@@ -118,6 +118,11 @@ class MongoManager(object):
                                                  {"$pull": {array: value}})
         return result.modified_count
 
+    def increment(self, object_type, object_id, incr_key, incr_value):
+        result = self.db[object_type].update_one(id_equals(object_id),
+                                                 {"$inc": {incr_key: incr_value}})
+        return result.modified_count
+
     def delete(self, object_type, object_id):
         """
         delete an object by ID
@@ -139,3 +144,4 @@ class MongoManager(object):
             list of all objects of type X
         """
         return self.db[object_type].find(filter)
+

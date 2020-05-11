@@ -1,5 +1,6 @@
 import random
-from gameplay_server import (get_current_question, answer_question, get_current_round, get_answers)
+from gameplay_server import (get_current_question, answer_question, get_current_round,
+                             get_answers, get_scoreboard)
 from .test_helpers import DummySessionWithPlayers
 
 
@@ -113,3 +114,16 @@ def test_answer_twice():
         answers = get_answers(session_id, question_id)
         assert answers['object'][player_id][0]["id"] == answer['object']["id"]
         assert answers['object'][player_id][1]["id"] == answer2['object']["id"]
+
+
+def test_get_scoreboard():
+    with DummySessionWithPlayers(players=2) as session:
+        session_id = session.session_id
+        player_id1 = session.players[0]
+        player_id2 = session.players[1]
+
+        scoreboard = get_scoreboard(session_id)
+        assert scoreboard['success']
+
+        assert scoreboard['object'][player_id1] == 0
+        assert scoreboard['object'][player_id2] == 0
