@@ -483,7 +483,9 @@ def _get_answers(session_id, data, session={}):
             answer = get_answer(answer_id)
             if not answer[SUCCESS]:
                 return answer
-            composed[player_id].append(answer[OBJECT])
+            answer = answer[OBJECT]
+            composed[player_id].append({ANSWER: answer[ANSWER], ID: answer[ID],
+                                        WAGER: answer[WAGER]})
 
     return succeed(composed)
 
@@ -504,12 +506,7 @@ def score_question(session_id, data, session={}):
             team2: {correct: false}
             ...
     }
-    for team in teams:
-        get_wager(question_id)
-        if team.correct:
-            $inc: { scoreboard.team_id.score : wager }
 
-    set question.scored = true
     """
     question_id = data[QUESTION_ID]
 
@@ -524,28 +521,30 @@ def score_question(session_id, data, session={}):
         if player_id not in given_players:
             return fail(f"{PLAYER_ID} {player_id} was not scored.")
 
+    answers = get_answers(session_id, question_id)
+    if not answers[SUCCESS]:
+        return answers
+    answers = answers[OBJECT]
+
     for player_id in given_players:
-        answer_ids = answers.get(player_id, [])
-        if len(answer_ids) == 0:
+        player_answers = answers.get(player_id, None)
+        if not player_answers:
             return fail(f"{PLAYER_ID} {player_id} has not answered question {question_id}")
 
         # last answer is the one scored
-        answer = get_answer(answer_ids[-1])
-        if not answer[SUCCESS]:
-            return answer
-
-        answer = answer[OBJECT]
-        wager = answer[WAGER]
-
+        answer = player_answers[-1]
         is_correct = given_players[player_id].get(CORRECT, None)
         if is_correct is None:
             return fail(f"Did not set correct True/False for {PLAYER_ID} {player_id}")
 
-        points_awarded = wager if is_correct else 0
+        points_awarded = answer[WAGER] if is_correct else 0
         awarded = award_points(session_id, player_id, points_awarded)
         if not awarded[SUCCESS]:
             return awarded
 
+    success = mongo.update("session", session_id, {f"{QUESTIONS}.{question_id}.{SCORED}": True})
+    if not success:
+        return fail("Failed to mark question as scored")
     return succeed(data)
 
 
@@ -604,7 +603,6 @@ def answer_question(session_id, data, session={}):
     answers = session.get(QUESTIONS).get(question_id, {}).get(ANSWERS, None)
     if answers is None:
         return fail(f"{QUESTION}_id {question_id} is not open")
-
 
     answer = create_answer(data)
     if not answer[SUCCESS]:

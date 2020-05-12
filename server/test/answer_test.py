@@ -1,6 +1,7 @@
 import random
 from gameplay_server import (get_current_question, answer_question, get_current_round,
-                             get_answers, get_scoreboard)
+                             get_answers, get_scoreboard, score_question,
+                             set_current_question, get_session)
 from .test_helpers import DummySessionWithPlayers
 
 
@@ -127,3 +128,73 @@ def test_get_scoreboard():
 
         assert scoreboard['object'][player_id1] == 0
         assert scoreboard['object'][player_id2] == 0
+
+
+def test_score_answer():
+    """
+    two players answer question
+    mark p1 == correct, p2 == incorrect
+    verify scoreboard updated with wagers
+    """
+    with DummySessionWithPlayers(players=2) as session:
+        session_id = session.session_id
+        player_id1 = session.players[0]
+        player_id2 = session.players[1]
+
+        answer_body = compose_answer(session, player_id1)
+        answer1 = answer_question(session_id, answer_body)
+        assert answer1["success"]
+
+        answer_body = compose_answer(session, player_id2)
+        answer2 = answer_question(session_id, answer_body)
+        assert answer2["success"]
+
+        question_id = answer_body['question_id']
+        score_body = {
+            'question_id': question_id,
+            'players': {
+                player_id1: {'correct': True},
+                player_id2: {'correct': False}
+            }
+        }
+        scored = score_question(session_id, score_body)
+        assert scored['success']
+
+        scoreboard = get_scoreboard(session_id)
+
+        assert scoreboard['object'][player_id1] == answer_body['wager']
+        assert scoreboard['object'][player_id2] == 0
+
+
+def test_score_two_answers():
+    with DummySessionWithPlayers(questions_per_round=2) as session:
+        session_id = session.session_id
+        player_id = session.players[0]
+        question_id1 = session.game.questions[0]
+        question_id2 = session.game.questions[1]
+
+        answer_body = compose_answer(session)
+        answer = answer_question(session_id, answer_body)
+        assert answer["success"]
+
+        score_body = {
+            'question_id': question_id1,
+            'players': {player_id: {'correct': True}}
+        }
+        score_question(session_id, score_body)
+        set_current_question(session_id, question_id2)
+
+        answer_body = compose_answer(session)
+        answer_body['wager'] = 2
+        answer = answer_question(session_id, answer_body)
+        assert answer["success"]
+
+        score_body = {
+            'question_id': question_id2,
+            'players': {player_id: {'correct': True}}
+        }
+        score_question(session_id, score_body)
+
+        sess = get_session(session_id)
+        assert sess['success']
+
