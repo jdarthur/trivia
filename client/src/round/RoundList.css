@@ -1,0 +1,10 @@
+.round_list {
+	display: flex;
+	flex-direction: row;
+    flex-wrap: wrap;
+	justify-content: space-around;
+    align-items: center;
+    flex: 0 1 auto;
+    padding: 25px;
+    border-right: 1px solid black;
+}
