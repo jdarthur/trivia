@@ -27,7 +27,7 @@ class QuestionList extends React.Component {
   }
 
   get_questions = () =>  {
-    let url = "/api/questions?"
+    let url = "/editor/questions?"
     if (this.state.text_filter !== "") {
       url += "text_filter=" + this.state.text_filter
     }
@@ -185,19 +185,19 @@ class QuestionList extends React.Component {
     return (
       <div className="ql_and_filter">
         Questions:
-        <div className="filter_holder"> 
+        <div className="filter_holder">
 
           <div className='filter'>
             <label htmlFor="text_filter"> Text filter: </label>
             <input name="text_filter" value={this.state.text_filter} onChange={this.set_text_filter} placeholder="Text filters"/>
           </div>
 
-          <div className ="filter"> 
+          <div className ="filter">
             <label htmlFor="unused_only"> Show unused questions only? </label>
             <input type="checkbox" name="unused_only" checked={this.state.unused_only} onChange={this.set_unused_only} />
           </div>
         </div>
-        
+
         <div className="question_list">
         {questions}
         {nqb}
@@ -209,7 +209,7 @@ class QuestionList extends React.Component {
 }
 
 async function sendData(question_id, method, question_data) {
-  const url = "/api/question" + (question_id != null ? "/" + question_id : "")
+  const url = "/editor/question" + (question_id != null ? "/" + question_id : "")
   const body = (question_data === undefined) ? "" : JSON.stringify(question_data)
   const response = await fetch(url, {
             method: method,

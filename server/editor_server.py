@@ -34,11 +34,12 @@ QUESTION_ID = "QUESTION_ID"
 
 MONGO_HOST = "localhost"
 MONGO_DB = "trivia"
+URL_BASE = "/editor"
 
 mongo = MongoManager(MONGO_HOST, MONGO_DB)
 
 
-@app.route('/api/question', methods=['POST'])
+@app.route(f'{URL_BASE}/question', methods=['POST'])
 def create_one_question():
     created = create_question(request.json)
     if created[SUCCESS]:
@@ -59,7 +60,7 @@ def create_question(data):
     return succeed(created)
 
 
-@app.route('/api/question/<question_id>', methods=['DELETE'])
+@app.route(f'{URL_BASE}/question/<question_id>', methods=['DELETE'])
 def delete_one_question(question_id):
     resp = delete_question(question_id)
     if resp[SUCCESS]:
@@ -71,7 +72,7 @@ def delete_one_question(question_id):
 def delete_question(question_id, question={}):
     mongo.delete("question", question_id)
     remove_question_from_all_rounds(question)
-    return question
+    return succeed(question)
 
 
 @model(qmodel, GET_ONE, "question")
@@ -79,7 +80,7 @@ def get_question(question_id, question={}):
     return succeed(question)
 
 
-@app.route('/api/question/<question_id>', methods=['PUT'])
+@app.route(f'{URL_BASE}/question/<question_id>', methods=['PUT'])
 def update_one_question(question_id):
     updated = update_question(question_id, request.json)
     if updated[SUCCESS]:
@@ -100,7 +101,7 @@ def update_question(question_id, data, question={}):
     return fail(f"Failed to update {QUESTION} with data {data}")
 
 
-@app.route('/api/questions', methods=['GET'])
+@app.route(f'{URL_BASE}/questions', methods=['GET'])
 def get_all_questions():
     text_filter = request.args.get(TEXT_FILTER, None)
     unused_only = request.args.get(UNUSED_ONLY, False)
@@ -323,4 +324,4 @@ def delete_game(game_id, game={}):
 
 if __name__ == "__main__":
 
-    app.run(host="0.0.0.0", debug=True)
+    app.run(host="0.0.0.0", port=6000, debug=True)

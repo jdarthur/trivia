@@ -1,11 +1,11 @@
 import React from 'react';
-import './App.css';
+import './Homepage.css';
 
 class Homepage extends React.Component {
     render() {
       return (
         <div className="homepage">
-           <button>New Game</button>
+           <button className="new-game-button">New Game</button>
         </div>
       );
     }
