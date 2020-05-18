@@ -13,8 +13,25 @@ from validator import (SUCCESS, ERRORS, OBJECT, CREATE,
                        UPDATE, DELETE, GET_ONE, ID)
 
 from flask import Flask, jsonify, request
-app = Flask(__name__)
+from flask.json import JSONEncoder
+from datetime import datetime
 
+
+class CustomJSONEncoder(JSONEncoder):
+    def default(self, obj):
+        try:
+            if isinstance(obj, datetime):
+                return obj.isoformat()
+            iterable = iter(obj)
+        except TypeError:
+            pass
+        else:
+            return list(iterable)
+        return JSONEncoder.default(self, obj)
+
+
+app = Flask(__name__)
+app.json_encoder = CustomJSONEncoder
 
 NAME = "name"
 ROUNDS = "rounds"
@@ -44,7 +61,7 @@ def create_one_question():
     created = create_question(request.json)
     if created[SUCCESS]:
         return jsonify(created[OBJECT])
-    return jsonify({ERRORS: created[ERRORS]})
+    return jsonify({ERRORS: created[ERRORS]}), 400
 
 
 qmodel = [
@@ -74,6 +91,13 @@ def delete_question(question_id, question={}):
     remove_question_from_all_rounds(question)
     return succeed(question)
 
+
+@app.route(f'{URL_BASE}/question/<question_id>', methods=['GET'])
+def get_one_question(question_id):
+    resp = get_question(question_id)
+    if resp[SUCCESS]:
+        return jsonify(resp[OBJECT])
+    return jsonify({ERRORS: resp[ERRORS]})
 
 @model(qmodel, GET_ONE, "question")
 def get_question(question_id, question={}):
@@ -105,8 +129,10 @@ def update_question(question_id, data, question={}):
 def get_all_questions():
     text_filter = request.args.get(TEXT_FILTER, None)
     unused_only = request.args.get(UNUSED_ONLY, False)
-
-    return jsonify({QUESTIONS: get_questions(text_filter, unused_only)})
+    questions = get_questions(text_filter, unused_only)
+    if not questions[SUCCESS]:
+        return jsonify(questions)
+    return jsonify({QUESTIONS: questions[OBJECT]})
 
 
 def get_questions(text_filter=None, unused_only=True):
@@ -115,7 +141,7 @@ def get_questions(text_filter=None, unused_only=True):
     for q in questions:
         if matches(q, text_filter, unused_only):
             ret.append(q)
-    return ret
+    return succeed(ret)
 
 
 def matches(question, text_filter, unused_only):
@@ -267,8 +293,16 @@ def get_round(round_id, round_obj={}):
     return succeed(round_obj)
 
 
+@app.route(f'{URL_BASE}/rounds', methods=['GET'])
+def get_all_rounds():
+    rounds = get_rounds()
+    if not rounds[SUCCESS]:
+        return jsonify(rounds)
+    return jsonify({ROUNDS: rounds[OBJECT]})
+
+
 def get_rounds():
-    return get_all("round")
+    return succeed(get_all("round"))
 
 
 def delete_round_from_all_games(round_id):

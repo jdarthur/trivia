@@ -3,10 +3,12 @@
 @date 18 Apr 2020
 """
 import uuid
+from datetime import datetime
 from pymongo import MongoClient
 
 ID = "id"
 _ID = "_id"
+CREATE_DATE = "create_date"
 
 
 def id_equals(object_id):
@@ -65,7 +67,7 @@ class MongoManager(object):
         returns:
             created object, with new ID
         """
-
+        data[CREATE_DATE] = datetime.utcnow()
         data = add_id(data)
         # print(f"MONGO: create {object_type} {data[_ID]}")
         self.db[object_type].insert_one(data)
@@ -144,4 +146,3 @@ class MongoManager(object):
             list of all objects of type X
         """
         return self.db[object_type].find(filter)
-

@@ -2,6 +2,7 @@ import React from 'react';
 import './RoundList.css';
 
 import Round from "./Round.jsx"
+import OpenRound from "./OpenRound.jsx"
 
 
 //JSON keys
@@ -129,9 +130,16 @@ class RoundList extends React.Component {
             <Round key={round.id} id={round.id} name={round.name} create_date={round.create_date}
                 questions={round.questions} wagers={round.wagers}
                 selected={(this.state.selected === round.id) ? true : false}
-                set_selected={this.set_selected} set={this.set_value} delete={this.delete} />))
+                set_selected={this.set_selected} delete={this.delete} />))
 
         const nrb = this.add_newround_button() ? <div className="new_round_button" onClick={this.add_new_round}>+</div> : null
+
+        let open_round = null
+        if (this.state.selected !== "") {
+            const r = find(this.state.selected, this.state.rounds)
+            open_round = <OpenRound key={r.id} id={r.id} name={r.name}
+                questions={r.questions} wagers={r.wagers} set={this.set_value} />
+        }
         return (
             <div>
                 Rounds:
@@ -139,6 +147,7 @@ class RoundList extends React.Component {
                     {rounds}
                     {nrb}
                 </div>
+                {open_round}
             </div>
         );
     }

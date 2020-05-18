@@ -28,6 +28,10 @@ class Question extends React.Component {
     this.props.delete(this.props.id)
   }
 
+  add_to_round = () => {
+    this.props.add_to_round(this.props.id)
+  }
+
   render() {
     if (this.props.selected) {
       const containerClass = "question_container selected"
@@ -39,6 +43,7 @@ class Question extends React.Component {
             onChange={this.set_question} placeholder="Question"/>
           <input className="answer"   value={this.props.answer}
             onChange={this.set_answer} placeholder="answer"/>
+          {<button onClick={this.add_to_round}> Add to round</button> ? this.props.addable : null}
           <button onClick={this.delete_self}> Delete </button>
         </div>
       );

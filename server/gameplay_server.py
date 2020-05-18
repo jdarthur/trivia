@@ -5,8 +5,6 @@ Trivia server mark II
 @date 12 Apr 2020
 """
 
-from datetime import datetime
-
 from mongo_manager import MongoManager
 
 from validator import model, succeed, fail, RestField, IdField
@@ -31,7 +29,6 @@ PLAYER_NAME = "player_name"
 PLAYER_ID = "player_id"
 
 SESSION_ID = "session_id"
-CREATE_DATE = "create_date"
 QUESTION_ID = "question_id"
 ROUND_ID = "round_id"
 
@@ -131,7 +128,6 @@ pmodel = [
 ]
 @model(pmodel, CREATE, "player")
 def create_player(data):
-    data[CREATE_DATE] = datetime.utcnow()
     obj = mongo.create("player", data)
     return succeed(fix_id(obj))
 
@@ -641,7 +637,6 @@ def get_legal_wagers(session, round_id, player_id):
 
 
 def create_answer(data):
-    data[CREATE_DATE] = datetime.utcnow()
     success = mongo.create("answer", data)
     if not success:
         return fail("Failed to create answer")
