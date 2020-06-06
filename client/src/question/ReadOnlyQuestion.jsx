@@ -1,11 +1,6 @@
 import React from 'react';
 import './Question.css';
 
-//JSON keys
-const CATEGORY = "category"
-const QUESTION = "question"
-const ANSWER = "answer"
-
 class ReadOnlyQuestion extends React.Component {
     constructor(props) {
         super(props)

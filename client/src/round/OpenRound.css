@@ -1,0 +1,16 @@
+
+.open-round {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+}
+
+.question-list {
+    display: flex;
+    flex-direction: row;
+}
+
+.wager-list {
+    display: flex;
+    flex-direction: row;
+}
