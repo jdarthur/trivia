@@ -1,3 +1,7 @@
+.editor-and-toolbar {
+    display: flex;
+    flex-direction: row;
+}
 .editor {
     display: flex;
     flex-direction: row;

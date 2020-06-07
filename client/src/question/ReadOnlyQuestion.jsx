@@ -2,44 +2,20 @@ import React from 'react';
 import './Question.css';
 
 class ReadOnlyQuestion extends React.Component {
-    constructor(props) {
-        super(props)
-        this.state = {
-            question: "",
-            category: "",
-            answer: "",
-        }
-    }
 
-    componentDidMount() {
-        this.get_question()
-    }
-
-    get_question = () => {
-        let url = "/editor/question/" + this.props.id
-
-        fetch(url)
-            .then(response => response.json())
-            .then(state => {
-                this.setState(
-                    {
-                        category: state.category,
-                        question: state.question,
-                        answer: state.answer
-                    })
-            })
+    select_self = () => {
+        this.props.select(this.props.id)
     }
 
     render() {
-        const containerClass = "question_container"
+        const containerClass = "question_container" + (this.props.selected ? " selected" : "")
         return (
-            <div className={containerClass}>
-                <div className="category"> {this.state.category} </div>
-                <div className="question"> {this.state.question} </div>
-                <div className="answer">   {this.state.answer}   </div>
+            <div className={containerClass} onClick={this.select_self}>
+                <div className="category"> {this.props.category} </div>
+                <div className="question"> {this.props.question} </div>
+                <div className="answer">   {this.props.answer}   </div>
             </div>
         );
-
     }
 }
 

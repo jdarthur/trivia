@@ -7,15 +7,22 @@
 	width:200px;
 	border: 1px solid #9c9c9c;
 	margin: 10px;
+	word-break: break-all;
+	/* overflow-wrap: break-word; */
 }
 
 .selected {
 	outline: 5px solid blue;
 }
 
+.textarea {
+	flex-grow: 1;
+}
+
 .question {
 	padding: 20px;
 	border-bottom: 1px solid #9c9c9c;
+	/* overflow-wrap: break-word; */
 }
 
 .category {
@@ -24,10 +31,13 @@
 	border-right: 1px solid #9c9c9c;
 	border-bottom: 1px solid #9c9c9c;
 	border-radius: 0px 0px 5px 0px;
+	white-space: pre-wrap;
+	/* overflow-wrap: break-word; */
 }
 
 .answer {
    align-self: flex-end;
    padding: 10px;
    /*color: #9c9c9c;;*/
+   /*overflow-wrap: break-word; */
 }

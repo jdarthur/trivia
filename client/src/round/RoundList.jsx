@@ -10,6 +10,7 @@ const NAME = "name"
 const QUESTIONS = "questions"
 const WAGERS = "wagers"
 const ID = "id"
+const NEW = "new"
 
 class RoundList extends React.Component {
     constructor(props) {
@@ -38,14 +39,10 @@ class RoundList extends React.Component {
     }
 
     set_selected = (round_id) => {
-        switch (this.state.selected) {
-            case "":
-            case round_id: break
-            case "new":
-            default: this.save(this.state.selected)
+        if (this.state.selected !== round_id) {
+            this.save(this.state.selected)
+            this.setState({ selected: round_id })
         }
-
-        this.setState({ selected: round_id });
     }
 
     set_value = (round_id, key, value) => {
@@ -58,7 +55,7 @@ class RoundList extends React.Component {
         //don't save if the selected round is not dirty
         if (this.state.dirty !== "") {
             const round = find(round_id, this.state.rounds)
-            if (round_id === "new") { //create new round
+            if (round_id === NEW) { //create new round
                 console.log("create round", round)
                 sendData(null, "POST", round)
                     .then((data) => {
@@ -76,7 +73,7 @@ class RoundList extends React.Component {
 
     delete = (round_id) => {
         const round = find(round_id, this.state.rounds)
-        if (round_id === "new") {
+        if (round_id === NEW) {
             this.delete_and_update_state(round)
         }
         else {
@@ -93,7 +90,7 @@ class RoundList extends React.Component {
     delete_and_update_state = (round) => {
         const index = this.state.rounds.map(function (e) { return e.id; }).indexOf(round.id);
         this.state.rounds.splice(index, index + 1)
-        this.setState({ rounds: this.state.rounds, dirty: "" })
+        this.setState({ rounds: this.state.rounds, dirty: "", selected: "" })
     }
 
     /**
@@ -101,7 +98,7 @@ class RoundList extends React.Component {
      */
     add_newround_button = () => {
         try {
-            find("new", this.state.rounds)
+            find(NEW, this.state.rounds)
             return false
         }
         catch (Error) { return true }
@@ -113,13 +110,13 @@ class RoundList extends React.Component {
     add_new_round = () => {
         const round = {
             [NAME]: "",
-            [QUESTIONS]: "",
-            [WAGERS]: "",
-            [ID]: "new"
+            [QUESTIONS]: [],
+            [WAGERS]: [],
+            [ID]: NEW
         }
         this.state.rounds.push(round)
         this.setState({ rounds: this.state.rounds }, () => {
-            this.set_selected("new")
+            this.set_selected(NEW)
         })
     }
 
@@ -132,16 +129,17 @@ class RoundList extends React.Component {
                 selected={(this.state.selected === round.id) ? true : false}
                 set_selected={this.set_selected} delete={this.delete} />))
 
-        const nrb = this.add_newround_button() ? <div className="new_round_button" onClick={this.add_new_round}>+</div> : null
+        const nrb = this.add_newround_button() ? <div className="new_button" onClick={this.add_new_round}>+</div> : null
 
         let open_round = null
         if (this.state.selected !== "") {
             const r = find(this.state.selected, this.state.rounds)
             open_round = <OpenRound key={r.id} id={r.id} name={r.name}
-                questions={r.questions} wagers={r.wagers} set={this.set_value} />
+                questions={r.questions} wagers={r.wagers} set={this.set_value}
+                set_selected={this.set_selected} delete={this.delete} />
         }
         return (
-            <div>
+            <div className="round-and-open-question">
                 Rounds:
                 <div className="round_list">
                     {rounds}
@@ -154,6 +152,9 @@ class RoundList extends React.Component {
 }
 
 function find(object_id, object_list) {
+    if (object_id === '') {
+        return null
+    }
     for (const index in object_list) {
         const object = object_list[index]
         if (object.id === object_id) {
@@ -164,8 +165,19 @@ function find(object_id, object_list) {
 }
 
 async function sendData(round_id, method, round_data) {
-    const url = "/editor/question" + (round_id != null ? "/" + round_id : "")
-    const body = (round_data === undefined) ? "" : JSON.stringify(round_data)
+    const url = "/editor/round" + (round_id != null ? "/" + round_id : "")
+    let body = ""
+    if (round_data !== undefined) {
+        const r_copy = {
+            [NAME]: round_data.name,
+            [QUESTIONS]: round_data[QUESTIONS],
+            [WAGERS]: round_data[WAGERS],
+            //[ID]: NEW
+        }
+        body = JSON.stringify(r_copy)
+    }
+
+    
     const response = await fetch(url, {
         method: method,
         headers: { 'Content-Type': 'application/json' },
