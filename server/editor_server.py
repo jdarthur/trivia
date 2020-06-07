@@ -109,7 +109,7 @@ def update_one_question(question_id):
     updated = update_question(question_id, request.json)
     if updated[SUCCESS]:
         return jsonify(updated[OBJECT])
-    return jsonify({ERRORS: updated[ERRORS]})
+    return jsonify({ERRORS: updated[ERRORS]}), 400
 
 
 @model(qmodel, UPDATE, "question")
@@ -237,6 +237,74 @@ rmodel = [
 ]
 
 
+def _resp(op_resp):
+    """
+    take fail/succeed response and return flask response
+    """
+    if op_resp[SUCCESS]:
+        return jsonify(op_resp[OBJECT])
+    return jsonify({ERRORS: op_resp[ERRORS]}), 400
+
+def create_and_respond(endpoint, data):
+    """
+    try to create some object and return a failure/success resp
+    """
+    if endpoint == "round":
+        return _resp(create_round(data))
+    raise Exception(f"unsupported create {endpoint}")
+
+def update_and_respond(endpoint, object_id, data):
+    """
+    try to update some object and return a failure/success resp
+    """
+    if endpoint == "round":
+        return _resp(update_round(object_id, data))
+    raise Exception(f"unsupported update {endpoint}")
+
+def delete_and_respond(endpoint, object_id):
+    """
+    try to delete some object and return a failure/success resp
+    """
+    if endpoint == "round":
+        return _resp(delete_round(object_id))
+    raise Exception(f"unsupported delete {endpoint}")
+
+
+
+# @app.route(f'{URL_BASE}/question/<question_id>', methods=['DELETE'])
+# def delete_one_question(question_id):
+#     resp = delete_question(question_id)
+#     if resp[SUCCESS]:
+#         return jsonify(resp[OBJECT])
+#     return jsonify({ERRORS: resp[ERRORS]})
+
+@app.route(f'{URL_BASE}/round', methods=['POST'])
+def create_one_round():
+    return create_and_respond("round", request.json)
+
+@app.route(f'{URL_BASE}/round/<round_id>', methods=['PUT'])
+def update_one_round(round_id):
+    return update_and_respond("round", round_id, request.json)
+
+
+@app.route(f'{URL_BASE}/round/<round_id>', methods=['DELETE'])
+def delete_one_round(round_id):
+    return delete_and_respond("round", round_id)
+
+# @app.route(f'{URL_BASE}/question/<question_id>', methods=['PUT'])
+# def update_one_question(question_id):
+#     updated = update_question(question_id, request.json)
+#     if updated[SUCCESS]:
+#         return jsonify(updated[OBJECT])
+#     return jsonify({ERRORS: updated[ERRORS]}), 400
+
+# @app.route(f'{URL_BASE}/question', methods=['POST'])
+# def create_one_question():
+#     created = create_question(request.json)
+#     if created[SUCCESS]:
+#         return jsonify(created[OBJECT])
+#     return jsonify({ERRORS: created[ERRORS]}), 400
+
 @model(rmodel, CREATE, "round")
 def create_round(data):
     qlen = len(data.get(QUESTIONS, []))
@@ -255,6 +323,7 @@ def create_round(data):
 
     set_round_in_questions(created, [])  # no original questions, new round
     return succeed(created)
+
 
 
 @model(rmodel, DELETE, "round")
@@ -283,7 +352,7 @@ def update_round(round_id, data, round_obj={}, set_questions=True):
     if success:
         if set_questions:
             round_obj[QUESTIONS] = data.get(QUESTIONS, orig_questions)
-            return set_round_in_questions(round_obj, orig_questions)
+            set_round_in_questions(round_obj, orig_questions)
         return succeed(round_obj)
     return fail(f"Failed to update round")
 
