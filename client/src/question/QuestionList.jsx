@@ -9,6 +9,7 @@ const CATEGORY = "category"
 const QUESTION = "question"
 const ANSWER = "answer"
 const ID = "id"
+const NEW = "new"
 
 class QuestionList extends React.Component {
   constructor(props) {
@@ -56,14 +57,10 @@ class QuestionList extends React.Component {
   }
 
   set_selected = (question_id) => {
-    switch (this.state.selected) {
-      case "":
-      case question_id: break
-      case "new":
-      default: this.save(this.state.selected)
+    if (this.state.selected !== question_id) {
+      this.save(this.state.selected)
+      this.setState({ selected: question_id });
     }
-
-    this.setState({ selected: question_id });
   }
 
   select_none = (event) => {
@@ -83,7 +80,7 @@ class QuestionList extends React.Component {
   save = (question_id) => {
     if (this.state.dirty !== "") {
       const question = find(question_id, this.state.questions)
-      if (question_id === "new") { //create new question
+      if (question_id === NEW) { //create new question
         delete question.id
         console.log("create question", question)
         sendData(null, "POST", question)
@@ -94,6 +91,8 @@ class QuestionList extends React.Component {
           })
       }
       else { //update existing question
+        //delete question.id
+        //delete question.create_date
         console.log("save question", question)
         sendData(question_id, "PUT", question)
           .then((data) => { this.setState({ dirty: "" }) })
@@ -103,7 +102,7 @@ class QuestionList extends React.Component {
 
   delete = (question_id) => {
     const question = find(question_id, this.state.questions)
-    if (question_id === "new") {
+    if (question_id === NEW) {
       this.delete_and_update_state(question)
     }
     else {
@@ -118,8 +117,8 @@ class QuestionList extends React.Component {
   */
   delete_and_update_state = (question) => {
     const index = this.state.questions.map(function (e) { return e.id; }).indexOf(question.id);
-    this.state.question.splice(index, index + 1)
-    this.setState({ questions: this.state.question, dirty: "" })
+    this.state.questions.splice(index, index + 1)
+    this.setState({ questions: this.state.questions, dirty: "", selected: "" })
   }
 
   add_newquestion_button = () => {
@@ -135,12 +134,16 @@ class QuestionList extends React.Component {
       [QUESTION]: "",
       [ANSWER]: "",
       [CATEGORY]: "",
-      [ID]: "new"
+      [ID]: NEW
     }
     this.state.questions.push(question)
     this.setState({ questions: this.state.questions }, () => {
-      this.set_selected("new")
+      this.set_selected(NEW)
     })
+  }
+
+  add_question_to_open_round = (question_id) => {
+    
   }
 
 
@@ -151,9 +154,10 @@ class QuestionList extends React.Component {
         answer={question.answer} question={question.question}
         selected={(this.state.selected === question.id) ? true : false}
         addable={this.props.round_open} add_to_round={this.props.add_to_round}
-        set_selected={this.set_selected} set={this.set_value} delete={this.delete} />))
+        set_selected={this.set_selected} set={this.set_value}
+        delete={this.delete} />))
 
-    const nqb = this.add_newquestion_button() ? <div className="new_question_button" onClick={this.add_new_question}>+</div> : null
+    const nqb = this.add_newquestion_button() ? <div className="new_button" onClick={this.add_new_question}>+</div> : null
     return (
       <div className="ql_and_filter">
         Questions:
@@ -181,6 +185,9 @@ class QuestionList extends React.Component {
 }
 
 function find(object_id, object_list) {
+  if (object_id === '') {
+    return null
+  }
   for (const index in object_list) {
     const object = object_list[index]
     if (object.id === object_id) {
@@ -192,7 +199,15 @@ function find(object_id, object_list) {
 
 async function sendData(question_id, method, question_data) {
   const url = "/editor/question" + (question_id != null ? "/" + question_id : "")
-  const body = (question_data === undefined) ? "" : JSON.stringify(question_data)
+  let body = ""
+  if (question_data !== undefined) {
+    const q_copy = Object.assign({}, question_data)
+    delete q_copy.id
+    delete q_copy.create_date
+    body = JSON.stringify(q_copy)
+  }
+  
+  JSON.stringify(question_data)
   const response = await fetch(url, {
     method: method,
     headers: { 'Content-Type': 'application/json' },

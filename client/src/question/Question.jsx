@@ -13,38 +13,57 @@ class Question extends React.Component {
   }
 
   set_category = (event) => {
-    this.props.set(this.props.id, CATEGORY, event.target.value)
+    this.set_value(event, CATEGORY)
+    //this.props.set(this.props.id, CATEGORY, event.target.value)
   }
 
   set_question = (event) => {
-    this.props.set(this.props.id, QUESTION, event.target.value)
+    this.set_value(event, QUESTION)
+    //this.props.set(this.props.id, QUESTION, event.target.value)
   }
 
   set_answer = (event) => {
-    this.props.set(this.props.id, ANSWER, event.target.value)
+    this.set_value(event, ANSWER)
+    //this.props.set(this.props.id, ANSWER, event.target.value)
+  }
+
+  set_value = (event, key) => {
+    this.props.set(this.props.id, key, event.target.value)
   }
 
   delete_self = (event) => {
     this.props.delete(this.props.id)
   }
 
-  add_to_round = () => {
-    this.props.add_to_round(this.props.id)
+  save_self = () => {
+    this.props.set_selected("")
   }
+
+  handleKeyPress = (event) => {
+    if (event.key === 'Enter' && !event.altKey) {
+      event.preventDefault()
+      this.save_self()
+    }
+  }
+
+
 
   render() {
     if (this.props.selected) {
       const containerClass = "question_container selected"
       return (
-        <div className={containerClass} onClick={this.set_selected}>
-          <input className="category" value={this.props.category}
-            onChange={this.set_category} placeholder="Category"/>
-          <input className="question" value={this.props.question}
-            onChange={this.set_question} placeholder="Question"/>
-          <input className="answer"   value={this.props.answer}
-            onChange={this.set_answer} placeholder="answer"/>
-          {<button onClick={this.add_to_round}> Add to round</button> ? this.props.addable : null}
-          <button onClick={this.delete_self}> Delete </button>
+        <div className={containerClass} onClick={this.set_selected} onKeyDown={this.handleKeyPress}>
+          <input type='textarea' className="category" value={this.props.category}
+            onChange={this.set_category} placeholder="Category" autoFocus />
+          <textarea className="text-area" value={this.props.question}
+            onChange={this.set_question} placeholder="Question" />
+          <textarea className="text-area" value={this.props.answer}
+            onChange={this.set_answer} placeholder="answer" />
+          <div>
+            <button onClick={this.delete_self}> Delete </button>
+            <button onClick={this.save_self} > Save </button>
+          </div>
+
         </div>
       );
     }
@@ -60,5 +79,7 @@ class Question extends React.Component {
     }
   }
 }
+
+
 
 export default Question

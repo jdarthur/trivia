@@ -1,11 +1,11 @@
 import React from 'react';
 import './App.css';
-import Toolbar from "./homepage/Toolbar.jsx"
+import GenericToolbar from "./editor/GenericToolbar.jsx"
 import HomePage from "./homepage/Homepage.jsx"
 import Editor from "./editor/Editor.jsx"
 
-const PLAY = "play"
-const EDITOR = "editor"
+const PLAY = "Play"
+const EDITOR = "Editor"
 
 class App extends React.Component {
   constructor(props) {
@@ -22,7 +22,8 @@ class App extends React.Component {
   render() {
     return (
       <div className="App">
-        <Toolbar select={this.set_selected} selected={this.state.selected}/>
+        <GenericToolbar labels={[PLAY, EDITOR]}
+        select={this.set_selected} selected={this.state.selected}/>
         {this.state.selected === PLAY ? <HomePage /> : null}
         {this.state.selected === EDITOR ? <Editor /> : null}
       </div>

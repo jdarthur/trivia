@@ -2,11 +2,16 @@
 	display: flex;
 	flex-direction: row;
     flex-wrap: wrap;
-	justify-content: space-around;
-    align-items: center;
-    flex: 0 1 auto;
+    justify-content: space-around;
+    align-self: flex-start;
+    align-items: flex-start;
     padding: 25px;
     border-right: 1px solid black;
     height: 65vh;
     overflow-y: scroll;
+}
+
+.round-and-open-question {
+    display: flex;
+    flex-direction: row;
 }
