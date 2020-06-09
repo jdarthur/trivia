@@ -1,7 +1,6 @@
 import React from 'react';
 import '../question/Question.css';
 import ReadOnlyQuestion from "../question/ReadOnlyQuestion"
-import RemovableQuestionsList from './RemovableQuestionsList';
 
 class AddableQuestion extends React.Component {
 
