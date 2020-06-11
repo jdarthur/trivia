@@ -1,0 +1,52 @@
+.modal-anim-enter {
+    opacity: 0.00;
+    transform: scale(0.7);
+    transition: all 0.2s;
+}
+
+.modal-anim-enter.modal-anim-enter-active {
+    opacity: 1;
+    transform: scale(1);
+}
+
+.modal-anim-leave {
+    opacity: 1;
+    transform: scale(1);
+    transition: all 0.2s;
+}
+
+.modal-anim-leave.modal-anim-leave-active {
+    opacity: 0.00;
+    transform: scale(0.7);
+}
+
+.modal {
+    margin: auto;
+    position: absolute;
+    background: white;
+    border-radius: 20px;
+    box-shadow: 0px 0px 40px grey;
+    border: 1px solid black;
+    min-width: 50vw;
+    min-height: 50vh;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+}
+
+.modal-title {
+    display: flex;
+    justify-content: space-between;
+    border-radius: 20px 20px 0px 0px;
+    border-bottom: 1px solid black;
+    padding: 10px;
+    background: lightblue;
+    font-weight: bold;
+    align-items: center;
+}
+
+.modal-close {
+    margin-right: 5px;
+    cursor: pointer;
+    font-size: 1.3em;
+}

@@ -1,7 +1,8 @@
 import React from 'react';
 import './OpenRound.css';
 //import ReadOnlyQuestion from "../question/ReadOnlyQuestion.jsx"
-import AddableQuestionsList from "./AddableQuestionsList"
+// import AddableQuestionsList from "./AddableQuestionsList"
+import AddQuestionsModal from "../modal/AddQuestionsModal"
 import RemovableQuestionsList from "./RemovableQuestionsList"
 import Wager from "./Wager.jsx"
 
@@ -59,7 +60,8 @@ class OpenRound extends React.Component {
                 <input className={NAME} value={this.props.name}
                     onChange={this.set_name} onKeyDown={this.handleKeyPress} placeholder="Name" />
                 <div>
-                    <AddableQuestionsList added_questions={this.props.questions} add_questions={this.add_questions} />
+                    {/* <AddableQuestionsList added_questions={this.props.questions} add_questions={this.add_questions} /> */}
+                    <AddQuestionsModal questions={this.props.questions} add_questions={this.add_questions} />
                     <RemovableQuestionsList questions={this.props.questions} remove_questions={this.remove_questions} />
                 </div>
                 <div className="wager-list">
