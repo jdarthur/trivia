@@ -49,6 +49,7 @@ UNUSED_ONLY = "unused_only"
 ROUND_ID = "round_id"
 QUESTION_ID = "question_id"
 ROUND_NAMES = "round_names"
+GAMES = "games"
 
 MONGO_HOST = "localhost"
 MONGO_DB = "trivia"
@@ -254,6 +255,9 @@ def create_and_respond(endpoint, data):
     """
     if endpoint == "round":
         return _resp(create_round(data))
+    if endpoint == "game":
+        return _resp(create_game(data))
+
     raise Exception(f"unsupported create {endpoint}")
 
 
@@ -263,6 +267,9 @@ def update_and_respond(endpoint, object_id, data):
     """
     if endpoint == "round":
         return _resp(update_round(object_id, data))
+    if endpoint == "game":
+        return _resp(update_game(object_id, data))
+
     raise Exception(f"unsupported update {endpoint}")
 
 
@@ -391,8 +398,16 @@ def delete_round_from_all_games(round_id):
     return succeed({})
 
 
+@app.route(f'{URL_BASE}/games', methods=['GET'])
+def get_all_games():
+    games = get_games()
+    if not games[SUCCESS]:
+        return jsonify(games)
+    return jsonify({GAMES: games[OBJECT]})
+
+
 def get_games():
-    return get_all("game")
+    return succeed(get_all("game"))
 
 
 gmodel = [
@@ -407,6 +422,11 @@ def get_game(game_id, game={}):
     return succeed(game)
 
 
+@app.route(f'{URL_BASE}/game', methods=['POST'])
+def create_one_game():
+    return create_and_respond("game", request.json)
+
+
 @model(gmodel, CREATE, "game")
 def create_game(data):
     created = mongo.create("game", data)
@@ -414,6 +434,11 @@ def create_game(data):
         return fail("Failed to create game")
 
     return succeed(created)
+
+
+@app.route(f'{URL_BASE}/game/<game_id>', methods=['PUT'])
+def update_one_game(game_id):
+    return update_and_respond("game", game_id, request.json)
 
 
 @model(gmodel, UPDATE, "game")
