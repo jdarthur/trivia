@@ -1,7 +1,8 @@
 import React from 'react';
 import './Editor.css';
-import QuestionList from "../question/QuestionList.jsx";
-import RoundList from "../round/RoundList.jsx"
+import QuestionList from "../question/QuestionList";
+import RoundList from "../round/RoundList"
+import GameList from "../game/GameList"
 import GenericToolbar from "./GenericToolbar"
 
 const QUESTIONS = "Questions"
@@ -22,17 +23,6 @@ class Editor extends React.Component {
         this.setState({ section: tab_name })
     }
 
-    add_question_to_open_round = (question_id) => {
-        //get open_round as obj
-        //append question_id to open_round.questions
-        //send data to server
-        //if 200: 
-        //update round.questions
-        //setState
-        //update state
-        console.log("add to open round (" + this.state.round_selected + "): " + question_id)
-    }
-
     render() {
         return (
             <div className="App">
@@ -41,7 +31,8 @@ class Editor extends React.Component {
 
                 <div className="editor">
                     {this.state.section === ROUNDS ? <RoundList /> : null }
-                    {this.state.section === QUESTIONS ? <QuestionList /> : null } 
+                    {this.state.section === QUESTIONS ? <QuestionList /> : null }
+                    {this.state.section === GAMES ? <GameList /> : null }
                 </div>
             </div>
         );
