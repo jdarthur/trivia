@@ -8,7 +8,7 @@ Trivia server mark II
 from mongo_manager import MongoManager
 
 from validator import (model, succeed, fail, RestField,
-                       ListOfIds, ListOfType, get_all)
+                       ListOfIds, ListOfType, get_all, DictOfIds)
 from validator import (SUCCESS, ERRORS, OBJECT, CREATE,
                        UPDATE, DELETE, GET_ONE, ID)
 
@@ -47,7 +47,8 @@ TEXT_FILTER = "text_filter"
 UNUSED_ONLY = "unused_only"
 
 ROUND_ID = "round_id"
-QUESTION_ID = "QUESTION_ID"
+QUESTION_ID = "question_id"
+ROUND_NAMES = "round_names"
 
 MONGO_HOST = "localhost"
 MONGO_DB = "trivia"
@@ -98,6 +99,7 @@ def get_one_question(question_id):
     if resp[SUCCESS]:
         return jsonify(resp[OBJECT])
     return jsonify({ERRORS: resp[ERRORS]})
+
 
 @model(qmodel, GET_ONE, "question")
 def get_question(question_id, question={}):
@@ -245,6 +247,7 @@ def _resp(op_resp):
         return jsonify(op_resp[OBJECT])
     return jsonify({ERRORS: op_resp[ERRORS]}), 400
 
+
 def create_and_respond(endpoint, data):
     """
     try to create some object and return a failure/success resp
@@ -252,6 +255,7 @@ def create_and_respond(endpoint, data):
     if endpoint == "round":
         return _resp(create_round(data))
     raise Exception(f"unsupported create {endpoint}")
+
 
 def update_and_respond(endpoint, object_id, data):
     """
@@ -261,6 +265,7 @@ def update_and_respond(endpoint, object_id, data):
         return _resp(update_round(object_id, data))
     raise Exception(f"unsupported update {endpoint}")
 
+
 def delete_and_respond(endpoint, object_id):
     """
     try to delete some object and return a failure/success resp
@@ -268,7 +273,6 @@ def delete_and_respond(endpoint, object_id):
     if endpoint == "round":
         return _resp(delete_round(object_id))
     raise Exception(f"unsupported delete {endpoint}")
-
 
 
 # @app.route(f'{URL_BASE}/question/<question_id>', methods=['DELETE'])
@@ -281,6 +285,7 @@ def delete_and_respond(endpoint, object_id):
 @app.route(f'{URL_BASE}/round', methods=['POST'])
 def create_one_round():
     return create_and_respond("round", request.json)
+
 
 @app.route(f'{URL_BASE}/round/<round_id>', methods=['PUT'])
 def update_one_round(round_id):
@@ -305,6 +310,7 @@ def delete_one_round(round_id):
 #         return jsonify(created[OBJECT])
 #     return jsonify({ERRORS: created[ERRORS]}), 400
 
+
 @model(rmodel, CREATE, "round")
 def create_round(data):
     qlen = len(data.get(QUESTIONS, []))
@@ -323,7 +329,6 @@ def create_round(data):
 
     set_round_in_questions(created, [])  # no original questions, new round
     return succeed(created)
-
 
 
 @model(rmodel, DELETE, "round")
@@ -392,7 +397,8 @@ def get_games():
 
 gmodel = [
     RestField(NAME),
-    ListOfIds(ROUNDS, "round")
+    ListOfIds(ROUNDS, "round"),
+    DictOfIds(ROUND_NAMES, "round")
 ]
 
 

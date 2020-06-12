@@ -51,12 +51,12 @@ def test_crud():
     print("   updated: {}".format(updated))
     assert updated['object']['answer'] == "ffff"
 
-    questions = get_questions()
+    questions = get_questions()['object']
     print("   all questions: {}".format(questions))
     assert object_with_id_in_list(questions, question_id, True)
 
     delete_question(question_id)
 
-    questions = get_questions()
+    questions = get_questions()['object']
     print("   all questions: {}".format(questions))
     assert object_with_id_in_list(questions, question_id, False)

@@ -130,7 +130,8 @@ class RestField(object):
             return fail(f"Missing required field '{self.field_name}'")
 
         if self.has_this_field(data) and not self.is_correct_type(data):
-            return fail(f"Field '{self.field_name}' (with value '{data[self.field_name]}') is not type {self.expected_type}")
+            return fail(f"Field '{self.field_name}' (with value "
+                        " '{data[self.field_name]}') is not type {self.expected_type}")
 
         return succeed(data)
 
@@ -168,6 +169,37 @@ class ListOfIds(RestField):
 
                 if id_list.count(object_id) > 1:
                     return fail(f"{self.object_type}_id {object_id} is used more than once.")
+
+                obj = id_is_valid(self.object_type, object_id)
+                if not obj[SUCCESS]:
+                    return obj
+
+        return succeed(data)
+
+
+class DictOfIds(RestField):
+    def __init__(self, field_name, object_type, value_type=str, optional=False):
+        super().__init__(field_name, dict, optional)
+        self.object_type = object_type
+        self.value_type = value_type
+
+    def validate(self, data, method):
+        validation = super().validate(data, method)
+        if not validation[SUCCESS]:
+            return validation
+
+        if super().has_this_field(data):
+            id_list = list(data[self.field_name].keys())
+            for object_id in id_list:
+                if not isinstance(object_id, str):
+                    return fail(f"{self.object_type}_id is not type {str}")
+
+                if id_list.count(object_id) > 1:
+                    return fail(f"{self.object_type}_id {object_id} is used more than once.")
+
+                val = data[self.field_name][object_id]
+                if not isinstance(val, self.value_type):
+                    return fail(f"{self.object_type}_id value {val} is not type {self.value_type}")
 
                 obj = id_is_valid(self.object_type, object_id)
                 if not obj[SUCCESS]:

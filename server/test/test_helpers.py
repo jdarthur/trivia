@@ -71,10 +71,16 @@ def dummy_round(question_ids):
 
 
 def dummy_game(rounds):
+    names = {}
+    for i, round in enumerate(rounds):
+        names[round] = f"Round {i+1}"
+
     gdata = {
         "name": "test game",
-        "rounds": rounds
+        "rounds": rounds,
+        "round_names": names
     }
+
     created = create_game(gdata)
     if created["success"]:
         return created["object"]["id"]
