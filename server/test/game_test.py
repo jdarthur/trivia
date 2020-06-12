@@ -76,14 +76,14 @@ def test_crud():
         updated = update_game(game_id, {"rounds": [round_id]})
         assert updated["success"]
 
-        all_games = get_games()
+        all_games = get_games()['object']
         print("   all games after update: {}".format(all_games))
         assert object_with_id_in_list(all_games, game_id, True)
 
         success = delete_game(game_id)
         assert success
 
-        all_games = get_games()
+        all_games = get_games()['object']
         print("   all games after delete: {}".format(all_games))
         assert object_with_id_in_list(all_games, game_id, False)
 

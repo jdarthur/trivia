@@ -25,7 +25,8 @@ CURRENT_ROUND = "current_round"
 SCORED = "scored"
 
 PLAYERS = "players"
-PLAYER_NAME = "player_name"
+TEAM_NAME = "team_name"
+REAL_NAME = "real_name"
 PLAYER_ID = "player_id"
 
 SESSION_ID = "session_id"
@@ -63,7 +64,7 @@ def create_session(data):
     """
     POST /session
     """
-    mod = create_player({})
+    mod = create_player({TEAM_NAME: "mod", REAL_NAME: "mod"})
     if not mod[SUCCESS]:
         return mod
 
@@ -122,8 +123,10 @@ def get_sessions():
 =====================================
 """
 
+
 pmodel = [
-    RestField(PLAYER_NAME, optional=True),
+    RestField(TEAM_NAME),
+    RestField(REAL_NAME),
     IdField(SESSION_ID, "session", optional=True)
 ]
 @model(pmodel, CREATE, "player")

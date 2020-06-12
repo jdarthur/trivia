@@ -102,11 +102,16 @@ def dummy_session(game_id):
 
 
 def dummy_player():
-    pdata = {"player_name": f"test team {randint(1, 100000)}"}
+    pdata = {
+        "team_name": f"test team {randint(1, 100000)}",
+        "real_name": "Jim Bibby"
+    }
+    print("create player ")
     created = create_player(pdata)
+    print(created)
     if created["success"]:
         return created["object"]["id"]
-    print(created)
+    print(f"pc f{created}")
     return None
 
 

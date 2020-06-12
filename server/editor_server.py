@@ -391,7 +391,7 @@ def delete_round_from_all_games(round_id):
     don't need to validate round_id because this is called
     inside delete_round where round_id is already validated
     """
-    games = get_games()
+    games = get_games()[OBJECT]
     for game in games:
         game_id = game[ID]
         mongo.pull("game", game_id, ROUNDS, round_id)
@@ -400,7 +400,7 @@ def delete_round_from_all_games(round_id):
 
 @app.route(f'{URL_BASE}/games', methods=['GET'])
 def get_all_games():
-    games = get_games()
+    games = get_games()[OBJECT]
     if not games[SUCCESS]:
         return jsonify(games)
     return jsonify({GAMES: games[OBJECT]})

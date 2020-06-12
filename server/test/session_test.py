@@ -115,9 +115,12 @@ def test_add_player_to_session():
 def test_add_players_and_get():
     print("\nTEST: add player to session and get, the nremove")
     with DummyGame() as game_id:
+        print("begin test_add_players_and_get")
         session_id = dummy_session(game_id)
+        print("after session create")
         for i in range(0, 4):
             player_id = dummy_player()
+            print(player_id)
             add_to_session(session_id, {"player_id": player_id})
 
         players = get_players(session_id)
