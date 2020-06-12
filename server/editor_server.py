@@ -58,12 +58,30 @@ URL_BASE = "/editor"
 mongo = MongoManager(MONGO_HOST, MONGO_DB)
 
 
+"""
+===================================================
+                   QUESTION API
+===================================================
+"""
+
+"""
+==============================
+        API ENDPOINTS
+==============================
+"""
 @app.route(f'{URL_BASE}/question', methods=['POST'])
 def create_one_question():
-    created = create_question(request.json)
-    if created[SUCCESS]:
-        return jsonify(created[OBJECT])
-    return jsonify({ERRORS: created[ERRORS]}), 400
+    return create_and_respond("question", request.json)
+
+
+@app.route(f'{URL_BASE}/question/<question_id>', methods=['GET'])
+def get_one_question(question_id):
+    return update_and_respond("question", question_id, request.json)
+
+
+@app.route(f'{URL_BASE}/question/<question_id>', methods=['DELETE'])
+def delete_one_question(question_id):
+    return delete_and_respond("question", question_id)
 
 
 qmodel = [
@@ -79,29 +97,21 @@ def create_question(data):
     return succeed(created)
 
 
-@app.route(f'{URL_BASE}/question/<question_id>', methods=['DELETE'])
-def delete_one_question(question_id):
-    resp = delete_question(question_id)
-    if resp[SUCCESS]:
-        return jsonify(resp[OBJECT])
-    return jsonify({ERRORS: resp[ERRORS]})
+@app.route(f'{URL_BASE}/questions', methods=['GET'])
+def get_all_questions():
+    text_filter = request.args.get(TEXT_FILTER, None)
+    unused_only = request.args.get(UNUSED_ONLY, False)
+    questions = get_questions(text_filter, unused_only)
+    if not questions[SUCCESS]:
+        return jsonify(questions)
+    return jsonify({QUESTIONS: questions[OBJECT]})
 
 
-@model(qmodel, DELETE, "question")
-def delete_question(question_id, question={}):
-    mongo.delete("question", question_id)
-    remove_question_from_all_rounds(question)
-    return succeed(question)
-
-
-@app.route(f'{URL_BASE}/question/<question_id>', methods=['GET'])
-def get_one_question(question_id):
-    resp = get_question(question_id)
-    if resp[SUCCESS]:
-        return jsonify(resp[OBJECT])
-    return jsonify({ERRORS: resp[ERRORS]})
-
-
+"""
+==============================
+        API HELPERS
+==============================
+"""
 @model(qmodel, GET_ONE, "question")
 def get_question(question_id, question={}):
     return succeed(question)
@@ -128,16 +138,6 @@ def update_question(question_id, data, question={}):
     return fail(f"Failed to update {QUESTION} with data {data}")
 
 
-@app.route(f'{URL_BASE}/questions', methods=['GET'])
-def get_all_questions():
-    text_filter = request.args.get(TEXT_FILTER, None)
-    unused_only = request.args.get(UNUSED_ONLY, False)
-    questions = get_questions(text_filter, unused_only)
-    if not questions[SUCCESS]:
-        return jsonify(questions)
-    return jsonify({QUESTIONS: questions[OBJECT]})
-
-
 def get_questions(text_filter=None, unused_only=True):
     ret = []
     questions = get_all("question")
@@ -147,6 +147,19 @@ def get_questions(text_filter=None, unused_only=True):
     return succeed(ret)
 
 
+@model(qmodel, DELETE, "question")
+def delete_question(question_id, question={}):
+    mongo.delete("question", question_id)
+    removed = remove_question_from_all_rounds(question)
+    if not removed[SUCCESS]:
+        return removed
+    return succeed(question)
+
+"""
+==============================
+        MISC HELPERS
+==============================
+"""
 def matches(question, text_filter, unused_only):
     return matches_text_filter(question, text_filter) and matches_unused_only(question, unused_only)
 
@@ -233,62 +246,25 @@ def set_round_in_questions(round_obj, orig_questions=[]):
             remove_round_from_question(question_id, {ROUND_ID: round_id})
 
 
+
+
+
+"""
+====================================================
+                       ROUNDS
+====================================================
+"""
+
+"""
+==============================
+        API ENDPOINTS
+==============================
+"""
 rmodel = [
     RestField(NAME),
     ListOfIds(QUESTIONS, "question"),
     ListOfType(WAGERS, int)
 ]
-
-
-def _resp(op_resp):
-    """
-    take fail/succeed response and return flask response
-    """
-    if op_resp[SUCCESS]:
-        return jsonify(op_resp[OBJECT])
-    return jsonify({ERRORS: op_resp[ERRORS]}), 400
-
-
-def create_and_respond(endpoint, data):
-    """
-    try to create some object and return a failure/success resp
-    """
-    if endpoint == "round":
-        return _resp(create_round(data))
-    if endpoint == "game":
-        return _resp(create_game(data))
-
-    raise Exception(f"unsupported create {endpoint}")
-
-
-def update_and_respond(endpoint, object_id, data):
-    """
-    try to update some object and return a failure/success resp
-    """
-    if endpoint == "round":
-        return _resp(update_round(object_id, data))
-    if endpoint == "game":
-        return _resp(update_game(object_id, data))
-
-    raise Exception(f"unsupported update {endpoint}")
-
-
-def delete_and_respond(endpoint, object_id):
-    """
-    try to delete some object and return a failure/success resp
-    """
-    if endpoint == "round":
-        return _resp(delete_round(object_id))
-    raise Exception(f"unsupported delete {endpoint}")
-
-
-# @app.route(f'{URL_BASE}/question/<question_id>', methods=['DELETE'])
-# def delete_one_question(question_id):
-#     resp = delete_question(question_id)
-#     if resp[SUCCESS]:
-#         return jsonify(resp[OBJECT])
-#     return jsonify({ERRORS: resp[ERRORS]})
-
 @app.route(f'{URL_BASE}/round', methods=['POST'])
 def create_one_round():
     return create_and_respond("round", request.json)
@@ -303,21 +279,20 @@ def update_one_round(round_id):
 def delete_one_round(round_id):
     return delete_and_respond("round", round_id)
 
-# @app.route(f'{URL_BASE}/question/<question_id>', methods=['PUT'])
-# def update_one_question(question_id):
-#     updated = update_question(question_id, request.json)
-#     if updated[SUCCESS]:
-#         return jsonify(updated[OBJECT])
-#     return jsonify({ERRORS: updated[ERRORS]}), 400
 
-# @app.route(f'{URL_BASE}/question', methods=['POST'])
-# def create_one_question():
-#     created = create_question(request.json)
-#     if created[SUCCESS]:
-#         return jsonify(created[OBJECT])
-#     return jsonify({ERRORS: created[ERRORS]}), 400
+@app.route(f'{URL_BASE}/rounds', methods=['GET'])
+def get_all_rounds():
+    rounds = get_rounds()
+    if not rounds[SUCCESS]:
+        return jsonify(rounds)
+    return jsonify({ROUNDS: rounds[OBJECT]})
 
 
+"""
+=========================
+      API HELPERS
+=========================
+"""
 @model(rmodel, CREATE, "round")
 def create_round(data):
     qlen = len(data.get(QUESTIONS, []))
@@ -374,18 +349,15 @@ def get_round(round_id, round_obj={}):
     return succeed(round_obj)
 
 
-@app.route(f'{URL_BASE}/rounds', methods=['GET'])
-def get_all_rounds():
-    rounds = get_rounds()
-    if not rounds[SUCCESS]:
-        return jsonify(rounds)
-    return jsonify({ROUNDS: rounds[OBJECT]})
-
-
 def get_rounds():
     return succeed(get_all("round"))
 
 
+"""
+==============================
+        MISC HELPERS
+==============================
+"""
 def delete_round_from_all_games(round_id):
     """
     don't need to validate round_id because this is called
@@ -398,34 +370,47 @@ def delete_round_from_all_games(round_id):
     return succeed({})
 
 
-@app.route(f'{URL_BASE}/games', methods=['GET'])
-def get_all_games():
-    games = get_games()[OBJECT]
-    if not games[SUCCESS]:
-        return jsonify(games)
-    return jsonify({GAMES: games[OBJECT]})
 
 
-def get_games():
-    return succeed(get_all("game"))
+"""
+====================================================
+                       GAMES
+====================================================
+"""
+
+"""
+=========================
+      API ENDPOINTS
+=========================
+"""
+@app.route(f'{URL_BASE}/game', methods=['POST'])
+def create_one_game():
+    return create_and_respond("game", request.json)
 
 
+@app.route(f'{URL_BASE}/game/<game_id>', methods=['PUT'])
+def update_one_game(game_id):
+    return update_and_respond("game", game_id, request.json)
+
+
+@app.route(f'{URL_BASE}/game/<game_id>', methods=['DELETE'])
+def delete_one_game(game_id):
+    return delete_and_respond("game", game_id)
+
+
+"""
+=========================
+      API_HELPERS
+=========================
+"""
 gmodel = [
     RestField(NAME),
     ListOfIds(ROUNDS, "round"),
     DictOfIds(ROUND_NAMES, "round")
 ]
-
-
 @model(gmodel, GET_ONE, "game")
 def get_game(game_id, game={}):
     return succeed(game)
-
-
-@app.route(f'{URL_BASE}/game', methods=['POST'])
-def create_one_game():
-    return create_and_respond("game", request.json)
-
 
 @model(gmodel, CREATE, "game")
 def create_game(data):
@@ -434,11 +419,6 @@ def create_game(data):
         return fail("Failed to create game")
 
     return succeed(created)
-
-
-@app.route(f'{URL_BASE}/game/<game_id>', methods=['PUT'])
-def update_one_game(game_id):
-    return update_and_respond("game", game_id, request.json)
 
 
 @model(gmodel, UPDATE, "game")
@@ -453,7 +433,77 @@ def update_game(game_id, data, game={}):
 @model(gmodel, DELETE, "game")
 def delete_game(game_id, game={}):
     mongo.delete("game", game_id)
-    return game
+    return succeed(game)
+
+
+@app.route(f'{URL_BASE}/games', methods=['GET'])
+def get_all_games():
+    games = get_games()
+    if not games[SUCCESS]:
+        return jsonify(games)
+    return jsonify({GAMES: games[OBJECT]})
+
+
+def get_games():
+    return succeed(get_all("game"))
+
+
+
+
+"""
+======================================
+        COMMON ENDPOINT HELPERS
+======================================
+"""
+def _resp(op_resp):
+    """
+    take fail/succeed response and return flask response
+    """
+    if op_resp[SUCCESS]:
+        return jsonify(op_resp[OBJECT])
+    return jsonify({ERRORS: op_resp[ERRORS]}), 400
+
+
+def create_and_respond(endpoint, data):
+    """
+    try to create some object and return a failure/success resp
+    """
+    if endpoint == "round":
+        return _resp(create_round(data))
+    if endpoint == "game":
+        return _resp(create_game(data))
+    if endpoint == "question":
+        return _resp(create_question(data))
+
+    raise Exception(f"unsupported create {endpoint}")
+
+
+def update_and_respond(endpoint, object_id, data):
+    """
+    try to update some object and return a failure/success resp
+    """
+    if endpoint == "round":
+        return _resp(update_round(object_id, data))
+    if endpoint == "game":
+        return _resp(update_game(object_id, data))
+    if endpoint == "question":
+        return _resp(update_question(object_id, data))
+
+    raise Exception(f"unsupported update {endpoint}")
+
+
+def delete_and_respond(endpoint, object_id):
+    """
+    try to delete some object and return a failure/success resp
+    """
+    if endpoint == "round":
+        return _resp(delete_round(object_id))
+    if endpoint == "game":
+        return _resp(delete_game(object_id))
+    if endpoint == "question":
+        return _resp(delete_question(object_id))
+
+    raise Exception(f"unsupported create {endpoint}")
 
 
 if __name__ == "__main__":
