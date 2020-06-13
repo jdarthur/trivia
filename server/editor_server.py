@@ -76,7 +76,7 @@ def create_one_question():
 
 @app.route(f'{URL_BASE}/question/<question_id>', methods=['GET'])
 def get_one_question(question_id):
-    return update_and_respond("question", question_id, request.json)
+    return get_and_respond("question", question_id)
 
 
 @app.route(f'{URL_BASE}/question/<question_id>', methods=['DELETE'])
@@ -455,13 +455,13 @@ def get_games():
         COMMON ENDPOINT HELPERS
 ======================================
 """
-def _resp(op_resp):
+def _resp(op_resp, error=400):
     """
     take fail/succeed response and return flask response
     """
     if op_resp[SUCCESS]:
         return jsonify(op_resp[OBJECT])
-    return jsonify({ERRORS: op_resp[ERRORS]}), 400
+    return jsonify({ERRORS: op_resp[ERRORS]}), error
 
 
 def create_and_respond(endpoint, data):
@@ -475,7 +475,7 @@ def create_and_respond(endpoint, data):
     if endpoint == "question":
         return _resp(create_question(data))
 
-    raise Exception(f"unsupported create {endpoint}")
+    raise Exception(f"unsupported create '{endpoint}'")
 
 
 def update_and_respond(endpoint, object_id, data):
@@ -489,7 +489,7 @@ def update_and_respond(endpoint, object_id, data):
     if endpoint == "question":
         return _resp(update_question(object_id, data))
 
-    raise Exception(f"unsupported update {endpoint}")
+    raise Exception(f"unsupported update '{endpoint}'")
 
 
 def delete_and_respond(endpoint, object_id):
@@ -503,7 +503,20 @@ def delete_and_respond(endpoint, object_id):
     if endpoint == "question":
         return _resp(delete_question(object_id))
 
-    raise Exception(f"unsupported create {endpoint}")
+    raise Exception(f"unsupported delete '{endpoint}'")
+
+def get_and_respond(endpoint, object_id):
+    """
+    try to get some object and return a failure/success resp
+    """
+    if endpoint == "round":
+        return _resp(get_round(object_id), 404)
+    if endpoint == "game":
+        return _resp(get_game(object_id), 404)
+    if endpoint == "question":
+        return _resp(get_question(object_id), 404)
+
+    raise Exception(f"unsupported get '{endpoint}'")
 
 
 if __name__ == "__main__":
