@@ -59,9 +59,9 @@ class Question extends React.Component {
             onChange={this.set_question} placeholder="Question" />
           <textarea className="text-area" value={this.props.answer}
             onChange={this.set_answer} placeholder="answer" />
-          <div>
-            <button onClick={this.delete_self}> Delete </button>
-            <button onClick={this.save_self} > Save </button>
+          <div className="button-container">
+            <button onClick={this.delete_self} className="delete-button button"> Delete </button>
+            <button onClick={this.save_self} className="button"> Save </button>
           </div>
 
         </div>

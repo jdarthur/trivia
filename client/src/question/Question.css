@@ -8,6 +8,7 @@
 	border: 1px solid #9c9c9c;
 	margin: 10px;
 	word-break: break-all;
+	cursor: pointer;
 	/* overflow-wrap: break-word; */
 }
 
@@ -40,4 +41,22 @@
    padding: 10px;
    /*color: #9c9c9c;;*/
    /*overflow-wrap: break-word; */
+}
+
+.button-container {
+	display: flex;
+	flex-direction: row;
+	justify-content: space-between;
+	align-self: stretch;
+}
+
+.delete-button {
+	background: lightcoral;
+}
+
+button {
+	padding:5px;
+	border-radius: 5px;
+	background: white;
+	margin: 10px
 }
