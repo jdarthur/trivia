@@ -32,6 +32,9 @@
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
 }
 
 .modal-title {
@@ -45,6 +48,14 @@
     align-items: center;
 }
 
+.modal-footer {
+    display: flex;
+    flex-direction: row;
+    justify-content: flex-end;
+    border-top: 1px solid #9c9c9c;
+    padding: 10px;
+}
+
 .modal-close {
     margin-right: 5px;
     cursor: pointer;
@@ -55,4 +66,8 @@
     display: flex;
     width: 100%;
     flex-wrap: wrap;
+}
+
+.footer-button {
+    margin-right: 10px;
 }

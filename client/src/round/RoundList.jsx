@@ -49,10 +49,14 @@ class RoundList extends React.Component {
         }
     }
 
-    set_value = (round_id, key, value) => {
+    set_value = (round_id, key, value, save) => {
         const round = find(round_id, this.state.rounds)
         round[key] = value
-        this.setState({ rounds: this.state.rounds, dirty: round_id });
+        if (save) {
+            this.setState({ rounds: this.state.rounds, dirty: round_id }, () => {
+                this.save(round_id)
+            });
+        }
     }
 
     save = (round_id) => {
@@ -140,7 +144,8 @@ class RoundList extends React.Component {
             const r = find(this.state.selected, this.state.rounds)
             open_round = <OpenRound key={r.id} id={r.id} name={r.name}
                 questions={r.questions} wagers={r.wagers} set={this.set_value}
-                set_selected={this.set_selected} delete={this.delete} />
+                set_selected={this.set_selected} delete={this.delete} 
+                save={this.save}/>
         }
         return (
             <div className="round-and-open-question">

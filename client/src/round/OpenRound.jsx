@@ -12,7 +12,7 @@ const QUESTIONS = "questions"
 class OpenRound extends React.Component {
 
     set_name = (event) => {
-        this.props.set(this.props.id, NAME, event.target.value)
+        this.props.set(this.props.id, NAME, event.target.value, false)
     }
 
     // set_wager = (event) => {
@@ -20,8 +20,7 @@ class OpenRound extends React.Component {
     // }
 
     add_questions = (questions_list) => {
-        this.props.set(this.props.id, QUESTIONS, this.props.questions.concat(questions_list))
-        // this.save_self()
+        this.props.set(this.props.id, QUESTIONS, this.props.questions.concat(questions_list), true)
     }
 
     remove_questions = (questions_list) => {
@@ -30,7 +29,7 @@ class OpenRound extends React.Component {
             const index = this.props.questions.indexOf(questions_list[i])
             this.props.questions.splice(index, index + 1)
         }
-        this.props.set(this.props.id, QUESTIONS, this.props.questions)
+        this.props.set(this.props.id, QUESTIONS, this.props.questions, true)
 
     }
 
@@ -38,8 +37,12 @@ class OpenRound extends React.Component {
         this.props.delete(this.props.id)
     }
 
-    save_self = () => {
+    save_self_and_close = () => {
         this.props.set_selected("")
+    }
+
+    save_self = () => {
+        this.props.save(this.props.id)
     }
 
     handleKeyPress = (event) => {
@@ -61,8 +64,8 @@ class OpenRound extends React.Component {
                 <input className={NAME} value={this.props.name}
                     onChange={this.set_name} onKeyDown={this.handleKeyPress} placeholder="Name" />
                 <div>
-                    {/* <AddableQuestionsList added_questions={this.props.questions} add_questions={this.add_questions} /> */}
-                    <AddQuestionsModal questions={this.props.questions} add_questions={this.add_questions} />
+                    <AddQuestionsModal questions={this.props.questions} 
+                    save={this.save_self} add_questions={this.add_questions} />
                     <RemovableQuestionsList questions={this.props.questions} remove_questions={this.remove_questions} />
                 </div>
                 <div className="wager-list">
@@ -71,7 +74,7 @@ class OpenRound extends React.Component {
 
                 <div>
                     <button onClick={this.delete_self}> Delete </button>
-                    <button onClick={this.save_self} > Save </button>
+                    <button onClick={this.save_self_and_close} > Save </button>
                 </div>
 
             </div>

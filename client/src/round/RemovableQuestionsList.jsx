@@ -23,7 +23,11 @@ class RemovableQuestionsList extends React.Component {
     }
 
     remove_selected = () => {
-        this.props.remove_questions(this.state.selected_questions)
+        if (this.state.selected_questions.length > 0) {
+            this.props.remove_questions(this.state.selected_questions)
+            this.setState({selected_questions: []})
+        }
+        
     }
 
 
