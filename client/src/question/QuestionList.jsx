@@ -154,13 +154,12 @@ class QuestionList extends React.Component {
         answer={question.answer} question={question.question}
         selected={(this.state.selected === question.id) ? true : false}
         addable={this.props.round_open} add_to_round={this.props.add_to_round}
-        set_selected={this.set_selected} set={this.set_value}
+        select={this.set_selected} set={this.set_value}
         delete={this.delete} />))
 
     const nqb = this.add_newquestion_button() ? <div className="new_button" onClick={this.add_new_question}>+</div> : null
     return (
       <div className="ql_and_filter">
-        Questions:
         <div className="filter_holder">
 
           <div className='filter'>
@@ -174,7 +173,7 @@ class QuestionList extends React.Component {
           </div>
         </div>
 
-        <div className="question_list">
+        <div className="question-list">
           {questions}
           {nqb}
         </div>

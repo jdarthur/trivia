@@ -10,9 +10,12 @@ class AddableQuestion extends React.Component {
 
     render() {
         return (
+            <div>
             <ReadOnlyQuestion id={this.props.id} question={this.props.question}
                     answer={this.props.answer} category={this.props.category} 
                     select={this.select_self} selected={this.props.selected} />
+            {this.props.index !== -1 ? this.props.index + 1 : null}
+            </div>
         );
 
     }

@@ -21,6 +21,7 @@ class OpenRound extends React.Component {
 
     add_questions = (questions_list) => {
         this.props.set(this.props.id, QUESTIONS, this.props.questions.concat(questions_list))
+        // this.save_self()
     }
 
     remove_questions = (questions_list) => {

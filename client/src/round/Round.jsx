@@ -8,7 +8,7 @@ import './Round.css';
  */
 class Round extends React.Component {
   set_selected = () => {
-    this.props.set_selected(this.props.id)
+    this.props.set_selected(this.props.id, !this.props.selected)
   }
 
   render() {

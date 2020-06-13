@@ -1,5 +1,6 @@
 import React from 'react';
 import './Question.css';
+import ReadOnlyQuestion from "./ReadOnlyQuestion"
 
 //JSON keys
 const CATEGORY = "category"
@@ -8,8 +9,8 @@ const ANSWER = "answer"
 
 class Question extends React.Component {
 
-  set_selected = (event) => {
-    this.props.set_selected(this.props.id)
+  select_self = (event) => {
+    this.props.select(this.props.id)
   }
 
   set_category = (event) => {
@@ -36,7 +37,7 @@ class Question extends React.Component {
   }
 
   save_self = () => {
-    this.props.set_selected("")
+    this.props.select("")
   }
 
   handleKeyPress = (event) => {
@@ -52,8 +53,8 @@ class Question extends React.Component {
     if (this.props.selected) {
       const containerClass = "question_container selected"
       return (
-        <div className={containerClass} onClick={this.set_selected} onKeyDown={this.handleKeyPress}>
-          <input type='textarea' className="category" value={this.props.category}
+        <div className={containerClass} onKeyDown={this.handleKeyPress}>
+          <input value={this.props.category}
             onChange={this.set_category} placeholder="Category" autoFocus />
           <textarea className="text-area" value={this.props.question}
             onChange={this.set_question} placeholder="Question" />
@@ -68,13 +69,17 @@ class Question extends React.Component {
       );
     }
     else {
-      const containerClass = "question_container"
+      // const containerClass = "question_container"
       return (
-        <div className={containerClass} onClick={this.set_selected}>
+        <ReadOnlyQuestion id={this.props.id} question={this.props.question}
+                    answer={this.props.answer} category={this.props.category} 
+                    select={this.select_self} selected={this.props.selected} />
+
+        /* <div className={containerClass} onClick={this.set_selected}>
           <div className="category"> {this.props.category} </div>
           <div className="question"> {this.props.question} </div>
           <div className="answer">   {this.props.answer}   </div>
-        </div>
+        </div> */
       );
     }
   }

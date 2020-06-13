@@ -136,7 +136,6 @@ class GameList extends React.Component {
         }
         return (
             <div className="round-and-open-question">
-                Games:
                 <div className="round_list">
                     {games}
                     {ngb}

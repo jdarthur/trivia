@@ -58,13 +58,14 @@ class AddableQuestionsList extends React.Component {
             if (this.props.added_questions.indexOf(question.id) === -1) {
                 questions.push(<AddableQuestion key={question.id} id={question.id}
                     question={question.question} answer={question.answer} category={question.category}
-                    select={this.select_item} selected={this.state.selected_questions.indexOf(question.id) !== -1} />)
+                    select={this.select_item} selected={this.state.selected_questions.indexOf(question.id) !== -1} 
+                    index={this.state.selected_questions.indexOf(question.id)}
+                    />)
             }
         }
 
         return (
             <div>
-                Addable Questions:
                 <div className="question-list">
                     {questions}
                     <button onClick={this.add_questions}> Add questions </button>

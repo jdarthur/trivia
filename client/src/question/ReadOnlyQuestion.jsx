@@ -13,7 +13,7 @@ class ReadOnlyQuestion extends React.Component {
             <div className={containerClass} onClick={this.select_self}>
                 <div className="category"> {this.props.category} </div>
                 <div className="question"> {this.props.question} </div>
-                <div className="answer">   {this.props.answer}   </div>
+                <div className="answer">  {this.props.answer}   </div>
             </div>
         );
     }

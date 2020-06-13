@@ -38,10 +38,14 @@ class RoundList extends React.Component {
             })
     }
 
-    set_selected = (round_id) => {
+    set_selected = (round_id, value) => {
         if (this.state.selected !== round_id) {
             this.save(this.state.selected)
             this.setState({ selected: round_id })
+        }
+        else if (!value) {
+            this.save(this.state.selected)
+            this.setState({ selected: "" })
         }
     }
 
@@ -140,7 +144,6 @@ class RoundList extends React.Component {
         }
         return (
             <div className="round-and-open-question">
-                Rounds:
                 <div className="round_list">
                     {rounds}
                     {nrb}

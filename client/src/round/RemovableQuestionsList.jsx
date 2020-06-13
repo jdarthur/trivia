@@ -11,29 +11,6 @@ class RemovableQuestionsList extends React.Component {
         }
     }
 
-    componentDidMount() {
-        this.get_questions()
-    }
-
-    get_questions = () => {
-        let url = "/editor/questions?unused_only=true"
-        // if (this.state.text_filter !== "") {
-        //   url += "text_filter=" + this.state.text_filter
-        // }
-
-        // if (this.state.unused_only === true) {
-        //   url += "&unused_only=true"
-        // }
-
-        fetch(url)
-            .then(response => response.json())
-            .then(state => {
-                console.log("got questions in addable questions")
-                console.log(state)
-                this.setState({ questions: state.questions })
-            })
-    }
-
     select_item = (question_id) => {
         const index = this.state.selected_questions.indexOf(question_id)
         if (index ===  -1) {

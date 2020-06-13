@@ -1,23 +1,24 @@
-.question_list {
+.question-list {
 	display: flex;
 	flex-direction: row;
     flex-wrap: wrap;
-	justify-content: space-around;
-    align-items: center;
+	justify-content: space-evenly;
+    align-items: stretch;
 }
 
 .new_button {
     background: #d1d1d1;
-    font-size: 4em;
+    font-size: 3em;
     display: flex;
     flex-direction: column;
     align-items: center;
-    border-radius: 5px;
-    width:100px;
-    border: 1px solid #9c9c9c;
-    margin: 10px;
     align-self: center;
+    border-radius: 5px;
+    border: 1px solid #9c9c9c;
+    width: 50px;
+    height: 50px;
     cursor: pointer;
+    font-weight: bold;
 }
 
 .filter {
@@ -34,8 +35,8 @@
 
 .ql_and_filter {
 	display: flex;
-	flex-direction: column;
-    align-items: center;
-    margin: 25px;
+    flex-direction: column;
+    align-items: flex-start;
+    margin: 10px;
     flex: 0 1 auto;
 }
