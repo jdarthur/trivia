@@ -34,6 +34,9 @@ class RoundInGame extends React.Component {
             })
     }
 
+    select_self = () => {
+        this.props.select(this.props.id)
+    }
 
     remove_self = () => {
         this.props.remove(this.props.id)
@@ -43,12 +46,19 @@ class RoundInGame extends React.Component {
         const questions = this.state.questions.map((question_id) => (
             <QuestionInRound key={question_id} id={question_id} />))
 
+
+
+        const containerClass = "round-and-index" + (this.props.selected ? " selected" : "")
         return (
-            <div className="round-in-game">
-                <div className="round-title"> {this.state.round_name}: </div>
-                
-                {questions}
+            <div className={containerClass}>
+                <div className="round-in-game" onClick={this.select_self}>
+                    <div className="round-title"> {this.state.round_name}: </div>
+                    {questions.length > 0 ? questions : (<div className="empty-round">no questions</div>)}
+
+                </div>
+                {this.props.index !== -1 && this.props.index !== undefined ? this.props.index + 1 : null}
             </div>
+
         );
     }
 }

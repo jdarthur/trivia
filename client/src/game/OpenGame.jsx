@@ -1,6 +1,7 @@
 import React from 'react';
 import '../round/OpenRound.css';
 import RoundInGame from "./RoundInGame"
+import AddRoundsModal from './AddRoundsModal';
 
 const NAME = "name"
 // const QUESTIONS = "questions"
@@ -54,6 +55,7 @@ class OpenGame extends React.Component {
                 </div>
 
                 <div>
+                    <AddRoundsModal rounds={this.props.rounds}/>
                     <button onClick={this.delete_self}> Delete </button>
                     <button onClick={this.save_self} > Save </button>
                 </div>

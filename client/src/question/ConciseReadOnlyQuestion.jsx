@@ -15,8 +15,10 @@ class ConciseReadOnlyQuestion extends React.Component {
             text = this.props.question.substring(0, cutoff) + "..."
         }
 
+        const containerClass = "concise-question" + (this.props.selected ? " selected" : "")
+
         return (
-            <div className="concise-question">
+            <div className={containerClass}>
                 {text}
             </div>
         );

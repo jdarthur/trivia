@@ -1,12 +1,30 @@
+.round-and-index {
+    display: flex;
+    align-self: stretch;
+}
+
 .round-in-game {
     border-radius: 5px;
     /* padding: 5px; */
     border: 1px solid black;
     font-size: .9em;
     text-align: left;
+    cursor: pointer;
+    margin: 5px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
 }
 
 .round-title {
     /* padding-bottom: 5px; */
     margin: 5px;
+}
+
+.empty-round {
+    color: #707070;
+    margin: 5px;
+    text-align: center;
+    flex-grow: 1;
+    /* display: flex; */
 }
