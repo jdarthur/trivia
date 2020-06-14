@@ -130,8 +130,7 @@ class RestField(object):
             return fail(f"Missing required field '{self.field_name}'")
 
         if self.has_this_field(data) and not self.is_correct_type(data):
-            return fail(f"Field '{self.field_name}' (with value "
-                        " '{data[self.field_name]}') is not type {self.expected_type}")
+            return fail(f"Field '{self.field_name}' (with value '{data[self.field_name]}') is not type {self.expected_type}")
 
         return succeed(data)
 
