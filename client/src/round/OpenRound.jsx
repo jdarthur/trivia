@@ -8,6 +8,7 @@ import Wager from "./Wager.jsx"
 
 const NAME = "name"
 const QUESTIONS = "questions"
+const WAGERS = "wagers"
 
 class OpenRound extends React.Component {
 
@@ -15,12 +16,20 @@ class OpenRound extends React.Component {
         this.props.set(this.props.id, NAME, event.target.value, false)
     }
 
-    // set_wager = (event) => {
-    //     this.props.set(this.props.id, NAME, event.target.value)
-    // }
+    set_wager = (event) => {
+        this.props.set(this.props.id, NAME, event.target.value)
+    }
 
     add_questions = (questions_list) => {
-        this.props.set(this.props.id, QUESTIONS, this.props.questions.concat(questions_list), true)
+        const new_wagers = []
+        for (let i = 0; i < questions_list.length; i++) {
+            new_wagers.push(1)
+        }
+        const update = {
+            [QUESTIONS]: this.props.questions.concat(questions_list),
+            [WAGERS]: this.props.wagers.concat(new_wagers)
+        }
+        this.props.set_multi(this.props.id, update, true)
     }
 
     remove_questions = (questions_list) => {
@@ -28,8 +37,14 @@ class OpenRound extends React.Component {
         for (let i = 0; i < questions_list.length; i++) {
             const index = this.props.questions.indexOf(questions_list[i])
             this.props.questions.splice(index, index + 1)
+            this.props.wagers.splice(index, index + 1)
         }
-        this.props.set(this.props.id, QUESTIONS, this.props.questions, true)
+
+        const update = {
+            [QUESTIONS]: this.props.questions,
+            [WAGERS]: this.props.wagers
+        }
+        this.props.set_multi(this.props.id, update, true)
 
     }
 
@@ -53,9 +68,6 @@ class OpenRound extends React.Component {
     }
 
     render() {
-        // const questions = this.props.questions.map((question, index) => (
-        // <ReadOnlyQuestion key={question} id={question} delete={this.delete} />))
-
         const wagers = this.props.wagers.map((wager, index) => (
             <Wager key={index} id={index} wager={wager} />))
 

@@ -59,6 +59,19 @@ class RoundList extends React.Component {
         });
     }
 
+    set_multi = (round_id, update_dict, save) => {
+        const round = find(round_id, this.state.rounds)
+        for (let key in update_dict) {
+            round[key] = update_dict[key]
+        }
+
+        this.setState({ rounds: this.state.rounds, dirty: round_id }, () => {
+            if (save) {
+                this.save(round_id)
+            }
+        });
+    }
+
 
     save = (round_id) => {
         //don't save if the selected round is not dirty
@@ -146,7 +159,7 @@ class RoundList extends React.Component {
             open_round = <OpenRound key={r.id} id={r.id} name={r.name}
                 questions={r.questions} wagers={r.wagers} set={this.set_value}
                 set_selected={this.set_selected} delete={this.delete}
-                save={this.save} />
+                save={this.save} set_multi={this.set_multi}/>
         }
         return (
             <div className="round-and-open-question">
