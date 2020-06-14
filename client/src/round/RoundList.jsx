@@ -82,7 +82,10 @@ class RoundList extends React.Component {
                 sendData(null, "POST", round)
                     .then((data) => {
                         round.id = data.id
-                        this.setState({ rounds: this.state.rounds, dirty: "" })
+                        this.setState({ 
+                            rounds: this.state.rounds,
+                            dirty: "",
+                            selected: round.id})
                     })
             }
             else { //update existing round
