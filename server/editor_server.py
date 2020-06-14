@@ -416,8 +416,20 @@ gmodel = [
 def get_game(game_id, game={}):
     return succeed(game)
 
+
 @model(gmodel, CREATE, "game")
 def create_game(data):
+
+    round_names = data[ROUND_NAMES]
+    rounds = data[ROUNDS]
+
+    if len(round_names) != len(rounds):
+        return fail(f"{ROUND_NAMES} is different length ({len(round_names)}) than {ROUNDS} ({len(rounds)})")
+
+    for round_id in rounds:
+        if round_names.get(round_id, None) is None:
+            return fail(f"missing round name for round with id {round_id})")
+
     created = mongo.create("game", data)
     if not created:
         return fail("Failed to create game")

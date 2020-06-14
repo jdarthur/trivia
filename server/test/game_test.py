@@ -1,7 +1,7 @@
 from editor_server import delete_round
 from editor_server import (create_game, delete_game, get_game,
                            update_game, get_games)
-from .test_helpers import object_with_id_in_list, indentprint, DummyGame
+from .test_helpers import object_with_id_in_list, indentprint, DummyGame, DummyRound
 
 
 def create_and_print(data):
@@ -59,6 +59,44 @@ def test_round_id_duplicated():
                                     "5e9c82c83e9f1b817df277aa"]}
     created = create_and_print(data)
     assert created["success"] is False
+
+
+def test_round_missing_name():
+    with DummyRound() as round_id:
+        with DummyRound() as round_id2:
+
+            data = {
+                "name": "f",
+                "rounds": [round_id],
+                "round_names": {round_id2: "f"}
+            }
+
+            created = create_and_print(data)
+            assert created["success"] is False
+
+
+def test_more_round_names_than_rounds():
+    with DummyRound() as round_id:
+        data = {
+            "name": "f",
+            "rounds": [],
+            "round_names": {round_id: "f"}
+        }
+
+        created = create_and_print(data)
+        assert created["success"] is False
+
+
+def test_more_rounds_than_round_names():
+    with DummyRound() as round_id:
+        data = {
+            "name": "f",
+            "rounds": [round_id],
+            "round_names": {}
+        }
+
+        created = create_and_print(data)
+        assert created["success"] is False
 
 
 def test_crud():

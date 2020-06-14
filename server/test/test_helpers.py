@@ -70,6 +70,33 @@ def dummy_round(question_ids):
     return None
 
 
+class DummyRound(object):
+    def __init__(self, questions_per_round=1, return_class=False):
+        self.qcount = questions_per_round
+        self.return_class = return_class
+
+    def __enter__(self):
+
+        self.questions = []
+        for j in range(0, self.qcount):
+            question_id = dummy_question()
+            self.questions.append(question_id)
+
+        self.round_id = dummy_round(self.questions)
+        print(self.round_id)
+
+        if self.return_class:
+            return self
+        return self.round_id
+
+    def __exit__(self, type, value, traceback):
+
+        delete_round(self.round_id)
+
+        for question_id in self.questions:
+            delete_question(question_id)
+
+
 def dummy_game(rounds):
     names = {}
     for i, round in enumerate(rounds):
