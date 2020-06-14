@@ -16,8 +16,10 @@ class OpenRound extends React.Component {
         this.props.set(this.props.id, NAME, event.target.value, false)
     }
 
-    set_wager = (event) => {
-        this.props.set(this.props.id, NAME, event.target.value)
+    set_wager = (index, value) => {
+        console.log("set wager " + index + "=" + value)
+        this.props.wagers[index] = value
+        this.props.set(this.props.id, WAGERS, this.props.wagers, false)
     }
 
     add_questions = (questions_list) => {
@@ -69,7 +71,7 @@ class OpenRound extends React.Component {
 
     render() {
         const wagers = this.props.wagers.map((wager, index) => (
-            <Wager key={index} id={index} wager={wager} />))
+            <Wager key={index} index={index} value={wager} set={this.set_wager}/>))
 
         return (
             <div className="open-round">
@@ -82,7 +84,7 @@ class OpenRound extends React.Component {
                     <RemovableQuestionsList questions={this.props.questions} remove_questions={this.remove_questions} />
                 </div>
 
-                <div className="wager-list"> {wagers} </div>
+                <div className="wager-list"> Wagers: {wagers} </div>
 
                 <div>
                     <button onClick={this.delete_self} className="delete-button"> Delete Round </button>

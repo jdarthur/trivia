@@ -117,7 +117,7 @@ class QuestionList extends React.Component {
   */
   delete_and_update_state = (question) => {
     const index = this.state.questions.map(function (e) { return e.id; }).indexOf(question.id);
-    this.state.questions.splice(index, index + 1)
+    this.state.questions.splice(index, 1)
     this.setState({ questions: this.state.questions, dirty: "", selected: "" })
   }
 

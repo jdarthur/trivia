@@ -1,10 +1,25 @@
 .wager {
     display: flex;
-    padding: 10px;
-    margin: 5px;
+    flex-direction: row;
+    /* padding: 10px; */
+    /* margin: 5px; */
     border: 1px solid black;
     border-radius: 5px;
     text-align: center;
     align-items: center;
     justify-content: center;
+
+    background: lightgrey;
+}
+
+.plus-or-minus {
+    cursor: pointer;
+    padding: 5px;
+}
+
+.wager-text {
+    padding: 10px;
+    border-left: 1px solid black;
+    border-right: 1px solid black;
+    background: white;
 }

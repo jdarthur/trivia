@@ -111,7 +111,9 @@ class RoundList extends React.Component {
      */
     delete_and_update_state = (round) => {
         const index = this.state.rounds.map(function (e) { return e.id; }).indexOf(round.id);
-        this.state.rounds.splice(index, index + 1)
+        console.log(this.state.rounds)
+        this.state.rounds.splice(index, 1)
+        console.log(this.state.rounds)
         this.setState({ rounds: this.state.rounds, dirty: "", selected: "" })
     }
 

@@ -39,13 +39,12 @@ class GameList extends React.Component {
     }
 
     set_selected = (game_id, value) => {
+        console.log(game_id)
         if (this.state.selected !== game_id) {
-            this.save(this.state.selected)
-            this.setState({ selected: game_id })
+            this.save(this.state.selected, game_id)
         }
         else if (!value) {
-            this.save(this.state.selected)
-            this.setState({ selected: "" })
+            this.save(this.state.selected, game_id)
         }
     }
 
@@ -59,14 +58,28 @@ class GameList extends React.Component {
         });
     }
 
+    set_multi = (game_id, update_dict, save) => {
+        const game = find(game_id, this.state.games)
+        for (let key in update_dict) {
+            game[key] = update_dict[key]
+        }
+
+        this.setState({ games: this.state.games, dirty: game_id }, () => {
+            if (save) {
+                this.save(game_id, game_id) //pass 2 game_id because this game is still selected
+            }
+        });
+    }
+
     set_round_name = (game_id, round_id, name) => {
         const game = find(game_id, this.state.games)
         game[ROUND_NAMES][round_id] = name
         this.setState({ games: this.state.games, dirty: game_id })
     }
 
-    save = (game_id) => {
+    save = (game_id, selected) => {
         //don't save if the selected game is not dirty
+        console.log(this.state)
         if (this.state.dirty !== "") {
             const game = find(game_id, this.state.games)
             if (game_id === NEW) { //create new game
@@ -74,7 +87,13 @@ class GameList extends React.Component {
                 sendData(null, "POST", game)
                     .then((data) => {
                         game.id = data.id
-                        this.setState({ games: this.state.games, dirty: "" })
+                        const to_save = { games: this.state.games, dirty: "" }
+                        if (selected) {
+                            to_save.selected = game.id
+                        }
+                        console.log(to_save)
+                    
+                        this.setState(to_save)
                     })
             }
             else { //update existing game
@@ -82,6 +101,9 @@ class GameList extends React.Component {
                 sendData(game_id, "PUT", game)
                     .then((data) => { this.setState({ dirty: "" }) })
             }
+        }
+        else {
+            this.setState({ selected: selected })
         }
     }
 
@@ -103,7 +125,7 @@ class GameList extends React.Component {
      */
     delete_and_update_state = (game) => {
         const index = this.state.games.map(function (e) { return e.id; }).indexOf(game.id);
-        this.state.games.splice(index, index + 1)
+        this.state.games.splice(index, 1)
         this.setState({ games: this.state.games, dirty: "", selected: "" })
     }
 
@@ -147,7 +169,7 @@ class GameList extends React.Component {
             open_game = <OpenGame key={g.id} id={g.id} name={g.name}
                 rounds={g.rounds} round_names={g.round_names} set={this.set_value}
                 set_selected={this.set_selected} delete={this.delete} 
-                set_round_name={this.set_round_name} />
+                set_round_name={this.set_round_name} set_multi={this.set_multi} />
         }
         return (
             <div className="round-and-open-question">

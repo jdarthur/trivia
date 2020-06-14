@@ -13,21 +13,21 @@ class RemovableQuestionsList extends React.Component {
 
     select_item = (question_id) => {
         const index = this.state.selected_questions.indexOf(question_id)
-        if (index ===  -1) {
+        if (index === -1) {
             this.state.selected_questions.push(question_id)
         }
         else {
             this.state.selected_questions.splice(index, index + 1)
         }
-        this.setState({selected_questions: this.state.selected_questions})
+        this.setState({ selected_questions: this.state.selected_questions })
     }
 
     remove_selected = () => {
         if (this.state.selected_questions.length > 0) {
             this.props.remove_questions(this.state.selected_questions)
-            this.setState({selected_questions: []})
+            this.setState({ selected_questions: [] })
         }
-        
+
     }
 
 
@@ -39,12 +39,9 @@ class RemovableQuestionsList extends React.Component {
         )
 
         return (
-            <div>
-                Removable Questions:
-                <div className="question-list">
-                    {questions}
-                    <button onClick={this.remove_selected}> Remove Questions</button>
-                </div>
+            <div className="question-list">
+                {questions}
+                <button onClick={this.remove_selected}> Remove Questions</button>
             </div>
         );
     }

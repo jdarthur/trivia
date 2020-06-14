@@ -5,6 +5,7 @@ import RemovableRoundsList from "./RemovableRoundsList"
 
 const NAME = "name"
 const ROUNDS = "rounds"
+const ROUND_NAMES = "round_names"
 
 class OpenGame extends React.Component {
 
@@ -17,7 +18,14 @@ class OpenGame extends React.Component {
     }
 
     add_rounds = (rounds_list) => {
-        this.props.set(this.props.id, ROUNDS, this.props.rounds.concat(rounds_list), true)
+        for(let i = 0; i < rounds_list.length; i++) {
+            this.props.round_names[rounds_list[i]] = "Round " + i
+        }
+        const update = {
+            [ROUNDS]: this.props.rounds.concat(rounds_list),
+            [ROUND_NAMES]: this.props.round_names
+        }
+        this.props.set_multi(this.props.id, update, true)
     }
 
     remove_rounds = (rounds_list) => {
@@ -25,8 +33,14 @@ class OpenGame extends React.Component {
         for (let i = 0; i < rounds_list.length; i++) {
             const index = this.props.rounds.indexOf(rounds_list[i])
             this.props.rounds.splice(index, index + 1)
+            delete this.props.round_names[rounds_list[i]]
         }
-        this.props.set(this.props.id, ROUNDS, this.props.rounds, true)
+
+        const update = {
+            [ROUNDS]: this.props.rounds,
+            [ROUND_NAMES]: this.props.round_names
+        }
+        this.props.set_multi(this.props.id, update, true)
 
     }
 
