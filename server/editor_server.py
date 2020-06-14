@@ -299,15 +299,9 @@ def get_all_rounds():
 """
 @model(rmodel, CREATE, "round")
 def create_round(data):
-    qlen = len(data.get(QUESTIONS, []))
-    wlen = len(data.get(WAGERS, []))
-    if qlen != wlen:
-        error = f"{WAGERS} length ({wlen}) does not equal {QUESTIONS} length ({qlen}) (data: {data}))"
-        return fail(error)
-
-    for wager in data.get(WAGERS, []):
-        if wager <= 0:
-            return fail(f"Wager '{wager}' is not positive int")
+    validate = validate_wagers(data)
+    if not validate[SUCCESS]:
+        return validate
 
     created = mongo.create("round", data)
     if not created:
@@ -338,6 +332,10 @@ def delete_round(round_id, round_obj={}):
 
 @model(rmodel, UPDATE, "round")
 def update_round(round_id, data, round_obj={}, set_questions=True):
+    validate = validate_wagers(data)
+    if not validate[SUCCESS]:
+        return validate
+
     orig_questions = round_obj.get(QUESTIONS, [])
     success = mongo.update("round", round_id, data)
     if success:
@@ -373,7 +371,17 @@ def delete_round_from_all_games(round_id):
         mongo.pull("game", game_id, ROUNDS, round_id)
     return succeed({})
 
+def validate_wagers(data):
+    qlen = len(data.get(QUESTIONS, []))
+    wlen = len(data.get(WAGERS, []))
+    if qlen != wlen:
+        error = f"{WAGERS} length ({wlen}) does not equal {QUESTIONS} length ({qlen}) (data: {data}))"
+        return fail(error)
 
+    for wager in data.get(WAGERS, []):
+        if wager <= 0:
+            return fail(f"Wager '{wager}' is not positive int")
+    return success(data)
 
 
 """
