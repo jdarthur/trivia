@@ -381,7 +381,7 @@ def validate_wagers(data):
     for wager in data.get(WAGERS, []):
         if wager <= 0:
             return fail(f"Wager '{wager}' is not positive int")
-    return success(data)
+    return succeed(data)
 
 
 """
