@@ -279,6 +279,10 @@ def update_one_round(round_id):
 def delete_one_round(round_id):
     return delete_and_respond("round", round_id)
 
+@app.route(f'{URL_BASE}/round/<round_id>', methods=['GET'])
+def get_one_round(round_id):
+    return get_and_respond("round", round_id)
+
 
 @app.route(f'{URL_BASE}/rounds', methods=['GET'])
 def get_all_rounds():
