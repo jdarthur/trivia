@@ -1,30 +1,30 @@
 import React from 'react';
 import '../round/OpenRound.css';
-import RoundInGame from "./RoundInGame"
 import AddRoundsModal from './AddRoundsModal';
+import RemovableRoundsList from "./RemovableRoundsList"
 
 const NAME = "name"
-// const QUESTIONS = "questions"
+const ROUNDS = "rounds"
 
 class OpenGame extends React.Component {
 
     set_name = (event) => {
-        this.props.set(this.props.id, NAME, event.target.value)
+        this.props.set(this.props.id, NAME, event.target.value, false)
     }
 
-    // add_questions = (questions_list) => {
-    //     this.props.set(this.props.id, QUESTIONS, this.props.questions.concat(questions_list))
-    // }
+    add_rounds = (rounds_list) => {
+        this.props.set(this.props.id, ROUNDS, this.props.rounds.concat(rounds_list), true)
+    }
 
-    // remove_questions = (questions_list) => {
-    //     console.log(questions_list)
-    //     for (let i = 0; i < questions_list.length; i++) {
-    //         const index = this.props.questions.indexOf(questions_list[i])
-    //         this.props.questions.splice(index, index + 1)
-    //     }
-    //     this.props.set(this.props.id, QUESTIONS, this.props.questions)
+    remove_rounds = (rounds_list) => {
+        console.log(rounds_list)
+        for (let i = 0; i < rounds_list.length; i++) {
+            const index = this.props.rounds.indexOf(rounds_list[i])
+            this.props.rounds.splice(index, index + 1)
+        }
+        this.props.set(this.props.id, ROUNDS, this.props.rounds, true)
 
-    // }
+    }
 
     delete_self = () => {
         this.props.delete(this.props.id)
@@ -42,21 +42,21 @@ class OpenGame extends React.Component {
     }
 
     render() {
-        const rounds = this.props.rounds.map((round_id) => (
-            <RoundInGame key={round_id} id={round_id} />))
+
 
         return (
             <div className="open-round">
                 <input className={NAME} value={this.props.name}
                     onChange={this.set_name} onKeyDown={this.handleKeyPress} placeholder="Name" />
+
+                <AddRoundsModal rounds={this.props.rounds} add_rounds={this.add_rounds} />
                 <div>
-                    Rounds:
-                    {rounds}
+                    <RemovableRoundsList rounds={this.props.rounds} remove_rounds={this.remove_rounds} />
                 </div>
 
                 <div>
-                    <AddRoundsModal rounds={this.props.rounds}/>
-                    <button onClick={this.delete_self}> Delete </button>
+
+                    <button onClick={this.delete_self} className="delete-button"> Delete </button>
                     <button onClick={this.save_self} > Save </button>
                 </div>
 

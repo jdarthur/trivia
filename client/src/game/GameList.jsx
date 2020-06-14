@@ -38,17 +38,25 @@ class GameList extends React.Component {
             })
     }
 
-    set_selected = (game_id) => {
+    set_selected = (game_id, value) => {
         if (this.state.selected !== game_id) {
             this.save(this.state.selected)
             this.setState({ selected: game_id })
         }
+        else if (!value) {
+            this.save(this.state.selected)
+            this.setState({ selected: "" })
+        }
     }
 
-    set_value = (game_id, key, value) => {
+    set_value = (game_id, key, value, save_game) => {
         const round = find(game_id, this.state.games)
         round[key] = value
-        this.setState({ rounds: this.state.games, dirty: game_id });
+        this.setState({ rounds: this.state.games, dirty: game_id }, () => {
+            if (save_game) {
+                this.save(game_id)
+            }
+        });
     }
 
     save = (game_id) => {
