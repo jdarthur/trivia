@@ -1,0 +1,12 @@
+.round-in-game {
+    border-radius: 5px;
+    /* padding: 5px; */
+    border: 1px solid black;
+    font-size: .9em;
+    text-align: left;
+}
+
+.round-title {
+    /* padding-bottom: 5px; */
+    margin: 5px;
+}

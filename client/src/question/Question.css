@@ -67,3 +67,10 @@ button {
 	background: white;
 	margin: 5px
 }
+
+.concise-question {
+	border: 1px solid black;
+	padding: 5px;
+	text-align: center;
+	margin: 5px;
+}

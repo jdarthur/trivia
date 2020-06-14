@@ -1,10 +1,6 @@
 import React from 'react';
 import '../round/OpenRound.css';
-//import ReadOnlyQuestion from "../question/ReadOnlyQuestion.jsx"
-// import AddableQuestionsList from "./AddableQuestionsList"
-// import AddQuestionsModal from "../modal/AddQuestionsModal"
-// import RemovableQuestionsList from "./RemovableQuestionsList"
-// import Wager from "./Wager.jsx"
+import RoundInGame from "./RoundInGame"
 
 const NAME = "name"
 // const QUESTIONS = "questions"
@@ -14,10 +10,6 @@ class OpenGame extends React.Component {
     set_name = (event) => {
         this.props.set(this.props.id, NAME, event.target.value)
     }
-
-    // // set_wager = (event) => {
-    // //     this.props.set(this.props.id, NAME, event.target.value)
-    // // }
 
     // add_questions = (questions_list) => {
     //     this.props.set(this.props.id, QUESTIONS, this.props.questions.concat(questions_list))
@@ -49,14 +41,16 @@ class OpenGame extends React.Component {
     }
 
     render() {
+        const rounds = this.props.rounds.map((round_id) => (
+            <RoundInGame key={round_id} id={round_id} />))
+
         return (
             <div className="open-round">
                 <input className={NAME} value={this.props.name}
                     onChange={this.set_name} onKeyDown={this.handleKeyPress} placeholder="Name" />
                 <div>
-                    {/* <AddableQuestionsList added_questions={this.props.questions} add_questions={this.add_questions} /> */}
-                    {/* <AddQuestionsModal questions={this.props.questions} add_questions={this.add_questions} />
-                    <RemovableQuestionsList questions={this.props.questions} remove_questions={this.remove_questions} /> */}
+                    Rounds:
+                    {rounds}
                 </div>
 
                 <div>

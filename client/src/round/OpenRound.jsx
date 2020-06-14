@@ -48,13 +48,13 @@ class OpenRound extends React.Component {
     handleKeyPress = (event) => {
         if (event.key === 'Enter' && !event.altKey) {
             event.preventDefault()
-            this.save_self()
+            this.save_self_and_close()
         }
     }
 
     render() {
         // const questions = this.props.questions.map((question, index) => (
-            // <ReadOnlyQuestion key={question} id={question} delete={this.delete} />))
+        // <ReadOnlyQuestion key={question} id={question} delete={this.delete} />))
 
         const wagers = this.props.wagers.map((wager, index) => (
             <Wager key={index} id={index} wager={wager} />))
@@ -63,14 +63,14 @@ class OpenRound extends React.Component {
             <div className="open-round">
                 <input className={NAME} value={this.props.name}
                     onChange={this.set_name} onKeyDown={this.handleKeyPress} placeholder="Name" />
+
                 <div>
-                    <AddQuestionsModal questions={this.props.questions} 
-                    save={this.save_self} add_questions={this.add_questions} />
+                    <AddQuestionsModal questions={this.props.questions}
+                        save={this.save_self} add_questions={this.add_questions} />
                     <RemovableQuestionsList questions={this.props.questions} remove_questions={this.remove_questions} />
                 </div>
-                <div className="wager-list">
-                    {wagers}
-                </div>
+
+                <div className="wager-list"> {wagers} </div>
 
                 <div>
                     <button onClick={this.delete_self}> Delete </button>
