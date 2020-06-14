@@ -73,8 +73,8 @@ class OpenRound extends React.Component {
                 <div className="wager-list"> {wagers} </div>
 
                 <div>
-                    <button onClick={this.delete_self} className="delete-button"> Delete </button>
-                    <button onClick={this.save_self_and_close} > Save </button>
+                    <button onClick={this.delete_self} className="delete-button"> Delete Round </button>
+                    <button onClick={this.save_self_and_close} > Save Round </button>
                 </div>
 
             </div>

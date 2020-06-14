@@ -65,8 +65,7 @@ class AddRoundsModal extends React.Component {
                 if (this.props.rounds.indexOf(round.id) === -1) {
                     rounds.push(<RoundInGame key={round.id} id={round.id}
                         select={this.select_item} selected={this.state.selected_rounds.indexOf(round.id) !== -1}
-                        index={this.state.selected_rounds.indexOf(round.id)}
-                    />)
+                        index={this.state.selected_rounds.indexOf(round.id)} show_title={true} />)
                 }
             }
             return (

@@ -1,6 +1,5 @@
 import React from 'react';
-// import './OpenRound.css';
-import RoundInGame from "./RoundInGame"
+import RemovableRound from './RemovableRound';
 
 class RemovableRoundsList extends React.Component {
 
@@ -32,9 +31,10 @@ class RemovableRoundsList extends React.Component {
 
     render() {
         const rounds = this.props.rounds.map((round_id) => (
-            <RoundInGame key={round_id} id={round_id} select={this.select_item}
+            <RemovableRound key={round_id} id={round_id} select={this.select_item}
                 selected={this.state.selected_rounds.indexOf(round_id) !== -1}
-            />))
+                show_title={false} set_round_name={this.props.set_round_name} 
+                name={this.props.round_names[round_id]} handleKeyPress={this.props.handleKeyPress}/>))
 
         return (
             <div>

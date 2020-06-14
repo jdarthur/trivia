@@ -50,13 +50,19 @@ class GameList extends React.Component {
     }
 
     set_value = (game_id, key, value, save_game) => {
-        const round = find(game_id, this.state.games)
-        round[key] = value
-        this.setState({ rounds: this.state.games, dirty: game_id }, () => {
+        const game = find(game_id, this.state.games)
+        game[key] = value
+        this.setState({ games: this.state.games, dirty: game_id }, () => {
             if (save_game) {
                 this.save(game_id)
             }
         });
+    }
+
+    set_round_name = (game_id, round_id, name) => {
+        const game = find(game_id, this.state.games)
+        game[ROUND_NAMES][round_id] = name
+        this.setState({ games: this.state.games, dirty: game_id })
     }
 
     save = (game_id) => {
@@ -140,7 +146,8 @@ class GameList extends React.Component {
             const g = find(this.state.selected, this.state.games)
             open_game = <OpenGame key={g.id} id={g.id} name={g.name}
                 rounds={g.rounds} round_names={g.round_names} set={this.set_value}
-                set_selected={this.set_selected} delete={this.delete} />
+                set_selected={this.set_selected} delete={this.delete} 
+                set_round_name={this.set_round_name} />
         }
         return (
             <div className="round-and-open-question">

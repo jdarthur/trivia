@@ -49,12 +49,12 @@ class RoundInGame extends React.Component {
 
 
         const containerClass = "round-and-index" + (this.props.selected ? " selected" : "")
+        const subContainerClass = this.props.show_title ? "round-in-game" : ""
         return (
             <div className={containerClass}>
-                <div className="round-in-game" onClick={this.select_self}>
-                    <div className="round-title"> {this.state.round_name}: </div>
+                <div className={subContainerClass} onClick={this.select_self}>
+                    {this.props.show_title ? <div className="round-title"> {this.state.round_name}: </div> : null}
                     {questions.length > 0 ? questions : (<div className="empty-round">no questions</div>)}
-
                 </div>
                 {this.props.index !== -1 && this.props.index !== undefined ? this.props.index + 1 : null}
             </div>

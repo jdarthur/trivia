@@ -12,6 +12,10 @@ class OpenGame extends React.Component {
         this.props.set(this.props.id, NAME, event.target.value, false)
     }
 
+    set_round_name = (round_id, name) => {
+        this.props.set_round_name(this.props.id, round_id, name)
+    }
+
     add_rounds = (rounds_list) => {
         this.props.set(this.props.id, ROUNDS, this.props.rounds.concat(rounds_list), true)
     }
@@ -50,9 +54,9 @@ class OpenGame extends React.Component {
                     onChange={this.set_name} onKeyDown={this.handleKeyPress} placeholder="Name" />
 
                 <AddRoundsModal rounds={this.props.rounds} add_rounds={this.add_rounds} />
-                <div>
-                    <RemovableRoundsList rounds={this.props.rounds} remove_rounds={this.remove_rounds} />
-                </div>
+                <RemovableRoundsList rounds={this.props.rounds} remove_rounds={this.remove_rounds}
+                    set_round_name={this.set_round_name} round_names={this.props.round_names}
+                    handleKeyPress={this.handleKeyPress} />
 
                 <div>
 

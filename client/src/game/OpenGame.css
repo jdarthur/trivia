@@ -1,9 +1,12 @@
 .round-and-index {
     display: flex;
+    flex-direction: column;
     align-self: stretch;
+    align-items: stretch;
 }
 
 .round-in-game {
+    display: flex;
     border-radius: 5px;
     /* padding: 5px; */
     border: 1px solid black;
@@ -27,4 +30,13 @@
     text-align: center;
     flex-grow: 1;
     /* display: flex; */
+}
+
+.removable-round {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    border: 1px solid black;
+    padding: 2px;
+    margin: 5px;
 }
