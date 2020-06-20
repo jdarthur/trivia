@@ -16,14 +16,14 @@ class App extends React.Component {
   }
 
   set_selected = (page) => {
-    this.setState({selected : page})
+    this.setState({ selected: page })
   }
 
   render() {
     return (
       <div className="App">
         <GenericToolbar labels={[PLAY, EDITOR]}
-        select={this.set_selected} selected={this.state.selected}/>
+          select={this.set_selected} selected={this.state.selected} />
         {this.state.selected === PLAY ? <HomePage /> : null}
         {this.state.selected === EDITOR ? <Editor /> : null}
       </div>

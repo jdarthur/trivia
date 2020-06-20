@@ -4,4 +4,20 @@
 
 .new-game-button {
     padding: 20px;
+    cursor: pointer;
+}
+
+.game-name {
+    cursor: pointer;
+    border: 1px solid black;
+    padding: 5px;
+    margin: 5px;
+}
+
+.new-game {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    flex-grow: 1;
+    padding: 25px;
 }
