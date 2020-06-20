@@ -5,13 +5,13 @@ Trivia server mark II
 @date 12 Apr 2020
 """
 
+from flask import Flask, request
+
 from mongo_manager import MongoManager
 
 from validator import model, succeed, fail, RestField, IdField
 from validator import SUCCESS, OBJECT, CREATE, UPDATE, DELETE, GET_ONE, SUBOP
-from editor_server import get_game, get_round, get_question
-
-from flask import Flask
+from editor_server import get_game, get_round, get_question, _resp
 
 
 app = Flask(__name__)
@@ -52,7 +52,48 @@ SCOREBOARD = "scoreboard"
 MONGO_HOST = "localhost"
 MONGO_DB = "trivia"
 
+URL_BASE = "/gameplay"
+
 mongo = MongoManager(MONGO_HOST, MONGO_DB)
+
+
+def create_and_respond(endpoint, data):
+    """
+    try to create some object and return a failure/success resp
+    """
+    if endpoint == "session":
+        return _resp(create_session(data))
+    if endpoint == "player":
+        return _resp(create_player(data))
+
+    raise Exception(f"unsupported create '{endpoint}'")
+
+def update_and_respond(endpoint, object_id, data):
+    if endpoint == "player":
+        return _resp(update_player(object_id, data))
+
+    raise Exception(f"unsupported create '{endpoint}'")
+
+def get_and_respond(endpoint, object_id, player_id=None, prune=None):
+    if endpoint == "session":
+        data = get_session(object_id)
+    if endpoint == "player":
+        data = get_player(object_id)
+    
+    if prune is not None:
+        prune(data, player_id)
+    return _resp(data)
+
+
+@app.route(f'{URL_BASE}/session', methods=['POST'])
+def create_one_session():
+    return create_and_respond("session", request.json)
+
+@app.route(f'{URL_BASE}/session/<session_id>', methods=['GET'])
+def get_one_session(session_id):
+    player_id = request.args.get(PLAYER_ID, False)
+    return get_and_respond("session", session_id, player_id, prune_session)
+    
 
 smodel = [
     RestField(NAME),
@@ -76,7 +117,7 @@ def create_session(data):
     created = mongo.create("session", data)
     if not created:
         return fail("Failed to create session")
-    created = fix_id(created)
+    # created = created
 
     # resp = update_player(mod_id, {SESSION_ID: created[ID]})
     # if not resp[SUCCESS]:
@@ -90,7 +131,14 @@ def get_session(session_id, session={}):
     """
     GET /session/:id?player_id=<mod_or_player_id>
     """
-    return succeed(fix_id(session))
+    return succeed(session)
+
+def prune_session(data, player_id):
+    session = data[OBJECT]
+    mod_id = session[MODERATOR]
+    if player_id != mod_id:
+        del session[MODERATOR]
+        del session[GAME_ID]
 
 
 @model(smodel, UPDATE, "session")
@@ -113,7 +161,7 @@ def get_sessions():
     sessions = mongo.get_all("session")
     if sessions:
         for s in sessions:
-            ret.append(fix_id(s))
+            ret.append(s)
     return succeed(ret)
 
 
@@ -122,6 +170,23 @@ def get_sessions():
                PLAYER
 =====================================
 """
+
+@app.route(f'{URL_BASE}/player', methods=['POST'])
+def create_one_player():
+    return create_and_respond("player", request.json)
+
+@app.route(f'{URL_BASE}/session/<session_id>/add', methods=['POST'])
+def add_player_to_session(session_id):
+    return _resp(add_to_session(session_id, request.json))
+    # return create_and_respond("player", request.json)
+
+@app.route(f'{URL_BASE}/player/<player_id>', methods=['GET'])
+def get_one_player(player_id):
+    return get_and_respond("player", player_id)
+
+@app.route(f'{URL_BASE}/player/<player_id>', methods=['PUT'])
+def update_one_player(player_id):
+    return update_and_respond("player", player_id, request.json)
 
 
 pmodel = [
@@ -132,7 +197,7 @@ pmodel = [
 @model(pmodel, CREATE, "player")
 def create_player(data):
     obj = mongo.create("player", data)
-    return succeed(fix_id(obj))
+    return succeed(obj)
 
 
 @model(pmodel, UPDATE, "player")
@@ -152,7 +217,9 @@ def delete_player(player_id, player={}):
 
 @model(pmodel, GET_ONE, "player")
 def get_player(player_id, player={}):
-    return succeed(fix_id(player))
+    return succeed(player)
+
+
 
 
 join_model = [
@@ -165,6 +232,9 @@ def add_to_session(session_id, data, session={}):
     """
     if session[STARTED]:
         return fail("Cannot add player to already-started session")
+
+    if data[PLAYER_ID] in session.get(PLAYERS, []):
+        return fail(f"Player id {data[PLAYER_ID]} is already in session")
 
     player_id = data[PLAYER_ID]
     success = mongo.push("session", session_id, PLAYERS, player_id)
@@ -649,19 +719,6 @@ def create_answer(data):
 @model(answer_model, GET_ONE, "answer")
 def get_answer(answer_id, answer={}):
     return succeed(answer)
-
-
-def fix_id(data):
-    if data is None:
-        return None
-
-    new = {}
-    for key in data:
-        if key == "_id":
-            new[ID] = str(data[key])
-        else:
-            new[key] = data[key]
-    return new
 
 
 if __name__ == "__main__":
