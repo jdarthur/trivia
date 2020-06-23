@@ -40,6 +40,7 @@ ROUNDS = "rounds"
 ID = "id"
 ROUND = "round"
 CATEGORY = "category"
+CATEGORIES = "categories"
 QUESTION = "question"
 ANSWER = "answer"
 ANSWERS = "answers"
@@ -497,6 +498,8 @@ def _set_current_question(session_id, data, session={}):
         if not success:
             return fail(f"Failed to set question for question_id {question_id}")
 
+        mongo.incr_state(session_id)
+
         return succeed({CURRENT_QUESTION: question_id})
 
     return fail(f"Failed to get round with ID {session.get(ROUND_ID)}")
@@ -564,8 +567,15 @@ def _set_current_round(session_id, data, session={}):
         r = get_round(round_id)
         if r[SUCCESS]:
             r = r[OBJECT]
+
+            categories = get_categories(r[QUESTIONS])
+
             data_to_update = {
-                 f"{ROUNDS}.{round_id}": {WAGERS: r[WAGERS], QUESTIONS: r[QUESTIONS]},
+                 f"{ROUNDS}.{round_id}": {
+                     WAGERS: r[WAGERS], 
+                     QUESTIONS: r[QUESTIONS],
+                     CATEGORIES: categories
+                     },
                  CURRENT_ROUND: round_id
             }
             success = mongo.update("session", session_id, data_to_update)
@@ -587,6 +597,9 @@ def _set_current_round(session_id, data, session={}):
                 if not set_first_q[SUCCESS]:
                     return set_first_q
 
+
+                mongo.incr_state(session_id)
+
                 return succeed(r)
 
             fail(f"Failed to update {SESSION}")
@@ -594,6 +607,13 @@ def _set_current_round(session_id, data, session={}):
         return fail(f"Failed to get {ROUND} with id {round_id}")
 
     return fail(f"Failed to get game with id '{session[GAME_ID]}'")
+
+def get_categories(list_of_questions):
+    categories = []
+    for question_id in list_of_questions:
+        question = get_question(question_id)
+        categories.append(question[OBJECT][CATEGORY])
+    return categories
 
 
 def get_answer_status(session_id, question_id):
@@ -705,6 +725,8 @@ def score_question(session_id, data, session={}):
     success = mongo.update("session", session_id, {f"{QUESTIONS}.{question_id}.{SCORED}": True})
     if not success:
         return fail("Failed to mark question as scored")
+
+    mongo.incr_state(session_id)
     return succeed(data)
 
 
@@ -774,6 +796,8 @@ def answer_question(session_id, data, session={}):
     success = mongo.push("session", session_id, array, answer_id)
     if not success:
         return fail(f"Failed to add add {answer_id} for player {player_id}")
+
+    mongo.incr_state(session_id)
 
     return succeed(answer)
 
