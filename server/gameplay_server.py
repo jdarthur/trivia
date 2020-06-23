@@ -85,7 +85,7 @@ def get_and_respond(endpoint, object_id, player_id=None, prune=None):
     if prune is not None:
         prune(data, player_id)
     return _resp(data)
-    
+
 
 
 @app.route(f'{URL_BASE}/session', methods=['POST'])
@@ -96,6 +96,7 @@ def create_one_session():
 def get_one_session(session_id):
     player_id = request.args.get(PLAYER_ID, False)
     return get_and_respond("session", session_id, player_id, prune_session)
+
 
 @app.route(f'{URL_BASE}/session/<session_id>/state', methods=['GET'])
 def get_session_state(session_id):
@@ -111,6 +112,7 @@ def get_session_state(session_id):
             print("ne3ed to refresh")
             return _resp(succeed({"state": state}))
         time.sleep(2)
+
 
 smodel = [
     RestField(NAME),
@@ -136,6 +138,8 @@ def create_session(data):
         return fail("Failed to create session")
 
     success = mongo.create("answer", data)
+    if not success:
+        return fail("Failed to create session")
     # created = created
 
     # resp = update_player(mod_id, {SESSION_ID: created[ID]})
@@ -228,7 +232,7 @@ def update_player(player_id, data, player={}):
     success = mongo.update("player", player_id, data)
     if success:
         player.update(data)
-        
+
         #dirty the session state, so other clients will see this update
         session_id = player.get(SESSION_ID, None)
         if session_id:
@@ -340,6 +344,22 @@ def get_players(session_id, player_id=None):
     return fail("Failed to get session")
 
 
+@app.route(f'{URL_BASE}/session/<session_id>/start', methods=['POST'])
+def start_one_session(session_id):
+    player_id = request.json.get(PLAYER_ID, None)
+    # get session to make sure you are the mod
+    # TODO: refactor this somehow into helper method to avoid double get
+    session = get_session(session_id)
+    if not session[SUCCESS]:
+        return session
+
+    mod = session[OBJECT][MODERATOR]
+    if player_id != mod:
+        return fail(f"only mod can start session")
+
+    return _resp(start_session(session_id))
+
+
 def start_session(session_id):
     return _start_session(session_id, {STARTED: True})
 
@@ -371,6 +391,8 @@ def _start_session(session_id, data, session={}):
             # set_question = set_current_question(session_id, first_question)
             # if not set_question[SUCCESS]:
             #     return set_question
+
+            mongo.incr_state(session_id)
 
             return succeed(session)
 
