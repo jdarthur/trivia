@@ -1,12 +1,18 @@
-.lobby {
-    padding: 100px;
+.active-game {
     border: 1px solid black;
     display: flex;
+    flex-grow: 1;
 }
 
-.lobby-player {
+.active-question {
+    padding: 25px;
+}
+
+.round-category {
     padding: 10px;
-    border: 1px solid black;
-    display: flex;
-    flex-direction: column;
+    border-left: 1px solid black
+}
+
+.active {
+    background: lightblue;
 }

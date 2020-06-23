@@ -70,29 +70,34 @@ def create_and_respond(endpoint, data):
 
     raise Exception(f"unsupported create '{endpoint}'")
 
+
 def update_and_respond(endpoint, object_id, data):
     if endpoint == "player":
         return _resp(update_player(object_id, data))
 
     raise Exception(f"unsupported create '{endpoint}'")
 
+
 def get_and_respond(endpoint, object_id, player_id=None, prune=None):
     if endpoint == "session":
         data = get_session(object_id)
     if endpoint == "player":
         data = get_player(object_id)
-    if  endpoint == "current_question":
+    if endpoint == "current_question":
         data = get_current_question(object_id)
+    if endpoint == "current_round":
+        data = get_current_round(object_id)
+        print(data)
 
     if prune is not None:
         prune(data, player_id)
     return _resp(data)
 
 
-
 @app.route(f'{URL_BASE}/session', methods=['POST'])
 def create_one_session():
     return create_and_respond("session", request.json)
+
 
 @app.route(f'{URL_BASE}/session/<session_id>', methods=['GET'])
 def get_one_session(session_id):
@@ -439,7 +444,7 @@ def game_has_round_and_question(session):
 
 
 @app.route(f'{URL_BASE}/session/<session_id>/current-question', methods=['GET'])
-def get_curr(session_id):
+def get_currq(session_id):
     return get_and_respond("current_question", session_id)
 
 
@@ -518,6 +523,11 @@ def _get_question_by_id(session_id, data, session={}):
     question = questions[question_id]
     # question[ID] = question_id
     return succeed(question)
+
+
+@app.route(f'{URL_BASE}/session/<session_id>/current-round', methods=['GET'])
+def get_curr_round(session_id):
+    return get_and_respond("current_round", session_id)
 
 
 @model(smodel, GET_ONE, "session")
