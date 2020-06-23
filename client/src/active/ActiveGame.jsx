@@ -34,7 +34,7 @@ class ActiveGame extends React.Component {
     let url = "/gameplay/session/" + this.props.session_id + "/current-round"
     fetch(url).then(response => response.json())
       .then(r => {
-        this.setState({ categories: r.categories, wagers: r.wagers})
+        this.setState({ categories: r.categories, wagers: r.wagers })
       })
   }
 
@@ -50,8 +50,10 @@ class ActiveGame extends React.Component {
   render() {
     return (
       <div className="active-game">
-        <ActiveQuestion session_state={this.props.session_state} session_id={this.props.session_id} />
         <ActiveRound categories={this.state.categories} active_category={this.state.active_category} />
+        <ActiveQuestion session_state={this.props.session_state} session_id={this.props.session_id}
+          question={this.state.question} answer={this.state.answer} />
+
         {/* {this.props.is_mod ? "youre the mod" : null} */}
         <div>
           {this.props.players}

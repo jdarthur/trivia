@@ -3,7 +3,7 @@ import './ActiveGame.css';
 
 class CategoryInRound extends React.Component {
   render() {
-    const rclass = "round-category" + (this.props.active ? "active" : "")
+    const rclass = "round-category" + (this.props.active ? " active" : "")
     return (
       <div className={rclass}>
           { this.props.name }

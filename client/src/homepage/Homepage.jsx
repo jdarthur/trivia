@@ -20,21 +20,6 @@ class Homepage extends React.Component {
     }
   }
 
-  get_session_state = () => {
-    if (this.state.session_id !== "") {
-      let url = "/gameplay/session/" + this.state.session_id + "/state?current=" + this.state.sess_state
-      fetch(url)
-        .then(response => response.json())
-        .then(state => {
-          console.log(state.state)
-          this.setState({ sess_state: state.state }, () => this.get_session_state())
-        })
-    }
-    else {
-      console.log(this.state)
-    }
-  }
-
   componentDidMount() {
     let search = window.location.search;
     let params = new URLSearchParams(search);
@@ -50,6 +35,21 @@ class Homepage extends React.Component {
     }
 
     this.setState(state, () => this.get_session())
+  }
+
+  get_session_state = () => {
+    if (this.state.session_id !== "") {
+      let url = "/gameplay/session/" + this.state.session_id + "/state?current=" + this.state.sess_state
+      fetch(url)
+        .then(response => response.json())
+        .then(state => {
+          console.log(state.state)
+          this.setState({ sess_state: state.state }, () => this.get_session())
+        })
+    }
+    else {
+      console.log(this.state)
+    }
   }
 
   get_session = () => {

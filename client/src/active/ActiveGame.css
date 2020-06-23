@@ -1,6 +1,7 @@
 .active-game {
     border: 1px solid black;
     display: flex;
+    flex-direction: column;
     flex-grow: 1;
 }
 
@@ -15,4 +16,10 @@
 
 .active {
     background: lightblue;
+}
+
+.active-round {
+    display: flex;
+    flex-direction: row;
+    border-bottom: 1px solid black;
 }
