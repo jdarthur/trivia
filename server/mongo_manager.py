@@ -146,3 +146,15 @@ class MongoManager(object):
             list of all objects of type X
         """
         return self.db[object_type].find(filter)
+
+    def incr_state(self, session_id):
+        new_state = {
+            "session_id": session_id,
+            "state": uuid.uuid4()
+        }
+        self.db.session_state.update({"session_id": session_id}, new_state, True)
+    
+    def get_state(self, session_id):
+        return self.db.session_state.find_one({"session_id": session_id})["state"]
+
+

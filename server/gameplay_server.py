@@ -5,7 +5,10 @@ Trivia server mark II
 @date 12 Apr 2020
 """
 
-from flask import Flask, request
+from flask import Flask, request, Response
+import random
+import time
+import uuid
 
 from mongo_manager import MongoManager
 
@@ -56,7 +59,6 @@ URL_BASE = "/gameplay"
 
 mongo = MongoManager(MONGO_HOST, MONGO_DB)
 
-
 def create_and_respond(endpoint, data):
     """
     try to create some object and return a failure/success resp
@@ -79,10 +81,11 @@ def get_and_respond(endpoint, object_id, player_id=None, prune=None):
         data = get_session(object_id)
     if endpoint == "player":
         data = get_player(object_id)
-    
+
     if prune is not None:
         prune(data, player_id)
     return _resp(data)
+    
 
 
 @app.route(f'{URL_BASE}/session', methods=['POST'])
@@ -93,7 +96,21 @@ def create_one_session():
 def get_one_session(session_id):
     player_id = request.args.get(PLAYER_ID, False)
     return get_and_respond("session", session_id, player_id, prune_session)
-    
+
+@app.route(f'{URL_BASE}/session/<session_id>/state', methods=['GET'])
+def get_session_state(session_id):
+    req_state = request.args.get("current", None)
+    print(f"req {repr(req_state)}")
+    if req_state is None:
+        time.sleep(10)
+
+    while True:
+        state = mongo.get_state(session_id)
+        print(f"db state {repr(state)}")
+        if str(state) != str(req_state):
+            print("ne3ed to refresh")
+            return _resp(succeed({"state": state}))
+        time.sleep(2)
 
 smodel = [
     RestField(NAME),
@@ -117,11 +134,14 @@ def create_session(data):
     created = mongo.create("session", data)
     if not created:
         return fail("Failed to create session")
+
+    success = mongo.create("answer", data)
     # created = created
 
     # resp = update_player(mod_id, {SESSION_ID: created[ID]})
     # if not resp[SUCCESS]:
     #     return fail(errors=resp[ERRORS])
+    mongo.incr_state(created[ID])
 
     return succeed(created)
 
@@ -139,6 +159,7 @@ def prune_session(data, player_id):
     if player_id != mod_id:
         del session[MODERATOR]
         del session[GAME_ID]
+        del session[PLAYERS]
 
 
 @model(smodel, UPDATE, "session")
@@ -147,6 +168,8 @@ def update_session(session_id, data, session={}):
     if success:
         session.update(data)
         return succeed(session)
+
+    mongo.incr_state(session_id)
     return fail(f"Failed to update session with data {data}")
 
 
@@ -205,6 +228,12 @@ def update_player(player_id, data, player={}):
     success = mongo.update("player", player_id, data)
     if success:
         player.update(data)
+        
+        #dirty the session state, so other clients will see this update
+        session_id = player.get(SESSION_ID, None)
+        if session_id:
+            mongo.incr_state(session_id)
+
         return succeed(player)
     return fail(f"Failed to update player with data {data}")
 
@@ -218,8 +247,6 @@ def delete_player(player_id, player={}):
 @model(pmodel, GET_ONE, "player")
 def get_player(player_id, player={}):
     return succeed(player)
-
-
 
 
 join_model = [
@@ -242,6 +269,12 @@ def add_to_session(session_id, data, session={}):
         return fail("Failed to add player to session")
 
     data[SESSION_ID] = session_id
+
+    mongo.incr_state(session_id)
+    update = update_player(player_id, {"session_id": session_id})
+    if not update:
+        return update
+
     return succeed(data)
 
 
@@ -257,10 +290,26 @@ def remove_from_session(session_id, data, session={}):
 
     # delete player?
     data[SESSION_ID] = session_id
+    mongo.incr_state(session_id)
+
     return succeed(data)
 
 
-def get_players(session_id):
+
+@app.route(f'{URL_BASE}/session/<session_id>/players', methods=['GET'])
+def get_all_players_in_session(session_id):
+    player_id = request.args.get(PLAYER_ID, False)
+    data = get_players(session_id)
+    if data[SUCCESS]:
+        mod = data[MODERATOR]
+        print(data)
+        if mod != player_id:
+            for player in data[OBJECT]:
+                if player[ID] != player_id:
+                    del player[ID]
+    return _resp(data)
+
+def get_players(session_id, player_id=None):
     """
     args: session_id
     returns:
@@ -284,7 +333,9 @@ def get_players(session_id):
             else:
                 print(f"Failed to get player {player_id}")
 
-        return succeed(ret)
+        resp = succeed(ret)
+        resp[MODERATOR] = session[MODERATOR]
+        return resp
 
     return fail("Failed to get session")
 
@@ -722,5 +773,4 @@ def get_answer(answer_id, answer={}):
 
 
 if __name__ == "__main__":
-
-    app.run(host="0.0.0.0", debug=True)
+    app.run(host="0.0.0.0", debug=True, threaded=True)
