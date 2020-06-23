@@ -81,6 +81,8 @@ def get_and_respond(endpoint, object_id, player_id=None, prune=None):
         data = get_session(object_id)
     if endpoint == "player":
         data = get_player(object_id)
+    if  endpoint == "current_question":
+        data = get_current_question(object_id)
 
     if prune is not None:
         prune(data, player_id)
@@ -435,6 +437,12 @@ def game_has_round_and_question(session):
     return succeed({ROUND_ID: first_round_id, QUESTION_ID: first_question_id})
 
 
+
+@app.route(f'{URL_BASE}/session/<session_id>/current-question', methods=['GET'])
+def get_curr(session_id):
+    return get_and_respond("current_question", session_id)
+
+
 @model(smodel, GET_ONE, "session")
 def get_current_question(session_id, session={}):
     """
@@ -508,7 +516,7 @@ def _get_question_by_id(session_id, data, session={}):
     if question_id not in questions:
         return fail(f"{QUESTION}_id {question_id} not found in session {session_id}")
     question = questions[question_id]
-    question[ID] = question_id
+    # question[ID] = question_id
     return succeed(question)
 
 

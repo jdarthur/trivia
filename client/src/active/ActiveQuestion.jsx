@@ -1,22 +1,48 @@
 import React from 'react';
 import './ActiveGame.css';
-// import InviteLink from "./InviteLink"
-// import LobbyPlayer from "./LobbyPlayer"
-// import OtherPlayers from "./OtherPlayers"
+import ReadOnlyQuestion from "../question/ReadOnlyQuestion"
 
-class ActiveGame extends React.Component {
+class ActiveQuestion extends React.Component {
+
+  constructor(props) {
+    super(props)
+    this.state = {
+      question: "",
+      answer: "",
+      category: ""
+    }
+  }
+
+  componentDidMount() {
+    this.get_current_question()
+  }
+
+  componentDidUpdate(prevProps) {
+    if (this.props.session_state !== prevProps.session_state) {
+      this.get_current_question()
+    }
+  }
+
+  get_current_question = () => {
+    let url = "/gameplay/session/" + this.props.session_id + "/current-question"
+    fetch(url)
+      .then(response => response.json())
+      .then(q => {
+        console.log(q)
+
+        this.setState({ question: q.question, answer: q.answer, category: q.category })
+      })
+  }
 
   render() {
     return (
       <div className="lobby">
-        we're in game wow
-        {this.props.is_mod ? "youre the mod" : null}
-        <div>
-          {this.props.players}
-        </div>
+        Question:
+        <ReadOnlyQuestion question={this.state.question} answer={this.state.answer}
+         category={this.state.category} />
       </div>
     );
   }
 }
 
-export default ActiveGame;
+export default ActiveQuestion;
