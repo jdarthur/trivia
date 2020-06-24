@@ -1,6 +1,5 @@
 import React from 'react';
 import './ActiveGame.css';
-import ReadOnlyQuestion from "../question/ReadOnlyQuestion"
 
 class ActiveQuestion extends React.Component {
 

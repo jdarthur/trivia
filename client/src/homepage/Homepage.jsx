@@ -53,22 +53,24 @@ class Homepage extends React.Component {
   }
 
   get_session = () => {
-    let url = "/gameplay/session/" + this.state.session_id
-    if (this.state.player_id) {
-      url = url + "?player_id=" + this.state.player_id
+    if (this.state.session_id !== "") {
+      let url = "/gameplay/session/" + this.state.session_id
+      if (this.state.player_id) {
+        url = url + "?player_id=" + this.state.player_id
+      }
+      fetch(url)
+        .then(response => response.json())
+        .then(state => {
+          console.log(state)
+          const update = {
+            players: state.players ? state.players : [],
+            is_mod: state.mod !== undefined,
+            name: state.name,
+            started: state.started ? true : false
+          }
+          this.setState(update, () => this.get_session_state())
+        })
     }
-    fetch(url)
-      .then(response => response.json())
-      .then(state => {
-        console.log(state)
-        const update = {
-          players: state.players ? state.players : [],
-          is_mod: state.mod !== undefined,
-          name: state.name,
-          started: state.started ? true : false
-        }
-        this.setState(update, () => this.get_session_state())
-      })
   }
 
 

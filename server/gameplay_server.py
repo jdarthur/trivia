@@ -109,15 +109,12 @@ def get_one_session(session_id):
 @app.route(f'{URL_BASE}/session/<session_id>/state', methods=['GET'])
 def get_session_state(session_id):
     req_state = request.args.get("current", None)
-    print(f"req {repr(req_state)}")
     if req_state is None:
         time.sleep(10)
 
     while True:
         state = mongo.get_state(session_id)
-        print(f"db state {repr(state)}")
         if str(state) != str(req_state):
-            print("ne3ed to refresh")
             return _resp(succeed({"state": state}))
         time.sleep(2)
 
@@ -386,19 +383,15 @@ def _start_session(session_id, data, session={}):
         if not startable[SUCCESS]:
             return startable
 
-        first_round = startable[OBJECT][ROUND_ID]
-
         success = mongo.update("session", session_id, data)
         if success:
             session.update(data)
 
-            set_round = set_current_round(session_id, first_round)
+            # set current round to 0th round ID in game
+            # this will also set first question to 0th question in round
+            set_round = set_current_round(session_id, 0)
             if not set_round[SUCCESS]:
                 return set_round
-
-            # set_question = set_current_question(session_id, first_question)
-            # if not set_question[SUCCESS]:
-            #     return set_question
 
             mongo.incr_state(session_id)
 
@@ -455,7 +448,7 @@ def get_current_question(session_id, session={}):
     return ID of active question
     """
     question_id = session.get(CURRENT_QUESTION, None)
-    return get_question_by_id(session_id, question_id)
+    return get_question_by_index(session_id, question_id)
 
 
 def set_current_question(session_id, question_id):
@@ -463,7 +456,7 @@ def set_current_question(session_id, question_id):
 
 
 cq_model = [
-    IdField(QUESTION_ID, "question")
+    RestField(QUESTION_ID, int)
 ]
 @model(cq_model, SUBOP, "session")
 def _set_current_question(session_id, data, session={}):
@@ -473,16 +466,18 @@ def _set_current_question(session_id, data, session={}):
     set session.current_question = question_id
     return new question_id
     """
-    # session_mod = session[MODERATOR]
-    # if data[MODERATOR] != session_mod:
-    #     return fail(f"Cannot set mod using ID {data[MODERATOR]}")
+    qindex = data[QUESTION_ID]
 
     r = get_current_round(session_id)
     if r[SUCCESS]:
         r = r[OBJECT]
-        question_id = data[QUESTION_ID]
-        if question_id not in r.get(QUESTIONS, []):
-            return fail(f"{QUESTION} with id {question_id} is not in current round {r}.")
+
+        question_ids = r.get(QUESTIONS, [])
+
+        if qindex > len(question_ids):
+            return fail(f"{QUESTION} with index {qindex} is not in current round {r}.")
+
+        question_id = question_ids[qindex]
 
         question = get_question(question_id)
         if not question[SUCCESS]:
@@ -490,9 +485,9 @@ def _set_current_question(session_id, data, session={}):
         question = question[OBJECT]
 
         data_to_update = {
-            f"{QUESTIONS}.{question_id}.{QUESTION}": question[QUESTION],
-            f"{QUESTIONS}.{question_id}.{ANSWERS}": {},
-            CURRENT_QUESTION: question_id
+            f"{QUESTIONS}.q{qindex}.{QUESTION}": question[QUESTION],
+            f"{QUESTIONS}.q{qindex}.{ANSWERS}": {},
+            CURRENT_QUESTION: qindex
         }
         success = mongo.update("session", session_id, data_to_update)
         if not success:
@@ -500,17 +495,17 @@ def _set_current_question(session_id, data, session={}):
 
         mongo.incr_state(session_id)
 
-        return succeed({CURRENT_QUESTION: question_id})
+        return succeed({CURRENT_QUESTION: qindex})
 
     return fail(f"Failed to get round with ID {session.get(ROUND_ID)}")
 
 
-def get_question_by_id(session_id, question_id):
-    return _get_question_by_id(session_id, {QUESTION_ID: question_id})
+def get_question_by_index(session_id, question_id):
+    return _get_question_by_index(session_id, {QUESTION_ID: question_id})
 
 
 @model(cq_model, SUBOP, "session")
-def _get_question_by_id(session_id, data, session={}):
+def _get_question_by_index(session_id, data, session={}):
     """
     if not open: (i.e. question not in session.answers)
         return category
@@ -519,12 +514,13 @@ def _get_question_by_id(session_id, data, session={}):
     if scored:
         return question category, answer
     """
-    question_id = data[QUESTION_ID]
+    index = data[QUESTION_ID]
+    qid = f"q{index}"
+
     questions = session.get(QUESTIONS)
-    if question_id not in questions:
-        return fail(f"{QUESTION}_id {question_id} not found in session {session_id}")
-    question = questions[question_id]
-    # question[ID] = question_id
+    if qid not in questions:
+        return fail(f"{QUESTION} index {index} not found in session {session_id}")
+    question = questions[qid]
     return succeed(question)
 
 
@@ -538,7 +534,7 @@ def get_current_round(session_id, session={}):
     """
     return round_name, list of questions, list of wagers
     """
-    round_id = session.get(CURRENT_ROUND)
+    round_id = f"r{session.get(CURRENT_ROUND)}"
     r = session.get(ROUNDS, {}).get(round_id, None)
     r[ID] = round_id
     return succeed(r)
@@ -549,19 +545,21 @@ def set_current_round(session_id, round_id):
 
 
 cr_model = [
-    IdField(ROUND_ID, "round")
+    RestField(ROUND_ID, int)
 ]
 @model(cr_model, SUBOP, "session")
 def _set_current_round(session_id, data, session={}):
-    round_id = data[ROUND_ID]
+    round_index = data[ROUND_ID]
 
     # round must be in game.rounds
     game = get_game(session[GAME_ID])
     if game[SUCCESS]:
         game = game[OBJECT]
         round_ids = game.get(ROUNDS)
-        if round_id not in round_ids:
-            return fail(f"{ROUND} with id '{round_id}' is not in {GAME} '{game}'")
+        if round_index > len(round_ids):
+            return fail(f"{ROUND} with index '{round_index}' is not in {GAME} '{game}'")
+
+        round_id = round_ids[round_index]
 
         # get round from DB and set in session obj
         r = get_round(round_id)
@@ -571,32 +569,31 @@ def _set_current_round(session_id, data, session={}):
             categories = get_categories(r[QUESTIONS])
 
             data_to_update = {
-                 f"{ROUNDS}.{round_id}": {
-                     WAGERS: r[WAGERS], 
+                 f"{ROUNDS}.r{round_index}": {
+                     WAGERS: r[WAGERS],
                      QUESTIONS: r[QUESTIONS],
                      CATEGORIES: categories
                      },
-                 CURRENT_ROUND: round_id
+                 CURRENT_ROUND: round_index
             }
             success = mongo.update("session", session_id, data_to_update)
             if success:
                 # for each question, populate questions.id.category
                 questions = r[QUESTIONS]
-                for question_id in questions:
+                for i, question_id in enumerate(questions):
                     question = get_question(question_id)
                     if not question[SUCCESS]:
                         return question
                     question = question[OBJECT]
 
-                    data_to_update = {f"{QUESTIONS}.{question_id}": {CATEGORY: question[CATEGORY]}}
+                    data_to_update = {f"{QUESTIONS}.q{i}": {CATEGORY: question[CATEGORY]}}
                     success = mongo.update("session", session_id, data_to_update)
                     if not success:
                         return fail(f"Failed to add category for question {question_id}")
 
-                set_first_q = set_current_question(session_id, questions[0])
+                set_first_q = set_current_question(session_id, 0)
                 if not set_first_q[SUCCESS]:
                     return set_first_q
-
 
                 mongo.incr_state(session_id)
 
@@ -607,6 +604,7 @@ def _set_current_round(session_id, data, session={}):
         return fail(f"Failed to get {ROUND} with id {round_id}")
 
     return fail(f"Failed to get game with id '{session[GAME_ID]}'")
+
 
 def get_categories(list_of_questions):
     categories = []
