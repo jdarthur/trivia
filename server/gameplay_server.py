@@ -389,6 +389,10 @@ def _start_session(session_id, data, session={}):
         if not startable[SUCCESS]:
             return startable
 
+        rounds = startable[OBJECT][ROUNDS]
+        for i, round_index in enumerate(rounds):
+            data[f"{ROUNDS}.r{i}"] = {}
+
         success = mongo.update("session", session_id, data)
         if success:
             session.update(data)
@@ -439,7 +443,7 @@ def game_has_round_and_question(session):
 
     first_question_id = questions[0]
 
-    return succeed({ROUND_ID: first_round_id, QUESTION_ID: first_question_id})
+    return succeed({ROUND_ID: first_round_id, QUESTION_ID: first_question_id, ROUNDS: rounds})
 
 
 @app.route(f'{URL_BASE}/session/<session_id>/current-question', methods=['GET'])
@@ -455,9 +459,9 @@ def get_current_question(session_id, session={}):
     question_id = session.get(CURRENT_QUESTION, None)
     return get_question_by_index(session_id, question_id)
 
-@app.route(f'/{URL_BASE}/session/<session_id>/current-question', methods=['POST'])
+
+@app.route(f'{URL_BASE}/session/<session_id>/current-question', methods=['PUT'])
 def set_currq(session_id):
-    print("L")
     player_id = request.json.get(PLAYER_ID, None)
     question_id = request.json.get(QUESTION_ID, None)
 
@@ -557,6 +561,17 @@ def get_current_round(session_id, session={}):
     r[ID] = round_id
     return succeed(r)
 
+
+@app.route(f'{URL_BASE}/session/<session_id>/current-round', methods=['PUT'])
+def set_curr_r(session_id):
+    player_id = request.json.get(PLAYER_ID, None)
+    round_id = request.json.get(ROUND_ID, None)
+
+    is_mod = verify_mod(session_id, player_id)
+    if not is_mod[SUCCESS]:
+        return is_mod
+
+    return _resp(set_current_round(session_id, round_id))
 
 def set_current_round(session_id, round_id):
     return _set_current_round(session_id, {ROUND_ID: round_id})

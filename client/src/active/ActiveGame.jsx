@@ -4,7 +4,7 @@ import './ActiveGame.css';
 // import LobbyPlayer from "./LobbyPlayer"
 import ActiveQuestion from "./ActiveQuestion"
 import ActiveRound from "./ActiveRound"
-import NextQuestion from "../control/NextQuestion"
+import NextOrPrevious from "../control/NextOrPrevious"
 
 class ActiveGame extends React.Component {
 
@@ -14,6 +14,7 @@ class ActiveGame extends React.Component {
       question: "",
       answer: "",
       active_question: "",
+      active_round: "",
       categories: [],
       wagers: []
     }
@@ -35,7 +36,7 @@ class ActiveGame extends React.Component {
     let url = "/gameplay/session/" + this.props.session_id + "/current-round"
     fetch(url).then(response => response.json())
       .then(r => {
-        this.setState({ categories: r.categories, wagers: r.wagers })
+        this.setState({ categories: r.categories, wagers: r.wagers, active_round: r.id})
       })
   }
 
@@ -49,10 +50,7 @@ class ActiveGame extends React.Component {
 
 
   render() {
-    let next_ind = this.state.categories.findIndex(category => category.question_id === this.state.active_question)
-    const next_question_id = (next_ind !== -1 && (next_ind + 1 < this.state.categories.length)) ? this.state.categories[next_ind + 1].question_id : null
-    
-    //const next_round_id
+    const questions = this.state.categories.map(category => category.question_id)
 
     return (
       <div className="active-game">
@@ -61,8 +59,9 @@ class ActiveGame extends React.Component {
         <ActiveQuestion session_state={this.props.session_state} session_id={this.props.session_id}
           question={this.state.question} answer={this.state.answer} />
 
-        {this.props.is_mod && next_question_id ?
-          <NextQuestion next_question={next_question_id}
+        {this.props.is_mod ?
+          <NextOrPrevious questions={questions} rounds={this.props.rounds}
+            active_question={this.state.active_question} active_round={this.state.active_round}
             session_id={this.props.session_id} player_id={this.props.player_id} /> : null}
         <div>
           {this.props.players}

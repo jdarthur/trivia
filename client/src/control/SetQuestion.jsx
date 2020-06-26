@@ -1,30 +1,28 @@
 import React from 'react';
 import sendData from "../index"
 
-class NextQuestion extends React.Component {
+class SetQuestion extends React.Component {
 
-    next_question = () => {
+    set_question = () => {
         const url = "/gameplay/session/" + this.props.session_id + "/current-question"
         const body = {
             player_id: this.props.player_id,
-            question_id: parseInt(this.props.next_question.replace("q", ""))
+            question_id: parseInt(this.props.target.replace("q", ""))
         }
         //TODO: come up with a better question ID solution
-        sendData(url, "POST", body)
+        sendData(url, "PUT", body)
         .then((data) => {
           console.log(data)
         })
     }
 
-
-
     render() {
         return (
             <div className="">
-                <button onClick={this.next_question}> Next Question </button>
+                <button onClick={this.set_question}> {this.props.label} </button>
             </div>
         );
     }
 }
 
-export default NextQuestion;
+export default SetQuestion;

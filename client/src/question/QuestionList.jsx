@@ -142,10 +142,6 @@ class QuestionList extends React.Component {
     })
   }
 
-  add_question_to_open_round = (question_id) => {
-    
-  }
-
 
   render() {
     const questions = this.state.questions.map((question, index) => (
@@ -203,9 +199,10 @@ async function sendData(question_id, method, question_data) {
     const q_copy = Object.assign({}, question_data)
     delete q_copy.id
     delete q_copy.create_date
+    delete q_copy.rounds_used
     body = JSON.stringify(q_copy)
   }
-  
+
   JSON.stringify(question_data)
   const response = await fetch(url, {
     method: method,

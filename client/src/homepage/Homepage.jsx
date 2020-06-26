@@ -16,7 +16,8 @@ class Homepage extends React.Component {
       sess_state: "",
       players: [],
       is_mod: false,
-      started: false
+      started: false,
+      rounds: []
     }
   }
 
@@ -62,11 +63,13 @@ class Homepage extends React.Component {
         .then(response => response.json())
         .then(state => {
           console.log(state)
+          const rounds = state.rounds ? Object.keys(state.rounds) : []
           const update = {
             players: state.players ? state.players : [],
             is_mod: state.mod !== undefined,
             name: state.name,
-            started: state.started ? true : false
+            started: state.started ? true : false,
+            rounds: rounds
           }
           this.setState(update, () => this.get_session_state())
         })
@@ -77,7 +80,7 @@ class Homepage extends React.Component {
   render() {
     const main = (this.state.started ?
       <ActiveGame session_id={this.state.session_id} player_id={this.state.player_id}
-        session_state={this.state.sess_state} is_mod={this.state.is_mod} /> :
+        session_state={this.state.sess_state} is_mod={this.state.is_mod} rounds={this.state.rounds} /> :
       <GameLobby session_id={this.state.session_id} player_id={this.state.player_id}
         session_state={this.state.sess_state} is_mod={this.state.is_mod} />)
     return (
