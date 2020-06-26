@@ -8,3 +8,22 @@ ReactDOM.render(
   </React.StrictMode>,
   document.getElementById('root')
 );
+
+const sendData = async function sendData(url, method, data) {
+  let body
+  if (data !== undefined) {
+    const copy = Object.assign({}, data)
+    delete copy.id
+    delete copy.create_date
+    body = JSON.stringify(copy)
+  }
+
+  const response = await fetch(url, {
+    method: method,
+    headers: { 'Content-Type': 'application/json' },
+    body: body
+  })
+  return response.json()
+}
+
+export default sendData
