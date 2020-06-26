@@ -5,10 +5,8 @@ Trivia server mark II
 @date 12 Apr 2020
 """
 
-from flask import Flask, request, Response
-import random
+from flask import Flask, request
 import time
-import uuid
 
 from mongo_manager import MongoManager
 
@@ -352,6 +350,15 @@ def get_players(session_id, player_id=None):
 @app.route(f'{URL_BASE}/session/<session_id>/start', methods=['POST'])
 def start_one_session(session_id):
     player_id = request.json.get(PLAYER_ID, None)
+
+    is_mod = verify_mod(session_id, player_id)
+    if not is_mod[SUCCESS]:
+        return is_mod
+
+    return _resp(start_session(session_id))
+
+
+def verify_mod(session_id, player_id):
     # get session to make sure you are the mod
     # TODO: refactor this somehow into helper method to avoid double get
     session = get_session(session_id)
@@ -361,8 +368,7 @@ def start_one_session(session_id):
     mod = session[OBJECT][MODERATOR]
     if player_id != mod:
         return fail(f"only mod can start session")
-
-    return _resp(start_session(session_id))
+    return succeed({})
 
 
 def start_session(session_id):
@@ -436,7 +442,6 @@ def game_has_round_and_question(session):
     return succeed({ROUND_ID: first_round_id, QUESTION_ID: first_question_id})
 
 
-
 @app.route(f'{URL_BASE}/session/<session_id>/current-question', methods=['GET'])
 def get_currq(session_id):
     return get_and_respond("current_question", session_id)
@@ -449,6 +454,18 @@ def get_current_question(session_id, session={}):
     """
     question_id = session.get(CURRENT_QUESTION, None)
     return get_question_by_index(session_id, question_id)
+
+@app.route(f'/{URL_BASE}/session/<session_id>/current-question', methods=['POST'])
+def set_currq(session_id):
+    print("L")
+    player_id = request.json.get(PLAYER_ID, None)
+    question_id = request.json.get(QUESTION_ID, None)
+
+    is_mod = verify_mod(session_id, player_id)
+    if not is_mod[SUCCESS]:
+        return is_mod
+
+    return _resp(set_current_question(session_id, question_id))
 
 
 def set_current_question(session_id, question_id):
@@ -521,6 +538,7 @@ def _get_question_by_index(session_id, data, session={}):
     if qid not in questions:
         return fail(f"{QUESTION} index {index} not found in session {session_id}")
     question = questions[qid]
+    question[ID] = qid
     return succeed(question)
 
 
@@ -566,7 +584,7 @@ def _set_current_round(session_id, data, session={}):
         if r[SUCCESS]:
             r = r[OBJECT]
 
-            categories = get_categories(r[QUESTIONS])
+            categories = []
 
             data_to_update = {
                  f"{ROUNDS}.r{round_index}": {
@@ -576,42 +594,38 @@ def _set_current_round(session_id, data, session={}):
                      },
                  CURRENT_ROUND: round_index
             }
-            success = mongo.update("session", session_id, data_to_update)
-            if success:
-                # for each question, populate questions.id.category
-                questions = r[QUESTIONS]
-                for i, question_id in enumerate(questions):
-                    question = get_question(question_id)
-                    if not question[SUCCESS]:
-                        return question
-                    question = question[OBJECT]
+            # for each question, populate questions.id.category
+            questions = r[QUESTIONS]
+            for i, question_id in enumerate(questions):
+                question = get_question(question_id)
+                if not question[SUCCESS]:
+                    return question
+                question = question[OBJECT]
+                category = question[CATEGORY]
+                r_cat = {
+                    QUESTION_ID: f"q{i}",
+                    CATEGORY: category
+                }
+                categories.append(r_cat)
 
-                    data_to_update = {f"{QUESTIONS}.q{i}": {CATEGORY: question[CATEGORY]}}
-                    success = mongo.update("session", session_id, data_to_update)
-                    if not success:
-                        return fail(f"Failed to add category for question {question_id}")
+                data_to_update[f"{QUESTIONS}.q{i}"] = {CATEGORY: category}
+                success = mongo.update("session", session_id, data_to_update)
+                if not success:
+                    return fail(f"Failed to add category for question {question_id}")
 
-                set_first_q = set_current_question(session_id, 0)
-                if not set_first_q[SUCCESS]:
-                    return set_first_q
+            set_first_q = set_current_question(session_id, 0)
+            if not set_first_q[SUCCESS]:
+                return set_first_q
 
-                mongo.incr_state(session_id)
+            mongo.incr_state(session_id)
 
-                return succeed(r)
+            return succeed(r)
 
             fail(f"Failed to update {SESSION}")
 
         return fail(f"Failed to get {ROUND} with id {round_id}")
 
     return fail(f"Failed to get game with id '{session[GAME_ID]}'")
-
-
-def get_categories(list_of_questions):
-    categories = []
-    for question_id in list_of_questions:
-        question = get_question(question_id)
-        categories.append(question[OBJECT][CATEGORY])
-    return categories
 
 
 def get_answer_status(session_id, question_id):
@@ -647,7 +661,7 @@ def _get_answers(session_id, data, session={}):
             wager: n
     """
     question_id = data[QUESTION_ID]
-    answers = get_question_by_id(session_id, question_id)
+    answers = get_question_by_index(session_id, question_id)
     if not answers[SUCCESS]:
         return answers
 
