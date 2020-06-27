@@ -1,0 +1,40 @@
+.answer-question {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    margin: 25px;
+    border: 1px solid black;
+    width: 500px;
+}
+
+.answer-box {
+    padding: 10px;
+    margin: 25px;
+}
+
+.answer-footer {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    margin: 10px;
+}
+
+.selectable-wagers {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+}
+
+.selectable-wager {
+    display: flex;
+    padding: 10px;
+    border: 1px solid black;
+    border-radius: 5px;
+    margin: 5px;
+    cursor: pointer;
+}
+
+.sel-wager {
+    background: lightblue;
+    border: 2px solid black
+}

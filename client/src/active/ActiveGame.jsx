@@ -5,6 +5,7 @@ import './ActiveGame.css';
 import ActiveQuestion from "./ActiveQuestion"
 import ActiveRound from "./ActiveRound"
 import NextOrPrevious from "../control/NextOrPrevious"
+import AnswerQuestion from "../answer/AnswerQuestion"
 
 class ActiveGame extends React.Component {
 
@@ -63,6 +64,9 @@ class ActiveGame extends React.Component {
           <NextOrPrevious questions={questions} rounds={this.props.rounds}
             active_question={this.state.active_question} active_round={this.state.active_round}
             session_id={this.props.session_id} player_id={this.props.player_id} /> : null}
+        <AnswerQuestion question={this.state.active_question} round={this.state.active_round}
+          session_id={this.props.session_id} player_id={this.props.player_id} 
+          session_state={this.props.session_state} />
         <div>
           {this.props.players}
         </div>
