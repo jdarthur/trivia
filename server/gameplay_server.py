@@ -782,12 +782,17 @@ def get_scoreboard(session_id, session={}):
 
 
 answer_model = (
-    IdField(QUESTION_ID, "question"),
-    IdField(ROUND_ID, "round"),
+    RestField(QUESTION_ID, int),
+    RestField(ROUND_ID, int),
     IdField(PLAYER_ID, "player"),
     RestField(ANSWER),
     RestField(WAGER, int),
 )
+
+
+@app.route(f'{URL_BASE}/session/<session_id>/answer', methods=['POST'])
+def answer_one_question(session_id):
+    return _resp(answer_question(session_id, request.json))
 
 
 @model(answer_model, SUBOP, "session")
@@ -801,8 +806,11 @@ def answer_question(session_id, data, session={}):
     return success: true
     """
     player_id = data[PLAYER_ID]
-    round_id = data[ROUND_ID]
-    question_id = data[QUESTION_ID]
+    rindex = data[ROUND_ID]
+    qindex = data[QUESTION_ID]
+
+    round_id = f"r{rindex}"
+    question_id = f"q{qindex}"
 
     legal_wagers = get_legal_wagers(session, round_id, player_id)
     wager = data[WAGER]
@@ -835,9 +843,10 @@ def get_legal_wagers(session, round_id, player_id):
     """
     r = session[ROUNDS][round_id]
     all_wagers = r[WAGERS].copy()
-    questions_in_round = r[QUESTIONS]
+    categories = r[CATEGORIES]
 
-    for question_id in questions_in_round:
+    for category in categories:
+        question_id = category[QUESTION_ID]
         question = session[QUESTIONS][question_id]
         if question.get(SCORED, False):
             answer_id = question[ANSWERS][player_id][-1]
