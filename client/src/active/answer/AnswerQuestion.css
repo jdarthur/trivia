@@ -1,0 +1,12 @@
+.answer-question {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    padding: 25px;
+}
+
+.answer-footer {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+}
