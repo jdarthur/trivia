@@ -36,12 +36,12 @@ class NextOrPrevious extends React.Component {
 
         return (
             <div className="next-or-previous">
-                {show_pq ? <SetQuestion target={prev_q} label="Previous Question"
+                {show_pq ? <SetQuestion target={prev_q} label="Previous Question" round_id={this.props.active_round}
                     session_id={this.props.session_id} player_id={this.props.player_id} /> : spacer}
                 {show_pr ? <SetRound target={prev_r} label="Previous Round"
                     session_id={this.props.session_id} player_id={this.props.player_id} /> : spacer}
 
-                {show_nq ? <SetQuestion target={next_q} label="Next Question"
+                {show_nq ? <SetQuestion target={next_q} label="Next Question" round_id={this.props.active_round}
                     session_id={this.props.session_id} player_id={this.props.player_id} /> : null}
                 {show_nr ? <SetRound target={next_r} label="Next Round"
                     session_id={this.props.session_id} player_id={this.props.player_id} /> : null}

@@ -7,7 +7,8 @@ class SetQuestion extends React.Component {
         const url = "/gameplay/session/" + this.props.session_id + "/current-question"
         const body = {
             player_id: this.props.player_id,
-            question_id: parseInt(this.props.target.replace("q", ""))
+            round_id: this.props.round_id,
+            question_id: this.props.target
         }
         //TODO: come up with a better question ID solution
         sendData(url, "PUT", body)

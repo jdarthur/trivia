@@ -56,8 +56,8 @@ class AnswerQuestion extends React.Component {
         if (this.sendable()) {
             console.log("send")
             const answer = {
-                question_id: parseInt(this.props.question.replace("q", "")),
-                round_id: parseInt(this.props.round.replace("r", "")),
+                question_id: this.props.question,
+                round_id: this.props.round,
                 player_id: this.props.player_id,
                 answer: this.state.answer,
                 wager: this.state.wager,

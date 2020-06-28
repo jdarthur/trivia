@@ -7,7 +7,7 @@ class SetRound extends React.Component {
         const url = "/gameplay/session/" + this.props.session_id + "/current-round"
         const body = {
             player_id: this.props.player_id,
-            round_id: parseInt(this.props.target.replace("r", ""))
+            round_id: this.props.target
         }
         //TODO: come up with a better round ID solution
         sendData(url, "PUT", body)

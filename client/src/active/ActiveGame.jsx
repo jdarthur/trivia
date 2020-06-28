@@ -16,7 +16,7 @@ class ActiveGame extends React.Component {
       answer: "",
       active_question: "",
       active_round: "",
-      categories: [],
+      questions: [],
       wagers: []
     }
   }
@@ -37,7 +37,8 @@ class ActiveGame extends React.Component {
     let url = "/gameplay/session/" + this.props.session_id + "/current-round"
     fetch(url).then(response => response.json())
       .then(r => {
-        this.setState({ categories: r.categories, wagers: r.wagers, active_round: r.id})
+        console.log(r)
+        this.setState({ questions: r.questions, wagers: r.wagers, active_round: r.id})
       })
   }
 
@@ -51,11 +52,12 @@ class ActiveGame extends React.Component {
 
 
   render() {
-    const questions = this.state.categories.map(category => category.question_id)
+    const questions = this.state.questions.map((question, index) => index)
+    const categories = this.state.questions.map(question => question.category)
 
     return (
       <div className="active-game">
-        <ActiveRound name="insert round name here" categories={this.state.categories}
+        <ActiveRound name="insert round name here" categories={categories}
           active_question={this.state.active_question} />
         <ActiveQuestion session_state={this.props.session_state} session_id={this.props.session_id}
           question={this.state.question} answer={this.state.answer} />
