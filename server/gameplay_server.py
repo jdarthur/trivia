@@ -517,10 +517,9 @@ def _set_current_question(session_id, data, session={}):
             f"{spot}.{ANSWERS}": {},
             CURRENT_QUESTION: qindex
         }
-        print(session)
-        success = mongo.update("session", session_id, data_to_update)
-        if not success:
-            return fail(f"Failed to set question for question_id {question_id}")
+        mongo.update("session", session_id, data_to_update)
+        # if not success:
+        #     return fail(f"Failed to set question for question_id {question_id}")
 
         mongo.incr_state(session_id)
 
@@ -617,24 +616,24 @@ def _set_current_round(session_id, data, session={}):
             data_to_update = {
                 f"{ROUNDS}.{round_index}.{WAGERS}":  r[WAGERS],
                 ROUND_ID: round_id,
-                CURRENT_ROUND: round_index
+                CURRENT_ROUND: round_index,
             }
 
             success = mongo.update("session", session_id, data_to_update)
             if not success:
                 fail(f"Failed to add update round with index {i} in session")
+            if session[ROUNDS][round_index].get(QUESTIONS, None) is None:
+                spot = f"{ROUNDS}.{round_index}.{QUESTIONS}"
+                questions = r[QUESTIONS]
+                for i, question_id in enumerate(questions):
+                    question = get_question(question_id)
+                    if not question[SUCCESS]:
+                        return question
+                    category = question[OBJECT][CATEGORY]
 
-            spot = f"{ROUNDS}.{round_index}.{QUESTIONS}"
-            questions = r[QUESTIONS]
-            for i, question_id in enumerate(questions):
-                question = get_question(question_id)
-                if not question[SUCCESS]:
-                    return question
-                category = question[OBJECT][CATEGORY]
-
-                success = mongo.push("session", session_id, spot, {CATEGORY: category})
-                if not success:
-                    fail(f"Failed to add question with index {i} to round")
+                    success = mongo.push("session", session_id, spot, {CATEGORY: category})
+                    if not success:
+                        fail(f"Failed to add question with index {i} to round")
 
             set_first_q = set_current_question(session_id, round_index, 0)
             if not set_first_q[SUCCESS]:
