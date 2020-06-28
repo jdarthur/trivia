@@ -1,6 +1,6 @@
 import React from 'react';
 import "./AnswerQuestion.css"
-import SelectableWager from "./SelectableWager"
+import WagerManager from "./WagerManager"
 import sendData from "../index"
 
 class AnswerQuestion extends React.Component {
@@ -9,32 +9,15 @@ class AnswerQuestion extends React.Component {
         super(props)
         this.state = {
             answer: "",
-            available_wagers: [],
             wager: null,
             dirty: false
         }
     }
 
-    componentDidMount() {
-        this.get_available_wagers()
-    }
-
     componentDidUpdate(prevProps) {
         if (this.props.session_state !== prevProps.session_state) {
-            this.setState({ answer: "", wager: null, dirty: false }, () => this.get_available_wagers())
+            this.setState({ answer: "", wager: null, dirty: false })
         }
-    }
-
-    get_available_wagers = () => {
-        //get available wagers and truncate duplicates
-        const available = []
-        const resp = [1,2,3,1,2,3]
-        for (let i = 0; i < resp.length; i++) {
-            if (available.indexOf(resp[i]) === -1) {
-                available.push(resp[i])
-            }
-        }
-        this.setState({available_wagers : available})
     }
 
     set_answer = (event) => {
@@ -62,24 +45,19 @@ class AnswerQuestion extends React.Component {
                 answer: this.state.answer,
                 wager: this.state.wager,
             }
-            
+
             const url = "/gameplay/session/" + this.props.session_id + "/answer"
             console.log(url)
             console.log(answer)
             sendData(url, "POST", answer)
-            .then((data) => {
-                this.setState({dirty: false})
-            })
+                .then((data) => {
+                    this.setState({ dirty: false })
+                })
         }
-
-
     }
 
     render() {
-        const wagers = this.state.available_wagers.map(wager =>
-             <SelectableWager key={wager} wager={wager}
-                 select={this.set_wager} selected={this.state.wager === wager} />)
-        
+
         const button_class = this.sendable() ? "" : "disabled"
         return (
             <div className="answer-question">
@@ -87,8 +65,8 @@ class AnswerQuestion extends React.Component {
                     onChange={this.set_answer} placeholder="Your answer" />
 
                 <div className="answer-footer">
-
-                    <div className="selectable-wagers"> Wager: {wagers} </div>
+                    <WagerManager session_id={this.props.session_id} player_id={this.props.player_id}
+                        round={this.props.round} wager={this.state.wager} select={this.set_wager} />
                     <button className={button_class} onClick={this.send}> Answer </button>
                 </div>
             </div>

@@ -6,7 +6,9 @@
 }
 
 .active-question {
-    padding: 25px;
+    padding: 50px;
+    font-size: 1.7em;
+    border-bottom: 1px solid black;
 }
 
 .round-category {
@@ -16,6 +18,7 @@
 
 .active {
     background: lightblue;
+
 }
 
 .active-round {

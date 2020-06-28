@@ -9,7 +9,7 @@ class SetRound extends React.Component {
             player_id: this.props.player_id,
             round_id: this.props.target
         }
-        //TODO: come up with a better round ID solution
+
         sendData(url, "PUT", body)
         .then((data) => {
           console.log(data)

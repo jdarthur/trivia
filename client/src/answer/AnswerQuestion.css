@@ -27,14 +27,45 @@
 
 .selectable-wager {
     display: flex;
-    padding: 10px;
+    justify-content: center;
+    align-items: center;
+    width: 2em;
+    height: 2em;
     border: 1px solid black;
     border-radius: 5px;
     margin: 5px;
+    font-size: 1.3em;
     cursor: pointer;
+    position:relative;
 }
 
 .sel-wager {
     background: lightblue;
-    border: 2px solid black
+    border: 2px solid black;
+    font-weight: bold;
 }
+
+.wager-count {
+    position: absolute;
+    padding: 3px;
+    /* left: 100% - calc(100%); */
+    top: 0px;
+    right: 0px;
+    color: rgb(99, 99, 99);
+
+    font-size: .6em;
+    font-weight: normal;
+    /* transform: translate(-100%, 100%); */
+}
+
+.wager-manager {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 5px;
+}
+
+.wager-title {
+    margin-left: 10px;
+    margin-bottom: 5px;
+} 

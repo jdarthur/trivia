@@ -63,7 +63,7 @@ class Homepage extends React.Component {
         .then(response => response.json())
         .then(state => {
           console.log(state)
-          const rounds = state.rounds ? Object.keys(state.rounds) : []
+          const rounds = state.rounds ? state.rounds.map((round, index) => index) : []
           const update = {
             players: state.players ? state.players : [],
             is_mod: state.mod !== undefined,

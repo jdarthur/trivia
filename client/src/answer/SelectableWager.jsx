@@ -9,8 +9,12 @@ class SelectableWager extends React.Component {
 
     render() {
         const className = "selectable-wager" + (this.props.selected ? " sel-wager" : "")
+        const remaining = "" + this.props.count + " remaining"
         return (
-            <div className={className} onClick={this.select}> {this.props.wager}</div>
+            <div className={className} onClick={this.select} title={remaining}> 
+                {/* <div  className="wager-count"> x{this.props.count} </div> */}
+                {this.props.wager}
+            </div>
         );
     }
 }
