@@ -45,6 +45,8 @@ class NextOrPrevious extends React.Component {
                     session_id={this.props.session_id} player_id={this.props.player_id} /> : null}
                 {show_nr ? <SetRound target={next_r} label="Next Round"
                     session_id={this.props.session_id} player_id={this.props.player_id} /> : null}
+
+                {show_end ? <button > End game </button>: null}
             </div>
         );
     }

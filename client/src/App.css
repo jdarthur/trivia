@@ -10,6 +10,10 @@
   /* font-weight: bold; */
 }
 
+button {
+  cursor: pointer;
+}
+
 .disabled {
   color: #b3b3b3;
   cursor: default;
