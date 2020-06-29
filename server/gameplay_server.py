@@ -706,7 +706,8 @@ def _get_answers(session_id, data, session={}):
 
 
 score_model = [
-    IdField(QUESTION_ID, "question"),
+    RestField(QUESTION_ID, int),
+    RestField(ROUND_ID, int),
     RestField(PLAYERS, dict)
 ]
 
