@@ -11,8 +11,13 @@ class App extends React.Component {
   constructor(props) {
     super(props)
     this.state = {
-      selected: PLAY
+      selected: PLAY,
+      show_toolbar: true
     }
+  }
+
+  set_show_toolbar = (value) => {
+    this.setState({ show_toolbar: value })
   }
 
   set_selected = (page) => {
@@ -22,9 +27,9 @@ class App extends React.Component {
   render() {
     return (
       <div className="App">
-        <GenericToolbar labels={[PLAY, EDITOR]}
-          select={this.set_selected} selected={this.state.selected} />
-        {this.state.selected === PLAY ? <HomePage /> : null}
+        { this.state.show_toolbar ? <GenericToolbar labels={[PLAY, EDITOR]}
+          select={this.set_selected} selected={this.state.selected} /> : null }
+        {this.state.selected === PLAY ? <HomePage set_toolbar={this.set_show_toolbar}/> : null}
         {this.state.selected === EDITOR ? <Editor /> : null}
       </div>
     );

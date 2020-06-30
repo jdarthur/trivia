@@ -673,11 +673,10 @@ def get_answer_status(session_id):
     if player_id != mod:
         # scored questions will provide answers and wagers
         if question.get(SCORED, False):
-            _resp(fail("unimplemented"))
+            return _resp(get_answers_scored(players, answers))
         else:
             # unscored questions will provide only answered:true/false
-            answers = get_answers_unscored(players, answers)
-            return _resp(answers)
+            return _resp(get_answers_unscored(players, answers))
 
     else:
         # mod always gets complete player_id/answer/wager
@@ -699,14 +698,32 @@ def get_answers_unscored(players, answers):
     for player in players:
         player_id = player[ID]
         print(player)
-        p = {PLAYER_ID: player_id, TEAM_NAME: player[TEAM_NAME]}
+        p = {TEAM_NAME: player[TEAM_NAME]}
 
         print(answers)
         panswers = answers.get(player_id, None)
         p['answered'] = panswers is not None
 
         ret.append(p)
-    return succeed(ret)
+    return succeed({SCORED: False, ANSWERS: ret})
+
+
+def get_answers_scored(players, answers):
+    ret = []
+    for player in players:
+        player_id = player[ID]
+        p = {TEAM_NAME: player[TEAM_NAME]}
+        panswers = answers.get(player_id, None)
+
+        answer_id = panswers[-1]
+        answer = get_answer(answer_id)[OBJECT]
+
+        p[ANSWER] = answer[ANSWER]
+        p[WAGER] = answer[WAGER]
+        p[CORRECT] = answer.get(CORRECT, False)
+        ret.append(p)
+    return succeed({SCORED: True, ANSWERS: ret})
+
 
 def get_answers_as_mod(players, answers):
     ret = []
@@ -822,8 +839,10 @@ def score_question(session_id, data, session={}):
         is_correct = given_players[player_id].get(CORRECT, None)
         if is_correct is None:
             return fail(f"Did not set correct True/False for {PLAYER_ID} {player_id}")
+        else:
+            success = mongo.update("answer", answer['answer_id'], {CORRECT: is_correct})
 
-        points_awarded = wager if is_correct else 0 # hack here to override
+        points_awarded = wager if is_correct else 0  # hack here to override
         awarded = award_points(session_id, player_id, points_awarded)
         if not awarded[SUCCESS]:
             return awarded

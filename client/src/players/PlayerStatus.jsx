@@ -1,6 +1,7 @@
 import React from 'react';
 import sendData from "../index"
 import AnsweredOrNot from "./AnsweredOrNot"
+import CorrectOrNot from "./CorrectOrNot"
 import "./Players.css"
 
 class PlayerStatus extends React.Component {
@@ -9,6 +10,7 @@ class PlayerStatus extends React.Component {
         super(props)
         this.state = {
             answers: [],
+            scored: false
         }
     }
 
@@ -42,14 +44,17 @@ class PlayerStatus extends React.Component {
             sendData(url, "GET")
                 .then((data) => {
                     console.log(data)
-                    this.setState({ answers: data })
+                    this.setState({ scored: data.scored, answers: data.answers })
                 })
         }
     }
 
     render() {
         const answers = this.state.answers.map(player => {
-            return <AnsweredOrNot key={player.team_name} player_name={player.team_name}
+            if (this.state.scored)
+                return <CorrectOrNot key={player.team_name} player_name={player.team_name}
+                    answer={player.answer} wager={player.wager} correct={player.correct} />
+            else return <AnsweredOrNot key={player.team_name} player_name={player.team_name}
                 answered={player.answered} />
         })
 
