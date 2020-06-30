@@ -40,3 +40,22 @@
 .incorrect {
     background: lightcoral;
 }
+
+.player-status-bar {
+    display: flex;
+    flex-direction: row;
+    align-items: flex-end;
+    justify-content: flex-start;
+    border-top: 1px solid black;
+}
+
+.one-player-status {
+    border-right: 1px solid black;
+    padding: 5px;
+    display: flex;
+    flex-direction: column
+}
+
+.player-name {
+    padding: 5px;
+}

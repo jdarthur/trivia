@@ -7,6 +7,7 @@ import ActiveRound from "./ActiveRound"
 import NextOrPrevious from "../control/NextOrPrevious"
 import AnswerQuestion from "../answer/AnswerQuestion"
 import PlayerScorer from "../players/PlayerScorer"
+import PlayerStatus from "../players/PlayerStatus"
 
 class ActiveGame extends React.Component {
 
@@ -57,7 +58,7 @@ class ActiveGame extends React.Component {
     const categories = this.state.questions.map(question => question.category)
 
     const dummy_answers = [
-      { player_id: "1234", answer: 7, wager: 1, player_name: "joe"}
+      { player_id: "1234", answer: 7, wager: 1, player_name: "joe" }
     ]
 
     return (
@@ -78,8 +79,14 @@ class ActiveGame extends React.Component {
 
         {this.props.is_mod ?
           <PlayerScorer question_id={this.state.active_question}
-            round_id={this.state.active_round} session_id={this.props.session_id} 
-            player_id={this.props.player_id} answers={dummy_answers} /> : null}
+            round_id={this.state.active_round} session_id={this.props.session_id}
+            player_id={this.props.player_id} answers={dummy_answers}
+            session_state={this.props.session_state} /> : null}
+
+        {!this.props.is_mod ?
+          <PlayerStatus question_id={this.state.active_question}
+            round_id={this.state.active_round} session_id={this.props.session_id}
+            player_id={this.props.player_id} session_state={this.props.session_state} /> : null}
 
         <div>
           {this.props.players}

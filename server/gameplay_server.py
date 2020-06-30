@@ -510,7 +510,7 @@ def _set_current_question(session_id, data, session={}):
         if not question[SUCCESS]:
             return question
         question = question[OBJECT]
-        
+
         spot = f"{ROUNDS}.{rindex}.{QUESTIONS}.{qindex}"
         data_to_update = {
             f"{spot}.{QUESTION}": question[QUESTION],
@@ -649,21 +649,63 @@ def _set_current_round(session_id, data, session={}):
 
     return fail(f"Failed to get game with id '{session[GAME_ID]}'")
 
+@app.route(f'{URL_BASE}/session/<session_id>/answers', methods=['GET'])
+def get_answer_status(session_id):
+    player_id = request.args.get(PLAYER_ID, None)
+    round_id = request.args.get(ROUND_ID, None)
+    question_id = request.args.get(QUESTION_ID, None)
 
-def get_answer_status(session_id, question_id):
-    """
-    if not open:
-        return failure
-    if open and not scored:
-        return map team_name -> answered:bool
-    if scored:
-        return map
-            team_name:
-                answers: similar form as get_answers()
-                correct: true/false
-                points_awarded: n
-    """
-    pass
+    try:
+        round_id = int(round_id)
+        question_id = int(question_id)
+    except:
+        return _resp(fail("Bad question/round ID"))
+
+    session = get_session(session_id)[OBJECT]
+    mod = session[MODERATOR]
+
+    if player_id != mod:
+
+        question = session[ROUNDS][round_id][QUESTIONS][question_id]
+        answers = question.get(ANSWERS, None)
+        if answers is None:
+            return _resp(fail("Question is not open"))
+
+        players = get_players2(session)
+
+        if question.get(SCORED, False):
+            _resp(fail("unimplemented"))
+        else:
+            answers = get_answers_unscored(players, answers)
+            return _resp(answers)
+
+    else:
+        return _resp(succeed({"nice": "mod"}))
+
+
+def get_players2(session):
+    players = session.get(PLAYERS, [])
+
+    ret = []
+    for player_id in players:
+        player = get_player(player_id)
+        ret.append(player[OBJECT])
+    return ret
+
+
+def get_answers_unscored(players, answers):
+    ret = []
+    for player in players:
+        player_id = player[ID]
+        print(player)
+        p = {PLAYER_ID: player_id, TEAM_NAME: player[TEAM_NAME]}
+
+        print(answers)
+        panswers = answers.get(player_id, None)
+        p['answered'] = panswers is not None
+
+        ret.append(p)
+    return succeed(ret)
 
 
 def get_answers(session_id, question_id):
