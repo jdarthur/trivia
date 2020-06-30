@@ -662,25 +662,26 @@ def get_answer_status(session_id):
         return _resp(fail("Bad question/round ID"))
 
     session = get_session(session_id)[OBJECT]
+
+    question = session[ROUNDS][round_id][QUESTIONS][question_id]
+    answers = question.get(ANSWERS, None)
+    if answers is None:
+        return _resp(fail("Question is not open"))
+
     mod = session[MODERATOR]
-
+    players = get_players2(session)
     if player_id != mod:
-
-        question = session[ROUNDS][round_id][QUESTIONS][question_id]
-        answers = question.get(ANSWERS, None)
-        if answers is None:
-            return _resp(fail("Question is not open"))
-
-        players = get_players2(session)
-
+        # scored questions will provide answers and wagers
         if question.get(SCORED, False):
             _resp(fail("unimplemented"))
         else:
+            # unscored questions will provide only answered:true/false
             answers = get_answers_unscored(players, answers)
             return _resp(answers)
 
     else:
-        return _resp(succeed({"nice": "mod"}))
+        # mod always gets complete player_id/answer/wager
+        return _resp(get_answers_as_mod(players, answers))
 
 
 def get_players2(session):
@@ -704,6 +705,22 @@ def get_answers_unscored(players, answers):
         panswers = answers.get(player_id, None)
         p['answered'] = panswers is not None
 
+        ret.append(p)
+    return succeed(ret)
+
+def get_answers_as_mod(players, answers):
+    ret = []
+    for player in players:
+        player_id = player[ID]
+        p = {PLAYER_ID: player_id, TEAM_NAME: player[TEAM_NAME]}
+        panswers = answers.get(player_id, None)
+        p['answered'] = panswers is not None
+        if panswers is not None:
+            answer_id = panswers[-1]
+            answer = get_answer(answer_id)[OBJECT]
+            p[ANSWER] = answer[ANSWER]
+            p[WAGER] = answer[WAGER]
+            p['answer_id'] = answer[ID]
         ret.append(p)
     return succeed(ret)
 
@@ -750,8 +767,20 @@ def _get_answers(session_id, data, session={}):
 score_model = [
     RestField(QUESTION_ID, int),
     RestField(ROUND_ID, int),
-    RestField(PLAYERS, dict)
+    RestField(PLAYERS, dict),
+    IdField(PLAYER_ID, "player"),
 ]
+
+
+@app.route(f'{URL_BASE}/session/<session_id>/score', methods=['PUT'])
+def score_one_question(session_id):
+    player_id = request.json.get(PLAYER_ID, None)
+
+    is_mod = verify_mod(session_id, player_id)
+    if not is_mod[SUCCESS]:
+        return is_mod
+
+    return _resp(score_question(session_id, request.json))
 
 
 @model(score_model, UPDATE, "session")
@@ -759,7 +788,8 @@ def score_question(session_id, data, session={}):
     """
     data = {
         question_id: x
-        teams:
+        round_id: y
+        players:
             team1: {correct: true}
             team2: {correct: false}
             ...
@@ -767,8 +797,11 @@ def score_question(session_id, data, session={}):
 
     """
     question_id = data[QUESTION_ID]
+    round_id = data[ROUND_ID]
 
-    answers = session.get(QUESTIONS).get(question_id, {}).get(ANSWERS, None)
+    question = session.get(ROUNDS)[round_id][QUESTIONS][question_id]
+
+    answers = question.get(ANSWERS, None)
     if answers is None:
         return fail(f"{QUESTION}_id {question_id} is not open")
 
@@ -779,28 +812,24 @@ def score_question(session_id, data, session={}):
         if player_id not in given_players:
             return fail(f"{PLAYER_ID} {player_id} was not scored.")
 
-    answers = get_answers(session_id, question_id)
-    if not answers[SUCCESS]:
-        return answers
-    answers = answers[OBJECT]
+    players = get_players2(session)
+    answers = get_answers_as_mod(players, answers)[OBJECT]
+    for answer in answers:
+        if answer['answered'] is False:
+            return fail(f"{PLAYER_ID} {answer[PLAYER_ID]} has not answered question {question_id}")
 
-    for player_id in given_players:
-        player_answers = answers.get(player_id, None)
-        if not player_answers:
-            return fail(f"{PLAYER_ID} {player_id} has not answered question {question_id}")
-
-        # last answer is the one scored
-        answer = player_answers[-1]
+        wager = answer[WAGER]
         is_correct = given_players[player_id].get(CORRECT, None)
         if is_correct is None:
             return fail(f"Did not set correct True/False for {PLAYER_ID} {player_id}")
 
-        points_awarded = answer[WAGER] if is_correct else 0
+        points_awarded = wager if is_correct else 0 # hack here to override
         awarded = award_points(session_id, player_id, points_awarded)
         if not awarded[SUCCESS]:
             return awarded
 
-    success = mongo.update("session", session_id, {f"{QUESTIONS}.{question_id}.{SCORED}": True})
+    spot = f"{ROUNDS}.{round_id}.{QUESTIONS}.{question_id}.{SCORED}"
+    success = mongo.update("session", session_id, {spot: True})
     if not success:
         return fail("Failed to mark question as scored")
 

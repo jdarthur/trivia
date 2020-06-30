@@ -20,10 +20,10 @@ class PlayerStatus extends React.Component {
         if (this.props.session_state !== prevProps.session_state) {
             this.get_answers()
         }
-        if (this.props.question_id !== prevProps.question_id) {
+        else if (this.props.question_id !== prevProps.question_id) {
             this.get_answers()
         }
-        if (this.props.round_id !== prevProps.round_id) {
+        else if (this.props.round_id !== prevProps.round_id) {
             this.get_answers()
         }
     }
