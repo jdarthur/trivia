@@ -20,6 +20,7 @@ class PlayerScorer extends React.Component {
     componentDidUpdate(prevProps) {
         if (this.props.session_state !== prevProps.session_state) {
             this.get_answers()
+            this.setState({scores: {}})
         }
         else if (this.props.question_id !== prevProps.question_id) {
             this.get_answers()
@@ -38,8 +39,6 @@ class PlayerScorer extends React.Component {
             url += "&round_id=" + this.props.round_id
             url += "&question_id=" + this.props.question_id
             console.log(url)
-
-            console.log(this.props)
             sendData(url, "GET")
                 .then((data) => {
                     console.log(data)
