@@ -836,6 +836,7 @@ def score_question(session_id, data, session={}):
             return fail(f"{PLAYER_ID} {answer[PLAYER_ID]} has not answered question {question_id}")
 
         wager = answer[WAGER]
+        player_id = answer[PLAYER_ID]
         is_correct = given_players[player_id].get(CORRECT, None)
         if is_correct is None:
             return fail(f"Did not set correct True/False for {PLAYER_ID} {player_id}")
@@ -858,9 +859,7 @@ def score_question(session_id, data, session={}):
 
 def award_points(session_id, player_id, points):
     # update_scoreboard -> $inc session.points[player_id]: points_awarded
-    success = mongo.increment("session", session_id, f"{SCOREBOARD}.{player_id}", points)
-    if not success:
-        return fail(f"Failed to award {points} points for player {player_id}")
+    mongo.increment("session", session_id, f"{SCOREBOARD}.{player_id}", points)
     return succeed({PLAYER_ID: player_id})
 
 
@@ -932,6 +931,20 @@ def answer_question(session_id, data, session={}):
 
     return succeed(answer)
 
+
+@app.route(f'{URL_BASE}/session/<session_id>/wagers', methods=['GET'])
+def legal_wagers_for_player(session_id):
+    player_id = request.args.get(PLAYER_ID, None)
+    round_id = request.args.get(ROUND_ID, None)
+    session = get_session(session_id)[OBJECT]
+
+
+    try:
+        round_id = int(round_id)
+    except:
+        return _resp(fail("Bad round ID"))
+
+    return _resp(succeed(get_legal_wagers(session, round_id, player_id)))
 
 def get_legal_wagers(session, round_id, player_id):
     """
