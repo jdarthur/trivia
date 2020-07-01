@@ -17,13 +17,13 @@ class PlayerAnswer extends React.Component {
         return (
             <div className="answer-and-scorer">
                 <div className="player-answer">   
-                    <div> { this.props.player_name } </div>
-                    <div> { this.props.answer } </div>
+                    <div className="team-name"> { this.props.player_name } </div>
+                    <div className="answer-text">    { this.props.answer || "[no answer]" }      </div>
                 </div>
-                <div className="answer-scorer">
-                    <button onClick={this.set_correct}   className={correct_class}  > ☑ </button>
-                    <button onClick={this.set_incorrect} className={incorrect_class}> ☒ </button>
-                </div>
+                { this.props.answer ? <div className="answer-scorer">
+                    <div onClick={this.set_incorrect} className={incorrect_class}> ✗ </div>
+                    <button onClick={this.set_correct}   className={correct_class}  > ✓ </button>
+                </div>: null} 
             </div>
         );
     }

@@ -7,13 +7,16 @@ import "./Players.css"
 class AnsweredOrNot extends React.Component {
 
     render() {
-        const class_name = "one-player-status" + (this.props.correct ? " correct" : "incorrect")
+        const class_name = "player-wager "  + (this.props.correct ? "": "in") + "correct"
         return (
-            <div className={class_name} >
-                <div className="player-name"> {this.props.player_name} </div>
-                <div className="player-name"> {this.props.answer} </div>
-                <div className="player-name"> {this.props.wager} </div>
-            </ div>
+            <div className="one-player-status" >
+                <div className="team-name"> {this.props.player_name} </div>
+                <div className="answer-text"> {this.props.answer} </div>
+                <div className={class_name} >
+                    <div className="player-name"> {this.props.wager} </div>
+                    <div> {this.props.correct ? "✓" : "✗" } </div>
+                </div>
+            </div>
         );
     }
 }
