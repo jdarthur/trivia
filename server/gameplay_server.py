@@ -513,7 +513,7 @@ def _set_current_question(session_id, data, session={}):
 
         spot = f"{ROUNDS}.{rindex}.{QUESTIONS}.{qindex}"
         data_to_update = {
-            f"{spot}.{QUESTION}": question[QUESTION],
+            f"{spot}.{QUESTION}": ƒscr[QUESTION],
             f"{spot}.{ANSWERS}": {},
             CURRENT_QUESTION: qindex
         }
@@ -662,8 +662,12 @@ def get_answer_status(session_id):
         return _resp(fail("Bad question/round ID"))
 
     session = get_session(session_id)[OBJECT]
+    print(session)
 
     question = session[ROUNDS][round_id][QUESTIONS][question_id]
+    print("\n")
+    print(question)
+    print("\n")
     answers = question.get(ANSWERS, None)
     if answers is None:
         return _resp(fail("Question is not open"))
@@ -713,7 +717,7 @@ def get_answers_scored(players, answers):
     for player in players:
         player_id = player[ID]
         p = {TEAM_NAME: player[TEAM_NAME]}
-        panswers = answers.get(player_id, None)
+        panswers = answers.get(player_id, [])
 
         answer_id = panswers[-1]
         answer = get_answer(answer_id)[OBJECT]
@@ -863,6 +867,17 @@ def award_points(session_id, player_id, points):
     return succeed({PLAYER_ID: player_id})
 
 
+@app.route(f'{URL_BASE}/session/<session_id>/score', methods=['PUT'])
+def score_one_question(session_id):
+    player_id = request.json.get(PLAYER_ID, None)
+
+    is_mod = verify_mod(session_id, player_id)
+    if not is_mod[SUCCESS]:
+        return is_mod
+
+    return _resp(score_question(session_id, request.json))
+
+
 @model([], GET_ONE, "session")
 def get_scoreboard(session_id, session={}):
     scoreboard = session.get(SCOREBOARD, None)
@@ -980,4 +995,5 @@ def get_answer(answer_id, answer={}):
 
 
 if __name__ == "__main__":
+    editor_key = "x12345x"
     app.run(host="0.0.0.0", debug=True, threaded=True)

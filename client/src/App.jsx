@@ -16,6 +16,13 @@ class App extends React.Component {
     }
   }
 
+  componentDidMount() {
+    let search = window.location.search;
+    let params = new URLSearchParams(search);
+    let key = params.get("key");
+    this.setState({key: key})
+  }
+
   set_show_toolbar = (value) => {
     this.setState({ show_toolbar: value })
   }
@@ -27,7 +34,7 @@ class App extends React.Component {
   render() {
     return (
       <div className="App">
-        { this.state.show_toolbar ? <GenericToolbar labels={[PLAY, EDITOR]}
+        { this.state.show_toolbar && this.state.key === "12344321" ? <GenericToolbar labels={[PLAY, EDITOR]}
           select={this.set_selected} selected={this.state.selected} /> : null }
         {this.state.selected === PLAY ? <HomePage set_toolbar={this.set_show_toolbar}/> : null}
         {this.state.selected === EDITOR ? <Editor /> : null}

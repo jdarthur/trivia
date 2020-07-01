@@ -4,9 +4,11 @@ import './ActiveGame.css';
 class ActiveQuestion extends React.Component {
 
   render() {
+    const question_newlined = this.props.question.split("^").map((part) => <div> {part} </div>)
+
     return (
       <div className="active-question">
-        <div> {this.props.question} </div>
+        <div> {question_newlined}  </div>
         <div> {this.props.answer}   </div>
       </div>
     );
