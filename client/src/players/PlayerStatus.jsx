@@ -9,8 +9,7 @@ class PlayerStatus extends React.Component {
     constructor(props) {
         super(props)
         this.state = {
-            answers: [],
-            scored: false
+            answers: []
         }
     }
 
@@ -44,14 +43,14 @@ class PlayerStatus extends React.Component {
             sendData(url, "GET")
                 .then((data) => {
                     console.log(data)
-                    this.setState({ scored: data.scored, answers: data.answers })
+                    this.setState({answers: data.answers })
                 })
         }
     }
 
     render() {
         const answers = this.state.answers.map(player => {
-            if (this.state.scored)
+            if (this.props.scored)
                 return <CorrectOrNot key={player.team_name} player_name={player.team_name}
                     answer={player.answer} wager={player.wager} correct={player.correct} />
             else return <AnsweredOrNot key={player.team_name} player_name={player.team_name}

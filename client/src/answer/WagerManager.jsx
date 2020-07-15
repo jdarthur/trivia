@@ -14,16 +14,18 @@ class WagerManager extends React.Component {
 
     componentDidMount() {
         this.get_available_wagers()
+        console.log("mount")
     }
 
     componentDidUpdate(prevProps) {
+        printDiffs(this.props, prevProps)
         if (this.props.session_state !== prevProps.session_state) {
-            this.setState({ answer: "", wager: null, dirty: false }, () => this.get_available_wagers())
-        }
-        else if (this.props.question_id !== prevProps.question_id) {
             this.get_available_wagers()
         }
-        else if (this.props.round_id !== prevProps.round_id) {
+        if (this.props.question_id !== prevProps.question_id) {
+            this.get_available_wagers()
+        }
+        if (this.props.round_id !== prevProps.round_id) {
             this.get_available_wagers()
         }
     }
@@ -71,6 +73,14 @@ class WagerManager extends React.Component {
                 <div className="selectable-wagers"> {wagers} </div>
             </div>
         );
+    }
+}
+
+function printDiffs(current, previous) {
+    for (let key in current) {
+        if (current[key] !== previous[key]) {
+            console.log("update " + key + ", '" + previous[key] + "' -> '" + current[key] + "'")
+        }
     }
 }
 

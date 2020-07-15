@@ -110,11 +110,13 @@ def get_session_state(session_id):
     if req_state is None:
         time.sleep(10)
 
-    while True:
+    attempts = 0
+    while attempts < 90:
         state = mongo.get_state(session_id)
         if str(state) != str(req_state):
             return _resp(succeed({"state": state}))
         time.sleep(2)
+        attempts += 1
 
 
 smodel = [
@@ -160,13 +162,14 @@ def get_session(session_id, session={}):
     """
     return succeed(session)
 
+
 def prune_session(data, player_id):
     session = data[OBJECT]
     mod_id = session[MODERATOR]
     if player_id != mod_id:
-        del session[MODERATOR]
-        del session[GAME_ID]
-        del session[PLAYERS]
+        session.pop(MODERATOR, None)
+        session.pop(GAME_ID, None)
+        session.pop(PLAYERS, None)
 
 
 @model(smodel, UPDATE, "session")
@@ -513,10 +516,12 @@ def _set_current_question(session_id, data, session={}):
 
         spot = f"{ROUNDS}.{rindex}.{QUESTIONS}.{qindex}"
         data_to_update = {
-            f"{spot}.{QUESTION}": ƒscr[QUESTION],
-            f"{spot}.{ANSWERS}": {},
             CURRENT_QUESTION: qindex
         }
+        if not question.get(SCORED, False):
+            data_to_update[f"{spot}.{QUESTION}"] = question[QUESTION]
+            data_to_update[f"{spot}.{ANSWERS}"] = {}
+
         mongo.update("session", session_id, data_to_update)
         # if not success:
         #     return fail(f"Failed to set question for question_id {question_id}")
@@ -538,6 +543,7 @@ def _get_question_by_index(session_id, data, session={}):
     q_index = data[QUESTION_ID]
 
     return get_question_in_round(session, r_index, q_index)
+
 
 def get_question_in_round(session, round_index, question_index):
     """
@@ -718,14 +724,14 @@ def get_answers_scored(players, answers):
         player_id = player[ID]
         p = {TEAM_NAME: player[TEAM_NAME]}
         panswers = answers.get(player_id, [])
+        if len(panswers) > 0:
+            answer_id = panswers[-1]
+            answer = get_answer(answer_id)[OBJECT]
 
-        answer_id = panswers[-1]
-        answer = get_answer(answer_id)[OBJECT]
-
-        p[ANSWER] = answer[ANSWER]
-        p[WAGER] = answer[WAGER]
-        p[CORRECT] = answer.get(CORRECT, False)
-        ret.append(p)
+            p[ANSWER] = answer[ANSWER]
+            p[WAGER] = answer[WAGER]
+            p[CORRECT] = answer.get(CORRECT, False)
+            ret.append(p)
     return succeed({SCORED: True, ANSWERS: ret})
 
 
@@ -865,17 +871,6 @@ def award_points(session_id, player_id, points):
     # update_scoreboard -> $inc session.points[player_id]: points_awarded
     mongo.increment("session", session_id, f"{SCOREBOARD}.{player_id}", points)
     return succeed({PLAYER_ID: player_id})
-
-
-@app.route(f'{URL_BASE}/session/<session_id>/score', methods=['PUT'])
-def score_one_question(session_id):
-    player_id = request.json.get(PLAYER_ID, None)
-
-    is_mod = verify_mod(session_id, player_id)
-    if not is_mod[SUCCESS]:
-        return is_mod
-
-    return _resp(score_question(session_id, request.json))
 
 
 @model([], GET_ONE, "session")

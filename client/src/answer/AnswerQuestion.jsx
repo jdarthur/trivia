@@ -15,8 +15,11 @@ class AnswerQuestion extends React.Component {
     }
 
     componentDidUpdate(prevProps) {
-        if (this.props.session_state !== prevProps.session_state && 
+        if (this.props.session_state !== prevProps.session_state &&
             this.props.question !== prevProps.question) {
+            this.setState({ answer: "", wager: null, dirty: false })
+        }
+        if (this.props.question !== prevProps.question) {
             this.setState({ answer: "", wager: null, dirty: false })
         }
     }
@@ -33,7 +36,8 @@ class AnswerQuestion extends React.Component {
         return (
             this.state.wager !== null &&
             this.state.answer !== "" &&
-            this.state.dirty)
+            this.state.dirty &&
+            !this.props.scored)
     }
 
     send = () => {
@@ -67,7 +71,8 @@ class AnswerQuestion extends React.Component {
 
                 <div className="answer-footer">
                     <WagerManager session_id={this.props.session_id} player_id={this.props.player_id}
-                        round_id={this.props.round} wager={this.state.wager} select={this.set_wager} />
+                        round_id={this.props.round} wager={this.state.wager} select={this.set_wager}
+                        question_id={this.props.question} />
                     <button className={button_class} onClick={this.send}> Answer </button>
                 </div>
             </div>
