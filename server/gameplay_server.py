@@ -86,7 +86,6 @@ def get_and_respond(endpoint, object_id, player_id=None, prune=None):
         data = get_current_question(object_id)
     if endpoint == "current_round":
         data = get_current_round(object_id)
-        print(data)
 
     if prune is not None:
         prune(data, player_id)
@@ -312,7 +311,6 @@ def get_all_players_in_session(session_id):
     data = get_players(session_id)
     if data[SUCCESS]:
         mod = data[MODERATOR]
-        print(data)
         if mod != player_id:
             for player in data[OBJECT]:
                 if player[ID] != player_id:
@@ -341,7 +339,7 @@ def get_players(session_id, player_id=None):
                 player = player[OBJECT]
                 ret.append(player)
             else:
-                print(f"Failed to get player {player_id}")
+                return fail(f"Failed to get player {player_id}")
 
         resp = succeed(ret)
         resp[MODERATOR] = session[MODERATOR]
@@ -495,8 +493,6 @@ def _set_current_question(session_id, data, session={}):
     rindex = data[ROUND_ID]
 
     prev = get_question_in_round(session, rindex, qindex)
-    print("\n l")
-    print(prev)
     if prev[SUCCESS]:
         prev = prev[OBJECT].get(ANSWERS, {})
     else:
@@ -555,13 +551,11 @@ def get_question_in_round(session, round_index, question_index):
     """
     get question at index X in round with index Y
     """
-    print(f"round: {round_index}")
     rounds = session[ROUNDS]
     if round_index >= len(rounds):
         return fail(f"{ROUND} index {round_index} not found in {SESSION} {session}")
 
     r = rounds[round_index]
-    print(f"\n\n{r}")
     questions = r[QUESTIONS]
     if question_index >= len(questions):
         return fail(f"{QUESTION} index {question_index} not found in round {r}")
@@ -582,7 +576,6 @@ def get_current_round(session_id, session={}):
     return round_name, list of questions, list of wagers
     """
     round_index = session.get(CURRENT_ROUND)
-    print(session)
     r = session.get(ROUNDS, [])[round_index]
     r[ID] = round_index
     return succeed(r)
@@ -674,12 +667,8 @@ def get_answer_status(session_id):
         return _resp(fail("Bad question/round ID"))
 
     session = get_session(session_id)[OBJECT]
-    print(session)
 
     question = session[ROUNDS][round_id][QUESTIONS][question_id]
-    print("\n")
-    print(question)
-    print("\n")
     answers = question.get(ANSWERS, None)
     if answers is None:
         return _resp(fail("Question is not open"))
@@ -713,10 +702,7 @@ def get_answers_unscored(players, answers):
     ret = []
     for player in players:
         player_id = player[ID]
-        print(player)
         p = {TEAM_NAME: player[TEAM_NAME]}
-
-        print(answers)
         panswers = answers.get(player_id, None)
         p['answered'] = panswers is not None
 
