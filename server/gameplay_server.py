@@ -115,7 +115,7 @@ def get_session_state(session_id):
         state = mongo.get_state(session_id)
         if str(state) != str(req_state):
             return _resp(succeed({"state": state}))
-        time.sleep(2)
+        time.sleep(1)
         attempts += 1
 
 
@@ -494,6 +494,14 @@ def _set_current_question(session_id, data, session={}):
     qindex = data[QUESTION_ID]
     rindex = data[ROUND_ID]
 
+    prev = get_question_in_round(session, rindex, qindex)
+    print("\n l")
+    print(prev)
+    if prev[SUCCESS]:
+        prev = prev[OBJECT].get(ANSWERS, {})
+    else:
+        prev = {}
+
     r = get_current_round(session_id)
     if r[SUCCESS]:
         r = r[OBJECT]
@@ -516,12 +524,10 @@ def _set_current_question(session_id, data, session={}):
 
         spot = f"{ROUNDS}.{rindex}.{QUESTIONS}.{qindex}"
         data_to_update = {
-            CURRENT_QUESTION: qindex
+            CURRENT_QUESTION: qindex,
+            f"{spot}.{QUESTION}": question[QUESTION],
+            f"{spot}.{ANSWERS}": prev
         }
-        if not question.get(SCORED, False):
-            data_to_update[f"{spot}.{QUESTION}"] = question[QUESTION]
-            data_to_update[f"{spot}.{ANSWERS}"] = {}
-
         mongo.update("session", session_id, data_to_update)
         # if not success:
         #     return fail(f"Failed to set question for question_id {question_id}")
@@ -955,6 +961,7 @@ def legal_wagers_for_player(session_id):
         return _resp(fail("Bad round ID"))
 
     return _resp(succeed(get_legal_wagers(session, round_id, player_id)))
+
 
 def get_legal_wagers(session, round_id, player_id):
     """
