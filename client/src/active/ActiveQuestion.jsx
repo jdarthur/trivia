@@ -7,9 +7,9 @@ class ActiveQuestion extends React.Component {
     const question_newlined = this.props.question.split("^").map((part) => <div> {part} </div>)
 
     return (
-      <div className="active-question">
-        <div> {question_newlined}  </div>
-        <div> {this.props.answer}   </div>
+      <div className="active-question-box">
+        <div className="active-question"> {question_newlined}  </div>
+        <div className="active-answer"> {this.props.answer} </div>
       </div>
     );
   }

@@ -31,7 +31,7 @@ class PlayerStatus extends React.Component {
 
     get_answers = () => {
         console.log(this.props)
-        if (this.props.round_id !== "" && this.props.question_id !== "") {
+        if (ready_to_call(this.props.round_id, this.props.question_id)) {
 
             let url = "/gameplay/session/" + this.props.session_id + "/answers"
             url += "?player_id=" + this.props.player_id
@@ -63,6 +63,18 @@ class PlayerStatus extends React.Component {
             </div>
         );
     }
+}
+
+function ready_to_call(round_id, question_id) {
+    if (round_id === null) return false
+    if (round_id === undefined) return false
+    if (round_id === "") return false
+
+    if (question_id === null) return false
+    if (question_id === undefined) return false
+    if (question_id === "") return false
+
+    return true
 }
 
 export default PlayerStatus;

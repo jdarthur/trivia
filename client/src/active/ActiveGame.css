@@ -1,14 +1,25 @@
 .active-game {
-    border: 1px solid black;
     display: flex;
     flex-direction: column;
     flex-grow: 1;
 }
 
-.active-question {
+
+.active-question-box {
+    display: flex;
+    flex-direction: column;
     padding: 50px;
-    font-size: 1.7em;
     border-bottom: 1px solid black;
+}
+.active-question {
+    font-size: 1.7em;
+}
+
+.active-answer {
+    align-self: flex-end;
+    font-style: italic;
+    font-size: 1.3em;
+    margin-top: 20px;
 }
 
 .round-category {
@@ -26,3 +37,11 @@
     flex-direction: row;
     border-bottom: 1px solid black;
 }
+
+.game-and-scoreboard {
+    border: 1px solid black;
+    display: flex;
+    flex-direction: row;
+    flex-grow: 1;
+}
+

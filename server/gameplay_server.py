@@ -110,12 +110,14 @@ def get_session_state(session_id):
         time.sleep(10)
 
     attempts = 0
-    while attempts < 90:
+    while True:
         state = mongo.get_state(session_id)
         if str(state) != str(req_state):
             return _resp(succeed({"state": state}))
         time.sleep(1)
         attempts += 1
+
+    # return _resp(succeed({"state": req_state}))
 
 
 smodel = [
@@ -851,7 +853,10 @@ def score_question(session_id, data, session={}):
             return awarded
 
     spot = f"{ROUNDS}.{round_id}.{QUESTIONS}.{question_id}.{SCORED}"
-    success = mongo.update("session", session_id, {spot: True})
+    answ = f"{ROUNDS}.{round_id}.{QUESTIONS}.{question_id}.{ANSWER}"
+    real_answer = get_real_question(session, round_id, question_id)[ANSWER]
+
+    success = mongo.update("session", session_id, {spot: True, answ: real_answer})
     if not success:
         return fail("Failed to mark question as scored")
 
@@ -859,10 +864,37 @@ def score_question(session_id, data, session={}):
     return succeed(data)
 
 
+def get_real_question(session, round_index, question_index):
+    round_id = session[ROUNDS][round_index][ROUND_ID]
+    r = get_round(round_id)[OBJECT]
+
+    question_id = r.get(QUESTIONS)[question_index]
+    return get_question(question_id)[OBJECT]
+
 def award_points(session_id, player_id, points):
     # update_scoreboard -> $inc session.points[player_id]: points_awarded
     mongo.increment("session", session_id, f"{SCOREBOARD}.{player_id}", points)
     return succeed({PLAYER_ID: player_id})
+
+
+@app.route(f'{URL_BASE}/session/<session_id>/scoreboard', methods=['GET'])
+def get_current_scoreboard(session_id):
+    print(session_id)
+    scores = get_scoreboard(session_id)[OBJECT]
+    print(scores)
+
+    ret = []
+    for player_id in scores:
+        player = get_player(player_id)
+        print(player)
+        player = player[OBJECT]
+        ret.append({
+            TEAM_NAME: player[TEAM_NAME],
+            "score": scores[player_id]
+        })
+    print(ret)
+
+    return _resp(succeed(ret))
 
 
 @model([], GET_ONE, "session")
@@ -939,7 +971,6 @@ def legal_wagers_for_player(session_id):
     player_id = request.args.get(PLAYER_ID, None)
     round_id = request.args.get(ROUND_ID, None)
     session = get_session(session_id)[OBJECT]
-
 
     try:
         round_id = int(round_id)

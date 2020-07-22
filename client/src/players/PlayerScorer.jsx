@@ -92,7 +92,7 @@ class PlayerScorer extends React.Component {
         const answers = this.state.answers.map(player => {
             const status = this.state.scores[player.player_id] || {}
             return <PlayerAnswer key={player.player_id} player_id={player.player_id}
-                answer={player.answer} wager={player.answer} set_correct={this.set_correct}
+                answer={player.answer} wager={player.wager} set_correct={this.set_correct}
                 player_name={player.team_name} correct={status.correct} /> })
 
         const score_class = this.scorable() ? "" : "disabled"
