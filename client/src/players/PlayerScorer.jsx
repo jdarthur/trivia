@@ -74,7 +74,25 @@ class PlayerScorer extends React.Component {
 
     set_correct = (player_id, correct) => {
         const scores = this.state.scores
-        scores[player_id] = { correct: correct }
+        if (scores[player_id] ===  undefined) {
+            scores[player_id] = {}
+        }
+        scores[player_id].correct = correct
+        this.setState({ scores: scores })
+    }
+
+    set_override = (player_id, value) => {
+        const scores = this.state.scores
+        if (scores[player_id] ===  undefined) {
+            scores[player_id] = {}
+        }
+        const val = parseInt(value) ? parseInt(value) : ""
+        if (val === "") {
+            delete scores[player_id].score_override
+        } else {
+            scores[player_id].score_override = val
+        }
+
         this.setState({ scores: scores })
     }
 
@@ -91,9 +109,11 @@ class PlayerScorer extends React.Component {
     render() {
         const answers = this.state.answers.map(player => {
             const status = this.state.scores[player.player_id] || {}
+            const override_value =  status.score_override !== undefined ? status.score_override : ""
             return <PlayerAnswer key={player.player_id} player_id={player.player_id}
                 answer={player.answer} wager={player.wager} set_correct={this.set_correct}
-                player_name={player.team_name} correct={status.correct} /> })
+                player_name={player.team_name} correct={status.correct}
+                set_override={this.set_override} override_value={override_value}/> })
 
         const score_class = this.scorable() ? "" : "disabled"
 

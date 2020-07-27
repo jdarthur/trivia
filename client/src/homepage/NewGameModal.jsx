@@ -48,7 +48,7 @@ class NewGameModal extends React.Component {
           console.log(data)
           const game_id = data.id
           const player_id = data.mod
-          window.location.href = window.location.href + "?session_id=" + game_id + "&player_id=" + player_id
+          window.location.href = window.location.href.split("?")[0] + "?session_id=" + game_id + "&player_id=" + player_id
           this.props.start_game(game_id)
           //this.close()
         })

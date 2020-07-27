@@ -44,9 +44,16 @@ class Scoreboard extends React.Component {
     }
 
     render() {
-        const scores = this.state.scores.map(player => {
+        const scores_sorted = this.state.scores.sort((a, b) => {
+            const score_a = sum(a.score)
+            const score_b = sum(b.score)
+            return (score_a > score_b) ? -1 : 1
+        })
+
+        const scores = scores_sorted.map(player => {
             return <PlayerScore key={player.player_name}
-                    team_name={player.team_name} score={player.score} /> })
+                team_name={player.team_name} score={sum(player.score)} />
+        })
 
         return (
             <div className="scoreboard" >
@@ -55,6 +62,10 @@ class Scoreboard extends React.Component {
             </div>
         );
     }
+}
+
+function sum(list) {
+    return (list || []).reduce(function (a, b) { return a + b; }, 0);
 }
 
 export default Scoreboard;

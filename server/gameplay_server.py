@@ -24,6 +24,7 @@ STARTED = "started"
 CURRENT_QUESTION = "current_question"
 CURRENT_ROUND = "current_round"
 SCORED = "scored"
+SCORE_OVERRIDE = "score_override"
 
 PLAYERS = "players"
 TEAM_NAME = "team_name"
@@ -789,10 +790,8 @@ score_model = [
     RestField(QUESTION_ID, int),
     RestField(ROUND_ID, int),
     RestField(PLAYERS, dict),
-    IdField(PLAYER_ID, "player"),
+    IdField(PLAYER_ID, "player")
 ]
-
-
 @app.route(f'{URL_BASE}/session/<session_id>/score', methods=['PUT'])
 def score_one_question(session_id):
     player_id = request.json.get(PLAYER_ID, None)
@@ -821,6 +820,7 @@ def score_question(session_id, data, session={}):
     round_id = data[ROUND_ID]
 
     question = session.get(ROUNDS)[round_id][QUESTIONS][question_id]
+    rescore = question.get(SCORED, False)
 
     answers = question.get(ANSWERS, None)
     if answers is None:
@@ -839,26 +839,25 @@ def score_question(session_id, data, session={}):
         if answer['answered'] is False:
             return fail(f"{PLAYER_ID} {answer[PLAYER_ID]} has not answered question {question_id}")
 
-        wager = answer[WAGER]
         player_id = answer[PLAYER_ID]
+        score_override = given_players[player_id].get(SCORE_OVERRIDE, None)
+        wager = answer[WAGER] if score_override is None else score_override  # hack here to override
+
         is_correct = given_players[player_id].get(CORRECT, None)
+
         if is_correct is None:
             return fail(f"Did not set correct True/False for {PLAYER_ID} {player_id}")
         else:
-            success = mongo.update("answer", answer['answer_id'], {CORRECT: is_correct})
+            mongo.update("answer", answer['answer_id'], {CORRECT: is_correct})
 
-        points_awarded = wager if is_correct else 0  # hack here to override
-        awarded = award_points(session_id, player_id, points_awarded)
-        if not awarded[SUCCESS]:
-            return awarded
+        points_awarded = wager if is_correct else 0
+        award_points(session_id, player_id, points_awarded, rescore)
 
-    spot = f"{ROUNDS}.{round_id}.{QUESTIONS}.{question_id}.{SCORED}"
+    score_flag = f"{ROUNDS}.{round_id}.{QUESTIONS}.{question_id}.{SCORED}"
     answ = f"{ROUNDS}.{round_id}.{QUESTIONS}.{question_id}.{ANSWER}"
     real_answer = get_real_question(session, round_id, question_id)[ANSWER]
 
-    success = mongo.update("session", session_id, {spot: True, answ: real_answer})
-    if not success:
-        return fail("Failed to mark question as scored")
+    mongo.update("session", session_id, {score_flag: True, answ: real_answer})
 
     mongo.incr_state(session_id)
     return succeed(data)
@@ -871,9 +870,12 @@ def get_real_question(session, round_index, question_index):
     question_id = r.get(QUESTIONS)[question_index]
     return get_question(question_id)[OBJECT]
 
-def award_points(session_id, player_id, points):
+
+def award_points(session_id, player_id, points, rescore):
     # update_scoreboard -> $inc session.points[player_id]: points_awarded
-    mongo.increment("session", session_id, f"{SCOREBOARD}.{player_id}", points)
+    if rescore:
+        mongo.pop("session", session_id, f"{SCOREBOARD}.{player_id}")
+    mongo.push("session", session_id, f"{SCOREBOARD}.{player_id}", points)
     return succeed({PLAYER_ID: player_id})
 
 

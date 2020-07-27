@@ -10,6 +10,10 @@ class PlayerAnswer extends React.Component {
         this.props.set_correct(this.props.player_id, false)
     }
 
+    set_override = (event) => {
+        this.props.set_override(this.props.player_id, event.target.value)
+    }
+
 
     render() {
         const correct_class = "set-score" + (this.props.correct === true ? " correct" : "")
@@ -24,7 +28,8 @@ class PlayerAnswer extends React.Component {
                 </div>
                 { this.props.answer ? <div className="answer-scorer">
                     <div onClick={this.set_incorrect} className={incorrect_class}> ✗ </div>
-                    <button onClick={this.set_correct}   className={correct_class}  > ✓ </button>
+                    <div onClick={this.set_correct}   className={correct_class}  > ✓ </div>
+                    <input value={this.props.override_value} onChange={this.set_override} placeholder="Score override" />
                 </div>: null}
             </div>
         );

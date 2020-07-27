@@ -41,7 +41,6 @@ class ActiveGame extends React.Component {
     let url = "/gameplay/session/" + this.props.session_id + "/current-round"
     fetch(url).then(response => response.json())
       .then(r => {
-        console.log(r)
         this.setState({ questions: r.questions, wagers: r.wagers, active_round: r.id })
       })
   }
@@ -64,10 +63,6 @@ class ActiveGame extends React.Component {
     const questions = this.state.questions.map((question, index) => index)
     const categories = this.state.questions.map(question => question.category)
 
-    const dummy_answers = [
-      { player_id: "1234", answer: 7, wager: 1, player_name: "joe" }
-    ]
-
     return (
       <div className="game-and-scoreboard">
         <div className='active-game'>
@@ -89,8 +84,8 @@ class ActiveGame extends React.Component {
           {this.props.is_mod ?
             <PlayerScorer question_id={this.state.active_question}
               round_id={this.state.active_round} session_id={this.props.session_id}
-              player_id={this.props.player_id} answers={dummy_answers}
-              session_state={this.props.session_state} scored={this.state.scored} /> : null}
+              player_id={this.props.player_id} session_state={this.props.session_state}
+              scored={this.state.scored} /> : null}
 
           {!this.props.is_mod ?
             <PlayerStatus question_id={this.state.active_question}

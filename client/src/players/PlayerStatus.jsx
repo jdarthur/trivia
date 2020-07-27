@@ -43,7 +43,10 @@ class PlayerStatus extends React.Component {
             sendData(url, "GET")
                 .then((data) => {
                     console.log(data)
-                    this.setState({answers: data.answers })
+                    if (data.answers) {
+                        this.setState({answers: data.answers })
+                    }
+
                 })
         }
     }

@@ -104,6 +104,23 @@ class MongoManager(object):
                                                  {"$push": {array: value}})
         return result.modified_count
 
+    def pop(self, object_type, object_id, array, last=True):
+        """
+        remove a value from an array in an object
+
+        args:
+            object type: type of object (same as mongo collection)
+            object id: ID of object in collection (uuid4)
+            array: name of array in object
+            last: true to remove last in array, false to remove first value
+        returns:
+            modified count
+        """
+        result = self.db[object_type].update_one(id_equals(object_id),
+                                                 {"$pop": {array: 1 if last else -1}})
+        return result.modified_count
+
+
     def pull(self, object_type, object_id, array, value):
         """
         remove a value from an array in an object
@@ -153,7 +170,7 @@ class MongoManager(object):
             "state": uuid.uuid4()
         }
         self.db.session_state.update({"session_id": session_id}, new_state, True)
-    
+
     def get_state(self, session_id):
         return self.db.session_state.find_one({"session_id": session_id})["state"]
 
