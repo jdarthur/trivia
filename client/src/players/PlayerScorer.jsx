@@ -20,18 +20,15 @@ class PlayerScorer extends React.Component {
     componentDidUpdate(prevProps) {
         if (this.props.session_state !== prevProps.session_state) {
             // this.get_answers()
-            if (this.props.question_id !== prevProps.question_id) {
-                this.setState({scores: {}}, () => this.get_answers())
-            }
-            else {
+            if (this.props.question_id === prevProps.question_id) {
                 this.get_answers()
             }
         }
         else if (this.props.question_id !== prevProps.question_id) {
-            this.get_answers()
+            this.setState({scores: {}}, () => this.get_answers())
         }
         else if (this.props.round_id !== prevProps.round_id) {
-            this.get_answers()
+            this.setState({scores: {}}, () => this.get_answers())
         }
     }
 

@@ -19,7 +19,7 @@ class AnswerQuestion extends React.Component {
             this.props.question !== prevProps.question) {
             this.setState({ answer: "", wager: null, dirty: false })
         }
-        if (this.props.question !== prevProps.question) {
+        if (this.props.question !== prevProps.question || this.props.round !== prevProps.round) {
             this.setState({ answer: "", wager: null, dirty: false })
         }
     }
