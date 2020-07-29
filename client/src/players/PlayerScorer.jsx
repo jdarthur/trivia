@@ -44,7 +44,9 @@ class PlayerScorer extends React.Component {
             sendData(url, "GET")
                 .then((data) => {
                     console.log(data)
-                    this.setState({ answers: data })
+                    if (!data.errors) {
+                        this.setState({ answers: data })
+                    }
                 })
         }
     }
