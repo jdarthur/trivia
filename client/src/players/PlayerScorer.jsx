@@ -96,9 +96,15 @@ class PlayerScorer extends React.Component {
     }
 
     scorable = () => {
+        if (this.state.scores.length === 0 ){
+            return false
+        }
         for (let i = 0; i < this.state.answers.length; i++) {
             const player_id = this.state.answers[i].player_id
             if (this.state.scores[player_id] === undefined) {
+                return false
+            }
+            if (this.state.scores[player_id].correct === undefined) {
                 return false
             }
         }

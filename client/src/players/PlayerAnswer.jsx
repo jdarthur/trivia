@@ -19,6 +19,7 @@ class PlayerAnswer extends React.Component {
         const correct_class = "set-score" + (this.props.correct === true ? " correct" : "")
         const incorrect_class = "set-score" + (this.props.correct === false ? " incorrect" : "")
         let answer_text = this.props.answer ? this.props.answer + " (" + this.props.wager + ")" : "[no answer]"
+        let override = this.props.correct === false ? "" : this.props.override_value
 
         return (
             <div className="answer-and-scorer">
@@ -29,7 +30,7 @@ class PlayerAnswer extends React.Component {
                 { this.props.answer ? <div className="answer-scorer">
                     <div onClick={this.set_incorrect} className={incorrect_class}> ✗ </div>
                     <div onClick={this.set_correct}   className={correct_class}  > ✓ </div>
-                    <input value={this.props.override_value} onChange={this.set_override} placeholder="Score override" />
+                    <input value={override} onChange={this.set_override} placeholder="Score override" />
                 </div>: null}
             </div>
         );

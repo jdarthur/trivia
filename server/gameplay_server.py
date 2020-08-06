@@ -44,6 +44,7 @@ QUESTION = "question"
 ANSWER = "answer"
 ANSWERS = "answers"
 WAGER = "wager"
+POINTS_AWARDED = "points_awarded"
 QUESTIONS = "questions"
 WAGERS = "wagers"
 ROUNDS_USED = "rounds_used"
@@ -726,6 +727,7 @@ def get_answers_scored(players, answers):
             p[ANSWER] = answer[ANSWER]
             p[WAGER] = answer[WAGER]
             p[CORRECT] = answer.get(CORRECT, False)
+            p[POINTS_AWARDED] = answer.get(POINTS_AWARDED, answer[WAGER])
             ret.append(p)
     return succeed({SCORED: True, ANSWERS: ret})
 
@@ -832,6 +834,9 @@ def score_question(session_id, data, session={}):
     for player_id in session_players:
         if player_id not in given_players:
             return fail(f"{PLAYER_ID} {player_id} was not scored.")
+        is_correct = given_players[player_id].get(CORRECT, None)
+        if is_correct is None:
+            return fail(f"Did not set correct True/False for {PLAYER_ID} {player_id}")
 
     players = get_players2(session)
     answers = get_answers_as_mod(players, answers)[OBJECT]
@@ -844,13 +849,10 @@ def score_question(session_id, data, session={}):
         wager = answer[WAGER] if score_override is None else score_override  # hack here to override
 
         is_correct = given_players[player_id].get(CORRECT, None)
-
-        if is_correct is None:
-            return fail(f"Did not set correct True/False for {PLAYER_ID} {player_id}")
-        else:
-            mongo.update("answer", answer['answer_id'], {CORRECT: is_correct})
-
         points_awarded = wager if is_correct else 0
+
+        mongo.update("answer", answer['answer_id'], {CORRECT: is_correct, POINTS_AWARDED: points_awarded})
+
         award_points(session_id, player_id, points_awarded, rescore)
 
     score_flag = f"{ROUNDS}.{round_id}.{QUESTIONS}.{question_id}.{SCORED}"
