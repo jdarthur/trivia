@@ -71,8 +71,15 @@ class AddQuestionsModal extends React.Component {
         if (this.state.is_open === true) {
 
             const questions = []
-            for (let i = 0; i < this.state.questions.length; i++) {
-                const question = this.state.questions[i];
+
+            const questions_sorted = this.state.questions.sort((a, b) => {
+                const cat_a = a.category
+                const cat_b = b.category
+                return (cat_a < cat_b) ? -1 : 1
+            })
+
+            for (let i = 0; i < questions_sorted.length; i++) {
+                const question = questions_sorted[i]
                 if (this.props.questions.indexOf(question.id) === -1) {
                     questions.push(<AddableQuestion key={question.id} id={question.id}
                         question={question.question} answer={question.answer} category={question.category}

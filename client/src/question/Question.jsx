@@ -51,7 +51,7 @@ class Question extends React.Component {
 
   render() {
     if (this.props.selected) {
-      const containerClass = "question_container selected"
+      const containerClass = "question_container selected editable_question"
       return (
         <div className={containerClass} onKeyDown={this.handleKeyPress}>
           <input value={this.props.category}
@@ -72,7 +72,7 @@ class Question extends React.Component {
       // const containerClass = "question_container"
       return (
         <ReadOnlyQuestion id={this.props.id} question={this.props.question}
-                    answer={this.props.answer} category={this.props.category} 
+                    answer={this.props.answer} category={this.props.category}
                     select={this.select_self} selected={this.props.selected} />
 
         /* <div className={containerClass} onClick={this.set_selected}>
