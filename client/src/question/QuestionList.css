@@ -5,7 +5,9 @@
 	justify-content: flex-start;
     align-items: center;
     width: 100%;
-    overflow-y: auto;
+    overflow-y: scroll;
+    /* height: 0px; */
+    flex: 1 1 auto;
 }
 
 .new_button {

@@ -33,16 +33,13 @@ class RemovableRoundsList extends React.Component {
         const rounds = this.props.rounds.map((round_id) => (
             <RemovableRound key={round_id} id={round_id} select={this.select_item}
                 selected={this.state.selected_rounds.indexOf(round_id) !== -1}
-                show_title={false} set_round_name={this.props.set_round_name} 
+                show_title={false} set_round_name={this.props.set_round_name}
                 name={this.props.round_names[round_id]} handleKeyPress={this.props.handleKeyPress}/>))
 
         return (
-            <div>
-                Rounds:
-                <div className="question-list">
-                    {rounds}
-                    <button onClick={this.remove_selected}> Remove Rounds</button>
-                </div>
+            <div className="rem-question-list">
+                {rounds}
+                <button onClick={this.remove_selected}> Remove Rounds</button>
             </div>
         );
     }

@@ -18,7 +18,7 @@ class OpenGame extends React.Component {
     }
 
     add_rounds = (rounds_list) => {
-        for(let i = 0; i < rounds_list.length; i++) {
+        for (let i = 0; i < rounds_list.length; i++) {
             this.props.round_names[rounds_list[i]] = "Round " + i
         }
         const update = {
@@ -64,16 +64,18 @@ class OpenGame extends React.Component {
 
         return (
             <div className="open-round">
-                <input className={NAME} value={this.props.name}
-                    onChange={this.set_name} onKeyDown={this.handleKeyPress} placeholder="Name" />
+                <div className="current-questions">
+                    <input className="round-name" value={this.props.name}
+                        onChange={this.set_name} onKeyDown={this.handleKeyPress} placeholder="Game name" />
+                    <AddRoundsModal rounds={this.props.rounds} add_rounds={this.add_rounds} />
+                </div>
 
-                <AddRoundsModal rounds={this.props.rounds} add_rounds={this.add_rounds} />
+                <div className="section-top"> Current rounds </div>
                 <RemovableRoundsList rounds={this.props.rounds} remove_rounds={this.remove_rounds}
                     set_round_name={this.set_round_name} round_names={this.props.round_names}
                     handleKeyPress={this.handleKeyPress} />
 
-                <div>
-
+                <div className="open-footer">
                     <button onClick={this.delete_self} className="delete-button"> Delete </button>
                     <button onClick={this.save_self} > Save </button>
                 </div>

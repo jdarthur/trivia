@@ -23,7 +23,8 @@ class OpenRound extends React.Component {
     add_questions = (questions_list) => {
         const new_wagers = []
         for (let i = 0; i < questions_list.length; i++) {
-            new_wagers.push((i % 3) + 1)
+            const wager = ((this.props.questions.length + i) % 3) + 1
+            new_wagers.push(wager)
         }
         const update = {
             [QUESTIONS]: this.props.questions.concat(questions_list),

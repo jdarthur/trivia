@@ -8,6 +8,8 @@
     border-right: 1px solid black;
     min-width: 25vw;
     max-width: 35vw;
+    height: 100%;
+    flex-grow: 1;
 }
 
 .open-header {
@@ -19,11 +21,11 @@
     background: lightgray
 }
 
-.question-list {
+/* .question-list {
     display: flex;
     flex-direction: row;
     min-height: 50px;
-}
+} */
 
 .wager-list {
     display: flex;
@@ -77,4 +79,7 @@
     align-items: center;
     border-top: 1px solid black;
     align-self: stretch;
+    flex: 1 1 auto;
+    height: 0px;
+    overflow-y: auto;
 }
