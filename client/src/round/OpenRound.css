@@ -1,11 +1,22 @@
-
 .open-round {
-    padding: 20px;
+    /* padding: 20px; */
     display: flex;
     flex-direction: column;
     justify-content: space-between;
     align-items: center;
-    border: 1px solid black;
+    border-left: 1px solid black;
+    border-right: 1px solid black;
+    min-width: 25vw;
+    max-width: 35vw;
+}
+
+.open-header {
+    align-self: stretch;
+    font-size: 1.4em;
+    font-weight: bold;
+    padding: 15px;
+    border-bottom: 1px solid black;
+    background: lightgray
 }
 
 .question-list {
@@ -17,9 +28,53 @@
 .wager-list {
     display: flex;
     flex-direction: row;
+    align-self: stretch;
+    text-align: center;
+    padding: 10px;
+    border-top: 1px solid black;
+}
+
+.section-top {
+    border-top: 1px solid black;
+    border-right: 1px solid black;
+    align-self: flex-start;
+    padding: 3px;
+    font-size: .9em;
+    text-align: left;
+    font-weight: bold;
+    background: lightgrey;
+    margin-top: 10px;
 }
 
 .addable-questions {
     display: flex;
     flex-direction: row;
+}
+
+.round-name {
+    padding: 5px;
+    margin: 10px;
+}
+
+.open-footer {
+    border-top: 1px solid black;
+    padding: 10px;
+    align-self: stretch;
+    display: flex;
+    justify-content: flex-end;
+}
+
+.footer-button {
+    padding: 10px;
+    font-size: .9em;
+}
+
+.rem-question-list {
+	display: flex;
+	flex-direction: row;
+    flex-wrap: wrap;
+	justify-content: flex-start;
+    align-items: center;
+    border-top: 1px solid black;
+    align-self: stretch;
 }

@@ -27,9 +27,7 @@ class RemovableQuestionsList extends React.Component {
             this.props.remove_questions(this.state.selected_questions)
             this.setState({ selected_questions: [] })
         }
-
     }
-
 
     render() {
         const questions = this.props.questions.map((question_id) => (
@@ -39,9 +37,9 @@ class RemovableQuestionsList extends React.Component {
         )
 
         return (
-            <div className="question-list">
+            <div className="rem-question-list">
                 {questions}
-                <button onClick={this.remove_selected}> Remove Questions</button>
+                <button onClick={this.remove_selected}>Remove selected questions</button>
             </div>
         );
     }

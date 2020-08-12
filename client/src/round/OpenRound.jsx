@@ -1,7 +1,5 @@
 import React from 'react';
 import './OpenRound.css';
-//import ReadOnlyQuestion from "../question/ReadOnlyQuestion.jsx"
-// import AddableQuestionsList from "./AddableQuestionsList"
 import AddQuestionsModal from "../modal/AddQuestionsModal"
 import RemovableQuestionsList from "./RemovableQuestionsList"
 import Wager from "./Wager.jsx"
@@ -25,7 +23,7 @@ class OpenRound extends React.Component {
     add_questions = (questions_list) => {
         const new_wagers = []
         for (let i = 0; i < questions_list.length; i++) {
-            new_wagers.push(1)
+            new_wagers.push((i % 3) + 1)
         }
         const update = {
             [QUESTIONS]: this.props.questions.concat(questions_list),
@@ -71,29 +69,32 @@ class OpenRound extends React.Component {
 
     render() {
         const wagers = this.props.wagers.map((wager, index) => (
-            <Wager key={index} index={index} value={wager} set={this.set_wager}/>))
+            <Wager key={index} index={index} value={wager} set={this.set_wager} />))
 
         return (
             <div className="open-round">
-                <input className={NAME} value={this.props.name}
-                    onChange={this.set_name} onKeyDown={this.handleKeyPress} placeholder="Name" />
+                <div className="open-header"> Edit Round </div>
 
-                <div>
-                    <AddQuestionsModal questions={this.props.questions}
-                        save={this.save_self} add_questions={this.add_questions} />
+
+                <div className="current-questions">
+                    <input className="round-name" value={this.props.name}
+                        onChange={this.set_name} onKeyDown={this.handleKeyPress} placeholder="Round name" />
+                    <AddQuestionsModal questions={this.props.questions} save={this.save_self} add_questions={this.add_questions} />
+                </div>
+
+                <div className="section-top"> Wagers </div>
+                <div className="wager-list"> {wagers} </div>
+
+                <div className="flex-grow">
+                    <div className="section-top"> Current questions </div>
                     <RemovableQuestionsList questions={this.props.questions} remove_questions={this.remove_questions} />
                 </div>
 
-                <div className="wager-list"> Wagers: {wagers} </div>
-
-                <div>
-                    <button onClick={this.delete_self} className="delete-button"> Delete Round </button>
-                    <button onClick={this.save_self_and_close} > Save Round </button>
+                <div className="open-footer">
+                    <button onClick={this.delete_self} className="delete-button footer-button"> Delete Round </button>
+                    <button onClick={this.save_self_and_close} className="footer-button" > Save Round </button>
                 </div>
-
             </div>
-
-
         );
     }
 }

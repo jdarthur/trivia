@@ -1,6 +1,10 @@
 .App {
   text-align: center;
   width: 100vw;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
 .button {
@@ -25,4 +29,10 @@ button {
 input {
   padding: 3px;
   margin: 3px;
+}
+
+#root, body {
+  display: flex;
+  height: 100vh;
+  margin: 0px;
 }

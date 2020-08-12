@@ -25,7 +25,7 @@ class Editor extends React.Component {
 
     render() {
         return (
-            <div className="App">
+            <div className="flex-grow">
                 <GenericToolbar labels={[QUESTIONS, ROUNDS, GAMES]}
                  select={this.select_tab} selected={this.state.section} />
 

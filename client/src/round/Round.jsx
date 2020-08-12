@@ -17,7 +17,7 @@ class Round extends React.Component {
     const css_class = "round" + (this.props.selected ? " selected" : "")
     return (
       <div className={css_class} onClick={this.set_selected} >
-        <div> {this.props.name === '' ? "unnamed round" : this.props.name} </div>
+        <div className="round-title"> {this.props.name === '' ? "[unnamed round]" : this.props.name} </div>
         <div> {q_label} </div>
       </div>
     );
