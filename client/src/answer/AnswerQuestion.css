@@ -2,14 +2,14 @@
     display: flex;
     flex-direction: column;
     justify-content: space-between;
-    margin: 25px;
+    margin: 15px;
     border: 1px solid black;
     width: 500px;
 }
 
 .answer-box {
     padding: 10px;
-    margin: 25px;
+    margin: 15px;
 }
 
 .answer-footer {
@@ -17,21 +17,24 @@
     flex-direction: row;
     justify-content: space-between;
     align-items: flex-end;
-    margin: 10px;
+    /* margin: 10px; */
 }
 
 .selectable-wagers {
     display: flex;
     flex-direction: row;
     align-items: center;
+    border-right: 1px solid black;
+    border-top: 1px solid black;
+    padding: 5px;
 }
 
 .selectable-wager {
     display: flex;
     justify-content: center;
     align-items: center;
-    width: 2em;
-    height: 2em;
+    width: 1.8em;
+    height: 1.8em;
     border: 1px solid black;
     border-radius: 5px;
     margin: 5px;
@@ -63,10 +66,10 @@
     display: flex;
     flex-direction: column;
     align-items: flex-start;
-    padding: 5px;
+    /* padding: 5px; */
 }
 
 .wager-title {
     margin-left: 10px;
     margin-bottom: 5px;
-} 
+}

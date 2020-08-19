@@ -34,6 +34,7 @@
     text-align: center;
     padding: 10px;
     border-top: 1px solid black;
+    flex-wrap: wrap;
 }
 
 .section-top {

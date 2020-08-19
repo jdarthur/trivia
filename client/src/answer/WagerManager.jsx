@@ -43,6 +43,7 @@ class WagerManager extends React.Component {
                 avail_count[wager] += 1
             }
         }
+        available.sort()
         this.setState({ available_wagers: available, avail_count: avail_count })
     }
 
@@ -67,10 +68,11 @@ class WagerManager extends React.Component {
             <SelectableWager key={wager} wager={wager} count={this.state.avail_count[wager]}
                 select={this.props.select} selected={this.props.wager === wager} />)
 
+        const can_wager = this.state.available_wagers.length > 0
         return (
             <div className="wager-manager">
-                <div className="wager-title"> Wager: </div>
-                <div className="selectable-wagers"> {wagers} </div>
+                {can_wager ? <div className="section-top"> Wager: </div> : null }
+                {can_wager ? <div className="selectable-wagers"> {wagers} </div> : null }
             </div>
         );
     }
