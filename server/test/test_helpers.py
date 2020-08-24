@@ -1,10 +1,16 @@
 import pprint
 from random import randint
+import os
+import sys
+sys.path.append(os.path.join("..", "src"))
+
 from editor_server import (create_question, create_round, create_game,
                            delete_question, delete_round, delete_game)
 
 from gameplay_server import (create_player, create_session, delete_player,
                              delete_session, start_session, add_to_session)
+
+
 
 
 def indentprint(data):

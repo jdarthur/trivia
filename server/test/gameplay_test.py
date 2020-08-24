@@ -45,14 +45,15 @@ def test_set_question_and_get():
     print("\nTEST: set question and get current question")
     with DummyGame(rounds=1, questions_per_round=5, return_class=True) as game:
         game_id = game.game_id
-        question2 = game.questions[1]
+        question2 = 1
+        round_id = 0
         session_id = dummy_session(game_id)
 
         print("Starting session")
         started = start_session(session_id)
         assert started['success']
 
-        newq = set_current_question(session_id, question2)
+        newq = set_current_question(session_id, round_id, question2)
         assert newq['success']
 
         session = get_session(session_id)

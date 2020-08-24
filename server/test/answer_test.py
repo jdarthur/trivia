@@ -71,8 +71,9 @@ def test_successful_answer():
         assert answer["success"]
 
         question_id = answer_body['question_id']
+        round_id = answer_body['round_id']
 
-        answers = get_answers(session_id, question_id)
+        answers = get_answers(session_id, round_id, question_id)
         assert answers['object'][player_id][-1]["id"] == answer['object']["id"]
 
 
@@ -91,8 +92,9 @@ def test_two_successful_answers():
         assert answer2["success"]
 
         question_id = answer_body['question_id']
+        round_id = answer_body['round_id'];
 
-        answers = get_answers(session_id, question_id)
+        answers = get_answers(session_id, round_id, question_id)
         assert answers['object'][player_id1][-1]["id"] == answer1['object']["id"]
         assert answers['object'][player_id2][-1]["id"] == answer2['object']["id"]
 
@@ -111,8 +113,9 @@ def test_answer_twice():
         assert answer2["success"]
 
         question_id = answer_body['question_id']
+        round_id = answer_body['round_id']
 
-        answers = get_answers(session_id, question_id)
+        answers = get_answers(session_id, round_id, question_id)
         assert answers['object'][player_id][0]["id"] == answer['object']["id"]
         assert answers['object'][player_id][1]["id"] == answer2['object']["id"]
 
@@ -150,8 +153,10 @@ def test_score_answer():
         assert answer2["success"]
 
         question_id = answer_body['question_id']
+        round_id = answer_body['round_id']
         score_body = {
             'question_id': question_id,
+            'round_id' : round_id,
             'players': {
                 player_id1: {'correct': True},
                 player_id2: {'correct': False}
@@ -162,16 +167,17 @@ def test_score_answer():
 
         scoreboard = get_scoreboard(session_id)
 
-        assert scoreboard['object'][player_id1] == answer_body['wager']
-        assert scoreboard['object'][player_id2] == 0
+        assert sum(scoreboard['object'][player_id1]) == answer_body['wager']
+        assert sum(scoreboard['object'][player_id2]) == 0
 
 
 def test_score_two_answers():
     with DummySessionWithPlayers(questions_per_round=2) as session:
         session_id = session.session_id
         player_id = session.players[0]
-        question_id1 = session.game.questions[0]
-        question_id2 = session.game.questions[1]
+        question_id1 = 0
+        question_id2 = 1
+        round_id = 0
 
         answer_body = compose_answer(session)
         answer = answer_question(session_id, answer_body)
@@ -179,10 +185,11 @@ def test_score_two_answers():
 
         score_body = {
             'question_id': question_id1,
+            'round_id': round_id,
             'players': {player_id: {'correct': True}}
         }
         score_question(session_id, score_body)
-        set_current_question(session_id, question_id2)
+        set_current_question(session_id, round_id, question_id2)
 
         answer_body = compose_answer(session)
         answer_body['wager'] = 2
@@ -191,6 +198,7 @@ def test_score_two_answers():
 
         score_body = {
             'question_id': question_id2,
+            'round_id': round_id,
             'players': {player_id: {'correct': True}}
         }
         score_question(session_id, score_body)

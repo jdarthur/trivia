@@ -1,72 +1,76 @@
-import pprint
+from pprint import pprint
+import sys
+pprint(sys.path)
+from .test_helpers import dummy_question, DummyRound
 from editor_server import (create_round, delete_round, get_round,
-                           update_round, get_rounds)
-from editor_server import (create_question, delete_question,
+                           update_round, get_rounds,
+                           delete_question,
                            get_question, get_questions)
 
 
 def create_and_print(data):
     created = create_round(data)
     print("created:")
-    indentprint(created)
+    pprint(created)
     return created
 
-def missing_name():
+
+def test_missing_name():
     print("\nTEST: round is missing name attribute")
     data = {}
     create_and_print(data)
 
 
-def name_not_str():
+def test_name_not_str():
     print("\nTEST: name is not str")
     data = {"name": []}
     create_and_print(data)
 
 
-def missing_questions():
+def test_missing_questions():
     print("\nTEST: missing attr 'questions'")
     data = {"name": "f"}
     create_and_print(data)
 
 
-def questions_not_list():
+def test_questions_not_list():
     print("\nTEST: attr 'questions' is not list")
     data = {"name": "f", "questions": ""}
     create_and_print(data)
 
 
-def missing_wagers():
+def test_missing_wagers():
     print("\nTEST: missing attr 'wagers'")
     data = {"name": "f", "questions": []}
     create_and_print(data)
 
 
-def wagers_not_list():
+def test_wagers_not_list():
     print("\nTEST: attr 'wagers' is not list")
     data = {"name": "f", "questions": [], "wagers": "f"}
     create_and_print(data)
 
 
-def question_id_is_not_str():
+def test_question_id_is_not_str():
     print("\nTEST: question ID is not str")
     data = {"name": "f", "questions": [{}, ""], "wagers": [1, 2]}
     create_and_print(data)
 
 
-def question_id_is_invalid():
+def test_question_id_is_invalid():
     print("\nTEST: question ID is not valid")
     data = {"name": "f", "questions": ["L"], "wagers": [1]}
     create_and_print(data)
 
 
-def question_id_is_valid_but_nonexistent():
+def test_question_id_is_valid_but_nonexistent():
     print("\nTEST: question ID is valid but nonexistent")
     data = {"name": "f", "questions": ["5e9c82c83e9f1b817df277aa"],
             "wagers": [1]}
     create_and_print(data)
 
 
-def question_id_is_duplicate():
+def test_question_id_is_duplicate():
     print("\nTEST: question ID is duplicated")
     data = {"name": "f", "questions": ["5e9c82c83e9f1b817df277aa",
                                        "5e9c82c83e9f1b817df277aa"],
@@ -74,13 +78,13 @@ def question_id_is_duplicate():
     create_and_print(data)
 
 
-def wager_is_not_int():
+def test_wager_is_not_int():
     print("\nTEST: wager is not int")
     data = {"name": "f", "questions": [""], "wagers": ["L"]}
     create_and_print(data)
 
 
-def wager_is_negative():
+def test_wager_is_negative():
     print("\nTEST: wager is negative")
     question_id = dummy_question()
     data = {"name": "f", "questions": [question_id], "wagers": [-1]}
@@ -88,48 +92,47 @@ def wager_is_negative():
     delete_question(question_id)
 
 
-def wager_is_zero():
+def test_wager_is_zero():
     print("\nTEST: wager is zero")
     data = {"name": "f", "questions": [""], "wagers": [0]}
     create_and_print(data)
 
 
-def wagers_list_is_not_the_same_length_as_questions_list():
+def test_wagers_list_is_not_the_same_length_as_questions_list():
     print("\nTEST: wager/questions lengths are different")
     data = {"name": "f", "questions": [""], "wagers": [1, 2]}
     create_and_print(data)
 
 
-def crud():
+def test_crud():
     print("\nTEST: successful crud")
     question_id = dummy_question()
 
-    round_id = dummy_round(question_id)
+    with DummyRound(0) as round_id:
+        obj = get_round(round_id)
+        print("got:")
+        pprint(obj)
 
-    obj = get_round(round_id)
-    print("got:")
-    indentprint(obj)
+        update_round(round_id, {"name": "ffff"})
 
-    update_round(round_id, {"name": "ffff"})
+        rounds = get_rounds()
+        print("all rounds:")
+        pprint(rounds)
 
-    rounds = get_rounds()
-    print("all rounds:")
-    indentprint(rounds)
+        questions = get_questions()
+        print("all questions")
+        pprint(questions)
 
-    questions = get_questions()
-    print("all questions")
-    indentprint(questions)
+        success = delete_round(round_id)
+        print("deleted: {} {}".format(success, round_id))
 
-    success = delete_round(round_id)
-    print("deleted: {} {}".format(success, round_id))
+        rounds = get_rounds()
+        print("all rounds: {}".format(rounds))
 
-    rounds = get_rounds()
-    print("all rounds: {}".format(rounds))
-
-    delete_question(question_id)
+        delete_question(question_id)
 
 
-def round_used_added_to_question():
+def test_round_used_added_to_question():
     """
     when I add a question to a round,
     the round_id should be stored in the
@@ -137,101 +140,92 @@ def round_used_added_to_question():
     """
     print("\nTEST: rounds_used added to question")
     question_id = dummy_question()
-    round_id = dummy_round(question_id)
-    print("   round ID: {}".format(round_id))
+    with DummyRound() as round_id:
+        print("   round ID: {}".format(round_id))
 
-    question = get_question(question_id)
-    ru = question.get("rounds_used", [])
-    print(f"   rounds_used: {ru} (question: {question})")
-    delete_round(round_id)
+        r = update_round(round_id, {"questions": [question_id], "wagers": [1]})
 
-    delete_question(question_id)
+        question = get_question(question_id)
+        ru = question['object'].get("rounds_used", [])
+        print(f"   rounds_used: {ru} (question: {question})")
+        assert ru[0] == round_id
+        delete_round(round_id)
+
+        delete_question(question_id)
 
 
-def round_removed_from_question_when_round_deleted():
+def test_round_removed_from_question_when_round_deleted():
     """
     when I delete a round, it should be removed from
     the rounds_used list on each question in round
     """
     print("\nTEST: round deleted from question when round deleted")
-    question_id = dummy_question()
-    round_id = dummy_round(question_id)
-    print("round ID: {}".format(round_id))
+    with DummyRound(1, True) as round:
+        round_id = round.round_id
+        question_id = round.questions[0]
 
-    question = get_question(question_id)["object"]
-    print(f"question after round created:")
-    indentprint(question)
+        print("round ID: {}".format(round_id))
 
-    delete_round(round_id)
+        question = get_question(question_id)["object"]
+        print(f"question after round created:")
+        pprint(question)
 
-    question = get_question(question_id)
-    ru = question.get("rounds_used", [])
-    print(f"rounds_used after round delete: {ru}")
+        delete_round(round_id)
 
-    delete_question(question_id)
+        question = get_question(question_id)
+        ru = question['object'].get("rounds_used", [])
+        print(f"rounds_used after round delete: {ru}")
+
+        delete_question(question_id)
+        assert len(ru) == 0
 
 
-def round_removed_from_question_when_question_removed_from_round():
+def test_round_removed_from_question_when_question_removed_from_round():
     """
     when I remove a question from a round, the round
     should be removed from this questions rounds_used list
     """
     print("\nTEST: round deleted from question when question removed from round")
-    question_id = dummy_question()
-    round_id = dummy_round(question_id)
-    print("round ID: {}".format(round_id))
+    with DummyRound(1, True) as round:
+        round_id = round.round_id
+        question_id = round.questions[0]
 
-    question = get_question(question_id)["object"]
-    print(f"question after round create:")
-    indentprint(question)
+        question = get_question(question_id)["object"]
+        print(f"question after round create:")
+        pprint(question)
+        ru = question.get("rounds_used", [])
+        assert len(ru) == 1
 
-    update_round(round_id, {"questions": []})
+        update_round(round_id, {"questions": []})
 
-    question = get_question(question_id)["object"]
-    print(f"question after removal from round:")
-    indentprint(question)
+        question = get_question(question_id)["object"]
+        print(f"question after removal from round:")
+        pprint(question)
+        ru = question.get("rounds_used", [])
+        assert len(ru) == 0
 
     delete_round(round_id)
 
     delete_question(question_id)
 
 
-def question_removed_from_round_when_question_is_deleted():
+def test_question_removed_from_round_when_question_is_deleted():
     print("\nTEST: question removed from round when question deleted")
-    question_id = dummy_question()
-    round_id = dummy_round(question_id)
-    indentprint("   round ID: {}".format(round_id))
+    with DummyRound(1, True) as round:
+        round_id = round.round_id
+        question_id = round.questions[0]
+        print("   round ID: {}".format(round_id))
 
-    round_obj = get_round(round_id)["object"]
-    print("round before question delete")
-    indentprint(round_obj)
+        round_obj = get_round(round_id)["object"]
+        print("round before question delete")
+        pprint(round_obj)
+        assert len(round_obj['questions']) == 1
 
-    delete_question(question_id)
+        delete_question(question_id)
 
-    round_obj = get_round(round_id)["object"]
-    print("round after question delete")
-    indentprint(round_obj)
+        round_obj = get_round(round_id)["object"]
+        print("round after question delete: ")
+        pprint(round_obj)
+        assert len(round_obj['questions']) == 0
 
-    delete_round(round_id)
-
-
-if __name__ == "__main__":
-    missing_name()
-    name_not_str()
-    missing_questions()
-    questions_not_list()
-    missing_wagers()
-    wagers_not_list()
-    question_id_is_not_str()
-    question_id_is_invalid()
-    question_id_is_valid_but_nonexistent()
-    question_id_is_duplicate()
-    wager_is_not_int()
-    wager_is_negative()
-    wager_is_zero()
-    wagers_list_is_not_the_same_length_as_questions_list()
-    crud()
-    round_used_added_to_question()
-    round_removed_from_question_when_round_deleted()
-    round_removed_from_question_when_question_removed_from_round()
-    question_removed_from_round_when_question_is_deleted()
+        delete_round(round_id)

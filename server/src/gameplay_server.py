@@ -10,7 +10,7 @@ import time
 
 from mongo_manager import MongoManager
 
-from validator import model, succeed, fail, RestField, IdField
+from validator import model, succeed, fail, RestField, IdField, get_all
 from validator import SUCCESS, OBJECT, CREATE, UPDATE, DELETE, GET_ONE, SUBOP
 from editor_server import get_game, get_round, get_question, _resp
 
@@ -193,12 +193,7 @@ def delete_session(session_id, session={}):
 
 
 def get_sessions():
-    ret = []
-    sessions = mongo.get_all("session")
-    if sessions:
-        for s in sessions:
-            ret.append(s)
-    return succeed(ret)
+    return succeed(get_all("session"))
 
 
 """
@@ -749,8 +744,8 @@ def get_answers_as_mod(players, answers):
     return succeed(ret)
 
 
-def get_answers(session_id, question_id):
-    return _get_answers(session_id, {QUESTION_ID: question_id})
+def get_answers(session_id, round_id, question_id):
+    return _get_answers(session_id, {QUESTION_ID: question_id, ROUND_ID: round_id})
 
 
 @model(cq_model, SUBOP, "session")
