@@ -4,6 +4,7 @@
     flex-wrap: wrap;
 	justify-content: flex-start;
     align-items: center;
+    align-content: flex-start;
     width: 100%;
     overflow-y: scroll;
     /* height: 0px; */
@@ -25,17 +26,6 @@
     font-weight: bold;
 }
 
-.filter {
-	display: flex;
-	flex-direction: row;
-	justify-content: space-between;
-	padding: 10px;
-}
-
-.filter_holder {
-	width: 300px;
-	border: 1px solid black;
-}
 
 .ql_and_filter {
 	display: flex;

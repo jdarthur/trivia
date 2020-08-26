@@ -1,6 +1,6 @@
 from editor_server import delete_round
 from editor_server import (create_game, delete_game, get_game,
-                           update_game, get_games)
+                           update_game, get_games, get_round)
 from .test_helpers import object_with_id_in_list, indentprint, DummyGame, DummyRound
 
 
@@ -143,3 +143,43 @@ def test_round_removed_from_game_when_deleted():
         print("game after round delete:")
         indentprint(game)
         assert len(gotten['object']['rounds']) == 0
+
+def test_game_added_and_removed_in_round():
+    """
+    create game with round
+     - round should have games: [:game_id]
+    remove round from game
+     - round should have games: []
+    """
+    with DummyGame(return_class=True) as game:
+        game_id = game.game_id
+        round_id = game.rounds[0]
+
+        round = get_round(round_id)['object']
+        assert len(round.get("games", [])) == 1
+        assert round.get("games", [])[0] == game_id
+
+        update_game(game_id, {"rounds": []})
+        round = get_round(round_id)['object']
+        assert len(round.get("games", [])) == 0
+        indentprint(round)
+
+def test_game_removed_from_round_when_deleted():
+    """
+    create game with round
+     - round should have games: [:game_id]
+    delete game
+     - round should have games: []
+    """
+    with DummyGame(return_class=True) as game:
+        game_id = game.game_id
+        round_id = game.rounds[0]
+
+        round = get_round(round_id)['object']
+        assert len(round.get("games", [])) == 1
+        assert round.get("games", [])[0] == game_id
+
+        delete_game(game_id)
+        round = get_round(round_id)['object']
+        assert len(round.get("games", [])) == 0
+        indentprint(round)

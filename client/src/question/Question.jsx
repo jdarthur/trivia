@@ -56,9 +56,9 @@ class Question extends React.Component {
         <div className={containerClass} onKeyDown={this.handleKeyPress}>
           <input value={this.props.category}
             onChange={this.set_category} placeholder="Category" autoFocus />
-          <textarea className="text-area" value={this.props.question}
+          <textarea className="question_input q_and_a" value={this.props.question}
             onChange={this.set_question} placeholder="Question" />
-          <textarea className="text-area" value={this.props.answer}
+          <textarea className="answer_input q_and_a" value={this.props.answer}
             onChange={this.set_answer} placeholder="answer" />
           <div className="button-container">
             <button onClick={this.delete_self} className="delete-button button"> Delete </button>
@@ -69,17 +69,10 @@ class Question extends React.Component {
       );
     }
     else {
-      // const containerClass = "question_container"
       return (
         <ReadOnlyQuestion id={this.props.id} question={this.props.question}
                     answer={this.props.answer} category={this.props.category}
                     select={this.select_self} selected={this.props.selected} />
-
-        /* <div className={containerClass} onClick={this.set_selected}>
-          <div className="category"> {this.props.category} </div>
-          <div className="question"> {this.props.question} </div>
-          <div className="answer">   {this.props.answer}   </div>
-        </div> */
       );
     }
   }

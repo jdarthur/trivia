@@ -229,3 +229,17 @@ def test_question_removed_from_round_when_question_is_deleted():
         assert len(round_obj['questions']) == 0
 
         delete_round(round_id)
+
+def test_get_rounds_with_exclusion_filter():
+    print("\nTEST: get rounds with filtering")
+    rounds = get_rounds(unused_only=False)
+    all_rounds_len = len(rounds['object'])
+    print(f"all rounds ({all_rounds_len}):")
+    pprint(rounds)
+
+    rounds = get_rounds(unused_only=True)
+    filtered_rounds_len = len(rounds['object'])
+    print(f"all rounds ({filtered_rounds_len}):")
+    pprint(rounds)
+
+    assert all_rounds_len >= filtered_rounds_len

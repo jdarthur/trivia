@@ -3,6 +3,7 @@ import './RoundList.css';
 
 import Round from "./Round.jsx"
 import OpenRound from "./OpenRound.jsx"
+import EditorFilter from "../editor/EditorFilter.jsx"
 
 
 //JSON keys
@@ -16,6 +17,8 @@ class RoundList extends React.Component {
     constructor(props) {
         super(props)
         this.state = {
+            unused_only: true,
+            text_filter: "",
             rounds: [],
             selected: "", //selected round ID (1 at a time)
             dirty: "", //dirty round ID (can be selected_round or empty if a round is selected but not changed)
@@ -27,7 +30,15 @@ class RoundList extends React.Component {
     }
 
     get_rounds = () => {
-        let url = "/editor/rounds"
+        let url = "/editor/rounds?"
+
+        if (this.state.text_filter !== "") {
+            url += "text_filter=" + this.state.text_filter
+        }
+
+        if (this.state.unused_only === true) {
+            url += "&unused_only=true"
+        }
 
         fetch(url)
             .then(response => response.json())
@@ -36,6 +47,14 @@ class RoundList extends React.Component {
                 console.log(state)
                 this.setState({ rounds: state.rounds })
             })
+    }
+
+    set_unused_only = (value) => {
+        this.setState({ unused_only: value }, () => { this.get_rounds() })
+    }
+
+    set_text_filter = (value) => {
+        this.setState({ text_filter: value }, () => { this.get_rounds() })
     }
 
     set_selected = (round_id, value) => {
@@ -82,10 +101,11 @@ class RoundList extends React.Component {
                 sendData(null, "POST", round)
                     .then((data) => {
                         round.id = data.id
-                        this.setState({ 
+                        this.setState({
                             rounds: this.state.rounds,
                             dirty: "",
-                            selected: round.id})
+                            selected: round.id
+                        })
                     })
             }
             else { //update existing round
@@ -164,14 +184,21 @@ class RoundList extends React.Component {
             open_round = <OpenRound key={r.id} id={r.id} name={r.name}
                 questions={r.questions} wagers={r.wagers} set={this.set_value}
                 set_selected={this.set_selected} delete={this.delete}
-                save={this.save} set_multi={this.set_multi}/>
+                save={this.save} set_multi={this.set_multi} />
         }
         return (
             <div className="round-and-open-question">
-                <div className="round_list">
-                    {rounds}
-                    {nrb}
+                <div className="ql_and_filter">
+                    <EditorFilter set_text_filter={this.set_text_filter} set_unused_only={this.set_unused_only} data_type="rounds"
+                        text_filter={this.state.text_filter} unused_only={this.state.unused_only} />
+
+                    <div className="round_list">
+                        {rounds}
+                        {nrb}
+                    </div>
+
                 </div>
+
                 {open_round}
             </div>
         );

@@ -115,9 +115,10 @@ def dummy_game(rounds):
     }
 
     created = create_game(gdata)
+    print(created)
     if created["success"]:
         return created["object"]["id"]
-    print(created)
+
     return None
 
 

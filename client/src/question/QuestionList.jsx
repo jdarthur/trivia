@@ -2,6 +2,7 @@ import React from 'react';
 import './QuestionList.css';
 
 import Question from "./Question.jsx"
+import EditorFilter from "../editor/EditorFilter.jsx"
 
 
 //JSON keys
@@ -46,13 +47,11 @@ class QuestionList extends React.Component {
       })
   }
 
-  set_unused_only = (event) => {
-    const value = event.target.checked
+  set_unused_only = (value) => {
     this.setState({ unused_only: value }, () => { this.get_questions() })
   }
 
-  set_text_filter = (event) => {
-    const value = event.target.value
+  set_text_filter = (value) => {
     this.setState({ text_filter: value }, () => { this.get_questions() })
   }
 
@@ -156,18 +155,8 @@ class QuestionList extends React.Component {
     const nqb = this.add_newquestion_button() ? <div className="new_button" onClick={this.add_new_question}>+</div> : null
     return (
       <div className="ql_and_filter">
-        <div className="filter_holder">
-
-          <div className='filter'>
-            <label htmlFor="text_filter"> Text filter: </label>
-            <input name="text_filter" value={this.state.text_filter} onChange={this.set_text_filter} placeholder="Text filters" />
-          </div>
-
-          <div className="filter">
-            <label htmlFor="unused_only"> Show unused questions only? </label>
-            <input type="checkbox" name="unused_only" checked={this.state.unused_only} onChange={this.set_unused_only} />
-          </div>
-        </div>
+        <EditorFilter set_text_filter={this.set_text_filter} set_unused_only={this.set_unused_only} data_type="questions"
+         text_filter={this.state.text_filter} unused_only={this.state.unused_only} />
 
         <div className="question-list">
           {questions}

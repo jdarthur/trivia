@@ -19,7 +19,7 @@ class AddRoundsModal extends React.Component {
     }
 
     get_rounds = () => {
-        let url = "/editor/rounds"
+        let url = "/editor/rounds?unused_only=true"
         fetch(url)
             .then(response => response.json())
             .then(state => {

@@ -16,3 +16,25 @@
     flex-grow: 1;
     align-self: stretch;
 }
+
+.filter {
+	display: flex;
+	flex-direction: row;
+	justify-content: space-between;
+    padding: 10px;
+    align-items: center;
+}
+
+.filter_subitem {
+    display: flex;
+    text-align: center;
+    margin-right: 5px;
+}
+
+.filter_holder {
+    display: flex;
+    flex-direction: row;
+    border: 1px solid black;
+    align-items: center;
+}
+

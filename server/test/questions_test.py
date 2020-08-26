@@ -60,3 +60,17 @@ def test_crud():
     questions = get_questions()['object']
     print("   all questions: {}".format(questions))
     assert object_with_id_in_list(questions, question_id, False)
+
+def test_get_questionss_with_exclusion_filter():
+    print("\nTEST: get rounds with filtering")
+    questions = get_questions(unused_only=False)
+    all_questions_len = len(questions['object'])
+    print(f"all rounds ({all_questions_len}):")
+    pprint(questions)
+
+    questions = get_questions(unused_only=True)
+    filtered_questions_len = len(questions['object'])
+    print(f"all rounds ({filtered_questions_len}):")
+    pprint(questions)
+
+    assert all_questions_len >= filtered_questions_len

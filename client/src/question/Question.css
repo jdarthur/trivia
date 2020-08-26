@@ -80,3 +80,16 @@ button {
 	text-align: center;
 	margin: 5px;
 }
+
+.q_and_a {
+	padding: 5px;
+	font-family: Arial, Helvetica, sans-serif;
+}
+.question_input {
+	flex-grow: 4;
+}
+
+.answer_input {
+	flex-grow: 1;
+	font-style: italic;
+}

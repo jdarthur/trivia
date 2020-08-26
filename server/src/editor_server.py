@@ -142,7 +142,7 @@ def get_questions(text_filter=None, unused_only=True):
     ret = []
     questions = get_all("question")
     for q in questions:
-        if matches(q, text_filter, unused_only):
+        if matches(q, text_filter, unused_only, ROUNDS_USED, QUESTION):
             ret.append(q)
     return succeed(ret)
 
@@ -160,27 +160,32 @@ def delete_question(question_id, question={}):
         MISC HELPERS
 ==============================
 """
-def matches(question, text_filter, unused_only):
-    return matches_text_filter(question, text_filter) and matches_unused_only(question, unused_only)
+def matches(question, text_filter, unused_only, unused_only_key, data_type):
+    return matches_text_filter(question, text_filter, data_type) and matches_unused_only(question, unused_only, unused_only_key)
 
 
-def matches_text_filter(question, text_filter):
+def matches_text_filter(question, text_filter, data_type):
     if text_filter is None:
         return True
 
-    for field in [QUESTION, ANSWER, CATEGORY]:
-        if text_filter in question[field]:
-            return True
+    if data_type == QUESTION:
+        for field in [QUESTION, ANSWER, CATEGORY]:
+            if text_filter in question[field]:
+                return True
+    if data_type == ROUND:
+        for field in [NAME]:
+            if text_filter in question[field]:
+                return True
 
     # print("does not match {} '{}': {}".format(TEXT_FILTER, text_filter, question))
     return False
 
 
-def matches_unused_only(question, unused_only):
+def matches_unused_only(question, unused_only, unused_only_key):
     if not unused_only:
         return True
 
-    match = len(question.get(ROUNDS_USED, [])) == 0
+    match = len(question.get(unused_only_key, [])) == 0
     if not match:
         # print("does not match {} '{}': {}".format(UNUSED_ONLY, unused_only, question))
         return False
@@ -286,7 +291,9 @@ def get_one_round(round_id):
 
 @app.route(f'{URL_BASE}/rounds', methods=['GET'])
 def get_all_rounds():
-    rounds = get_rounds()
+    text_filter = request.args.get(TEXT_FILTER, None)
+    unused_only = request.args.get(UNUSED_ONLY, False)
+    rounds = get_rounds(text_filter, unused_only)
     if not rounds[SUCCESS]:
         return jsonify(rounds)
     return jsonify({ROUNDS: rounds[OBJECT]})
@@ -351,8 +358,13 @@ def get_round(round_id, round_obj={}):
     return succeed(round_obj)
 
 
-def get_rounds():
-    return succeed(get_all("round"))
+def get_rounds(text_filter=None, unused_only=True):
+    ret = []
+    rounds = get_all("round")
+    for r in rounds:
+        if matches(r, text_filter, unused_only, GAMES, ROUND):
+            ret.append(r)
+    return succeed(ret)
 
 
 """
@@ -442,11 +454,77 @@ def create_game(data):
     if not created:
         return fail("Failed to create game")
 
+    # add game_id to all rounds, and return error if this fails
+    game_id = created[ID]
+    rupdate = rounds_have_game_id(rounds, game_id)
+    if not rupdate:
+        return rupdate
+
     return succeed(created)
+
+
+def rounds_have_game_id(rounds, game_id):
+    """
+    set state of round so that all rounds in list have
+    game_id in their games list
+    """
+    for round_id in rounds:
+        added = set_round_and_game_id(round_id, game_id, True)
+        if not added:
+            return added
+    return succeed(rounds)
+
+
+def rounds_do_not_have_game_id(rounds, game_id):
+    """
+    set state of round so that all rounds in list
+    do not have game_id in their games list
+    """
+    for round_id in rounds:
+        added = set_round_and_game_id(round_id, game_id, False)
+        if not added: return added
+    return succeed(rounds)
+
+
+def set_round_and_game_id(round_id, game_id, present=True):
+    """
+    set round so that it has or does not have game_id in its games list
+
+    args:
+        round_id: ID of target round
+        game_id: ID of target game
+        present: true if round X is marked as in game Y, false if not
+    """
+    round = get_round(round_id)
+    if not round:
+        return fail(f"Can't set game_id {game_id} in nonexistent round_id {round_id}")
+    round = round[OBJECT]
+
+    games = round.get(GAMES, [])
+    if present and game_id not in games:
+        if not mongo.push("round", round_id, GAMES, game_id):
+            return fail(f"Failed to add game_id {game_id} to round_id {round_id}")
+
+    if not present and game_id in games:
+        if not mongo.pull("round", round_id, GAMES, game_id):
+            return fail(f"Failed to remove game_id {game_id} to round_id {round_id}")
+
+    return succeed(round)
 
 
 @model(gmodel, UPDATE, "game")
 def update_game(game_id, data, game={}):
+
+    prev_rounds = game.get(ROUNDS, [])
+    target_rounds = data.get(ROUNDS, [])
+    for round_id in prev_rounds:
+        if round_id not in target_rounds:
+            set_round_and_game_id(round_id, game_id, False)  # remove game_id from round
+
+    for round_id in target_rounds:
+        if round_id not in prev_rounds:
+            set_round_and_game_id(round_id, game_id, True)  # add game_id to round
+
     success = mongo.update("game", game_id, data)
     if success:
         game.update(data)
@@ -457,6 +535,12 @@ def update_game(game_id, data, game={}):
 @model(gmodel, DELETE, "game")
 def delete_game(game_id, game={}):
     mongo.delete("game", game_id)
+
+    rounds = game.get(ROUNDS, [])
+    rupdate = rounds_do_not_have_game_id(rounds, game_id)
+    if not rupdate:
+        return rupdate
+
     return succeed(game)
 
 
