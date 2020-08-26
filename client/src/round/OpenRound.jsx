@@ -2,7 +2,7 @@ import React from 'react';
 import './OpenRound.css';
 import AddQuestionsModal from "../modal/AddQuestionsModal"
 import RemovableQuestionsList from "./RemovableQuestionsList"
-import Wager from "./Wager.jsx"
+import Wager from "./Incrementer.jsx"
 
 const NAME = "name"
 const QUESTIONS = "questions"
@@ -70,12 +70,11 @@ class OpenRound extends React.Component {
 
     render() {
         const wagers = this.props.wagers.map((wager, index) => (
-            <Wager key={index} index={index} value={wager} set={this.set_wager} />))
+            <Wager key={index} index={index} value={wager} set={this.set_wager} prevent_negative={true} />))
 
         return (
             <div className="open-round">
                 <div className="open-header"> Edit Round </div>
-
 
                 <div className="current-questions">
                     <input className="round-name" value={this.props.name}

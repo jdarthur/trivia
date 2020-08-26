@@ -136,3 +136,9 @@
     background: rgb(228, 228, 228);
     flex-grow: 1;
 }
+
+.score-and-override {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}

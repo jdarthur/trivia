@@ -72,12 +72,30 @@ class PlayerScorer extends React.Component {
     }
 
     set_correct = (player_id, correct) => {
+
         const scores = this.state.scores
         if (scores[player_id] ===  undefined) {
             scores[player_id] = {}
         }
         scores[player_id].correct = correct
-        this.setState({ scores: scores })
+
+        const wager = this.get_wager(player_id)
+        if (correct) {
+            scores[player_id].score_override = wager
+        }
+        if (!correct) {
+            scores[player_id].score_override = 0
+        }
+
+        this.setState({ scores: scores})
+    }
+
+    get_wager = (player_id) => {
+        for (let i = 0; i < this.state.answers.length; i++) {
+            if (this.state.answers[i].player_id === player_id) {
+                return this.state.answers[i].wager
+            }
+        }
     }
 
     set_override = (player_id, value) => {
@@ -85,13 +103,7 @@ class PlayerScorer extends React.Component {
         if (scores[player_id] ===  undefined) {
             scores[player_id] = {}
         }
-        const val = parseInt(value) ? parseInt(value) : ""
-        if (val === "") {
-            delete scores[player_id].score_override
-        } else {
-            scores[player_id].score_override = val
-        }
-
+        scores[player_id].score_override = value
         this.setState({ scores: scores })
     }
 
@@ -114,7 +126,7 @@ class PlayerScorer extends React.Component {
     render() {
         const answers = this.state.answers.map(player => {
             const status = this.state.scores[player.player_id] || {}
-            const override_value =  status.score_override !== undefined ? status.score_override : ""
+            const override_value =  status.score_override !== undefined ? status.score_override : 0
             return <PlayerAnswer key={player.player_id} player_id={player.player_id}
                 answer={player.answer} wager={player.wager} set_correct={this.set_correct}
                 player_name={player.team_name} correct={status.correct}

@@ -6,21 +6,40 @@
     border: 1px solid black;
     border-radius: 5px;
     text-align: center;
-    align-items: center;
+    align-items: stretch;
     justify-content: center;
-    background: lightgrey;
+    background: #d4d4d4;
     font-weight: bold;
 }
 
 .plus-or-minus {
     cursor: pointer;
     padding: 5px;
+    user-select: none;
+}
+
+.decr { border-radius: 5px 0px 0px 5px; }
+.incr { border-radius: 0px 5px 5px 0px; }
+
+.plus-or-minus:hover {
+    background: #bfbfbf;
 }
 
 .wager-text {
-    padding: 5px;
     font-size: 1.2em;
-    border-left: 1px solid black;
-    border-right: 1px solid black;
-    background: white;
+    text-align: center;
+    display: flex;
+    align-items: center;
+    flex-grow: 1;
+    padding-left: 5px;
+    padding-right: 5px;
+}
+
+.disabled_action {
+    color: darkgrey;
+    cursor: default;
+}
+
+.disabled_action:hover {
+    background: #d4d4d4;;
 }
