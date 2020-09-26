@@ -53,12 +53,14 @@ class AddQuestionsModal extends React.Component {
     }
 
     select_item = (question_id, selected) => {
+        console.log(question_id)
         const index = this.state.selected_questions.indexOf(question_id)
+        console.log(index)
         if (index === -1) {
             this.state.selected_questions.push(question_id)
         }
         else {
-            this.state.selected_questions.splice(index, index + 1)
+            this.state.selected_questions.splice(index, 1)
         }
         this.setState({ selected_questions: this.state.selected_questions })
     }
@@ -95,6 +97,7 @@ class AddQuestionsModal extends React.Component {
                     title="Add Questions"
                     visible={this.state.is_open}
                     onOk={this.add_questions_and_close}
+                    okText="Add"
                     onCancel={this.close_modal}
                     width="50vw">
 
@@ -104,18 +107,6 @@ class AddQuestionsModal extends React.Component {
                     </div>
 
                 </Modal>
-
-
-
-                // <Modal is_open={this.state.is_open}
-                //     close={this.close_modal} transitionName="modal-anim"
-                //     title="Add Questions" save_label="Add" save={this.add_questions_and_close}>
-                //     <div className="body">
-                //         <div className="question-list">
-                //             {questions}
-                //         </div>
-                //     </div>
-                // </Modal>
             );
         }
         else {

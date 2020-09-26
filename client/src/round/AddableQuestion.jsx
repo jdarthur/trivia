@@ -10,10 +10,10 @@ class AddableQuestion extends React.Component {
 
     render() {
         return (
-            <div>
+            <div onClick={this.select_self}>
             <ReadOnlyQuestion id={this.props.id} question={this.props.question}
-                    answer={this.props.answer} category={this.props.category} 
-                    select={this.select_self} selected={this.props.selected} />
+                    answer={this.props.answer} category={this.props.category}
+                    selected={this.props.selected} hide_extra={true}/>
             {this.props.index !== -1 ? this.props.index + 1 : null}
             </div>
         );

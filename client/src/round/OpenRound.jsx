@@ -4,7 +4,7 @@ import AddQuestionsModal from "../modal/AddQuestionsModal"
 import RemovableQuestionsList from "./RemovableQuestionsList"
 import Wager from "./Incrementer.jsx"
 
-import { Collapse } from 'antd';
+import { Collapse, Button } from 'antd';
 const { Panel } = Collapse;
 
 const NAME = "name"
@@ -78,7 +78,7 @@ class OpenRound extends React.Component {
                 </div>
 
 
-                <Collapse defaultActiveKey={['1', '2']} style={{width: "100%"}}>
+                <Collapse defaultActiveKey={['1', '2']} style={{ width: "100%" }}>
                     <Panel header="Wagers" key="1">
                         {wagers}
                     </Panel>
@@ -87,9 +87,9 @@ class OpenRound extends React.Component {
                     </Panel>
                 </Collapse>
 
-                <div className="open-footer">
-                    <button onClick={this.delete_self} className="delete-button footer-button"> Delete Round </button>
-                    <button onClick={this.save_self_and_close} className="footer-button" > Save Round </button>
+                <div className="save-delete">
+                    <Button danger className="button" onClick={this.delete_self}> Delete round </Button>
+                    <Button className="button" onClick={this.save_self_and_close}> Save </Button>
                 </div>
             </div>
         );

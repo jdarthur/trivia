@@ -74,3 +74,7 @@
 .actionable-question {
     cursor: pointer;
 }
+
+.centered {
+    justify-content: "center";
+}

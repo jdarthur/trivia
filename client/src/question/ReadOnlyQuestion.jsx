@@ -20,12 +20,14 @@ class ReadOnlyQuestion extends React.Component {
     render() {
         // const containerClass = (this.props.selected ? "selected" : "")
         const background = this.props.selected ? "#d9d9d9" : ""
+        const cursor = this.props.hide_extra ? "pointer" : ""
         const edit = this.props.hide_extra ? null : <div>
             <DeleteOutlined onClick={this.delete_self} className="delete-edit-mini" />
             <EditOutlined onClick={this.select_self} className="delete-edit-mini" />
         </div>
         return (
-            <Card title={this.props.category} size="small" extra={edit} style={{ width: 200, margin: 5, background: background }}>
+            <Card title={this.props.category} size="small" extra={edit}
+            style={{ width: 200, margin: 5, background: background, cursor: cursor}}>
                 <p>{this.props.question} </p>
                 <p className="answer">{this.props.answer}</p>
             </Card>
