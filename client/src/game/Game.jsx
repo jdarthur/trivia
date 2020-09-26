@@ -1,6 +1,12 @@
 import React from 'react';
 import './Game.css';
 
+import {
+  EditOutlined,
+} from '@ant-design/icons';
+
+import { Card } from 'antd';
+
 class Game extends React.Component {
   set_selected = () => {
     this.props.set_selected(this.props.id, !this.props.selected)
@@ -9,12 +15,15 @@ class Game extends React.Component {
   render() {
     const r_count = this.props.rounds.length
     const r_label = r_count + " Round" + (r_count !== 1 ? "s" : "")
-    const css_class = "game" + (this.props.selected ? " selected" : "")
+
+    const background = (this.props.selected ? "#d9d9d9" : "")
+    const title = this.props.name === '' ? "[unnamed game]" : this.props.name
+
     return (
-      <div className={css_class} onClick={this.set_selected} >
-        <div> {this.props.name === '' ? "unnamed game" : this.props.name} </div>
+      <Card size="small" title={title} style={{ width: 200, margin: 5, background: background }}
+        extra={<EditOutlined onClick={this.set_selected} />} >
         <div> {r_label} </div>
-      </div>
+      </Card>
     );
   }
 }

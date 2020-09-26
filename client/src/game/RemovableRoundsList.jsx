@@ -1,6 +1,12 @@
 import React from 'react';
 import RemovableRound from './RemovableRound';
 
+import { Button, Empty } from 'antd';
+
+import {
+    DeleteOutlined
+} from '@ant-design/icons';
+
 class RemovableRoundsList extends React.Component {
 
     constructor(props) {
@@ -36,10 +42,16 @@ class RemovableRoundsList extends React.Component {
                 show_title={false} set_round_name={this.props.set_round_name}
                 name={this.props.round_names[round_id]} handleKeyPress={this.props.handleKeyPress}/>))
 
+        const show_empty = this.props.rounds.length > 0 ? false : true
+
         return (
-            <div className="rem-question-list">
-                {rounds}
-                <button onClick={this.remove_selected}> Remove Rounds</button>
+
+            <div className={"rem-question-list" + show_empty? " centered" : ""}>
+                {show_empty ? <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="No rounds added"/> : rounds }
+                {this.state.selected_rounds.length > 0 ?
+                    <Button className="new_button" danger onClick={this.remove_selected} >
+                        <DeleteOutlined />  Remove selected
+                    </Button> : null}
             </div>
         );
     }

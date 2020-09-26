@@ -28,7 +28,6 @@ class Round extends React.Component {
     return (
       <Card size="small" title={title} style={{ width: 200, margin: 5, background: background }}
         extra={<EditOutlined onClick={this.set_selected} />} >
-        <div className="round-title">  </div>
         <div> {q_label} </div>
       </Card>
     );

@@ -3,6 +3,9 @@ import '../round/OpenRound.css';
 import AddRoundsModal from './AddRoundsModal';
 import RemovableRoundsList from "./RemovableRoundsList"
 
+import { Collapse, Button } from 'antd';
+const { Panel } = Collapse;
+
 const NAME = "name"
 const ROUNDS = "rounds"
 const ROUND_NAMES = "round_names"
@@ -64,20 +67,25 @@ class OpenGame extends React.Component {
 
         return (
             <div className="open-round">
+
+                <div className="open-header"> Edit Game </div>
                 <div className="current-questions">
                     <input className="round-name" value={this.props.name}
                         onChange={this.set_name} onKeyDown={this.handleKeyPress} placeholder="Game name" />
                     <AddRoundsModal rounds={this.props.rounds} add_rounds={this.add_rounds} />
                 </div>
 
-                <div className="section-top"> Current rounds </div>
-                <RemovableRoundsList rounds={this.props.rounds} remove_rounds={this.remove_rounds}
-                    set_round_name={this.set_round_name} round_names={this.props.round_names}
-                    handleKeyPress={this.handleKeyPress} />
+                <Collapse defaultActiveKey={['1']} style={{ width: "100%" }}>
+                    <Panel header="Rounds" key="1">
+                        <RemovableRoundsList rounds={this.props.rounds} remove_rounds={this.remove_rounds}
+                            set_round_name={this.set_round_name} round_names={this.props.round_names}
+                            handleKeyPress={this.handleKeyPress} />
+                    </Panel>
+                </Collapse>
 
-                <div className="open-footer">
-                    <button onClick={this.delete_self} className="delete-button"> Delete </button>
-                    <button onClick={this.save_self} > Save </button>
+                <div className="save-delete">
+                    <Button onClick={this.delete_self} className="button" danger> Delete game </Button>
+                    <Button onClick={this.save_self} className="button" > Save </Button>
                 </div>
 
             </div>

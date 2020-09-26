@@ -4,7 +4,7 @@ import QuestionInRound from "./QuestionInRound"
 
 /**
  * This is a round inside of an open game. It shows
- * its questions and can be deleted from the game. 
+ * its questions and can be deleted from the game.
  */
 class RoundInGame extends React.Component {
 
@@ -46,10 +46,8 @@ class RoundInGame extends React.Component {
         const questions = this.state.questions.map((question_id) => (
             <QuestionInRound key={question_id} id={question_id} />))
 
-
-
-        const containerClass = "round-and-index" + (this.props.selected ? " selected" : "")
-        const subContainerClass = this.props.show_title ? "round-in-game" : ""
+        const containerClass = "round-and-index"
+        const subContainerClass = (this.props.show_title ? "round-in-game" : "") + (this.props.selected ? " selected" : "")
         return (
             <div className={containerClass}>
                 <div className={subContainerClass} onClick={this.select_self}>

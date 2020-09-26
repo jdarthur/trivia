@@ -1,6 +1,7 @@
 import React from 'react';
 import '../modal/Modal.css';
-import Modal from "../modal/Modal"
+import { Modal, Button } from 'antd';
+
 import RoundInGame from "./RoundInGame"
 
 class AddRoundsModal extends React.Component {
@@ -69,19 +70,37 @@ class AddRoundsModal extends React.Component {
                 }
             }
             return (
-                <Modal is_open={this.state.is_open}
-                    close={this.close_modal} transitionName="modal-anim"
-                    title="Add Rounds" save_label="Add" save={this.add_rounds_and_close}>
-                    <div className="body">
-                        <div className="question-list">
-                            {rounds}
-                        </div>
+                // <Modal is_open={this.state.is_open}
+                //     close={this.close_modal} transitionName="modal-anim"
+                //     title="Add Rounds" save_label="Add" save={this.add_rounds_and_close}>
+                //     <div className="body">
+                //         <div className="question-list">
+                //             {rounds}
+                //         </div>
+                //     </div>
+                // </Modal>
+
+                <Modal
+                    title="Add Rounds"
+                    visible={this.state.is_open}
+                    onOk={this.add_rounds_and_close}
+                    okText="Add"
+                    onCancel={this.close_modal}
+                    width="50vw">
+
+                    <div className="rem-question-list">
+                        {rounds}
+
                     </div>
+
                 </Modal>
             );
         }
         else {
-            return (<button onClick={this.open_modal}>Add rounds</button>)
+            return (
+                <Button type="primary" onClick={this.open_modal}>
+                    Add rounds
+                </Button>)
         }
     }
 }

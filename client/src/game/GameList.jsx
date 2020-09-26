@@ -5,6 +5,10 @@ import Game from "./Game.jsx"
 import OpenGame from "./OpenGame.jsx"
 
 
+import {
+    PlusSquareOutlined
+  } from '@ant-design/icons';
+
 //JSON keys
 const NAME = "name"
 const ROUNDS = "rounds"
@@ -90,9 +94,11 @@ class GameList extends React.Component {
                         const to_save = { games: this.state.games, dirty: "" }
                         if (selected) {
                             to_save.selected = game.id
+                        } else {
+                            to_save.selected = ""
                         }
                         console.log(to_save)
-                    
+
                         this.setState(to_save)
                     })
             }
@@ -161,14 +167,14 @@ class GameList extends React.Component {
                 selected={(this.state.selected === game.id) ? true : false}
                 set_selected={this.set_selected} delete={this.delete} />))
 
-        const ngb = this.add_newgame_button() ? <div className="new_button" onClick={this.add_new_game}>+</div> : null
+        const ngb = this.add_newgame_button() ? <PlusSquareOutlined className="new_button" onClick={this.add_new_game} /> : null
 
         let open_game = null
         if (this.state.selected !== "") {
             const g = find(this.state.selected, this.state.games)
             open_game = <OpenGame key={g.id} id={g.id} name={g.name}
                 rounds={g.rounds} round_names={g.round_names} set={this.set_value}
-                set_selected={this.set_selected} delete={this.delete} 
+                set_selected={this.set_selected} delete={this.delete}
                 set_round_name={this.set_round_name} set_multi={this.set_multi} />
         }
         return (
