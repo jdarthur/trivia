@@ -1,7 +1,7 @@
 import React from 'react';
 import './Homepage.css';
 
-import Modal from "../modal/Modal"
+import { Modal, Button } from 'antd';
 import GameNames from "./GameNames"
 
 class NewGameModal extends React.Component {
@@ -15,13 +15,9 @@ class NewGameModal extends React.Component {
     }
   }
 
-  open = () => {
-    this.setState({ open: true })
-  }
-
-  close = () => {
-    this.setState({ open: false })
-  }
+  open = () => { this.setState({ open: true }) }
+  close = () => { this.setState({ open: false }) }
+  set_name = (event) => { this.setState({ name: event.target.value }) }
 
   select_game = (game_id) => {
     if (this.state.selected_game === game_id) {
@@ -30,10 +26,6 @@ class NewGameModal extends React.Component {
     else {
       this.setState({ selected_game: game_id })
     }
-  }
-
-  set_name = (event) => {
-    this.setState({ name: event.target.value })
   }
 
   create_new_game = () => {
@@ -59,18 +51,37 @@ class NewGameModal extends React.Component {
 
     if (this.state.open) {
       return (
-        <Modal is_open={this.state.open} title="New Game" save={this.create_new_game}
-          save_label="Create" close={this.close}>
-          <div className="new-game">
+
+        <Modal
+          title="New Game"
+          visible={this.state.open}
+          onOk={this.create_new_game}
+          okText="Create"
+          onCancel={this.close}
+          width="65vw">
+
+          <div>
             <input value={this.state.name} onChange={this.set_name} placeholder="Name" />
             <GameNames select={this.select_game} selected={this.state.selected_game} />
           </div>
+
         </Modal>
+        // set_name = (event) => { this.setState({ name: event.target.value }) }
+
+        // <Modal is_open={this.state.open} title="New Game" save={this.create_new_game}
+        //   save_label="Create" close={this.close}>
+        //   <div className="new-game">
+        //     <input value={this.state.name} onChange={this.set_name} placeholder="Name" />
+        //     <GameNames select={this.select_game} selected={this.state.selected_game} />
+        //   </div>
+        // </Modal>
       )
     }
 
     return (
-      <button className="new-game-button" onClick={this.open}>New Game</button>
+      <Button type="primary" onClick={this.open}>
+        New Game
+      </Button>
     );
   }
 }

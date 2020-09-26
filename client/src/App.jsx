@@ -81,7 +81,7 @@ class App extends React.Component {
           <Content style={{ margin: '0 16px' }}>
 
             <div className="site-layout-background" style={{ padding: 12, minHeight: 360 }}>
-              {this.state.selected === PLAY ? <HomePage /> : null}
+              {this.state.selected === PLAY ? <HomePage set_toolbar={this.set_show_toolbar}/> : null}
               {this.state.selected === EDITOR ? <Editor section={this.state.editor_section} /> : null}
             </div>
           </Content>

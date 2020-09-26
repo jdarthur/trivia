@@ -24,6 +24,7 @@ class GameNames extends React.Component {
     fetch(url)
       .then(response => response.json())
       .then(state => {
+        console.log(state.games)
         this.setState({ games: state.games })
       })
   }
@@ -31,17 +32,12 @@ class GameNames extends React.Component {
   render() {
     const games = this.state.games.map((game) => (
       <GameName key={game.id} id={game.id} name={game.name}
-        select={this.select_game} selected={this.props.selected === game.id}/>
+        select={this.select_game} selected={this.props.selected === game.id}
+        round_count={game.rounds.length} create_date={game.create_date}/>
     ))
 
-    // const games = this.state.games.map((game, index) => (
-    //   <Game key={game.id} id={game.id} name={game.name} create_date={game.create_date}
-    //       rounds={game.rounds} round_names={game.round_names}
-    //       selected={(this.state.selected === game.id) ? true : false}
-    //       set_selected={this.set_selected} delete={this.delete} />))
-
     return (
-      <div>
+      <div className="rem-question-list">
         {games}
       </div>
     )

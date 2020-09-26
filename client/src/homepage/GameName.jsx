@@ -1,5 +1,6 @@
 import React from 'react';
 import './Homepage.css';
+import { Card } from 'antd';
 
 class GameName extends React.Component {
 
@@ -8,11 +9,21 @@ class GameName extends React.Component {
   }
 
   render() {
-    const className = "game-name" + (this.props.selected ? " selected" : "")
+    const background = this.props.selected ? "#d9d9d9" : ""
+    const date = new Date(this.props.create_date);
+
+    const options = { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' };
+    const dateString = date.toLocaleDateString(undefined, options);
+
     return (
-      <div className={className} onClick={this.select_self}>
-        {this.props.name}
+      <div onClick={this.select_self}>
+        <Card title={this.props.name} size="small"
+          style={{ width: 200, margin: 5, background: background, cursor: "pointer" }}>
+          <p>{this.props.round_count + " round" + (this.props.round_count !== 1 ? "s" : "")} </p>
+          <p >{dateString}</p>
+        </Card>
       </div>
+
     )
   }
 }

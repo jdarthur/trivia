@@ -29,6 +29,7 @@ SCORE_OVERRIDE = "score_override"
 PLAYERS = "players"
 TEAM_NAME = "team_name"
 REAL_NAME = "real_name"
+ICON = "icon"
 PLAYER_ID = "player_id"
 
 SESSION_ID = "session_id"
@@ -223,6 +224,7 @@ def update_one_player(player_id):
 pmodel = [
     RestField(TEAM_NAME),
     RestField(REAL_NAME),
+    RestField(ICON),
     IdField(SESSION_ID, "session", optional=True)
 ]
 @model(pmodel, CREATE, "player")

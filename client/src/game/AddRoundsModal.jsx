@@ -59,7 +59,6 @@ class AddRoundsModal extends React.Component {
 
     render() {
         if (this.state.is_open === true) {
-
             const rounds = []
             for (let i = 0; i < this.state.rounds.length; i++) {
                 const round = this.state.rounds[i];
@@ -70,16 +69,6 @@ class AddRoundsModal extends React.Component {
                 }
             }
             return (
-                // <Modal is_open={this.state.is_open}
-                //     close={this.close_modal} transitionName="modal-anim"
-                //     title="Add Rounds" save_label="Add" save={this.add_rounds_and_close}>
-                //     <div className="body">
-                //         <div className="question-list">
-                //             {rounds}
-                //         </div>
-                //     </div>
-                // </Modal>
-
                 <Modal
                     title="Add Rounds"
                     visible={this.state.is_open}
