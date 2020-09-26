@@ -27,7 +27,7 @@ class App extends React.Component {
     this.state = {
       selected: PLAY,
       editor_section: QUESTION,
-      collapsed: false
+      collapsed: true
     }
   }
 
@@ -61,17 +61,17 @@ class App extends React.Component {
           </div>
           <Menu
             defaultSelectedKeys={['2']}
-            defaultOpenKeys={['sub1']}
+            defaultOpenKeys={ (this.state.show_toolbar && !this.state.collapsed) ? ['sub1'] : [] }
             mode="inline"
             theme="dark"
             inlineCollapsed={this.state.collapsed} >
             <Menu.Item key="2" icon={<PlaySquareOutlined />} onClick={this.play}>
               Play
           </Menu.Item>
-            <SubMenu key="sub1" icon={<FormOutlined />} title="Editor">
-              <Menu.Item key="5" onClick={this.edit_question}>{QUESTION}</Menu.Item>
-              <Menu.Item key="6" onClick={this.edit_round}>{ROUND}</Menu.Item>
-              <Menu.Item key="7" onClick={this.edit_game}>{GAME}</Menu.Item>
+            <SubMenu key="sub1" icon={<FormOutlined />} title="Editor" disabled={!this.state.show_toolbar} >
+              <Menu.Item key="5" onClick={this.edit_question} disabled={!this.state.show_toolbar} >{QUESTION}</Menu.Item>
+              <Menu.Item key="6" onClick={this.edit_round} disabled={!this.state.show_toolbar} >{ROUND}</Menu.Item>
+              <Menu.Item key="7" onClick={this.edit_game} disabled={!this.state.show_toolbar} >{GAME}</Menu.Item>
             </SubMenu>
 
           </Menu>

@@ -72,9 +72,7 @@ class Homepage extends React.Component {
             rounds: rounds
           }
           this.setState(update, () => this.get_session_state())
-          if (state.mod === undefined) {
-            this.props.set_toolbar(false)
-          }
+          this.props.set_toolbar(state.mod !== undefined)
         })
     }
   }

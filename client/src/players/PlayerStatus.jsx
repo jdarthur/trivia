@@ -58,7 +58,7 @@ class PlayerStatus extends React.Component {
                     answer={player.answer} wager={player.wager} correct={player.correct}
                     points_awarded={player.points_awarded} />
             else return <AnsweredOrNot key={player.team_name} player_name={player.team_name}
-                answered={player.answered} />
+                answered={player.answered} icon_name={player.icon} />
         })
 
         return (

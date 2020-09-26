@@ -64,7 +64,7 @@ class ActiveGame extends React.Component {
     const categories = this.state.questions.map(question => question.category)
 
     return (
-      <div className="game-and-scoreboard">
+      <div>
         <div className='active-game'>
           <ActiveRound name="insert round name here" categories={categories}
             active_question={this.state.active_question} />

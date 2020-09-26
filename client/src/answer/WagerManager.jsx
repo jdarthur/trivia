@@ -1,7 +1,7 @@
 import React from 'react';
 import "./AnswerQuestion.css"
 import sendData from "../index"
-import SelectableWager from "./SelectableWager"
+import { Radio } from 'antd';
 
 class WagerManager extends React.Component {
 
@@ -14,7 +14,6 @@ class WagerManager extends React.Component {
 
     componentDidMount() {
         this.get_available_wagers()
-        console.log("mount")
     }
 
     componentDidUpdate(prevProps) {
@@ -65,15 +64,21 @@ class WagerManager extends React.Component {
 
     render() {
         const wagers = this.state.available_wagers.map(wager =>
-            <SelectableWager key={wager} wager={wager} count={this.state.avail_count[wager]}
-                select={this.props.select} selected={this.props.wager === wager} />)
+            <Radio.Button value={wager}> {wager} </Radio.Button>
+        )
 
         const can_wager = this.state.available_wagers.length > 0
         return (
-            <div className="wager-manager">
-                {can_wager ? <div className="section-top"> Wager: </div> : null }
-                {can_wager ? <div className="selectable-wagers"> {wagers} </div> : null }
+            <div>
+                {can_wager ? <p>Wager: </p> : null}
+
+                <Radio.Group onChange={this.props.select} value={this.props.wager} >
+
+                    {can_wager ? wagers : null}
+                </Radio.Group>
+
             </div>
+
         );
     }
 }

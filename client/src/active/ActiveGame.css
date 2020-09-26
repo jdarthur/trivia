@@ -1,7 +1,7 @@
 .active-game {
     display: flex;
     flex-direction: column;
-    flex-grow: 1;
+    /* flex-grow: 1; */
 
 }
 
@@ -24,19 +24,22 @@
 }
 
 .round-category {
-    padding: 10px;
-    border-right: 1px solid black
+    padding: 10px 15px 10px 15px;
+    border-right: 1px solid #d9d9d9
 }
 
 .active {
-    background: lightblue;
-
+    background: #1890ff;
+    color:white
 }
 
 .active-round {
     display: flex;
     flex-direction: row;
-    border-bottom: 1px solid black;
+    border-left: 1px solid #d9d9d9;
+    border-top: 1px solid #d9d9d9;
+    border-bottom: 1px solid #d9d9d9;
+    align-self: flex-start;
 }
 
 .game-and-scoreboard {
@@ -49,4 +52,3 @@
 
     /* flex-grow: 1; */
 }
-

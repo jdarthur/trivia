@@ -61,6 +61,7 @@ URL_BASE = "/gameplay"
 
 mongo = MongoManager(MONGO_HOST, MONGO_DB)
 
+
 def create_and_respond(endpoint, data):
     """
     try to create some object and return a failure/success resp
@@ -133,7 +134,7 @@ def create_session(data):
     """
     POST /session
     """
-    mod = create_player({TEAM_NAME: "mod", REAL_NAME: "mod"})
+    mod = create_player({TEAM_NAME: "mod", REAL_NAME: "mod", ICON: ""})
     if not mod[SUCCESS]:
         return mod
 
@@ -703,7 +704,7 @@ def get_answers_unscored(players, answers):
     ret = []
     for player in players:
         player_id = player[ID]
-        p = {TEAM_NAME: player[TEAM_NAME]}
+        p = {TEAM_NAME: player[TEAM_NAME], ICON: player.get(ICON, None)}
         panswers = answers.get(player_id, None)
         p['answered'] = panswers is not None
 

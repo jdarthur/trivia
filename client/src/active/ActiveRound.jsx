@@ -12,7 +12,6 @@ class ActiveRound extends React.Component {
 
     return (
       <div className="active-round">
-        <div className="round-name"> {this.props.round_name} </div>
         {categories}
       </div>
     );

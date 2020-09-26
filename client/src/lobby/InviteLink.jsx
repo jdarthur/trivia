@@ -1,7 +1,7 @@
 import React from 'react';
 import './Lobby.css';
 
-import { Button, Input} from 'antd';
+import { Button } from 'antd';
 
 const INVITE_LINK = "inviteLink"
 class InviteLink extends React.Component {

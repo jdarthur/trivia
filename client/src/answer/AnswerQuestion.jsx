@@ -3,34 +3,32 @@ import "./AnswerQuestion.css"
 import WagerManager from "./WagerManager"
 import sendData from "../index"
 
+import { Card, Input, Button } from 'antd';
+
+const { TextArea } = Input;
+
 class AnswerQuestion extends React.Component {
 
-    constructor(props) {
-        super(props)
-        this.state = {
-            answer: "",
-            wager: null,
-            dirty: false
-        }
+    state = {
+        answer: "",
+        wager: null,
+        dirty: false,
+        answered: false,
     }
+
 
     componentDidUpdate(prevProps) {
         if (this.props.session_state !== prevProps.session_state &&
             this.props.question !== prevProps.question) {
-            this.setState({ answer: "", wager: null, dirty: false })
+            this.setState({ answer: "", wager: null, dirty: false, answered: false })
         }
         if (this.props.question !== prevProps.question || this.props.round !== prevProps.round) {
-            this.setState({ answer: "", wager: null, dirty: false })
+            this.setState({ answer: "", wager: null, dirty: false, answered: false })
         }
     }
 
-    set_answer = (event) => {
-        this.setState({ answer: event.target.value, dirty: true })
-    }
-
-    set_wager = (value) => {
-        this.setState({ wager: value, dirty: true })
-    }
+    set_answer = (event) => { this.setState({ answer: event.target.value, dirty: true }) }
+    set_wager = (event) => { this.setState({ wager: event.target.value, dirty: true }) }
 
     sendable = () => {
         return (
@@ -40,9 +38,20 @@ class AnswerQuestion extends React.Component {
             !this.props.scored)
     }
 
+    handleKeyPress = (event) => {
+        if (event.key === 'Enter') {
+            if (event.altKey) {
+                console.log("alt-enter")
+            }
+            else {
+                event.preventDefault()
+                this.send()
+            }
+        }
+    }
+
     send = () => {
         if (this.sendable()) {
-            console.log("send")
             const answer = {
                 question_id: this.props.question,
                 round_id: this.props.round,
@@ -55,27 +64,43 @@ class AnswerQuestion extends React.Component {
             console.log(url)
             console.log(answer)
             sendData(url, "POST", answer)
-                .then((data) => {
-                    this.setState({ dirty: false })
-                })
+                .then((data) => { this.setState({ dirty: false, answered: true }) })
         }
     }
 
     render() {
 
         const button_class = this.sendable() ? "" : "disabled"
+        const send_text = this.state.answered ? "Update" : "Answer"
         return (
-            <div className="answer-question">
-                <textarea rows={8} className="answer-box" value={this.state.answer}
-                    onChange={this.set_answer} placeholder="Your answer" />
+
+            <Card style={{ width: 300, margin: 5}} bodyStyle={{ padding: 15 }}  >
+                <TextArea placeholder="Your answer" value={this.state.answer}
+                    onChange={this.set_answer} autoSize={{ minRows: 3 }}
+                    onPressEnter={this.handleKeyPress} />
 
                 <div className="answer-footer">
                     <WagerManager session_id={this.props.session_id} player_id={this.props.player_id}
                         round_id={this.props.round} wager={this.state.wager} select={this.set_wager}
                         question_id={this.props.question} />
-                    <button className={button_class} onClick={this.send}> Answer </button>
+                    <Button type="primary" className={button_class}
+                        onClick={this.send} disabled={!this.sendable()}> {send_text} </Button>
                 </div>
-            </div>
+            </Card>
+
+
+
+            // <div className="answer-question">
+            //     <textarea rows={8} className="answer-box" value={this.state.answer}
+            //         onChange={this.set_answer} placeholder="Your answer" />
+
+            //     <div className="answer-footer">
+            //         <WagerManager session_id={this.props.session_id} player_id={this.props.player_id}
+            //             round_id={this.props.round} wager={this.state.wager} select={this.set_wager}
+            //             question_id={this.props.question} />
+            //         <button className={button_class} onClick={this.send}> Answer </button>
+            //     </div>
+            // </div>
         );
     }
 }
