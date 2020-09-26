@@ -6,7 +6,11 @@ import { ICONS } from "./Icons.js"
 import { Select } from 'antd';
 
 const { Option } = Select;
-
+/**
+ * This is a dropdown to select a player icon in the game lobby
+ * @author JD Arthur
+ * @date 26 Sep 2020
+ */
 class SelectIcon extends React.Component {
 
     select = (value) => {
@@ -14,8 +18,6 @@ class SelectIcon extends React.Component {
         console.log("select " + value)
     }
     render() {
-        //const excluded_icons = []
-
         const options = []
         for (let key in ICONS) {
             const icon = ICONS[key]

@@ -1,18 +1,29 @@
-.lobby {
-    padding: 100px;
-    border: 1px solid black;
+.game-lobby {
+    padding: 20px;
     display: flex;
-}
-
-.lobby-player {
-    padding: 10px;
-    border: 1px solid black;
-    display: flex;
-    flex-direction: column;
+    min-height: 30vh;
+    flex-direction: row;
+    flex-wrap: wrap;
+    flex-grow: 1;
+    align-items: flex-start;
 }
 
 .save-container {
     display: flex;
     justify-content: flex-end;
     padding-top: 10px;
+}
+
+
+.invite {
+    display: flex;
+    flex-direction: row;
+    align-items: flex-start
+}
+.invite-button {
+    margin-left: 25px;
+}
+
+.invite-link {
+    width: 300px;
 }

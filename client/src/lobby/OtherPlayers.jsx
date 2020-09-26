@@ -4,11 +4,8 @@ import './Lobby.css';
 import OtherPlayer from "./OtherPlayer"
 
 class OtherPlayers extends React.Component {
-  constructor(props) {
-    super(props)
-    this.state = {
-      players: []
-    }
+  state = {
+    players: []
   }
 
   componentDidMount() {
@@ -52,7 +49,7 @@ class OtherPlayers extends React.Component {
     })
 
     return (
-      <div>
+      <div className="game-lobby">
         {players}
       </div>
     )

@@ -1,6 +1,8 @@
 import React from 'react';
 import './Lobby.css';
 
+import { Button, Input} from 'antd';
+
 const INVITE_LINK = "inviteLink"
 class InviteLink extends React.Component {
 
@@ -21,8 +23,8 @@ class InviteLink extends React.Component {
   render() {
     return (
       <div className="invite" >
-        <input id={INVITE_LINK} readOnly value={this.invite_link()} />
-        <button onClick={this.copy_link}>Copy</button>
+        <input className="invite-link" id={INVITE_LINK} readOnly value={this.invite_link()} />
+        <Button className="invite-button" onClick={this.copy_link}> Copy </Button>
       </div>
     );
   }
