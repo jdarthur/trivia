@@ -1,5 +1,12 @@
 import React from 'react';
 import './Round.css';
+
+import {
+  EditOutlined,
+} from '@ant-design/icons';
+
+import { Card } from 'antd';
+
 /**
  * This is the round-icon that appears in the list.
  * Clicking ont one pulls it up in the open round
@@ -14,12 +21,16 @@ class Round extends React.Component {
   render() {
     const q_count = this.props.questions.length
     const q_label = q_count + " Question" + (q_count !== 1 ? "s" : "")
-    const css_class = "round" + (this.props.selected ? " selected" : "")
+
+    const background = (this.props.selected ? "#d9d9d9" : "")
+    const title = this.props.name === '' ? "[unnamed round]" : this.props.name
+
     return (
-      <div className={css_class} onClick={this.set_selected} >
-        <div className="round-title"> {this.props.name === '' ? "[unnamed round]" : this.props.name} </div>
+      <Card size="small" title={title} style={{ width: 200, margin: 5, background: background }}
+        extra={<EditOutlined onClick={this.set_selected} />} >
+        <div className="round-title">  </div>
         <div> {q_label} </div>
-      </div>
+      </Card>
     );
   }
 }

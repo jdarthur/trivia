@@ -20,7 +20,7 @@
 }
 
 .selected {
-	outline: 5px solid blue;
+	background: red;
 }
 
 textarea {
@@ -49,28 +49,20 @@ textarea {
 .answer {
    align-self: flex-end;
    padding: 5px;
+   padding-left: 15px;
    color: #707070;
    font-size: .9em;
    font-style: italic;
-
-   /*overflow-wrap: break-word; */
 }
 
-.button-container {
+.save-delete {
 	display: flex;
 	flex-direction: row;
 	justify-content: space-between;
 	align-self: stretch;
 }
 
-.delete-button {
-	background: lightcoral;
-}
-
-button {
-	padding:5px;
-	border-radius: 5px;
-	background: white;
+.button {
 	margin: 5px
 }
 
@@ -92,4 +84,9 @@ button {
 .answer_input {
 	flex-grow: 1;
 	font-style: italic;
+}
+
+.delete-edit-mini {
+	margin-left: 7px;
+	margin-right: 7px;
 }

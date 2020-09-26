@@ -6,9 +6,6 @@
     align-self: flex-start;
     align-items: center;
     padding: 25px;
-    border-right: 1px solid black;
-    /* height: 65vh; */
-    overflow-y: scroll;
 }
 
 .round-and-open-question {

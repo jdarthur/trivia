@@ -4,6 +4,10 @@ import './QuestionList.css';
 import Question from "./Question.jsx"
 import EditorFilter from "../editor/EditorFilter.jsx"
 
+import {
+  PlusSquareOutlined
+} from '@ant-design/icons';
+
 
 //JSON keys
 const CATEGORY = "category"
@@ -152,7 +156,7 @@ class QuestionList extends React.Component {
         select={this.set_selected} set={this.set_value}
         delete={this.delete} />))
 
-    const nqb = this.add_newquestion_button() ? <div className="new_button" onClick={this.add_new_question}>+</div> : null
+    const nqb = this.add_newquestion_button() ? <PlusSquareOutlined className="new_button" onClick={this.add_new_question} /> : null
     return (
       <div className="ql_and_filter">
         <EditorFilter set_text_filter={this.set_text_filter} set_unused_only={this.set_unused_only} data_type="questions"

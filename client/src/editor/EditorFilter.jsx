@@ -1,6 +1,8 @@
 import React from 'react';
 import './Editor.css';
 
+import { Input, Checkbox } from 'antd';
+
 class EditorFilter extends React.Component {
 
     set_unused_only = (event) => {
@@ -8,28 +10,22 @@ class EditorFilter extends React.Component {
         this.props.set_unused_only(value)
     }
 
-    set_text_filter = (event) => {
-        const value = event.target.value
+    set_text_filter = (value, event) => {
+        console.log("click search")
         this.props.set_text_filter(value)
     }
 
 
     render() {
         return (
-            <div className="filter_holder">
-                <div className='filter'>
-                    <div className="filter_subitem"> Text filters: </div>
-                    <div className="filter_subitem">
-                        <input name="text_filter" value={this.props.text_filter} onChange={this.set_text_filter} placeholder="Text filters" />
-                    </div>
-                </div>
 
-                <div className="filter">
-                    <div className="filter_subitem">  Unused {this.props.data_type} only </div>
-                    <div className="filter_subitem">
-                        <input type="checkbox" name="unused_only" checked={this.props.unused_only} onChange={this.set_unused_only} />
-                    </div>
+            <div className="filter_holder">
+                {/* <Input.Group compact> */}
+                <Input.Search placeholder="Text filters" style={{ width: '50%' }} className="filter-subitem" onSearch={this.set_text_filter} />
+                <div className="filter-subitem">
+                    <Checkbox onChange={this.set_unused_only} checked={this.props.unused_only} > Unused {this.props.data_type} only </Checkbox>
                 </div>
+                {/* </Input.Group> */}
             </div>
         );
     }

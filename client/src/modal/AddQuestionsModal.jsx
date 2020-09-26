@@ -1,7 +1,8 @@
 import React from 'react';
 import './Modal.css';
-import Modal from "./Modal"
-// import AddableQuestionsList from "../round/AddableQuestionsList"
+
+import { Modal, Button } from 'antd';
+
 import AddableQuestion from "../round/AddableQuestion"
 
 
@@ -89,19 +90,41 @@ class AddQuestionsModal extends React.Component {
                 }
             }
             return (
-                <Modal is_open={this.state.is_open}
-                    close={this.close_modal} transitionName="modal-anim"
-                    title="Add Questions" save_label="Add" save={this.add_questions_and_close}>
-                    <div className="body">
-                        <div className="question-list">
-                            {questions}
-                        </div>
+
+                <Modal
+                    title="Add Questions"
+                    visible={this.state.is_open}
+                    onOk={this.add_questions_and_close}
+                    onCancel={this.close_modal}
+                    width="50vw">
+
+                    <div className="rem-question-list">
+                        {questions}
+
                     </div>
+
                 </Modal>
+
+
+
+                // <Modal is_open={this.state.is_open}
+                //     close={this.close_modal} transitionName="modal-anim"
+                //     title="Add Questions" save_label="Add" save={this.add_questions_and_close}>
+                //     <div className="body">
+                //         <div className="question-list">
+                //             {questions}
+                //         </div>
+                //     </div>
+                // </Modal>
             );
         }
         else {
-            return (<button onClick={this.open_modal}>Add questions</button>)
+            return (
+
+                <Button type="primary" onClick={this.open_modal}>
+                    Add questions
+                </Button>
+            )
         }
     }
 }

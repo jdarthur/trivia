@@ -2,6 +2,10 @@ import React from 'react';
 import './Question.css';
 import ReadOnlyQuestion from "./ReadOnlyQuestion"
 
+import { Card, Input, Button } from 'antd';
+
+const { TextArea } = Input;
+
 //JSON keys
 const CATEGORY = "category"
 const QUESTION = "question"
@@ -13,24 +17,11 @@ class Question extends React.Component {
     this.props.select(this.props.id)
   }
 
-  set_category = (event) => {
-    this.set_value(event, CATEGORY)
-    //this.props.set(this.props.id, CATEGORY, event.target.value)
-  }
+  set_category = (event) => { this.set_value(event, CATEGORY) }
+  set_question = (event) => { this.set_value(event, QUESTION) }
+  set_answer = (event) => { this.set_value(event, ANSWER) }
 
-  set_question = (event) => {
-    this.set_value(event, QUESTION)
-    //this.props.set(this.props.id, QUESTION, event.target.value)
-  }
-
-  set_answer = (event) => {
-    this.set_value(event, ANSWER)
-    //this.props.set(this.props.id, ANSWER, event.target.value)
-  }
-
-  set_value = (event, key) => {
-    this.props.set(this.props.id, key, event.target.value)
-  }
+  set_value = (event, key) => { this.props.set(this.props.id, key, event.target.value) }
 
   delete_self = (event) => {
     this.props.delete(this.props.id)
@@ -41,9 +32,14 @@ class Question extends React.Component {
   }
 
   handleKeyPress = (event) => {
-    if (event.key === 'Enter' && !event.altKey) {
-      event.preventDefault()
-      this.save_self()
+    if (event.key === 'Enter') {
+      if (event.altKey) {
+        console.log("alt-enter")
+      }
+      else {
+        event.preventDefault()
+        this.save_self()
+      }
     }
   }
 
@@ -51,33 +47,31 @@ class Question extends React.Component {
 
   render() {
     if (this.props.selected) {
-      const containerClass = "question_container selected editable_question"
       return (
-        <div className={containerClass} onKeyDown={this.handleKeyPress}>
-          <input value={this.props.category}
-            onChange={this.set_category} placeholder="Category" autoFocus />
-          <textarea className="question_input q_and_a" value={this.props.question}
-            onChange={this.set_question} placeholder="Question" />
-          <textarea className="answer_input q_and_a" value={this.props.answer}
-            onChange={this.set_answer} placeholder="answer" />
-          <div className="button-container">
-            <button onClick={this.delete_self} className="delete-button button"> Delete </button>
-            <button onClick={this.save_self} className="button"> Save </button>
-          </div>
+        <Card size="small" style={{ width: 200, margin: 5, background: "#d9d9d9"}} >
+          <Input placeholder="Category" value={this.props.category}
+            onChange={this.set_category} onPressEnter={this.handleKeyPress} />
+          <TextArea placeholder="Question" value={this.props.question}
+            onChange={this.set_question} autoSize={{ minRows: 3 }} onPressEnter={this.handleKeyPress} />
+          <Input placeholder="Answer" value={this.props.answer}
+            onChange={this.set_answer} onPressEnter={this.handleKeyPress} />
 
-        </div>
+          <div className="save-delete">
+            <Button danger className="button" onClick={this.delete_self}> Delete</Button>
+            <Button className="button" onClick={this.save_self}> Save</Button>
+          </div>
+        </Card>
       );
     }
     else {
       return (
         <ReadOnlyQuestion id={this.props.id} question={this.props.question}
-                    answer={this.props.answer} category={this.props.category}
-                    select={this.select_self} selected={this.props.selected} />
+          answer={this.props.answer} category={this.props.category}
+          select={this.select_self} selected={this.props.selected}
+          delete={this.delete_self} />
       );
     }
   }
 }
-
-
 
 export default Question

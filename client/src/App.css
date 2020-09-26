@@ -36,3 +36,23 @@ input {
   height: 100vh;
   margin: 0px;
 }
+
+.logo {
+  /* height: 32px; */
+  background: rgba(255, 255, 255, 0.2);
+  margin: 16px;
+  display: flex;
+  align-items: center;
+
+  color: white;
+}
+
+.logo-min {
+  justify-content: center;
+}
+
+.icon {
+  margin: 5px 10px 5px 10px;
+  width: 25px;
+  height: 25px;
+}

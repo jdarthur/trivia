@@ -31,15 +31,16 @@ class RemovableQuestion extends React.Component {
     }
 
     select_self = () => {
+        console.log("select " + this.props.id)
         this.props.select(this.props.id)
     }
 
     render() {
         return (
-            <div>
+            <div onClick={this.select_self} className="actionable-question">
                 <ReadOnlyQuestion id={this.props.id} question={this.state.question}
                     answer={this.state.answer} category={this.state.category}
-                    select={this.props.select} selected = {this.props.selected} />
+                    selected={this.props.selected} hide_extra={true}  />
             </div>
         );
 

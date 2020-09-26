@@ -4,6 +4,9 @@ import AddQuestionsModal from "../modal/AddQuestionsModal"
 import RemovableQuestionsList from "./RemovableQuestionsList"
 import Wager from "./Incrementer.jsx"
 
+import { Collapse } from 'antd';
+const { Panel } = Collapse;
+
 const NAME = "name"
 const QUESTIONS = "questions"
 const WAGERS = "wagers"
@@ -49,17 +52,9 @@ class OpenRound extends React.Component {
 
     }
 
-    delete_self = () => {
-        this.props.delete(this.props.id)
-    }
-
-    save_self_and_close = () => {
-        this.props.set_selected("")
-    }
-
-    save_self = () => {
-        this.props.save(this.props.id)
-    }
+    delete_self = () => { this.props.delete(this.props.id) }
+    save_self_and_close = () => { this.props.set_selected("") }
+    save_self = () => { this.props.save(this.props.id) }
 
     handleKeyPress = (event) => {
         if (event.key === 'Enter' && !event.altKey) {
@@ -70,7 +65,7 @@ class OpenRound extends React.Component {
 
     render() {
         const wagers = this.props.wagers.map((wager, index) => (
-            <Wager key={index} index={index} value={wager} set={this.set_wager} prevent_negative={true} />))
+            <Wager key={index} index={index} value={wager} set={this.set_wager} />))
 
         return (
             <div className="open-round">
@@ -82,13 +77,15 @@ class OpenRound extends React.Component {
                     <AddQuestionsModal questions={this.props.questions} save={this.save_self} add_questions={this.add_questions} />
                 </div>
 
-                <div className="section-top"> Wagers </div>
-                <div className="wager-list"> {wagers} </div>
 
-                <div className="flex-grow">
-                    <div className="section-top"> Current questions </div>
-                    <RemovableQuestionsList questions={this.props.questions} remove_questions={this.remove_questions} />
-                </div>
+                <Collapse defaultActiveKey={['1', '2']} style={{width: "100%"}}>
+                    <Panel header="Wagers" key="1">
+                        {wagers}
+                    </Panel>
+                    <Panel header="Questions" key="2">
+                        <RemovableQuestionsList questions={this.props.questions} remove_questions={this.remove_questions} />
+                    </Panel>
+                </Collapse>
 
                 <div className="open-footer">
                     <button onClick={this.delete_self} className="delete-button footer-button"> Delete Round </button>
