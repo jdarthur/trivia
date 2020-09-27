@@ -63,7 +63,7 @@ class Scoreboard extends React.Component {
             <div className="scoreboard" >
                 <div className="scoreboard-title">
                 <FundProjectionScreenOutlined />
-                <span>Scoreboard</span>
+                <span style={{'padding-left': '10px'}}>Scoreboard</span>
                 </div>
                 {scores}
             </div>
