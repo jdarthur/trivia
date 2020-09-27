@@ -99,8 +99,8 @@ class LobbyPlayer extends React.Component {
 
   saveable = () => {
     return (
-      this.state.team_name != "" &&
-      this.state.real_name != "" &&
+      this.state.team_name !== "" &&
+      this.state.real_name !== "" &&
       this.state.dirty)
   }
 
