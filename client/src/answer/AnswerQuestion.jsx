@@ -73,7 +73,6 @@ class AnswerQuestion extends React.Component {
         const button_class = this.sendable() ? "" : "disabled"
         const send_text = this.state.answered ? "Update" : "Answer"
         return (
-
             <Card style={{ width: 300, margin: 5}} bodyStyle={{ padding: 15 }}  >
                 <TextArea placeholder="Your answer" value={this.state.answer}
                     onChange={this.set_answer} autoSize={{ minRows: 3 }}
@@ -87,20 +86,6 @@ class AnswerQuestion extends React.Component {
                         onClick={this.send} disabled={!this.sendable()}> {send_text} </Button>
                 </div>
             </Card>
-
-
-
-            // <div className="answer-question">
-            //     <textarea rows={8} className="answer-box" value={this.state.answer}
-            //         onChange={this.set_answer} placeholder="Your answer" />
-
-            //     <div className="answer-footer">
-            //         <WagerManager session_id={this.props.session_id} player_id={this.props.player_id}
-            //             round_id={this.props.round} wager={this.state.wager} select={this.set_wager}
-            //             question_id={this.props.question} />
-            //         <button className={button_class} onClick={this.send}> Answer </button>
-            //     </div>
-            // </div>
         );
     }
 }

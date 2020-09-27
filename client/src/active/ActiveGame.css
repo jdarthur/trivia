@@ -9,8 +9,6 @@
 .active-question-box {
     display: flex;
     flex-direction: column;
-    padding: 20px;
-    border-bottom: 1px solid black;
 }
 .active-question {
     font-size: 1.6em;
@@ -20,7 +18,7 @@
     align-self: flex-end;
     font-style: italic;
     font-size: 1.3em;
-    margin-top: 20px;
+    margin-top: 40px;
 }
 
 .round-category {
@@ -51,4 +49,8 @@
     flex-grow: 1;
 
     /* flex-grow: 1; */
+}
+
+.linebreak {
+    min-height: 15px;
 }

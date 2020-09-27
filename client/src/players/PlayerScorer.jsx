@@ -3,15 +3,15 @@ import sendData from "../index"
 import PlayerAnswer from "./PlayerAnswer"
 import "./Players.css"
 
+
+
 class PlayerScorer extends React.Component {
 
-    constructor(props) {
-        super(props)
-        this.state = {
-            scores: {},
-            answers: []
-        }
+    state = {
+        scores: {},
+        answers: []
     }
+
 
     componentDidMount() {
         this.get_answers()
@@ -25,10 +25,10 @@ class PlayerScorer extends React.Component {
             }
         }
         else if (this.props.question_id !== prevProps.question_id) {
-            this.setState({scores: {}}, () => this.get_answers())
+            this.setState({ scores: {} }, () => this.get_answers())
         }
         else if (this.props.round_id !== prevProps.round_id) {
-            this.setState({scores: {}}, () => this.get_answers())
+            this.setState({ scores: {} }, () => this.get_answers())
         }
     }
 
@@ -74,7 +74,7 @@ class PlayerScorer extends React.Component {
     set_correct = (player_id, correct) => {
 
         const scores = this.state.scores
-        if (scores[player_id] ===  undefined) {
+        if (scores[player_id] === undefined) {
             scores[player_id] = {}
         }
         scores[player_id].correct = correct
@@ -87,7 +87,7 @@ class PlayerScorer extends React.Component {
             scores[player_id].score_override = 0
         }
 
-        this.setState({ scores: scores})
+        this.setState({ scores: scores })
     }
 
     get_wager = (player_id) => {
@@ -100,7 +100,7 @@ class PlayerScorer extends React.Component {
 
     set_override = (player_id, value) => {
         const scores = this.state.scores
-        if (scores[player_id] ===  undefined) {
+        if (scores[player_id] === undefined) {
             scores[player_id] = {}
         }
         scores[player_id].score_override = value
@@ -108,7 +108,7 @@ class PlayerScorer extends React.Component {
     }
 
     scorable = () => {
-        if (this.state.scores.length === 0 ){
+        if (this.state.scores.length === 0) {
             return false
         }
         for (let i = 0; i < this.state.answers.length; i++) {
@@ -126,11 +126,12 @@ class PlayerScorer extends React.Component {
     render() {
         const answers = this.state.answers.map(player => {
             const status = this.state.scores[player.player_id] || {}
-            const override_value =  status.score_override !== undefined ? status.score_override : 0
+            const override_value = status.score_override !== undefined ? status.score_override : 0
             return <PlayerAnswer key={player.player_id} player_id={player.player_id}
                 answer={player.answer} wager={player.wager} set_correct={this.set_correct}
                 player_name={player.team_name} correct={status.correct}
-                set_override={this.set_override} override_value={override_value}/> })
+                set_override={this.set_override} override_value={override_value} />
+        })
 
         const score_class = this.scorable() ? "" : "disabled"
 

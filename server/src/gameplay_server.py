@@ -716,7 +716,7 @@ def get_answers_scored(players, answers):
     ret = []
     for player in players:
         player_id = player[ID]
-        p = {TEAM_NAME: player[TEAM_NAME]}
+        p = {TEAM_NAME: player[TEAM_NAME], ICON: player.get(ICON, None)}
         panswers = answers.get(player_id, [])
         if len(panswers) > 0:
             answer_id = panswers[-1]
