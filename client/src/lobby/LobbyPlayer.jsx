@@ -99,8 +99,8 @@ class LobbyPlayer extends React.Component {
 
   saveable = () => {
     return (
-      this.state.team_name !== "" &&
-      this.state.real_name !== "" &&
+      this.state.team_name != "" &&
+      this.state.real_name != "" &&
       this.state.dirty)
   }
 
@@ -112,13 +112,14 @@ class LobbyPlayer extends React.Component {
     const button_text = this.props.player_id ? "Update" : "Join game"
     const selectIcon = <SelectIcon select={this.set_icon} icon_name={this.state.icon}
       excluded_icons={this.props.excluded_icons} />
+    const disabled = !this.state.dirty || !this.saveable()
     return (
       <Card title="You" extra={selectIcon}
-        style={{ width: 300, margin: 5 }}>
+        style={{ width: 250, margin: 5 }}>
         <Input value={this.state.team_name} onChange={this.set_team_name} placeholder="Team name" />
         <Input value={this.state.real_name} onChange={this.set_real_name} placeholder="Your real name" />
         <div class="save-container">
-          <Button onClick={this.save} type="primary" disabled={!this.state.dirty}> {button_text} </Button>
+          <Button onClick={this.save} type="primary" disabled={disabled}> {button_text} </Button>
         </div>
       </Card>
     );

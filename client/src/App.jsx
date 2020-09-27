@@ -27,7 +27,8 @@ class App extends React.Component {
     this.state = {
       selected: PLAY,
       editor_section: QUESTION,
-      collapsed: true
+      collapsed: true,
+      show_toolbar: true
     }
   }
 

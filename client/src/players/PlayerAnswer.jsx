@@ -38,7 +38,7 @@ class PlayerAnswer extends React.Component {
         return (
 
             <Card size="small" title={this.props.player_name} extra={wager}
-                style={{ 'min-width': 150 }} bodyStyle={{ padding: 15 }}  >
+                style={{ 'width': 200 }} bodyStyle={{ padding: 15 }}  >
                 <div className="answered-or-not"> {answer_text} </div>
 
                 {this.props.answer ?

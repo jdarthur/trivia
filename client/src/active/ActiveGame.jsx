@@ -1,7 +1,5 @@
 import React from 'react';
 import './ActiveGame.css';
-// import InviteLink from "./InviteLink"
-// import LobbyPlayer from "./LobbyPlayer"
 import ActiveQuestion from "./ActiveQuestion"
 import ActiveRound from "./ActiveRound"
 import NextOrPrevious from "../control/NextOrPrevious"
@@ -21,7 +19,8 @@ class ActiveGame extends React.Component {
       active_round: "",
       questions: [],
       wagers: [],
-      scored: []
+      scored: [],
+      round_name: ""
     }
   }
 
@@ -41,7 +40,8 @@ class ActiveGame extends React.Component {
     let url = "/gameplay/session/" + this.props.session_id + "/current-round"
     fetch(url).then(response => response.json())
       .then(r => {
-        this.setState({ questions: r.questions, wagers: r.wagers, active_round: r.id })
+        console.log(r)
+        this.setState({ questions: r.questions, wagers: r.wagers, active_round: r.id, round_name: r.name || "" })
       })
   }
 
@@ -65,14 +65,11 @@ class ActiveGame extends React.Component {
 
     return (
       <div>
-
-
-
         <div className="game-and-scoreboard">
           <div className='active-game'>
             <div className="round-and-question">
-              <ActiveRound name="insert round name here" categories={categories}
-                active_question={this.state.active_question} />
+              <ActiveRound categories={categories} active_question={this.state.active_question}
+                name={this.state.round_name} />
               <ActiveQuestion session_state={this.props.session_state} session_id={this.props.session_id}
                 question={this.state.question} answer={this.state.answer} scored={this.state.scored} />
             </div>
@@ -90,8 +87,6 @@ class ActiveGame extends React.Component {
           </div>
           <Scoreboard round_id={this.state.active_round} session_id={this.props.session_id}
             player_id={this.props.player_id} session_state={this.props.session_state} />
-
-
 
         </div>
         {this.props.is_mod ?

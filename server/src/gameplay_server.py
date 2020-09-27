@@ -7,6 +7,7 @@ Trivia server mark II
 
 from flask import Flask, request
 import time
+import pprint
 
 from mongo_manager import MongoManager
 
@@ -53,6 +54,7 @@ GAME = "game"
 SESSION = "session"
 CORRECT = "correct"
 SCOREBOARD = "scoreboard"
+ROUND_NAMES = "round_names"
 
 MONGO_HOST = "localhost"
 MONGO_DB = "trivia"
@@ -578,8 +580,20 @@ def get_current_round(session_id, session={}):
     return round_name, list of questions, list of wagers
     """
     round_index = session.get(CURRENT_ROUND)
+    round_id = session.get(ROUND_ID)
+
+    # pprint.pprint(session)
     r = session.get(ROUNDS, [])[round_index]
     r[ID] = round_index
+    print(r[ID])
+
+    game_id = session.get(GAME_ID)
+    game = get_game(game_id)
+    round_name = game[OBJECT].get(ROUND_NAMES, {}).get(round_id)
+    pprint.pprint(game)
+
+    r[NAME] = round_name
+
     return succeed(r)
 
 

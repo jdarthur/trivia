@@ -22,7 +22,7 @@ class OpenGame extends React.Component {
 
     add_rounds = (rounds_list) => {
         for (let i = 0; i < rounds_list.length; i++) {
-            this.props.round_names[rounds_list[i]] = "Round " + i
+            this.props.round_names[rounds_list[i]] = "Round " + (i + 1)
         }
         const update = {
             [ROUNDS]: this.props.rounds.concat(rounds_list),

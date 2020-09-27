@@ -88,10 +88,12 @@
 }
 
 .answered-or-not {
-    min-height: 50px;
+    /* min-height: 50px; */
+    padding-bottom: 15px;
     align-items: center;
     display: flex;
     justify-content: center;
+
 }
 
 .borderbottom {
@@ -154,10 +156,11 @@
 .scoreboard-title {
     display: flex;
     flex-direction: row;
-    justify-content: space-between;
+    justify-content: space-around;
     align-items: center;
     padding: 10px;
     font-size: 1.3em;
+    font-weight: bold;
     border: 1px solid #d9d9d9;
     background: white;
 }
