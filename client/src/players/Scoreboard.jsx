@@ -3,6 +3,10 @@ import sendData from "../index"
 import PlayerScore from "./PlayerScore"
 import "./Players.css"
 
+import {
+    FundProjectionScreenOutlined
+} from '@ant-design/icons';
+
 class Scoreboard extends React.Component {
 
     constructor(props) {
@@ -51,13 +55,16 @@ class Scoreboard extends React.Component {
         })
 
         const scores = scores_sorted.map(player => {
-            return <PlayerScore key={player.player_name}
-                team_name={player.team_name} score={sum(player.score)} />
+            return <PlayerScore key={player.player_name} team_name={player.team_name}
+                score={sum(player.score)} icon_name={player.icon} />
         })
 
         return (
             <div className="scoreboard" >
-                Scoreboard:
+                <div className="scoreboard-title">
+                <FundProjectionScreenOutlined />
+                <span>Scoreboard</span>
+                </div>
                 {scores}
             </div>
         );

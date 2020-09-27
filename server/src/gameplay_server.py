@@ -892,6 +892,7 @@ def get_current_scoreboard(session_id):
         player = player[OBJECT]
         ret.append({
             TEAM_NAME: player[TEAM_NAME],
+            ICON: player.get(ICON, None),
             "score": scores[player_id]
         })
     print(ret)

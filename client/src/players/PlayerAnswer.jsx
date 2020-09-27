@@ -29,12 +29,15 @@ class PlayerAnswer extends React.Component {
         const incorrect_class = "scorer-icon" + (this.props.correct === false ? " incorrect" : "")
         let answer_text = this.props.answer ? this.props.answer :
             <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="No answer"
-                style={{margin:0}}/>
+                style={{ margin: 0 }} />
         let override = this.props.correct === false ? 0 : this.props.override_value
+        const wager = <div style={{ 'padding-left': '10px', 'font-size': '1.3em', 'font-weight': 'bold' }}>
+            {this.props.wager}
+        </div>
 
         return (
 
-            <Card size="small" title={this.props.player_name} extra={this.props.wager}
+            <Card size="small" title={this.props.player_name} extra={wager}
                 style={{ 'min-width': 150 }} bodyStyle={{ padding: 15 }}  >
                 <div className="answered-or-not"> {answer_text} </div>
 
@@ -51,21 +54,6 @@ class PlayerAnswer extends React.Component {
                     </div> : null}
 
             </Card>
-
-
-            // <div className="answer-and-scorer">
-            //     <div className="player-answer">
-            //         <div className="team-name"> {this.props.player_name} </div>
-            //         <div className="answer-text">    {answer_text}      </div>
-            //     </div>
-            //     {this.props.answer ?
-            //         <div className="score-and-override">
-            //         <div className="answer-scorer">
-            //             <div onClick={this.set_incorrect} className={incorrect_class}> ✗ </div>
-            //             <div onClick={this.set_correct} className={correct_class}  > ✓ </div>
-            //         </div>
-            //         <Incrementer set={this.set_override} value={override} disabled={this.props.correct === false} /> </div>: null}
-            // </div>
         );
     }
 }

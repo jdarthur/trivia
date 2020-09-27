@@ -65,43 +65,47 @@ class ActiveGame extends React.Component {
 
     return (
       <div>
-        <div className='active-game'>
-          <ActiveRound name="insert round name here" categories={categories}
-            active_question={this.state.active_question} />
-          <ActiveQuestion session_state={this.props.session_state} session_id={this.props.session_id}
-            question={this.state.question} answer={this.state.answer} scored={this.state.scored} />
 
-          {!this.props.is_mod ? <AnswerQuestion question={this.state.active_question}
-            round={this.state.active_round} session_id={this.props.session_id}
+
+
+        <div className="game-and-scoreboard">
+          <div className='active-game'>
+            <div className="round-and-question">
+              <ActiveRound name="insert round name here" categories={categories}
+                active_question={this.state.active_question} />
+              <ActiveQuestion session_state={this.props.session_state} session_id={this.props.session_id}
+                question={this.state.question} answer={this.state.answer} scored={this.state.scored} />
+            </div>
+
+            {!this.props.is_mod ? <AnswerQuestion question={this.state.active_question}
+              round={this.state.active_round} session_id={this.props.session_id}
+              player_id={this.props.player_id} session_state={this.props.session_state}
+              scored={this.state.scored} /> : null}
+
+            {this.props.is_mod ?
+              <NextOrPrevious questions={questions} rounds={this.props.rounds}
+                active_question={this.state.active_question} active_round={this.state.active_round}
+                session_id={this.props.session_id} player_id={this.props.player_id} /> : null}
+
+          </div>
+          <Scoreboard round_id={this.state.active_round} session_id={this.props.session_id}
+            player_id={this.props.player_id} session_state={this.props.session_state} />
+
+
+
+        </div>
+        {this.props.is_mod ?
+          <PlayerScorer question_id={this.state.active_question}
+            round_id={this.state.active_round} session_id={this.props.session_id}
             player_id={this.props.player_id} session_state={this.props.session_state}
             scored={this.state.scored} /> : null}
 
-          {this.props.is_mod ?
-            <NextOrPrevious questions={questions} rounds={this.props.rounds}
-              active_question={this.state.active_question} active_round={this.state.active_round}
-              session_id={this.props.session_id} player_id={this.props.player_id} /> : null}
-
-          {this.props.is_mod ?
-            <PlayerScorer question_id={this.state.active_question}
-              round_id={this.state.active_round} session_id={this.props.session_id}
-              player_id={this.props.player_id} session_state={this.props.session_state}
-              scored={this.state.scored} /> : null}
-
-          {!this.props.is_mod ?
-            <PlayerStatus question_id={this.state.active_question}
-              round_id={this.state.active_round} session_id={this.props.session_id}
-              player_id={this.props.player_id} session_state={this.props.session_state}
-              scored={this.state.scored} /> : null}
-        </div>
-
-
-        <Scoreboard round_id={this.state.active_round} session_id={this.props.session_id}
-          player_id={this.props.player_id} session_state={this.props.session_state} />
-
-
-        <div>
-          {this.props.players}
-        </div>
+        {!this.props.is_mod ?
+          <PlayerStatus question_id={this.state.active_question}
+            round_id={this.state.active_round} session_id={this.props.session_id}
+            player_id={this.props.player_id} session_state={this.props.session_state}
+            scored={this.state.scored} /> : null}
+        {/* {this.props.players} */}
       </div>
     );
   }

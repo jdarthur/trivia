@@ -38,6 +38,7 @@
     display: flex;
     flex-direction: row;
     align-items: center;
+    margin-top: 20px;
 }
 
 .set-score {
@@ -62,7 +63,7 @@
     flex-direction: row;
     align-items: flex-end;
     justify-content: flex-start;
-    margin-top: 50px;
+    margin-top: 20px;
 }
 
 .one-player-status {
@@ -104,7 +105,8 @@
     flex-direction: column;
     align-items: stretch;
     justify-content: flex-start;
-    border-left: 1px solid black;
+    margin-left: 100px;
+    /* border-left: 1px solid black; */
 }
 
 .one-player-score {
@@ -147,4 +149,15 @@
     font-size: 1.3em;
     border: 1px solid #d9d9d9;
     cursor: pointer
+}
+
+.scoreboard-title {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px;
+    font-size: 1.3em;
+    border: 1px solid #d9d9d9;
+    background: white;
 }

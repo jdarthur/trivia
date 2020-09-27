@@ -1,6 +1,7 @@
 .active-game {
     display: flex;
     flex-direction: column;
+    justify-content: space-between;
     /* flex-grow: 1; */
 
 }
@@ -11,13 +12,13 @@
     flex-direction: column;
 }
 .active-question {
-    font-size: 1.6em;
+    font-size: 1.4em;
 }
 
 .active-answer {
     align-self: flex-end;
     font-style: italic;
-    font-size: 1.3em;
+    font-size: 1.2em;
     margin-top: 40px;
 }
 
@@ -41,16 +42,17 @@
 }
 
 .game-and-scoreboard {
-    border: 1px solid black;
     display: flex;
     flex-direction: row;
-    min-width: 30vw;
-    max-width: 70vw;
-    flex-grow: 1;
-
-    /* flex-grow: 1; */
+    justify-content: space-between;
 }
 
 .linebreak {
     min-height: 15px;
+}
+
+.round-and-question {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
 }
