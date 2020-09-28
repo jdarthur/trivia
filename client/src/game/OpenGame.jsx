@@ -75,7 +75,8 @@ class OpenGame extends React.Component {
                     <AddRoundsModal rounds={this.props.rounds} add_rounds={this.add_rounds} />
                 </div>
 
-                <Collapse defaultActiveKey={['1']} style={{ width: "100%" }}>
+                <Collapse defaultActiveKey={['1']}
+                    style={{ width: "100%", 'border-left': 0, 'border-right': 0 }}>
                     <Panel header="Rounds" key="1">
                         <RemovableRoundsList rounds={this.props.rounds} remove_rounds={this.remove_rounds}
                             set_round_name={this.set_round_name} round_names={this.props.round_names}

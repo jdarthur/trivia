@@ -61,9 +61,10 @@
 .player-status-bar {
     display: flex;
     flex-direction: row;
-    align-items: ;
+    align-items: stretch;
     justify-content: flex-start;
     margin-top: 20px;
+    flex-wrap: wrap;
 }
 
 .one-player-status {
@@ -89,7 +90,6 @@
 
 .answered-or-not {
     /* min-height: 50px; */
-    padding-bottom: 15px;
     align-items: center;
     display: flex;
     justify-content: center;

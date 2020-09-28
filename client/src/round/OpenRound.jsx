@@ -78,11 +78,12 @@ class OpenRound extends React.Component {
                 </div>
 
 
-                <Collapse defaultActiveKey={['1', '2']} style={{ width: "100%" }}>
-                    <Panel header="Wagers" key="1">
+                <Collapse defaultActiveKey={['1', '2']}
+                style={{ width: "100%", 'border-left': 0, 'border-right': 0 }}>
+                    <Panel header="Wagers" key="1" >
                         {wagers}
                     </Panel>
-                    <Panel header="Questions" key="2">
+                    <Panel header="Questions" key="2" >
                         <RemovableQuestionsList questions={this.props.questions} remove_questions={this.remove_questions} />
                     </Panel>
                 </Collapse>

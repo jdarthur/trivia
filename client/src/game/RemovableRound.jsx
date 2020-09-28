@@ -1,6 +1,7 @@
 import React from 'react';
 import "./OpenGame.css"
 import RoundInGame from './RoundInGame';
+import { Input } from "antd"
 
 /**
  * This is a round inside of an open game. It shows
@@ -21,8 +22,8 @@ class RemovableRound extends React.Component {
     render() {
         return (
             <div className="removable-round">
-                <input value={this.props.name} onChange={this.set_name}
-                onKeyDown={this.keydown} placeholder="Name" />
+                <Input value={this.props.name} onChange={this.set_name}
+                onKeyDown={this.keydown} placeholder="Round name" style={{width: 150}}/>
                 <RoundInGame key={this.props.id} id={this.props.id} select={this.props.select}
                     selected={this.props.selected} show_title={false} />
             </div>

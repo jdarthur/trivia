@@ -36,7 +36,7 @@ class App extends React.Component {
     let search = window.location.search;
     let params = new URLSearchParams(search);
     let key = params.get("key");
-    this.setState({ key: key })
+    this.setState({ key: key, show_toolbar: key == "12344321"})
   }
 
   set_show_toolbar = (value) => {
@@ -58,7 +58,7 @@ class App extends React.Component {
         <Sider collapsible collapsed={this.state.collapsed} onCollapse={this.toggleCollapsed}>
           <div className={this.state.collapsed? "logo logo-min" : "logo"}>
             <img src={logo} className="icon" alt="Bort Trivia"/>
-            {this.state.collapsed ? null : <div> Bort Trivia </div>}
+            {this.state.collapsed ? null : <div> bort trivia </div>}
           </div>
           <Menu
             defaultSelectedKeys={['2']}
@@ -79,9 +79,9 @@ class App extends React.Component {
         </Sider>
 
         <Layout className="site-layout">
-          <Content style={{ margin: '0 16px' }}>
+          <Content style={{ 'margin': '16px' }}>
 
-            <div className="site-layout-background" style={{ padding: 12, minHeight: 360 }}>
+            <div className="site-layout-background" style={{ minHeight: 360 }}>
               {this.state.selected === PLAY ? <HomePage set_toolbar={this.set_show_toolbar}/> : null}
               {this.state.selected === EDITOR ? <Editor section={this.state.editor_section} /> : null}
             </div>

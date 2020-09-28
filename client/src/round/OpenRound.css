@@ -4,7 +4,8 @@
     flex-direction: column;
     justify-content: space-between;
     align-items: center;
-    border: 1px solid black;
+    border: 1px solid #d9d9d9;
+    border-radius: 2px;
     min-width: 25vw;
     max-width: 35vw;
     height: 100%;
@@ -14,9 +15,8 @@
 .open-header {
     align-self: stretch;
     font-size: 1.4em;
-    font-weight: bold;
     padding: 15px;
-    border-bottom: 1px solid black;
+    border-bottom: 1px solid #d9d9d9;
     background: lightgray
 }
 
@@ -77,4 +77,14 @@
 
 .centered {
     justify-content: "center";
+}
+
+.current-questions {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-around;
+    padding-left: 10px;
+    padding-right: 10px;
+    align-items: center;
+    flex-wrap: wrap;
 }

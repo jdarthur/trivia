@@ -61,25 +61,15 @@ class NewGameModal extends React.Component {
           width="65vw">
 
           <div>
-            <input value={this.state.name} onChange={this.set_name} placeholder="Name" />
+            <input value={this.state.name} onChange={this.set_name} placeholder="Game name" />
             <GameNames select={this.select_game} selected={this.state.selected_game} />
           </div>
-
         </Modal>
-        // set_name = (event) => { this.setState({ name: event.target.value }) }
-
-        // <Modal is_open={this.state.open} title="New Game" save={this.create_new_game}
-        //   save_label="Create" close={this.close}>
-        //   <div className="new-game">
-        //     <input value={this.state.name} onChange={this.set_name} placeholder="Name" />
-        //     <GameNames select={this.select_game} selected={this.state.selected_game} />
-        //   </div>
-        // </Modal>
       )
     }
 
     return (
-      <Button type="primary" onClick={this.open}>
+      <Button type="primary" onClick={this.open} style={{margin: 50}}>
         New Game
       </Button>
     );

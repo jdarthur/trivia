@@ -1,19 +1,30 @@
 import React from 'react';
 import './ActiveGame.css';
 
-import { Card } from 'antd';
+import { Card, Breadcrumb } from 'antd';
+import { PlaySquareOutlined } from '@ant-design/icons';
 
 class ActiveQuestion extends React.Component {
 
   render() {
     const question_newlined = this.props.question.split("^").map((part) => <div className="linebreak"> {part} </div>)
 
+
+
     return (
 
-      <Card style={{ width: 400, 'margin-top': 10}} >
+      <Card style={{ width: 400, 'margin-top': 10}} bodyStyle={{padding: 15}}  >
+        <Breadcrumb style={{'padding-bottom': '10px'}}>
+          <Breadcrumb.Item>
+            <PlaySquareOutlined />
+          </Breadcrumb.Item>
+          <Breadcrumb.Item> {this.props.round_name} </Breadcrumb.Item>
+          <Breadcrumb.Item> {this.props.category} </Breadcrumb.Item>
+        </Breadcrumb>
+
         <div className="active-question-box">
           <div className="active-question"> {question_newlined} </div>
-          <div className="active-answer"> {this.props.answer} </div>
+          {this.props.answer ? <div className="active-answer"> {this.props.answer} </div> : null}
         </div>
       </Card>
     );

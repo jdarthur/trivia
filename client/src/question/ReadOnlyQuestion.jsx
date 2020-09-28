@@ -27,9 +27,9 @@ class ReadOnlyQuestion extends React.Component {
         </div>
         return (
             <Card title={this.props.category} size="small" extra={edit}
-            style={{ width: 200, margin: 5, background: background, cursor: cursor}}>
-                <p>{this.props.question} </p>
-                <p className="answer">{this.props.answer}</p>
+            style={{ width: 225, margin: 5, background: background, cursor: cursor}}>
+                <div>{this.props.question} </div>
+                <div className="answer">{this.props.answer}</div>
             </Card>
         );
     }

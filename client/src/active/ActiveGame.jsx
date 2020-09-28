@@ -15,6 +15,7 @@ class ActiveGame extends React.Component {
     this.state = {
       question: "",
       answer: "",
+      category: "",
       active_question: "",
       active_round: "",
       questions: [],
@@ -52,6 +53,7 @@ class ActiveGame extends React.Component {
         this.setState({
           question: q.question,
           answer: q.answer,
+          category: q.category,
           active_question: q.id,
           scored: q.scored === true
         })
@@ -71,13 +73,14 @@ class ActiveGame extends React.Component {
               <ActiveRound categories={categories} active_question={this.state.active_question}
                 name={this.state.round_name} />
               <ActiveQuestion session_state={this.props.session_state} session_id={this.props.session_id}
-                question={this.state.question} answer={this.state.answer} scored={this.state.scored} />
+                question={this.state.question} answer={this.state.answer} scored={this.state.scored}
+                round_name={this.state.round_name} category={this.state.category}/>
             </div>
 
             {!this.props.is_mod ? <AnswerQuestion question={this.state.active_question}
               round={this.state.active_round} session_id={this.props.session_id}
               player_id={this.props.player_id} session_state={this.props.session_state}
-              scored={this.state.scored} /> : null}
+              scored={this.state.scored} wagers={this.state.wagers}/> : null}
 
             {this.props.is_mod ?
               <NextOrPrevious questions={questions} rounds={this.props.rounds}

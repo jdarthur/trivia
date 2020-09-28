@@ -11,7 +11,8 @@ class Incrementer extends React.Component {
 
     render() {
         return (
-            <InputNumber min={1} value={this.props.value} onChange={this.set_value} />
+            <InputNumber min={1} value={this.props.value} onChange={this.set_value}
+              style={{'margin-right': 5, 'margin-top': 5}} />
         );
     }
 }

@@ -1,6 +1,8 @@
 import React from 'react';
 import sendData from "../index"
 
+import { Button } from "antd"
+
 class SetQuestion extends React.Component {
 
     set_question = () => {
@@ -19,9 +21,7 @@ class SetQuestion extends React.Component {
 
     render() {
         return (
-            <div className="">
-                <button onClick={this.set_question}> {this.props.label} </button>
-            </div>
+            <Button type="primary" onClick={this.set_question}> {this.props.label} </Button>
         );
     }
 }

@@ -112,7 +112,7 @@ class AddQuestionsModal extends React.Component {
         else {
             return (
 
-                <Button type="primary" onClick={this.open_modal}>
+                <Button type="primary" onClick={this.open_modal} style={{'margin-bottom': '10px', 'margin-top': '10px'}}>
                     Add questions
                 </Button>
             )

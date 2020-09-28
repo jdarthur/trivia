@@ -63,18 +63,30 @@ class WagerManager extends React.Component {
     }
 
     render() {
-        const wagers = this.state.available_wagers.map(wager =>
-            <Radio.Button value={wager}> {wager} </Radio.Button>
-        )
+        // const wagers = this.state.available_wagers.map(wager =>
+        //     <Radio.Button value={wager}> {wager} </Radio.Button>
+        // )
+
+        const sorted = (this.props.all_wagers || []).sort()
+        const wager_elements = []
+        const used_wagers = []
+        for (let i = 0; i < sorted.length; i++) {
+            const wager = sorted[i]
+            if (!used_wagers.includes(wager)) {
+                const disabled =  !this.state.available_wagers.includes(wager)
+                wager_elements.push(<Radio.Button value={wager} disabled={disabled}> {wager} </Radio.Button>)
+                used_wagers.push(wager)
+            }
+
+        }
 
         const can_wager = this.state.available_wagers.length > 0
         return (
             <div>
                 {can_wager ? <p>Wager: </p> : null}
 
-                <Radio.Group onChange={this.props.select} value={this.props.wager} >
-
-                    {can_wager ? wagers : null}
+                <Radio.Group buttonStyle="solid" onChange={this.props.select} value={this.props.wager} >
+                    {can_wager ? wager_elements : null}
                 </Radio.Group>
 
             </div>

@@ -10,11 +10,12 @@
     display: flex;
     border-radius: 5px;
     /* padding: 5px; */
-    border: 1px solid black;
+    border: 1px solid #d9d9d9;
     font-size: .9em;
     text-align: left;
     cursor: pointer;
     margin: 5px;
+    padding: 5px;
     display: flex;
     flex-direction: column;
     justify-content: space-between;
@@ -36,8 +37,8 @@
 .removable-round {
     display: flex;
     flex-direction: column;
-    align-items: stretch;
-    border: 1px solid black;
-    padding: 2px;
-    margin: 5px;
+    align-items: flex-start;
+    border: 1px solid #d9d9d9;
+    padding: 10px;
+    margin-top: 5px;
 }

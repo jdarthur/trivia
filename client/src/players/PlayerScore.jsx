@@ -11,7 +11,7 @@ class PlayerScore extends React.Component {
         </div>
         return (
             <Card size="small" title={this.props.team_name} extra={icon}
-                style={{ 'min-width': 150 }} bodyStyle={{ padding: 0 }}  >
+                style={{ 'width': 200 }} bodyStyle={{ padding: 0 }}  >
                 <div className="scoreboard-score"> {this.props.score} </div>
             </Card>
         );

@@ -3,6 +3,8 @@ import sendData from "../index"
 import PlayerAnswer from "./PlayerAnswer"
 import "./Players.css"
 
+import { Button } from "antd"
+
 
 
 class PlayerScorer extends React.Component {
@@ -138,7 +140,8 @@ class PlayerScorer extends React.Component {
         return (
             <div className="player-scorer" >
                 {answers}
-                <button onClick={this.score} className={score_class}> Score </button>
+                <Button  type="primary"onClick={this.score}
+                className={score_class} style = {{margin: 10}}> Score </Button>
             </div>
         );
     }
