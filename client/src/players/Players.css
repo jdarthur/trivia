@@ -124,7 +124,7 @@
     align-items: center;
     display: flex;
     justify-content: center;
-    padding: 15px;
+    padding: 10px;
     font-weight: bold;
     font-size: 1.3em;
 }
@@ -163,4 +163,11 @@
     font-weight: bold;
     border: 1px solid #d9d9d9;
     background: white;
+}
+
+.self-indicator {
+    /* font-size: 1.7em; */
+    color: #1890ff;
+    margin-right: 5px;
+
 }

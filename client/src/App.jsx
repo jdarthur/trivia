@@ -36,7 +36,7 @@ class App extends React.Component {
     let search = window.location.search;
     let params = new URLSearchParams(search);
     let key = params.get("key");
-    this.setState({ key: key, show_toolbar: key == "12344321"})
+    this.setState({ key: key, show_toolbar: key === "12344321"})
   }
 
   set_show_toolbar = (value) => {

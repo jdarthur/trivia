@@ -22,7 +22,7 @@ class SelectIcon extends React.Component {
         for (let key in ICONS) {
             const icon = ICONS[key]
             if (!this.props.excluded_icons.includes(key)) {
-                options.push(<Option value={key} title=""> {icon} </Option>)
+                options.push(<Option key={key} value={key} title=""> {icon} </Option>)
             }
         }
 

@@ -118,7 +118,7 @@ class LobbyPlayer extends React.Component {
         style={{ width: 250, margin: 5 }}>
         <Input value={this.state.team_name} onChange={this.set_team_name} placeholder="Team name" />
         <Input value={this.state.real_name} onChange={this.set_real_name} placeholder="Your real name" />
-        <div class="save-container">
+        <div className="save-container">
           <Button onClick={this.save} type="primary" disabled={disabled}> {button_text} </Button>
         </div>
       </Card>

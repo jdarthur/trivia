@@ -55,15 +55,16 @@ class Scoreboard extends React.Component {
         })
 
         const scores = scores_sorted.map(player => {
-            return <PlayerScore key={player.player_name} team_name={player.team_name}
-                score={sum(player.score)} icon_name={player.icon} />
+            return <PlayerScore key={player.team_name} team_name={player.team_name}
+                score={sum(player.score)} icon_name={player.icon}
+                player_id={player.player_id} current_player={this.props.player_id} />
         })
 
         return (
             <div className="scoreboard" >
                 <div className="scoreboard-title">
+                <span style={{paddingRight: 10}}>Scoreboard</span>
                 <FundProjectionScreenOutlined />
-                <span style={{'padding-left': '10px'}}>Scoreboard</span>
                 </div>
                 {scores}
             </div>

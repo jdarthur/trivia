@@ -694,10 +694,10 @@ def get_answer_status(session_id):
     if player_id != mod:
         # scored questions will provide answers and wagers
         if question.get(SCORED, False):
-            return _resp(get_answers_scored(players, answers))
+            return _resp(get_answers_scored(players, answers, player_id))
         else:
             # unscored questions will provide only answered:true/false
-            return _resp(get_answers_unscored(players, answers))
+            return _resp(get_answers_unscored(players, answers, player_id))
 
     else:
         # mod always gets complete player_id/answer/wager
@@ -714,19 +714,21 @@ def get_players2(session):
     return ret
 
 
-def get_answers_unscored(players, answers):
+def get_answers_unscored(players, answers, caller_player_id):
     ret = []
     for player in players:
         player_id = player[ID]
         p = {TEAM_NAME: player[TEAM_NAME], ICON: player.get(ICON, None)}
         panswers = answers.get(player_id, None)
         p['answered'] = panswers is not None
+        if caller_player_id == player_id:
+            p[PLAYER_ID] = player_id
 
         ret.append(p)
     return succeed({SCORED: False, ANSWERS: ret})
 
 
-def get_answers_scored(players, answers):
+def get_answers_scored(players, answers, caller_player_id):
     ret = []
     for player in players:
         player_id = player[ID]
@@ -740,6 +742,8 @@ def get_answers_scored(players, answers):
             p[WAGER] = answer[WAGER]
             p[CORRECT] = answer.get(CORRECT, False)
             p[POINTS_AWARDED] = answer.get(POINTS_AWARDED, answer[WAGER])
+            if caller_player_id == player_id:
+                p[PLAYER_ID] = player_id
             ret.append(p)
     return succeed({SCORED: True, ANSWERS: ret})
 
@@ -895,20 +899,25 @@ def award_points(session_id, player_id, points, rescore):
 
 @app.route(f'{URL_BASE}/session/<session_id>/scoreboard', methods=['GET'])
 def get_current_scoreboard(session_id):
-    print(session_id)
+    caller_player_id = request.args.get(PLAYER_ID, None)
+
     scores = get_scoreboard(session_id)[OBJECT]
-    print(scores)
 
     ret = []
     for player_id in scores:
         player = get_player(player_id)
-        print(player)
+        pprint.pprint(player)
         player = player[OBJECT]
-        ret.append({
+        score = {
             TEAM_NAME: player[TEAM_NAME],
             ICON: player.get(ICON, None),
             "score": scores[player_id]
-        })
+        }
+        if caller_player_id == player_id:
+            score[PLAYER_ID] = player_id
+
+        ret.append(score)
+
     print(ret)
 
     return _resp(succeed(ret))

@@ -7,14 +7,12 @@ import { PlaySquareOutlined } from '@ant-design/icons';
 class ActiveQuestion extends React.Component {
 
   render() {
-    const question_newlined = this.props.question.split("^").map((part) => <div className="linebreak"> {part} </div>)
-
-
+    const question_newlined = this.props.question.split("^").map((part, index) => <div key={index} className="linebreak"> {part} </div>)
 
     return (
 
-      <Card style={{ width: 400, 'margin-top': 10}} bodyStyle={{padding: 15}}  >
-        <Breadcrumb style={{'padding-bottom': '10px'}}>
+      <Card style={{ width: 400, marginTop: 10}} bodyStyle={{padding: 15}}  >
+        <Breadcrumb style={{paddingBottom: 10}}>
           <Breadcrumb.Item>
             <PlaySquareOutlined />
           </Breadcrumb.Item>

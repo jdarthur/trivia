@@ -73,7 +73,7 @@ class AnswerQuestion extends React.Component {
         const button_class = this.sendable() ? "" : "disabled"
         const send_text = this.state.answered ? "Update" : "Answer"
         return (
-            <Card style={{ width: 300, 'margin-top': '15px' }} bodyStyle={{ padding: 15 }}  >
+            <Card style={{ width: 300, marginTop: 15 }} bodyStyle={{ padding: 15 }}  >
                 <TextArea placeholder="Your answer" value={this.state.answer}
                     onChange={this.set_answer} autoSize={{ minRows: 3 }}
                     onPressEnter={this.handleKeyPress} />

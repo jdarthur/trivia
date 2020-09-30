@@ -18,27 +18,24 @@ class CorrectOrNot extends React.Component {
 
     render() {
         const class_name = "player-wager "  + (this.props.correct && this.props.points_awarded > 0 ? "": "in") + "correct"
-
         const amount_to_show = this.props.correct ? this.props.points_awarded : this.props.wager
-
-        // return (
-
-           // (this.props.correct && this.props.points_awarded > 0 ? "": "in") + "correct"
         const icon = <div className="delete-edit-mini" >
             <PlayerIcon icon_name={this.props.icon_name} />
         </div>
+
         const correct_icon = this.props.correct ? <CheckSquareOutlined /> : <CloseSquareOutlined />
+        const is_self = this.props.player_id === this.props.current_player
+        const title = <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center' }}>
+            {is_self ? <span className="self-indicator"> • </span> : null}
+            {this.props.player_name}
+        </div>
         return (
-            <Card size="small" title={this.props.player_name} extra={icon}
+            <Card size="small" title={title} extra={icon}
                 style={{ 'min-width': 150 }} bodyStyle={{ padding: 0 }}  >
-                {/* <div className="answered-or-not"> {answer_icon} </div> */}
                 <div className="answer-text"> {this.props.answer} </div>
                 <div className={class_name} >
                     <div> {amount_to_show} </div>
                     <div> {correct_icon} </div>
-
-                    {/* <div onClick={this.set_incorrect} className={incorrect_class}> <CloseSquareOutlined /> </div> */}
-                    {/* <div onClick={this.set_correct} className={correct_class}  > <CheckSquareOutlined /> </div> */}
                 </div>
             </Card>
         )
