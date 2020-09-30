@@ -1,4 +1,5 @@
 import React from 'react';
+import ScorerLink from "./ScorerLink.jsx"
 
 import { Card, InputNumber, Empty } from "antd"
 
@@ -35,9 +36,13 @@ class PlayerAnswer extends React.Component {
             {this.props.wager}
         </div>
 
+        const title = <div>
+            {this.props.player_name}
+            <ScorerLink session_id={this.props.session_id} player_id={this.props.player_id} />
+        </div>
         return (
 
-            <Card size="small" title={this.props.player_name} extra={wager}
+            <Card size="small" title={title} extra={wager}
                 style={{ 'width': 200 }} bodyStyle={{ padding: 15 }}  >
                 <div className="answered-or-not"> {answer_text} </div>
 

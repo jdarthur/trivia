@@ -3,6 +3,7 @@ import sendData from "../index"
 import PlayerAnswer from "./PlayerAnswer"
 import "./Players.css"
 
+
 import { Button } from "antd"
 
 
@@ -131,7 +132,7 @@ class PlayerScorer extends React.Component {
             const override_value = status.score_override !== undefined ? status.score_override : 0
             return <PlayerAnswer key={player.player_id} player_id={player.player_id}
                 answer={player.answer} wager={player.wager} set_correct={this.set_correct}
-                player_name={player.team_name} correct={status.correct}
+                player_name={player.team_name} correct={status.correct} session_id={this.props.session_id}
                 set_override={this.set_override} override_value={override_value} />
         })
 
