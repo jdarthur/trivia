@@ -7,7 +7,7 @@ class ScorerLink extends React.Component {
         const url = window.location.href.split("?")[0] + "?session_id=" +
             this.props.session_id + "&player_id=" + this.props.player_id
         return (
-            <a href={url} target="_blank">
+            <a href={url} target="_blank"  rel="noopener noreferrer">
                 <ExportOutlined style={{paddingLeft: 5}}/>
             </a>
         );
