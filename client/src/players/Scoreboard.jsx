@@ -54,9 +54,10 @@ class Scoreboard extends React.Component {
             return (score_a > score_b) ? -1 : 1
         })
 
-        const scores = scores_sorted.map(player => {
+        const scores = scores_sorted.map((player, index) => {
+            const background = ((index + 1) % 2) === 1 ? "#fafafa" : ""
             return <PlayerScore key={player.team_name} team_name={player.team_name}
-                score={sum(player.score)} icon_name={player.icon}
+                score={sum(player.score)} icon_name={player.icon} background={background}
                 player_id={player.player_id} current_player={this.props.player_id} />
         })
 

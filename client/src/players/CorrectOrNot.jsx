@@ -22,7 +22,6 @@ class CorrectOrNot extends React.Component {
         const icon = <div className="delete-edit-mini" >
             <PlayerIcon icon_name={this.props.icon_name} />
         </div>
-
         const correct_icon = this.props.correct ? <CheckSquareOutlined /> : <CloseSquareOutlined />
         const is_self = this.props.player_id === this.props.current_player
         const title = <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center' }}>
@@ -36,21 +35,11 @@ class CorrectOrNot extends React.Component {
                 <div className={class_name} >
                     <div> {amount_to_show} </div>
                     <div> {correct_icon} </div>
+
                 </div>
             </Card>
         )
     }
-
-
-            // <div className="one-player-status" >
-            //     <div className="team-name"> {this.props.player_name} </div>
-            //     <div className="answer-text"> {this.props.answer} </div>
-            //     <div className={class_name} >
-            //         <div className="player-name"> {amount_to_show} </div>
-            //         <div> {this.props.correct ? "✓" : "✗" } </div>
-            //     </div>
-            // </div>
-        //);
 }
 
 export default CorrectOrNot;

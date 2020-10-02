@@ -54,7 +54,7 @@ class App extends React.Component {
 
   render() {
     return (
-      <Layout style={{ minHeight: '100vh' }}>
+      <Layout style={{ minHeight: '100vh', minWidth: '100vw' }}>
         <Sider collapsible collapsed={this.state.collapsed} onCollapse={this.toggleCollapsed}>
           <div className={this.state.collapsed? "logo logo-min" : "logo"}>
             <img src={logo} className="icon" alt="Bort Trivia"/>
