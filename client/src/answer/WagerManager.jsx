@@ -18,9 +18,9 @@ class WagerManager extends React.Component {
 
     componentDidUpdate(prevProps) {
         printDiffs(this.props, prevProps)
-        if (this.props.session_state !== prevProps.session_state) {
-            this.get_available_wagers()
-        }
+        // if (this.props.session_state !== prevProps.session_state) {
+        //     this.get_available_wagers()
+        // }
         if (this.props.question_id !== prevProps.question_id) {
             this.get_available_wagers()
         }

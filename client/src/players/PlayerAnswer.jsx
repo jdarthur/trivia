@@ -54,8 +54,6 @@ class PlayerAnswer extends React.Component {
                         </div>
 
                         <InputNumber value={override} onChange={this.set_override} />
-                        {/* <Incrementer set={this.set_override} value={override}
-                            disabled={this.props.correct === false}  /> */}
                     </div> : null}
 
             </Card>
