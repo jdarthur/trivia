@@ -7,7 +7,7 @@ import { PlaySquareOutlined } from '@ant-design/icons';
 class ActiveQuestion extends React.Component {
 
   render() {
-    const question_newlined = this.props.question.split("^").map((part, index) => <div key={index} className="linebreak"> {part} </div>)
+    const question_newlined = this.props.question?.split("^").map((part, index) => <div key={index} className="linebreak"> {part} </div>)
 
     return (
 

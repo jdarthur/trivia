@@ -62,8 +62,8 @@ class ActiveGame extends React.Component {
 
 
   render() {
-    const questions = this.state.questions.map((question, index) => index)
-    const categories = this.state.questions.map(question => question.category)
+    const questions = this.state.questions?.map((question, index) => index)
+    const categories = this.state.questions?.map(question => question.category)
 
     return (
       <div>

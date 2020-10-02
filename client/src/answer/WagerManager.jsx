@@ -18,9 +18,6 @@ class WagerManager extends React.Component {
 
     componentDidUpdate(prevProps) {
         printDiffs(this.props, prevProps)
-        // if (this.props.session_state !== prevProps.session_state) {
-        //     this.get_available_wagers()
-        // }
         if (this.props.question_id !== prevProps.question_id) {
             this.get_available_wagers()
         }
@@ -63,13 +60,13 @@ class WagerManager extends React.Component {
     }
 
     render() {
-        const sorted = (this.props.all_wagers || []).sort()
+        const sorted = this.props.all_wagers?.sort()
         const wager_elements = []
         const used_wagers = []
         for (let i = 0; i < sorted.length; i++) {
             const wager = sorted[i]
             if (!used_wagers.includes(wager)) {
-                const disabled =  !this.state.available_wagers.includes(wager)
+                const disabled =  !(this.state.available_wagers || []).includes(wager)
                 wager_elements.push(<Radio.Button key={wager} value={wager} disabled={disabled}> {wager} </Radio.Button>)
                 used_wagers.push(wager)
             }

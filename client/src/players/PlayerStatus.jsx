@@ -52,7 +52,7 @@ class PlayerStatus extends React.Component {
     }
 
     render() {
-        const answers = this.state.answers.map(player => {
+        const answers = this.state.answers?.map(player => {
             if (this.props.scored)
                 return <CorrectOrNot key={player.team_name} player_name={player.team_name}
                     answer={player.answer} wager={player.wager} correct={player.correct}

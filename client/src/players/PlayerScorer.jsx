@@ -127,7 +127,7 @@ class PlayerScorer extends React.Component {
     }
 
     render() {
-        const answers = this.state.answers.map(player => {
+        const answers = this.state.answers?.map(player => {
             const status = this.state.scores[player.player_id] || {}
             const override_value = status.score_override !== undefined ? status.score_override : 0
             return <PlayerAnswer key={player.player_id} player_id={player.player_id}
