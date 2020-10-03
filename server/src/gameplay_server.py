@@ -5,9 +5,11 @@ Trivia server mark II
 @date 12 Apr 2020
 """
 
+from dotenv import load_dotenv
 from flask import Flask, request
 import time
 import pprint
+import os
 
 from mongo_manager import MongoManager
 
@@ -15,6 +17,8 @@ from validator import model, succeed, fail, RestField, IdField, get_all
 from validator import SUCCESS, OBJECT, CREATE, UPDATE, DELETE, GET_ONE, SUBOP
 from editor_server import get_game, get_round, get_question, _resp
 
+load_dotenv()
+debug = os.environ.get("debug").upper() == 'TRUE'
 
 app = Flask(__name__)
 
@@ -1041,4 +1045,4 @@ def get_answer(answer_id, answer={}):
 
 if __name__ == "__main__":
     editor_key = "x12345x"
-    app.run(host="0.0.0.0", debug=True, threaded=True)
+    app.run(host="0.0.0.0", debug=debug, threaded=True)

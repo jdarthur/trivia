@@ -4,7 +4,9 @@ Trivia server mark II
 @author jdarthur
 @date 12 Apr 2020
 """
+import os
 
+from dotenv import load_dotenv
 from mongo_manager import MongoManager
 
 from validator import (model, succeed, fail, RestField,
@@ -16,6 +18,9 @@ from flask import Flask, jsonify, request
 from flask.json import JSONEncoder
 from datetime import datetime
 
+
+load_dotenv()
+debug = os.environ.get("debug").upper() == 'TRUE'
 
 class CustomJSONEncoder(JSONEncoder):
     def default(self, obj):
@@ -628,4 +633,4 @@ def get_and_respond(endpoint, object_id):
 
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=6000, debug=True)
+    app.run(host="0.0.0.0", port=6000, debug=debug)
