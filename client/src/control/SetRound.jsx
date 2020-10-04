@@ -1,6 +1,8 @@
 import React from 'react';
 import sendData from "../index"
 
+import { Button } from "antd"
+
 class SetRound extends React.Component {
 
     set_round = () => {
@@ -18,9 +20,7 @@ class SetRound extends React.Component {
 
     render() {
         return (
-            <div className="">
-                <button onClick={this.set_round}> {this.props.label} </button>
-            </div>
+                <Button type="primary" onClick={this.set_round}> {this.props.label} </Button>
         );
     }
 }

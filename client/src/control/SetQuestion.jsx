@@ -5,6 +5,10 @@ import { Button } from "antd"
 
 class SetQuestion extends React.Component {
 
+    state = {
+        loading: false
+    }
+
     set_question = () => {
         const url = "/gameplay/session/" + this.props.session_id + "/current-question"
         const body = {
@@ -13,9 +17,12 @@ class SetQuestion extends React.Component {
             question_id: this.props.target
         }
         //TODO: come up with a better question ID solution
-        sendData(url, "PUT", body)
-        .then((data) => {
-          console.log(data)
+        this.setState({loading: true} , () => {
+            sendData(url, "PUT", body)
+            .then((data) => {
+              console.log(data)
+              this.setState({loading: false})
+            })
         })
     }
 

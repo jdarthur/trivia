@@ -57,3 +57,10 @@ input {
   width: 25px;
   height: 25px;
 }
+
+.left-aligned-flexrow {
+  display: flex;
+  flex-direction: row;
+  align-self: flex-start;
+  align-items: center;
+}

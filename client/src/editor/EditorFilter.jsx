@@ -18,15 +18,18 @@ class EditorFilter extends React.Component {
 
     render() {
         return (
-
-            <div className="filter_holder">
-                {/* <Input.Group compact> */}
-                <Input.Search placeholder="Text filters" style={{ width: '50%' }} className="filter-subitem" onSearch={this.set_text_filter} />
-                <div className="filter-subitem">
-                    <Checkbox onChange={this.set_unused_only} checked={this.props.unused_only} > Unused {this.props.data_type} only </Checkbox>
+            <div style={{display: 'flex', flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start'}}>
+                <div className="filter_holder">
+                    {/* <Input.Group compact> */}
+                    <Input.Search placeholder="Text filters" style={{ width: '50%' }} className="filter-subitem" onSearch={this.set_text_filter} />
+                    <div className="filter-subitem">
+                        <Checkbox onChange={this.set_unused_only} checked={this.props.unused_only} > Unused {this.props.data_type} only </Checkbox>
+                    </div>
+                    {/* </Input.Group> */}
                 </div>
-                {/* </Input.Group> */}
+                {this.props.add_button}
             </div>
+
         );
     }
 }

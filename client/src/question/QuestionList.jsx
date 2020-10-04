@@ -3,6 +3,7 @@ import './QuestionList.css';
 
 import Question from "./Question.jsx"
 import EditorFilter from "../editor/EditorFilter.jsx"
+import LoadingOrView from "../editor/LoadingOrView"
 
 import {
   PlusSquareOutlined
@@ -17,6 +18,7 @@ const ID = "id"
 const NEW = "new"
 
 class QuestionList extends React.Component {
+
   constructor(props) {
     super(props)
     this.state = {
@@ -25,6 +27,7 @@ class QuestionList extends React.Component {
       text_filter: "",
       selected: "",
       dirty: "",
+      loading: false
     }
   }
 
@@ -42,13 +45,14 @@ class QuestionList extends React.Component {
       url += "&unused_only=true"
     }
 
-    fetch(url)
-      .then(response => response.json())
-      .then(state => {
-        console.log("got questions")
-        console.log(state)
-        this.setState({ questions: state.questions })
-      })
+    this.setState({ loading: true }, () => {
+      fetch(url)
+        .then(response => response.json())
+        .then(state => {
+          console.log(state)
+          this.setState({ questions: state.questions, loading: false })
+        })
+    })
   }
 
   set_unused_only = (value) => {
@@ -93,10 +97,7 @@ class QuestionList extends React.Component {
             this.setState({ questions: this.state.questions, dirty: "" })
           })
       }
-      else { //update existing question
-        //delete question.id
-        //delete question.create_date
-        console.log("save question", question)
+      else {
         sendData(question_id, "PUT", question)
           .then((data) => { this.setState({ dirty: "" }) })
       }
@@ -129,7 +130,7 @@ class QuestionList extends React.Component {
       find("new", this.state.questions)
       return false
     }
-    catch (Error) { return true }
+    catch (Error) { return this.state.loading === false }
   }
 
   add_new_question = () => {
@@ -139,7 +140,7 @@ class QuestionList extends React.Component {
       [CATEGORY]: "",
       [ID]: NEW
     }
-    this.state.questions.push(question)
+    this.state.questions.unshift(question)
     this.setState({ questions: this.state.questions }, () => {
       this.set_selected(NEW)
     })
@@ -148,7 +149,6 @@ class QuestionList extends React.Component {
 
   render() {
     const questions = this.state.questions.map((question, index) => (
-
       <Question key={question.id} id={question.id} category={question.category}
         answer={question.answer} question={question.question}
         selected={(this.state.selected === question.id) ? true : false}
@@ -157,16 +157,13 @@ class QuestionList extends React.Component {
         delete={this.delete} />))
 
     const nqb = this.add_newquestion_button() ? <PlusSquareOutlined className="new_button" onClick={this.add_new_question} /> : null
+
     return (
       <div className="ql_and_filter">
         <EditorFilter set_text_filter={this.set_text_filter} set_unused_only={this.set_unused_only} data_type="questions"
-         text_filter={this.state.text_filter} unused_only={this.state.unused_only} />
-
-        <div className="question-list">
-          {questions}
-          {nqb}
-        </div>
-
+          text_filter={this.state.text_filter} unused_only={this.state.unused_only} add_button={nqb} />
+        <LoadingOrView loading={this.state.loading} class_name="question-list"
+          empty={questions?.length === 0} loaded_view={questions} />
       </div>
     );
   }

@@ -11,7 +11,7 @@ class ActiveQuestion extends React.Component {
 
     return (
 
-      <Card style={{ width: 400, marginTop: 10}} bodyStyle={{padding: 15}}  >
+      <Card style={{ width: 400, marginTop: 10}} bodyStyle={{padding: 20}}  >
         <Breadcrumb style={{paddingBottom: 10}}>
           <Breadcrumb.Item>
             <PlaySquareOutlined />

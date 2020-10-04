@@ -2,6 +2,8 @@ import React from 'react';
 import './Lobby.css';
 
 import { Button } from 'antd';
+import { CopyOutlined } from '@ant-design/icons';
+
 
 const INVITE_LINK = "inviteLink"
 class InviteLink extends React.Component {
@@ -24,7 +26,10 @@ class InviteLink extends React.Component {
     return (
       <div className="invite" >
         <input className="invite-link" id={INVITE_LINK} readOnly value={this.invite_link()} />
-        <Button className="invite-button" onClick={this.copy_link}> Copy </Button>
+        <Button className="invite-button" onClick={this.copy_link}>
+          <CopyOutlined />
+          Copy
+        </Button>
       </div>
     );
   }

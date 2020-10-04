@@ -18,10 +18,6 @@ class AnswerQuestion extends React.Component {
 
 
     componentDidUpdate(prevProps) {
-        // if (this.props.session_state !== prevProps.session_state &&
-        //     this.props.question !== prevProps.question) {
-        //     this.setState({ answer: "", wager: null, dirty: false, answered: false })
-        // }
         if (this.props.question !== prevProps.question || this.props.round !== prevProps.round) {
             this.setState({ answer: "", wager: null, dirty: false, answered: false })
         }

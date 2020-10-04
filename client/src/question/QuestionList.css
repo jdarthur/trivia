@@ -11,15 +11,15 @@
 }
 
 .new_button {
-    margin: 25px;
-    font-size: 3em;
+    padding-left: 50px;
+    font-size: 2em;
 }
 
 
 .ql_and_filter {
 	display: flex;
     flex-direction: column;
-    align-items: flex-start;
+    align-items: center;
     margin: 10px;
-    flex: 0 1 auto;
+    flex: 1 1 auto;
 }

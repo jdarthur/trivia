@@ -4,10 +4,11 @@ import './RoundList.css';
 import Round from "./Round.jsx"
 import OpenRound from "./OpenRound.jsx"
 import EditorFilter from "../editor/EditorFilter.jsx"
+import LoadingOrView from "../editor/LoadingOrView"
 
 import {
-    PlusSquareOutlined
-  } from '@ant-design/icons';
+    PlusSquareOutlined,
+} from '@ant-design/icons';
 
 
 
@@ -27,6 +28,7 @@ class RoundList extends React.Component {
             rounds: [],
             selected: "", //selected round ID (1 at a time)
             dirty: "", //dirty round ID (can be selected_round or empty if a round is selected but not changed)
+            loading: false
         }
     }
 
@@ -45,13 +47,14 @@ class RoundList extends React.Component {
             url += "&unused_only=true"
         }
 
-        fetch(url)
-            .then(response => response.json())
-            .then(state => {
-                console.log("got rounds")
-                console.log(state)
-                this.setState({ rounds: state.rounds })
-            })
+        this.setState({ loading: true }, () => {
+            fetch(url)
+                .then(response => response.json())
+                .then(state => {
+                    console.log(state)
+                    this.setState({ rounds: state.rounds, loading: false })
+                })
+        })
     }
 
     set_unused_only = (value) => {
@@ -153,7 +156,7 @@ class RoundList extends React.Component {
             find(NEW, this.state.rounds)
             return false
         }
-        catch (Error) { return true }
+        catch (Error) { return this.state.loading === false }
     }
 
     /**
@@ -175,7 +178,6 @@ class RoundList extends React.Component {
 
     render() {
         const rounds = this.state.rounds.map((round, index) => (
-
             <Round key={round.id} id={round.id} name={round.name} create_date={round.create_date}
                 questions={round.questions} wagers={round.wagers}
                 selected={(this.state.selected === round.id) ? true : false}
@@ -195,13 +197,10 @@ class RoundList extends React.Component {
             <div className="round-and-open-question">
                 <div className="ql_and_filter">
                     <EditorFilter set_text_filter={this.set_text_filter} set_unused_only={this.set_unused_only} data_type="rounds"
-                        text_filter={this.state.text_filter} unused_only={this.state.unused_only} />
+                        text_filter={this.state.text_filter} unused_only={this.state.unused_only} add_button={nrb} />
 
-                    <div className="round_list">
-                        {rounds}
-                        {nrb}
-                    </div>
-
+                    <LoadingOrView loading={this.state.loading} class_name="round_list"
+                        empty={rounds?.length === 0} loaded_view={rounds} />
                 </div>
 
                 {open_round}
