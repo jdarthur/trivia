@@ -16,11 +16,13 @@ class Game extends React.Component {
     const r_count = this.props.rounds.length
     const r_label = r_count + " Round" + (r_count !== 1 ? "s" : "")
 
-    const background = (this.props.selected ? "#d9d9d9" : "")
+    const background = (this.props.selected ? "#f5f5f5" : "")
+    const border = (this.props.selected ? "3px solid darkgray" : "")
     const title = this.props.name === '' ? "[unnamed game]" : this.props.name
 
     return (
-      <Card size="small" title={title} style={{ width: 200, margin: 5, background: background }}
+      <Card size="small" title={title}
+        style={{ width: 200, margin: 5, background: background, border: border }}
         extra={<EditOutlined onClick={this.set_selected} />} >
         <div> {r_label} </div>
       </Card>

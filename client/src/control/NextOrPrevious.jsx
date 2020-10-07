@@ -2,7 +2,7 @@ import React from 'react';
 import "./control.css"
 import SetQuestion from "./SetQuestion"
 import SetRound from "./SetRound"
-//import EngGame from "./EndGame"
+import { Button } from "antd"
 
 /**
  * mod controller for next/previous question,
@@ -46,7 +46,7 @@ class NextOrPrevious extends React.Component {
                 {show_nr ? <SetRound target={next_r} label="Next Round"
                     session_id={this.props.session_id} player_id={this.props.player_id} /> : null}
 
-                {show_end ? <button > End game </button>: null}
+                {show_end ? <Button type="primary"> End game </Button>: null}
             </div>
         );
     }

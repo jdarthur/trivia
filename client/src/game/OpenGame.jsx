@@ -86,7 +86,7 @@ class OpenGame extends React.Component {
 
                 <div className="save-delete">
                     <Button onClick={this.delete_self} className="button" danger> Delete game </Button>
-                    <Button onClick={this.save_self} className="button" > Save </Button>
+                    <Button type="primary" onClick={this.save_self} className="button" > Save </Button>
                 </div>
 
             </div>

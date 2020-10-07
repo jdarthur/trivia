@@ -2,6 +2,7 @@ import React from 'react';
 import './Lobby.css';
 
 import OtherPlayer from "./OtherPlayer"
+import { Empty } from "antd"
 
 class OtherPlayers extends React.Component {
   state = {
@@ -39,7 +40,7 @@ class OtherPlayers extends React.Component {
   }
 
   render() {
-    const players = this.state.players.map((player) => {
+    const players = this.state.players?.map((player) => {
       if (player.id !== this.props.player_id) {
         return <OtherPlayer key={player.team_name} team_name={player.team_name}
           real_name={player.real_name} create_date={player.create_date}
@@ -48,9 +49,11 @@ class OtherPlayers extends React.Component {
       return null
     })
 
+    const show_empty = players?.length === 0 || (players.length == 1 && players[0] === null)
     return (
       <div className="game-lobby">
-        {players}
+        {show_empty ? <Empty image={Empty.PRESENTED_IMAGE_SIMPLE}
+        description="No players" style={{margin: 50}} /> : players }
       </div>
     )
   }

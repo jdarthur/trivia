@@ -22,11 +22,14 @@ class Round extends React.Component {
     const q_count = this.props.questions.length
     const q_label = q_count + " Question" + (q_count !== 1 ? "s" : "")
 
-    const background = (this.props.selected ? "#d9d9d9" : "")
+    const background = (this.props.selected ? "#f5f5f5" : "")
+    const border = (this.props.selected ? "3px solid darkgray" : "")
+
     const title = this.props.name === '' ? "[unnamed round]" : this.props.name
 
     return (
-      <Card size="small" title={title} style={{ width: 200, margin: 5, background: background }}
+      <Card size="small" title={title}
+        style={{ width: 200, margin: 5, background: background, border: border }}
         extra={<EditOutlined onClick={this.set_selected} />} >
         <div> {q_label} </div>
       </Card>

@@ -90,7 +90,7 @@ class OpenRound extends React.Component {
 
                 <div className="save-delete">
                     <Button danger className="button" onClick={this.delete_self}> Delete round </Button>
-                    <Button className="button" onClick={this.save_self_and_close}> Save </Button>
+                    <Button type="primary" className="button" onClick={this.save_self_and_close}> Save </Button>
                 </div>
             </div>
         );
