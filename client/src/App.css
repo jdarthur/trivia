@@ -10,8 +10,6 @@
 .button {
   cursor: pointer;
   border: 1px solid black;
-  padding: 10px;
-  /* font-weight: bold; */
 }
 
 button {

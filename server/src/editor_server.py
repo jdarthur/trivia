@@ -177,11 +177,11 @@ def matches_text_filter(question, text_filter, data_type):
 
     if data_type == QUESTION:
         for field in [QUESTION, ANSWER, CATEGORY]:
-            if text_filter in question[field]:
+            if text_filter.lower() in question[field].lower():
                 return True
     if data_type == ROUND:
         for field in [NAME]:
-            if text_filter in question[field]:
+            if text_filter.lower() in question[field].lower():
                 return True
 
     # print("does not match {} '{}': {}".format(TEXT_FILTER, text_filter, question))
