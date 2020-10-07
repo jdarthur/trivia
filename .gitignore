@@ -3,3 +3,4 @@ server/__pycache__
 server/test/__pycache__
 server/src/__pycache__
 .idea/
+client/build

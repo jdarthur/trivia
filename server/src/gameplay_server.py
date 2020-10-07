@@ -119,15 +119,18 @@ def get_session_state(session_id):
     if req_state is None:
         time.sleep(10)
 
+    sleep_time = .5
+    timeout_s = 90
+
     attempts = 0
-    while True:
+    while attempts < (timeout_s / sleep_time):
         state = mongo.get_state(session_id)
         if str(state) != str(req_state):
             return _resp(succeed({"state": state}))
-        time.sleep(1)
+        time.sleep(sleep_time)
         attempts += 1
 
-    # return _resp(succeed({"state": req_state}))
+    return _resp(succeed({"state": req_state}))
 
 
 smodel = [

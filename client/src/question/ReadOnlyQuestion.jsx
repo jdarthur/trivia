@@ -1,11 +1,14 @@
 import React from 'react';
-import './Question.css';
 import { Card } from 'antd';
+
+import ReactMarkdown from "react-markdown";
 
 import {
     EditOutlined,
     DeleteOutlined
 } from '@ant-design/icons';
+
+import './Question.css';
 
 class ReadOnlyQuestion extends React.Component {
 
@@ -28,8 +31,8 @@ class ReadOnlyQuestion extends React.Component {
         return (
             <Card title={this.props.category} size="small" extra={edit}
             style={{ width: 225, margin: 5, background: background, cursor: cursor}}>
-                <div>{this.props.question} </div>
-                <div className="answer">{this.props.answer}</div>
+                <ReactMarkdown source={this.props.question} />
+                <ReactMarkdown source={this.props.answer} className="answer" />
             </Card>
         );
     }

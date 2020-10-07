@@ -7,6 +7,10 @@ Trivia server mark II
 import os
 
 from dotenv import load_dotenv
+from flask import Flask, jsonify, request
+from flask.json import JSONEncoder
+from datetime import datetime
+
 from mongo_manager import MongoManager
 
 from validator import (model, succeed, fail, RestField,
@@ -14,9 +18,7 @@ from validator import (model, succeed, fail, RestField,
 from validator import (SUCCESS, ERRORS, OBJECT, CREATE,
                        UPDATE, DELETE, GET_ONE, ID)
 
-from flask import Flask, jsonify, request
-from flask.json import JSONEncoder
-from datetime import datetime
+
 
 
 load_dotenv()

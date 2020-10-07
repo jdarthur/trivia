@@ -3,11 +3,12 @@ import './ActiveGame.css';
 
 import { Card, Breadcrumb } from 'antd';
 import { PlaySquareOutlined } from '@ant-design/icons';
+import ReactMarkdown from "react-markdown";
 
 class ActiveQuestion extends React.Component {
 
   render() {
-    const question_newlined = this.props.question?.split("^").map((part, index) => <div key={index} className="linebreak"> {part} </div>)
+    // const question_newlined = this.props.question?.split("^").map((part, index) => <div key={index} className="linebreak"> {part} </div>)
 
     return (
 
@@ -21,8 +22,8 @@ class ActiveQuestion extends React.Component {
         </Breadcrumb>
 
         <div className="active-question-box">
-          <div className="active-question"> {question_newlined} </div>
-          {this.props.answer ? <div className="active-answer"> {this.props.answer} </div> : null}
+          <ReactMarkdown className="active-question" source={this.props.question} />
+          {this.props.answer ? <ReactMarkdown className="active-answer" source={this.props.answer} />: null}
         </div>
       </Card>
     );
