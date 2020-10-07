@@ -2,7 +2,7 @@ import React from 'react';
 import './Question.css';
 
 import { Input, Button, Modal, Radio } from 'antd';
-import ReactMarkdown from "react-markdown";
+import FormattedQuestion from "./FormattedQuestion"
 
 const { TextArea } = Input;
 
@@ -68,8 +68,8 @@ class EditQuestionModal extends React.Component {
                     onChange={this.set_answer} onPressEnter={this.answer_enter} />
             </div> :
             <div style={{border: '1px solid #d9d9d9', borderRadius: 2, padding: 10}}>
-                <ReactMarkdown source={this.props.question} />
-                <ReactMarkdown source={this.props.answer} className="answer" />
+                <FormattedQuestion question={this.props.question}
+                    answer={this.props.answer} max_width={425} />
             </div>
 
         return (
@@ -79,7 +79,7 @@ class EditQuestionModal extends React.Component {
                 visible={true}
                 onCancel={cancel_action}
                 footer={footer}
-                width="400px">
+                width="500px">
 
                 <Input placeholder="Category" value={this.props.category} style={{ marginBottom: 10 }}
                     onChange={this.set_category} onPressEnter={this.category_enter} />

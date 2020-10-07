@@ -1,7 +1,7 @@
 import React from 'react';
 import { Card } from 'antd';
 
-import ReactMarkdown from "react-markdown";
+import FormattedQuestion from "./FormattedQuestion";
 
 import {
     EditOutlined,
@@ -30,9 +30,9 @@ class ReadOnlyQuestion extends React.Component {
         </div>
         return (
             <Card title={this.props.category} size="small" extra={edit}
-            style={{ width: 225, margin: 5, background: background, cursor: cursor}}>
-                <ReactMarkdown source={this.props.question} />
-                <ReactMarkdown source={this.props.answer} className="answer" />
+                style={{ width: 225, margin: 5, background: background, cursor: cursor }}>
+                <FormattedQuestion question={this.props.question}
+                    answer={this.props.answer} max_width={200} />
             </Card>
         );
     }
