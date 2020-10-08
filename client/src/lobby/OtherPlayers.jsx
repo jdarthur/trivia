@@ -49,7 +49,7 @@ class OtherPlayers extends React.Component {
       return null
     })
 
-    const show_empty = players?.length === 0 || (players.length == 1 && players[0] === null)
+    const show_empty = players?.length === 0 || (players.length === 1 && players[0] === null)
     return (
       <div className="game-lobby">
         {show_empty ? <Empty image={Empty.PRESENTED_IMAGE_SIMPLE}
