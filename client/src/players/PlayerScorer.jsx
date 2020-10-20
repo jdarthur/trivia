@@ -1,6 +1,6 @@
 import React from 'react';
 import sendData from "../index"
-import PlayerAnswer from "./PlayerAnswer"
+import PlayerAnswer from "./PlayerAnswers"
 import "./Players.css"
 
 
@@ -56,7 +56,9 @@ class PlayerScorer extends React.Component {
 
 
     score = () => {
+
         if (this.scorable()) {
+
             const url = "/gameplay/session/" + this.props.session_id + "/score"
             const body = {
                 player_id: this.props.player_id,
@@ -96,7 +98,9 @@ class PlayerScorer extends React.Component {
     get_wager = (player_id) => {
         for (let i = 0; i < this.state.answers.length; i++) {
             if (this.state.answers[i].player_id === player_id) {
-                return this.state.answers[i].wager
+                return this.state.answers?.length > 0 ?
+                    this.state.answers[i].answers[this.state.answers[i].answers.length - 1].wager
+                    : null
             }
         }
     }
@@ -107,6 +111,12 @@ class PlayerScorer extends React.Component {
             scores[player_id] = {}
         }
         scores[player_id].score_override = value
+        this.setState({ scores: scores })
+    }
+
+    clear = (player_id) => {
+        const scores = this.state.scores
+        delete scores[player_id]
         this.setState({ scores: scores })
     }
 
@@ -131,18 +141,17 @@ class PlayerScorer extends React.Component {
             const status = this.state.scores[player.player_id] || {}
             const override_value = status.score_override !== undefined ? status.score_override : 0
             return <PlayerAnswer key={player.player_id} player_id={player.player_id}
-                answer={player.answer} wager={player.wager} set_correct={this.set_correct}
+                answers={player.answers} clear={this.clear} set_correct={this.set_correct}
                 player_name={player.team_name} correct={status.correct} session_id={this.props.session_id}
                 set_override={this.set_override} override_value={override_value} />
         })
 
-        const score_class = this.scorable() ? "" : "disabled"
-
         return (
             <div className="player-scorer" >
                 {answers}
-                <Button  type="primary"onClick={this.score}
-                className={score_class} style = {{margin: 10}}> Score </Button>
+                <Button type="primary" onClick={this.score} disabled={!this.scorable()} style={{ margin: 10 }}>
+                    Score
+                </Button>
             </div>
         );
     }

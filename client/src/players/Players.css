@@ -169,5 +169,17 @@
     /* font-size: 1.7em; */
     color: #1890ff;
     margin-right: 5px;
+}
 
+.old-answer {
+    text-decoration: line-through;
+    margin: 5px;
+    white-space: pre-wrap;
+}
+
+.multi-answer {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
 }

@@ -742,13 +742,17 @@ def get_answers_scored(players, answers, caller_player_id):
         p = {TEAM_NAME: player[TEAM_NAME], ICON: player.get(ICON, None)}
         panswers = answers.get(player_id, [])
         if len(panswers) > 0:
-            answer_id = panswers[-1]
-            answer = get_answer(answer_id)[OBJECT]
+            p[ANSWERS] = []
+            for answer_id in panswers:
+                ans = {}
+                answer = get_answer(answer_id)[OBJECT]
 
-            p[ANSWER] = answer[ANSWER]
-            p[WAGER] = answer[WAGER]
-            p[CORRECT] = answer.get(CORRECT, False)
-            p[POINTS_AWARDED] = answer.get(POINTS_AWARDED, answer[WAGER])
+                ans[ANSWER] = answer[ANSWER]
+                ans[WAGER] = answer[WAGER]
+                ans[CORRECT] = answer.get(CORRECT, False)
+                ans[POINTS_AWARDED] = answer.get(POINTS_AWARDED, answer[WAGER])
+                p[ANSWERS].append(ans)
+
             if caller_player_id == player_id:
                 p[PLAYER_ID] = player_id
             ret.append(p)
@@ -763,11 +767,14 @@ def get_answers_as_mod(players, answers):
         panswers = answers.get(player_id, None)
         p['answered'] = panswers is not None
         if panswers is not None:
-            answer_id = panswers[-1]
-            answer = get_answer(answer_id)[OBJECT]
-            p[ANSWER] = answer[ANSWER]
-            p[WAGER] = answer[WAGER]
-            p['answer_id'] = answer[ID]
+            p[ANSWERS] = []
+            for answer_id in panswers:
+                ans = {}
+                answer = get_answer(answer_id)[OBJECT]
+                ans[ANSWER] = answer[ANSWER]
+                ans[WAGER] = answer[WAGER]
+                ans['answer_id'] = answer_id
+                p[ANSWERS].append(ans)
         ret.append(p)
     return succeed(ret)
 
@@ -864,17 +871,20 @@ def score_question(session_id, data, session={}):
     players = get_players2(session)
     answers = get_answers_as_mod(players, answers)[OBJECT]
     for answer in answers:
+        print(answer)
         if answer['answered'] is False:
             return fail(f"{PLAYER_ID} {answer[PLAYER_ID]} has not answered question {question_id}")
 
+        last_answer = answer[ANSWERS][-1]
+
         player_id = answer[PLAYER_ID]
         score_override = given_players[player_id].get(SCORE_OVERRIDE, None)
-        wager = answer[WAGER] if score_override is None else score_override  # hack here to override
+        wager = last_answer[WAGER] if score_override is None else score_override  # hack here to override
 
         is_correct = given_players[player_id].get(CORRECT, None)
         points_awarded = wager if is_correct else 0
 
-        mongo.update("answer", answer['answer_id'], {CORRECT: is_correct, POINTS_AWARDED: points_awarded})
+        mongo.update("answer", last_answer['answer_id'], {CORRECT: is_correct, POINTS_AWARDED: points_awarded})
 
         award_points(session_id, player_id, points_awarded, rescore)
 
