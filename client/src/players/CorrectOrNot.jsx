@@ -33,7 +33,7 @@ class CorrectOrNot extends React.Component {
         </div>
         return (
             <Card size="small" title={title} extra={icon}
-                style={{ minWidth: 150, maxWidth: 300 }} bodyStyle={{ padding: 0 }}  >
+                style={{ minWidth: 150, maxWidth: 300, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }} bodyStyle={{ padding: 0}}  >
                 <div className="answer-text"> <MultiAnswer answers={this.props.answers} /> </div>
                 <div className={class_name} >
                     <div> {amount_to_show} </div>
