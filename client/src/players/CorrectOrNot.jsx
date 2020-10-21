@@ -18,7 +18,7 @@ import {
 class CorrectOrNot extends React.Component {
 
     render() {
-        const last_answer = {}
+        let last_answer = {}
         if (this.props.answers?.length > 0) {
             last_answer = this.props.answers[this.props.answers.length - 1]
         }
