@@ -18,7 +18,7 @@ class PlayerAnswer extends React.Component {
 
         const old_answers = <div className="multi-answer">
             {this.props.answers?.map((answer, index) =>
-                index == (this.props.answers.length - 1) ? null :
+                index === (this.props.answers.length - 1) ? null :
                     <span key={answer.answer_id} className="old-answer">
                         {answer.answer} ({answer.wager})
                      </span>)}

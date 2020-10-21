@@ -18,9 +18,12 @@ import {
 class CorrectOrNot extends React.Component {
 
     render() {
-        const last_answer = this.props.answers[this.props.answers.length - 1]
+        const last_answer = {}
+        if (this.props.answers?.length > 0) {
+            last_answer = this.props.answers[this.props.answers.length - 1]
+        }
 
-        const class_name = "player-wager "  + (last_answer.correct && last_answer.points_awarded > 0 ? "": "in") + "correct"
+        const class_name = "player-wager " + (last_answer.correct && last_answer.points_awarded > 0 ? "" : "in") + "correct"
         const amount_to_show = last_answer.correct ? last_answer.points_awarded : last_answer.wager
         const icon = <div className="delete-edit-mini" >
             <PlayerIcon icon_name={this.props.icon_name} />
@@ -33,7 +36,7 @@ class CorrectOrNot extends React.Component {
         </div>
         return (
             <Card size="small" title={title} extra={icon}
-                style={{ minWidth: 150, maxWidth: 300, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }} bodyStyle={{ padding: 0}}  >
+                style={{ minWidth: 150, maxWidth: 300, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }} bodyStyle={{ padding: 0 }}  >
                 <div className="answer-text"> <MultiAnswer answers={this.props.answers} /> </div>
                 <div className={class_name} >
                     <div> {amount_to_show} </div>
@@ -42,6 +45,7 @@ class CorrectOrNot extends React.Component {
                 </div>
             </Card>
         )
+
     }
 }
 
