@@ -14,7 +14,6 @@ class Homepage extends React.Component {
       session_id: "",
       player_id: "",
       sess_state: "",
-      players: [],
       is_mod: false,
       started: false,
       rounds: []
@@ -33,6 +32,14 @@ class Homepage extends React.Component {
     }
     if (player_id) {
       state[PLAYER_ID] = player_id
+    }
+
+    //startedness is immutable... don't need to get from API after we know a game has started
+    if (sessionStorage.getItem("started")) {
+      state.started = true
+    }
+    if (sessionStorage.getItem("is_mod")) {
+      state.is_mod = true
     }
 
     this.setState(state, () => this.get_session())
@@ -65,12 +72,19 @@ class Homepage extends React.Component {
           console.log(state)
           const rounds = state.rounds ? state.rounds.map((round, index) => index) : []
           const update = {
-            players: state.players ? state.players : [],
             is_mod: state.mod !== undefined,
             name: state.name,
             started: state.started ? true : false,
             rounds: rounds
           }
+
+          if (!sessionStorage.getItem("started") && state.started) {
+            sessionStorage.setItem("started", true)
+          }
+          if (!sessionStorage.getItem("is_mod") && update.is_mod) {
+            sessionStorage.setItem("is_mod", update.is_mod)
+          }
+
           this.setState(update, () => this.get_session_state())
           this.props.set_toolbar(state.mod !== undefined)
         })
@@ -82,6 +96,7 @@ class Homepage extends React.Component {
     const main = (this.state.started ?
       <ActiveGame session_id={this.state.session_id} player_id={this.state.player_id}
         session_state={this.state.sess_state} is_mod={this.state.is_mod} rounds={this.state.rounds} /> :
+
       <GameLobby session_id={this.state.session_id} player_id={this.state.player_id}
         session_state={this.state.sess_state} is_mod={this.state.is_mod} />)
     return (

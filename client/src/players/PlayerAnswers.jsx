@@ -13,8 +13,8 @@ class PlayerAnswer extends React.Component {
 
 
     componentDidUpdate(prevProps) {
-        console.log(prevProps)
-        console.log(this.props)
+        // console.log(prevProps)
+        // console.log(this.props)
         if (prevProps.answers?.length > 1 && this.props.answers?.length > 1) {
             const previous_last_answer_id = (prevProps.answers[prevProps.answers.length - 1].answer_id)
             const new_last_answer_id = (this.props.answers[this.props.answers.length - 1].answer_id)
@@ -45,7 +45,7 @@ class PlayerAnswer extends React.Component {
         let answer_text = <MultiAnswer answers={this.props.answers} />
 
         let override = this.props.correct === false ? 0 : this.props.override_value
-        const wager = <div style={{ 'padding-left': '10px', 'font-size': '1.3em', 'font-weight': 'bold' }}>
+        const wager = <div style={{ paddingLeft: '10px', fontSize: '1.3em', fontWeight: 'bold' }}>
             {this.props.answer?.length > 0 ? this.props.answers[this.props.answers.length - 1].wager : null }
         </div>
 

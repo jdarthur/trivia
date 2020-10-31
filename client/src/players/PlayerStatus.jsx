@@ -14,7 +14,12 @@ class PlayerStatus extends React.Component {
     }
 
     componentDidMount() {
-        this.get_answers()
+        const statusStored = JSON.parse(sessionStorage.getItem("status"))
+        if (statusStored) {
+            this.setState({answers: statusStored}, () => this.get_answers())
+        } else {
+            this.get_answers()
+        }
     }
 
     componentDidUpdate(prevProps) {
@@ -44,6 +49,7 @@ class PlayerStatus extends React.Component {
                 .then((data) => {
                     console.log(data)
                     if (data.answers) {
+                        sessionStorage.setItem("status", JSON.stringify(data.answers))
                         this.setState({answers: data.answers })
                     }
 

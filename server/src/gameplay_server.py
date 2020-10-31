@@ -7,11 +7,12 @@ Trivia server mark II
 
 from dotenv import load_dotenv
 from flask import Flask, request
+from datetime import timezone
 import time
 import pprint
 import os
 
-from mongo_manager import MongoManager
+from mongo_manager import MongoManager, CREATE_DATE
 
 from validator import model, succeed, fail, RestField, IdField, get_all
 from validator import SUCCESS, OBJECT, CREATE, UPDATE, DELETE, GET_ONE, SUBOP
@@ -771,8 +772,11 @@ def get_answers_as_mod(players, answers):
             for answer_id in panswers:
                 ans = {}
                 answer = get_answer(answer_id)[OBJECT]
+
+                print(answer)
                 ans[ANSWER] = answer[ANSWER]
                 ans[WAGER] = answer[WAGER]
+                ans[CREATE_DATE] = answer[CREATE_DATE].replace(tzinfo=timezone.utc).timestamp()
                 ans['answer_id'] = answer_id
                 p[ANSWERS].append(ans)
         ret.append(p)

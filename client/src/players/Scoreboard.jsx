@@ -17,7 +17,12 @@ class Scoreboard extends React.Component {
     }
 
     componentDidMount() {
-        this.get_scoreboard()
+        const scoresStored = JSON.parse(sessionStorage.getItem("scoreboard"))
+        if (scoresStored) {
+            this.setState({scores: scoresStored}, () => this.get_scoreboard())
+        } else {
+            this.get_scoreboard()
+        }
     }
 
     componentDidUpdate(prevProps) {
@@ -42,13 +47,14 @@ class Scoreboard extends React.Component {
             sendData(url, "GET")
                 .then((data) => {
                     console.log(data)
+                    sessionStorage.setItem("scoreboard", JSON.stringify(data))
                     this.setState({ scores: data })
                 })
         }
     }
 
     render() {
-        const scores_sorted = this.state.scores.sort((a, b) => {
+        const scores_sorted = this.state.scores?.sort((a, b) => {
             const score_a = sum(a.score)
             const score_b = sum(b.score)
             return (score_a > score_b) ? -1 : 1
@@ -64,8 +70,8 @@ class Scoreboard extends React.Component {
         return (
             <div className="scoreboard" >
                 <div className="scoreboard-title">
-                <span style={{paddingRight: 10}}>Scoreboard</span>
-                <FundProjectionScreenOutlined />
+                    <span style={{ paddingRight: 10 }}>Scoreboard</span>
+                    <FundProjectionScreenOutlined />
                 </div>
                 {scores}
             </div>

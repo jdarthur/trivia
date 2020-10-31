@@ -15,13 +15,20 @@ class PlayerScorer extends React.Component {
         answers: []
     }
 
-
     componentDidMount() {
-        this.get_answers()
+        console.log("mount")
+        const answersStored = JSON.parse(sessionStorage.getItem("answers"))
+        if (answersStored) {
+            console.log("got answerrs from browser")
+            console.log(answersStored)
+            this.setState({answers: answersStored}, () => this.get_answers())
+        } else {
+            this.get_answers()
+        }
     }
 
     componentDidUpdate(prevProps) {
-        if (this.props.session_state !== prevProps.session_state) {
+        if (this.props.session_state !== prevProps.session_state && prevProps.session_state) {
             // this.get_answers()
             if (this.props.question_id === prevProps.question_id) {
                 this.get_answers()
@@ -36,9 +43,9 @@ class PlayerScorer extends React.Component {
     }
 
     get_answers = () => {
-        console.log(this.props)
-        if (this.props.round_id !== "" && this.props.question_id !== "") {
 
+        if (this.props.round_id !== "" && this.props.question_id !== "") {
+            console.log(this.props)
             let url = "/gameplay/session/" + this.props.session_id + "/answers"
             url += "?player_id=" + this.props.player_id
             url += "&round_id=" + this.props.round_id
@@ -46,11 +53,29 @@ class PlayerScorer extends React.Component {
             console.log(url)
             sendData(url, "GET")
                 .then((data) => {
-                    console.log(data)
+                    this.log_answer_lag(data)
+                    sessionStorage.setItem("answers", JSON.stringify(data))
                     if (!data.errors) {
                         this.setState({ answers: data })
                     }
                 })
+        }
+    }
+
+    log_answer_lag = (data) => {
+        let timestamp = 0;
+        for (let i = 0; i < data.length; i++) {
+            let answers = data[i]?.answers || []
+            for (let j = 0; j < answers.length; j++) {
+                let this_timestamp = answers[j]?.create_date
+                if (this_timestamp > timestamp) {
+                    timestamp = this_timestamp
+                }
+            }
+        }
+        let elapsed_time = ((Date.now() - (timestamp * 1000))/1000)
+        if (elapsed_time < 15) {
+            console.log("elapsed time: " + elapsed_time + "s")
         }
     }
 
@@ -137,6 +162,7 @@ class PlayerScorer extends React.Component {
     }
 
     render() {
+        console.log("rerender")
         const answers = this.state.answers?.map(player => {
             const status = this.state.scores[player.player_id] || {}
             const override_value = status.score_override !== undefined ? status.score_override : 0

@@ -3,7 +3,7 @@
 @date 18 Apr 2020
 """
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from pymongo import MongoClient
 
 ID = "id"
@@ -67,7 +67,7 @@ class MongoManager(object):
         returns:
             created object, with new ID
         """
-        data[CREATE_DATE] = datetime.utcnow()
+        data[CREATE_DATE] = datetime.now(timezone.utc)
         data = add_id(data)
         # print(f"MONGO: create {object_type} {data[_ID]}")
         self.db[object_type].insert_one(data)

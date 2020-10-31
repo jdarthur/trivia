@@ -89,21 +89,21 @@ class ActiveGame extends React.Component {
 
           </div>
           <Scoreboard round_id={this.state.active_round} session_id={this.props.session_id}
-            player_id={this.props.player_id} session_state={this.props.session_state} />
+            player_id={this.props.player_id} session_state={this.props.session_state}
+            players={this.props.players} />
 
         </div>
         {this.props.is_mod ?
           <PlayerScorer question_id={this.state.active_question}
             round_id={this.state.active_round} session_id={this.props.session_id}
             player_id={this.props.player_id} session_state={this.props.session_state}
-            scored={this.state.scored} /> : null}
+            scored={this.state.scored} players={this.props.players} /> : null}
 
         {!this.props.is_mod ?
           <PlayerStatus question_id={this.state.active_question}
             round_id={this.state.active_round} session_id={this.props.session_id}
             player_id={this.props.player_id} session_state={this.props.session_state}
-            scored={this.state.scored} /> : null}
-        {/* {this.props.players} */}
+            scored={this.state.scored} players={this.props.players} /> : null}
       </div>
     );
   }
