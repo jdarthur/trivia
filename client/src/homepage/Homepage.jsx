@@ -95,7 +95,8 @@ class Homepage extends React.Component {
   render() {
     const main = (this.state.started ?
       <ActiveGame session_id={this.state.session_id} player_id={this.state.player_id}
-        session_state={this.state.sess_state} is_mod={this.state.is_mod} rounds={this.state.rounds} /> :
+        session_state={this.state.sess_state} is_mod={this.state.is_mod}
+        rounds={this.state.rounds} is_mobile={this.props.is_mobile} /> :
 
       <GameLobby session_id={this.state.session_id} player_id={this.state.player_id}
         session_state={this.state.sess_state} is_mod={this.state.is_mod} />)

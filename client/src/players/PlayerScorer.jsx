@@ -16,11 +16,8 @@ class PlayerScorer extends React.Component {
     }
 
     componentDidMount() {
-        console.log("mount")
         const answersStored = JSON.parse(sessionStorage.getItem("answers"))
         if (answersStored) {
-            console.log("got answerrs from browser")
-            console.log(answersStored)
             this.setState({answers: answersStored}, () => this.get_answers())
         } else {
             this.get_answers()
@@ -162,7 +159,6 @@ class PlayerScorer extends React.Component {
     }
 
     render() {
-        console.log("rerender")
         const answers = this.state.answers?.map(player => {
             const status = this.state.scores[player.player_id] || {}
             const override_value = status.score_override !== undefined ? status.score_override : 0

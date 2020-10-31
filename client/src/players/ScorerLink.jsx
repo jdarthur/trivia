@@ -8,7 +8,7 @@ class ScorerLink extends React.Component {
             this.props.session_id + "&player_id=" + this.props.player_id
         return (
             <a href={url} target="_blank"  rel="noopener noreferrer">
-                <ExportOutlined style={{paddingLeft: 5}}/>
+                <ExportOutlined style={{paddingRight: 5}}/>
             </a>
         );
     }
