@@ -44,7 +44,7 @@ class OtherPlayers extends React.Component {
       if (player.id !== this.props.player_id) {
         return <OtherPlayer key={player.team_name} team_name={player.team_name}
           real_name={player.real_name} create_date={player.create_date}
-          icon_name={player.icon}/>
+          icon_name={player.icon} player_id={player.id}/>
       }
       return null
     })

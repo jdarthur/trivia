@@ -1,45 +1,4 @@
-.answer-and-scorer {
-    border: 1px solid black;
-    margin: 5px;
-    /* padding: 10px; */
-    display: flex;
-    flex-direction: column;
-    min-width: 100px;
-}
 
-.player-answer {
-    display: flex;
-    flex-direction: column;
-    align-items: stretch;
-    justify-content: space-between;
-}
-
-.team-name {
-    padding: 10px;
-    border-bottom: 1px solid black;
-    background: rgb(228, 228, 228);
-    flex-grow: 1;
-}
-
-.answer-text {
-    font-style: italic;
-    color: #707070;
-    padding: 10px 20px 10px 20px;
-}
-
-.answer-scorer {
-    display: flex;
-    flex-direction: row;
-    align-items: center;
-    justify-content: center;
-    font-size: 1.5em;
-}
-.player-scorer {
-    display: flex;
-    flex-direction: row;
-    align-items: stretch;
-    margin-top: 20px;
-}
 
 .set-score {
     padding: 0px;
@@ -56,10 +15,6 @@
 
 .incorrect {
     background: rgb(247, 205, 205);
-}
-
-.selected-correctness {
-    border: 2px solid #d9d9d9;
 }
 
 .player-status-bar {
@@ -105,75 +60,6 @@
     margin-bottom: 20p
 }
 
-.scoreboard {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: flex-start;
-    /* border-left: 1px solid black; */
-}
-
-.one-player-score {
-    border-top: 1px solid black;
-    border-bottom: 1px solid black;
-    border-collapse: collapse;
-    display: flex;
-    flex-direction: row;
-    margin-bottom: 5px;
-}
-
-.scoreboard-score {
-    align-items: center;
-    display: flex;
-    justify-content: center;
-    padding: 10px;
-    font-weight: bold;
-    font-size: 1.3em;
-}
-
-.scoreboard-team {
-    align-items: center;
-    display: flex;
-    justify-content: center;
-    border-left: 1px solid black;
-    padding: 10px;
-    background: rgb(228, 228, 228);
-    flex-grow: 1;
-}
-
-.score-and-override {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-}
-
-.scorer-icon {
-    padding-left: .7em;
-    padding-right: .7em;
-    margin: 5px;
-    font-size: 1.3em;
-    cursor: pointer;
-    border-radius: 2px;
-}
-
-.scoreboard-title {
-    display: flex;
-    flex-direction: row;
-    justify-content: space-around;
-    align-items: center;
-    padding: 10px;
-    font-size: 1.3em;
-    font-weight: bold;
-    border: 1px solid #d9d9d9;
-    background: white;
-}
-
-.self-indicator {
-    /* font-size: 1.7em; */
-    color: #1890ff;
-    margin-right: 5px;
-}
-
 .old-answer {
     text-decoration: line-through;
     margin: 5px;
@@ -187,8 +73,3 @@
     justify-content: center;
 }
 
-.open-scoreboard-button {
-    position: absolute;
-    right: 10;
-    top: 10;
-}

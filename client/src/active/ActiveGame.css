@@ -40,6 +40,11 @@
     border-top: 1px solid #d9d9d9;
     border-bottom: 1px solid #d9d9d9;
     align-self: flex-start;
+    max-width: 100%;
+    overflow-x: auto;
+    white-space: nowrap;
+    flex-shrink: 1;
+    max-width: calc(95vw - 32px);
 }
 
 .game-and-scoreboard {
@@ -47,6 +52,10 @@
     flex-direction: row;
     justify-content: space-between;
     flex-grow: 1;
+    max-width: min(95vw, 1400px);
+    /* overflow-x: scroll; */
+    /* max-width: calc(100vw - 32px); */
+
 }
 
 .linebreak {
@@ -57,4 +66,5 @@
     display: flex;
     flex-direction: column;
     align-items: flex-start;
+    max-width: 100%;
 }

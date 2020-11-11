@@ -76,7 +76,7 @@ class WagerManager extends React.Component {
         const can_wager = this.state.available_wagers.length > 0
         return (
             <div>
-                {can_wager ? <p>Wager: </p> : null}
+                {/* {can_wager ? <p>Wager: </p> : null} */}
 
                 <Radio.Group buttonStyle="solid" onChange={this.props.select} value={this.props.wager} >
                     {can_wager ? wager_elements : null}

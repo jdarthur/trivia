@@ -1,5 +1,5 @@
 import React from 'react';
-import "./Players.css"
+import "./Scoreboard.css"
 
 import PlayerIcon from '../lobby/PlayerIcon';
 import { Card } from "antd"

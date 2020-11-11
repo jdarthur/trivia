@@ -4,9 +4,9 @@ import ActiveQuestion from "./ActiveQuestion"
 import ActiveRound from "./ActiveRound"
 import NextOrPrevious from "../control/NextOrPrevious"
 import AnswerQuestion from "../answer/AnswerQuestion"
-import PlayerScorer from "../players/PlayerScorer"
+import PlayerScorer from "../admin-scorer/PlayerScorer"
 import PlayerStatus from "../players/PlayerStatus"
-import Scoreboard from '../players/Scoreboard';
+import Scoreboard from '../scoreboard/Scoreboard';
 
 class ActiveGame extends React.Component {
 
@@ -66,7 +66,7 @@ class ActiveGame extends React.Component {
     const categories = this.state.questions?.map(question => question.category)
 
     return (
-      <div style={{flexGrow: 1, display: 'flex', flexDirection: 'column'}}>
+      <div style={{flexGrow: 1, display: 'flex', flexDirection: 'column', maxWidth: '100%'}}>
         <div className="game-and-scoreboard">
           <div className='active-game'>
             <div className="round-and-question">

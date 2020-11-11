@@ -1,5 +1,5 @@
 import React from 'react';
-import "./Players.css"
+import "../players/Players.css"
 
 import { Empty } from "antd"
 

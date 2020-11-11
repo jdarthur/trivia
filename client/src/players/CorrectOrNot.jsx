@@ -1,7 +1,7 @@
 import React from 'react';
 import "./Players.css"
 import PlayerIcon from '../lobby/PlayerIcon';
-import MultiAnswer from "./MultiAnswer"
+import MultiAnswer from "../admin-scorer/MultiAnswer"
 
 import { Card } from "antd"
 
@@ -23,27 +23,42 @@ class CorrectOrNot extends React.Component {
             last_answer = this.props.answers[this.props.answers.length - 1]
         }
 
-        const class_name = "player-wager " + (last_answer.correct && last_answer.points_awarded > 0 ? "" : "in") + "correct"
-        const amount_to_show = last_answer.correct ? last_answer.points_awarded : last_answer.wager
-        const icon = <div className="delete-edit-mini" >
+        //player's icon
+        const icon = <div className="delete-edit-mini" style={{ padding: 0 }}>
             <PlayerIcon icon_name={this.props.icon_name} />
         </div>
-        const correct_icon = last_answer.correct ? <CheckSquareOutlined /> : <CloseSquareOutlined />
+
+        //team name
         const is_self = this.props.player_id === this.props.current_player
         const title = <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center' }}>
             {is_self ? <span className="self-indicator"> • </span> : null}
             {this.props.player_name}
         </div>
-        return (
-            <Card size="small" title={title} extra={icon}
-                style={{ minWidth: 150, maxWidth: 300, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }} bodyStyle={{ padding: 0 }}  >
-                <div className="answer-text"> <MultiAnswer answers={this.props.answers} /> </div>
-                <div className={class_name} >
-                    <div> {amount_to_show} </div>
-                    <div> {correct_icon} </div>
 
-                </div>
-            </Card>
+        //correctness icon + wager
+        const class_name = "player-wager " + (last_answer.correct && last_answer.points_awarded > 0 ? "" : "in") + "correct"
+        let correctness_and_wager = <div className={class_name} >
+            <div> {last_answer.correct ? last_answer.points_awarded : last_answer.wager} </div>
+            <div> {last_answer.correct ? <CheckSquareOutlined /> : <CloseSquareOutlined />} </div>
+        </div>
+
+        return (<div style={{display: 'flex', alignItems: 'stretch'}}>
+            {this.props.is_mobile ?
+                // show mini status on mobile
+                <Card style={{ width: 75 }} bodyStyle={{ padding: 0 }}>
+                    <div style={{ display: 'flex', justifyContent: 'center', padding: 5 }}>
+                        {icon}
+                    </div>
+                    {correctness_and_wager}
+                </Card> :
+                //show full version with full answers
+                <Card size="small" title={title} extra={icon}
+                    style={{ minWidth: 150, maxWidth: 300, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}  >
+
+                    <div className="answer-text"> <MultiAnswer answers={this.props.answers} /> </div>
+                    {correctness_and_wager}
+                </Card>}
+        </div>
         )
 
     }

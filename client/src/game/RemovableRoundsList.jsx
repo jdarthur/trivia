@@ -42,7 +42,7 @@ class RemovableRoundsList extends React.Component {
                 show_title={false} set_round_name={this.props.set_round_name}
                 name={this.props.round_names[round_id]} handleKeyPress={this.props.handleKeyPress}/>))
 
-        const show_empty = this.props.rounds.length > 0 ? false : true
+        const show_empty = this.props.rounds?.length > 0 ? false : true
 
         return (
 

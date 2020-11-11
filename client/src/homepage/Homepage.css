@@ -4,6 +4,9 @@
     flex-direction: column;
     flex-grow: 1;
     align-items: flex-start;
+    max-width: calc(100vw);
+    overflow-x: hidden;
+    padding: 10px;
 }
 
 .new-game-button {
@@ -24,4 +27,5 @@
     justify-content: space-between;
     flex-grow: 1;
     padding: 25px;
+
 }

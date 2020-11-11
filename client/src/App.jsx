@@ -56,7 +56,7 @@ class App extends React.Component {
 
   render() {
     return (
-      <Layout style={{ minHeight: '100vh', minWidth: 'min(1300px, 100vw)' }}>
+      <Layout style={{ minHeight: '100vh', minWidth: 'min(1300px, 100vw)', maxWidth: '100vw' }}>
         {
           this.state.is_mobile ? null :
             <Sider collapsible collapsed={this.state.collapsed} onCollapse={this.toggleCollapsed}>
@@ -82,7 +82,7 @@ class App extends React.Component {
 
 
         <Layout className="site-layout">
-          <Content style={{ 'margin': '16px', display: 'flex', flexDirection: 'column' }}>
+          <Content style={{display: 'flex', flexDirection: 'column' }}>
 
             <div className="site-layout-background" style={{ minHeight: 360, display: 'flex', flexDirection: 'column', flexGrow: 1 }}>
               {this.state.selected === PLAY ? <HomePage set_toolbar={this.set_show_toolbar} is_mobile={this.state.is_mobile} /> : null}

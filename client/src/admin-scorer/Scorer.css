@@ -1,0 +1,47 @@
+.open-scoreboard-button {
+    position: absolute;
+    right: 10;
+    top: 10;
+}
+
+.scorer-icon {
+    padding-left: .7em;
+    padding-right: .7em;
+    margin: 5px;
+    font-size: 1.3em;
+    cursor: pointer;
+    border-radius: 2px;
+}
+
+.score-and-override {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.answer-scorer {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5em;
+}
+.player-scorer {
+    display: flex;
+    flex-direction: row;
+    align-items: stretch;
+    margin-top: 20px;
+}
+
+.answer-and-scorer {
+    border: 1px solid black;
+    margin: 5px;
+    /* padding: 10px; */
+    display: flex;
+    flex-direction: column;
+    min-width: 100px;
+}
+
+.selected-correctness {
+    border: 2px solid #d9d9d9;
+}

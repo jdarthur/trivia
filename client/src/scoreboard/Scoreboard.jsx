@@ -1,7 +1,7 @@
 import React from 'react';
 import sendData from "../index"
 import PlayerScore from "./PlayerScore"
-import "./Players.css"
+import "./Scoreboard.css"
 
 import { Modal, Button } from 'antd';
 

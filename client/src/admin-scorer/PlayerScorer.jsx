@@ -1,12 +1,9 @@
 import React from 'react';
 import sendData from "../index"
 import PlayerAnswer from "./PlayerAnswers"
-import "./Players.css"
-
+import "./Scorer.css"
 
 import { Button } from "antd"
-
-
 
 class PlayerScorer extends React.Component {
 
@@ -26,7 +23,6 @@ class PlayerScorer extends React.Component {
 
     componentDidUpdate(prevProps) {
         if (this.props.session_state !== prevProps.session_state && prevProps.session_state) {
-            // this.get_answers()
             if (this.props.question_id === prevProps.question_id) {
                 this.get_answers()
             }
