@@ -15,7 +15,7 @@ class Editor extends React.Component {
     render() {
         return (
             <div >
-                <Breadcrumb style={{ margin: '16px 0' }}>
+                <Breadcrumb style={{ margin: 16 }}>
                     <Breadcrumb.Item>Editor</Breadcrumb.Item>
                     <Breadcrumb.Item>{this.props.section}</Breadcrumb.Item>
                 </Breadcrumb>

@@ -16,7 +16,7 @@ class OtherPlayer extends React.Component {
       </span>
       : null
     return (
-      <Card title={this.props.real_name} extra={<PlayerIcon icon_name={this.props.icon_name} />}
+      <Card title={title} extra={<PlayerIcon icon_name={this.props.icon_name} />}
         style={{ width: 200, margin: 5 }}>
         <p style={{ fontStyle: 'italic' }}> {this.props.team_name} </p>
         <p style={{ color: 'darkgrey', textAlign: 'right', marginBottom: 0 }}> joined {dateString} </p>

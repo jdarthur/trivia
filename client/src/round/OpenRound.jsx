@@ -1,6 +1,6 @@
 import React from 'react';
 import './OpenRound.css';
-import AddQuestionsModal from "../modal/AddQuestionsModal"
+import AddQuestionsModal from "./AddQuestionsModal"
 import RemovableQuestionsList from "./RemovableQuestionsList"
 import Wager from "./Incrementer.jsx"
 
