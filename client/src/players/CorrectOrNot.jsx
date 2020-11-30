@@ -45,7 +45,7 @@ class CorrectOrNot extends React.Component {
         return (<div style={{display: 'flex', alignItems: 'stretch'}}>
             {this.props.is_mobile ?
                 // show mini status on mobile
-                <Card style={{ width: 75 }} bodyStyle={{ padding: 0 }}>
+                <Card style={{ width: 65 }} bodyStyle={{ padding: 0 }}>
                     <div style={{ display: 'flex', justifyContent: 'center', padding: 5 }}>
                         {icon}
                     </div>
