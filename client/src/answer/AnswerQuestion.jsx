@@ -69,10 +69,10 @@ class AnswerQuestion extends React.Component {
         const button_class = this.sendable() ? "" : "disabled"
         const send_text = this.state.answered ? "Update" : "Answer"
         return (
-            <Card style={{ width: 300, marginTop: 15 }} bodyStyle={{ padding: 15 }}  >
+            <Card style={{ width: 'min(400px, 100%)', marginTop: 15}} bodyStyle={{ padding: 15 }}  >
                 <TextArea placeholder="Your answer" value={this.state.answer}
-                    onChange={this.set_answer} autoSize={{ minRows: 3 }}
-                    onPressEnter={this.handleKeyPress} />
+                    onChange={this.set_answer} autoSize={{ minRows: 3 }} style={{fontSize: 16}}
+                    onPressEnter={this.handleKeyPress} style={{maxWidth: 2500}} />
 
                 <div className="answer-footer">
                     <WagerManager session_id={this.props.session_id} player_id={this.props.player_id}

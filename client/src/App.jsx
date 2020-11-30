@@ -55,8 +55,12 @@ class App extends React.Component {
   toggleCollapsed = () => { this.setState({ collapsed: !this.state.collapsed }); }
 
   render() {
+    // let vh = window.innerHeight * 0.01;
+    // // Then we set the value in the --vh custom property to the root of the document
+    // document.documentElement.style.setProperty('--vh', `${vh}px`);
+
     return (
-      <Layout style={{ minHeight: '100vh', minWidth: 'min(1300px, 100vw)', maxWidth: '100vw' }}>
+      <Layout className="height-trick" style={{minWidth: 'min(1300px, 100vw)', maxWidth: '100vw' }}>
         {
           this.state.is_mobile ? null :
             <Sider collapsible collapsed={this.state.collapsed} onCollapse={this.toggleCollapsed}>

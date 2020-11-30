@@ -16,12 +16,14 @@ class PlayerAnswer extends React.Component {
             <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="No answer"
                 style={{ margin: 0 }} />
 
+
         const old_answers = <div className="multi-answer">
-            {this.props.answers?.map((answer, index) =>
-                index === (this.props.answers.length - 1) ? null :
-                    <span key={answer.answer_id} className="old-answer">
-                        {answer.answer} ({answer.wager})
-                     </span>)}
+            {this.props.answers?.map((answer, index) => {
+                let show = (index !== (this.props.answers.length - 1) && index > this.props.answers.length - 4)
+                return (show ? <span key={answer.answer_id} className="old-answer">
+                    {answer.answer} ({answer.wager})
+                 </span> : null)
+            })}
         </div>
 
         return (

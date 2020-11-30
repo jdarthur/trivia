@@ -9,10 +9,9 @@ class ActiveQuestion extends React.Component {
 
   render() {
     // const question_newlined = this.props.question?.split("^").map((part, index) => <div key={index} className="linebreak"> {part} </div>)
-
     return (
 
-      <Card style={{ width: 400, marginTop: 10 }} bodyStyle={{ padding: 20 }}  >
+      <Card style={{ width: 'min(400px, 100%)', marginTop: 10 }} bodyStyle={{ padding: 20 }}  >
         <Breadcrumb style={{ paddingBottom: 10 }}>
           <Breadcrumb.Item>
             <PlaySquareOutlined />
