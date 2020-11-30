@@ -37,6 +37,7 @@ TEAM_NAME = "team_name"
 REAL_NAME = "real_name"
 ICON = "icon"
 PLAYER_ID = "player_id"
+ADMIN_ID = "admin_id"
 
 SESSION_ID = "session_id"
 QUESTION_ID = "question_id"
@@ -214,18 +215,26 @@ def get_sessions():
 =====================================
 """
 
+
 @app.route(f'{URL_BASE}/player', methods=['POST'])
 def create_one_player():
     return create_and_respond("player", request.json)
 
+
 @app.route(f'{URL_BASE}/session/<session_id>/add', methods=['POST'])
 def add_player_to_session(session_id):
     return _resp(add_to_session(session_id, request.json))
-    # return create_and_respond("player", request.json)
+
+
+@app.route(f'{URL_BASE}/session/<session_id>/remove', methods=['POST'])
+def remove_player_from_session(session_id):
+    return _resp(remove_from_session(session_id, request.json))
+
 
 @app.route(f'{URL_BASE}/player/<player_id>', methods=['GET'])
 def get_one_player(player_id):
     return get_and_respond("player", player_id)
+
 
 @app.route(f'{URL_BASE}/player/<player_id>', methods=['PUT'])
 def update_one_player(player_id):
@@ -299,12 +308,25 @@ def add_to_session(session_id, data, session={}):
     return succeed(data)
 
 
-@model(join_model, UPDATE, "session")
+delete_model = [
+    IdField(PLAYER_ID, "player"),
+    IdField(ADMIN_ID, "player"),
+]
+@model(delete_model, UPDATE, "session")
 def remove_from_session(session_id, data, session={}):
     """
     POST /session/:id/remove
     """
+    admin_id = data[ADMIN_ID]
     player_id = data[PLAYER_ID]
+
+    if player_id not in session.get(PLAYERS, []):
+        return fail(f"Player id {player_id} is not in session")
+
+    mod = session[MODERATOR]
+    if admin_id != mod:
+        return fail("Given admin ID does not match session")
+
     success = mongo.pull("session", session_id, PLAYERS, player_id)
     if not success:
         return fail("Failed to remove player from session")
