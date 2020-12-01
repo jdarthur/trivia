@@ -1,13 +1,17 @@
 import React from 'react';
 import './QuestionList.css';
 
-import Question from "./Question.jsx"
+import DeleteConfirm from "../editor/DeleteConfirm"
 import EditorFilter from "../editor/EditorFilter.jsx"
 import LoadingOrView from "../editor/LoadingOrView"
 
+import { Table } from "antd"
+
 import {
-  PlusSquareOutlined
+  PlusSquareOutlined,
+  EditOutlined
 } from '@ant-design/icons';
+import EditQuestionModal from './EditQuestionModal';
 
 
 //JSON keys
@@ -19,16 +23,13 @@ const NEW = "new"
 
 class QuestionList extends React.Component {
 
-  constructor(props) {
-    super(props)
-    this.state = {
-      questions: [],
-      unused_only: true,
-      text_filter: "",
-      selected: "",
-      dirty: "",
-      loading: false
-    }
+  state = {
+    questions: [],
+    unused_only: true,
+    text_filter: "",
+    selected: "",
+    dirty: "",
+    loading: false
   }
 
   componentDidMount() {
@@ -146,24 +147,43 @@ class QuestionList extends React.Component {
     })
   }
 
-
   render() {
-    const questions = this.state.questions.map((question, index) => (
-      <Question key={question.id} id={question.id} category={question.category}
-        answer={question.answer} question={question.question}
-        selected={(this.state.selected === question.id) ? true : false}
-        addable={this.props.round_open} add_to_round={this.props.add_to_round}
-        select={this.set_selected} set={this.set_value}
-        delete={this.delete} />))
+
+    const delete_edit = (text, record) => <span style={{fontSize: '1.2em'}}>
+      <DeleteConfirm delete={() => this.delete(record.id)} style={{paddingRight: 10}}/>
+      <EditOutlined onClick={() => this.set_selected(record.id)} />
+    </span>
+
+    const columns = [
+      { title: "", render: delete_edit, width: '7em'},
+      { title: 'Category', dataIndex: 'category', ellipsis: { showTitle: false } },
+      { title: 'Question', dataIndex: 'question', ellipsis: { showTitle: false }, width: '50%' },
+      { title: 'Answer', dataIndex: 'answer', ellipsis: { showTitle: false } }
+    ]
+
+
+    let question_editor = null;
+    if (this.state.selected) {
+      const selected = find(this.state.selected, this.state.questions)
+      question_editor = <EditQuestionModal answer={selected.answer} question={selected.question}
+        category={selected.category} select={this.set_selected} set={this.set_value}
+        id={this.state.selected} delete={this.delete} />
+    }
+
 
     const nqb = this.add_newquestion_button() ? <PlusSquareOutlined className="new_button" onClick={this.add_new_question} /> : null
+
+    const table_and_modal = <div>
+      {question_editor}
+      <Table columns={columns} dataSource={this.state.questions} pagination={false} />
+    </div>
 
     return (
       <div className="ql_and_filter">
         <EditorFilter set_text_filter={this.set_text_filter} set_unused_only={this.set_unused_only} data_type="questions"
           text_filter={this.state.text_filter} unused_only={this.state.unused_only} add_button={nqb} />
         <LoadingOrView loading={this.state.loading} class_name="question-list"
-          empty={questions?.length === 0} loaded_view={questions} />
+          empty={this.state.questions?.length === 0} loaded_view={table_and_modal} />
       </div>
     );
   }

@@ -4,9 +4,9 @@ import '../modal/Modal.css';
 import { Modal, Button, Table } from 'antd';
 
 const columns = [
-    { title: 'Category', dataIndex: 'category',  },
+    { title: 'Category', dataIndex: 'category', ellipsis: { showTitle: false } },
     { title: 'Question', dataIndex: 'question', ellipsis: { showTitle: false}, width: '50%' },
-    { title: 'Answer', dataIndex: 'answer' }
+    { title: 'Answer', dataIndex: 'answer', ellipsis: { showTitle: false } }
 ]
 
 class AddQuestionsModal extends React.Component {
