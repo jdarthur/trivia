@@ -1,4 +1,5 @@
 client/node_modules/
+client/cert/
 server/__pycache__
 server/test/__pycache__
 server/src/__pycache__
