@@ -121,9 +121,8 @@ class QuestionList extends React.Component {
   * delete a question by value & update the state of the rounds list
   */
   delete_and_update_state = (question) => {
-    const index = this.state.questions.map(function (e) { return e.id; }).indexOf(question.id);
-    this.state.questions.splice(index, 1)
-    this.setState({ questions: this.state.questions, dirty: "", selected: "" })
+    const data = this.state.questions.filter(item => item.id !== question.id);//   this.state.questions.splice(index, 1)
+    this.setState({ questions: data, dirty: "", selected: "" })
   }
 
   add_newquestion_button = () => {
@@ -141,8 +140,9 @@ class QuestionList extends React.Component {
       [CATEGORY]: "",
       [ID]: NEW
     }
-    this.state.questions.unshift(question)
-    this.setState({ questions: this.state.questions }, () => {
+    const data = [...this.state.questions]
+    data.push(question)
+    this.setState({ questions: data }, () => {
       this.set_selected(NEW)
     })
   }
