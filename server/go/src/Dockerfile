@@ -24,6 +24,7 @@ WORKDIR /go/src
 RUN go get "github.com/gin-gonic/gin"
 RUN go get "github.com/globalsign/mgo"
 RUN go get "github.com/google/uuid"
+RUN go get "github.com/joho/godotenv"
 
 RUN go build -o main .
 
