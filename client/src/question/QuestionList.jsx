@@ -5,7 +5,7 @@ import DeleteConfirm from "../editor/DeleteConfirm"
 import EditorFilter from "../editor/EditorFilter.jsx"
 import LoadingOrView from "../editor/LoadingOrView"
 
-import { Table } from "antd"
+import { Table, Pagination } from "antd"
 
 import {
   PlusSquareOutlined,
@@ -175,7 +175,7 @@ class QuestionList extends React.Component {
 
     const table_and_modal = <div>
       {question_editor}
-      <Table columns={columns} dataSource={this.state.questions} pagination={false} />
+      <Table columns={columns} dataSource={this.state.questions} pagination={<Pagination />} />
     </div>
 
     return (
