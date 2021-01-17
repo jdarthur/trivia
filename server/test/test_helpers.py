@@ -4,13 +4,21 @@ import os
 import sys
 sys.path.append(os.path.join("..", "src"))
 
-from editor_server import (create_question, create_round, create_game,
-                           delete_question, delete_round, delete_game)
+from .api_calls import (create_question, get_question, get_questions,
+                        update_question, delete_question,
+                        create_round, delete_round, 
+                        create_game, delete_game)
 
-from gameplay_server import (create_player, create_session, delete_player,
-                             delete_session, start_session, add_to_session)
+# from editor_server import (create_question, create_round, create_game,
+#                            delete_question, delete_round, delete_game)
+
+# from gameplay_server import (create_player, create_session, delete_player,
+#                              delete_session, start_session, add_to_session)
 
 
+
+def has_errors(response):
+    return response.get("errors", None) is not None
 
 
 def indentprint(data):
@@ -50,9 +58,20 @@ def dummy_question():
     }
 
     created = create_question(qdata)
-    if created["success"]:
-        return created["object"]["id"]
-    return None
+    if has_errors(created) == True:
+        return None
+    return created["id"]
+
+class DummyQuestion(object):
+    def __init__(self):
+        self.question_id = None
+
+    def __enter__(self):
+        self.question_id = dummy_question()
+        return self.question_id
+
+    def __exit__(self, type, value, traceback):
+        delete_question(self.question_id)
 
 
 def dummy_round(question_ids):
@@ -71,9 +90,10 @@ def dummy_round(question_ids):
         "wagers": wagers
     }
     created = create_round(rdata)
-    if created["success"]:
-        return created["object"]["id"]
-    return None
+    print(created)
+    if has_errors(created) == True:
+        return None
+    return created["id"]
 
 
 class DummyRound(object):
@@ -116,10 +136,9 @@ def dummy_game(rounds):
 
     created = create_game(gdata)
     print(created)
-    if created["success"]:
-        return created["object"]["id"]
-
-    return None
+    if has_errors(created) == True:
+        return None
+    return created["id"]
 
 
 def dummy_session(game_id):

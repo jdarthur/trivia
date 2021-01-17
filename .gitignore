@@ -4,4 +4,13 @@ server/__pycache__
 server/test/__pycache__
 server/src/__pycache__
 .idea/
+client/.env
 client/build
+server/go/bin/
+server/go/pkg/
+server/go/src/github.com
+server/go/src/go.mongodb.org
+server/go/src/golang.org
+server/go/src/gopkg.in
+server/go/src/google.golang.org
+server/go/src/.env

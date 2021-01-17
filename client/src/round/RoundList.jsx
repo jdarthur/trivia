@@ -58,11 +58,11 @@ class RoundList extends React.Component {
     }
 
     set_unused_only = (value) => {
-        this.setState({ unused_only: value }, () => { this.get_rounds() })
+        this.setState({ unused_only: value, selected: "" }, () => { this.get_rounds() })
     }
 
     set_text_filter = (value) => {
-        this.setState({ text_filter: value }, () => { this.get_rounds() })
+        this.setState({ text_filter: value, selected: "" }, () => { this.get_rounds() })
     }
 
     set_selected = (round_id, value) => {

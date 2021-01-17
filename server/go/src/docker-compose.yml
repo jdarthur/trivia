@@ -1,0 +1,10 @@
+version: "3.9"
+services:
+  editor-server:
+    build: .
+    ports:
+      - "8080:8080"
+  mongo:
+    image: "mongo"
+    volumes:
+      - ~/trivdata:/data/db

@@ -26,3 +26,8 @@
 .invite-link {
     width: 300px;
 }
+
+.save-container {
+    display: flex;
+    justify-content: flex-end;
+}

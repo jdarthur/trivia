@@ -108,6 +108,8 @@ def create_question(data):
 def get_all_questions():
     text_filter = request.args.get(TEXT_FILTER, None)
     unused_only = request.args.get(UNUSED_ONLY, False)
+    if (unused_only.lower() == "false"):
+        unused_only = False
     questions = get_questions(text_filter, unused_only)
     if not questions[SUCCESS]:
         return jsonify(questions)
@@ -414,6 +416,11 @@ def validate_wagers(data):
       API ENDPOINTS
 =========================
 """
+@app.route(f'{URL_BASE}/game/<game_id>', methods=['GET'])
+def get_one_game(game_id):
+    return get_and_respond("game", game_id)
+
+
 @app.route(f'{URL_BASE}/game', methods=['POST'])
 def create_one_game():
     return create_and_respond("game", request.json)
@@ -427,6 +434,13 @@ def update_one_game(game_id):
 @app.route(f'{URL_BASE}/game/<game_id>', methods=['DELETE'])
 def delete_one_game(game_id):
     return delete_and_respond("game", game_id)
+
+@app.route(f'{URL_BASE}/games', methods=['GET'])
+def get_all_games():
+    games = get_games()
+    if not games[SUCCESS]:
+        return jsonify(games)
+    return jsonify({GAMES: games[OBJECT]})
 
 
 """
@@ -522,6 +536,17 @@ def set_round_and_game_id(round_id, game_id, present=True):
 @model(gmodel, UPDATE, "game")
 def update_game(game_id, data, game={}):
 
+    round_names = data.get(ROUND_NAMES, {})
+    rounds = data.get(ROUNDS, [])
+
+    if len(round_names) != len(rounds):
+        return fail(f"{ROUND_NAMES} is different length ({len(round_names)}) than {ROUNDS} ({len(rounds)})")
+
+    for round_id in rounds:
+        if round_names.get(round_id, None) is None:
+            return fail(f"missing round name for round with id {round_id})")
+
+
     prev_rounds = game.get(ROUNDS, [])
     target_rounds = data.get(ROUNDS, [])
     for round_id in prev_rounds:
@@ -531,6 +556,10 @@ def update_game(game_id, data, game={}):
     for round_id in target_rounds:
         if round_id not in prev_rounds:
             set_round_and_game_id(round_id, game_id, True)  # add game_id to round
+
+    if len(round_names) == 0 or len(rounds) == 0:
+        data[ROUND_NAMES] = {}
+        data[ROUNDS] = {}
 
     success = mongo.update("game", game_id, data)
     if success:
@@ -549,15 +578,6 @@ def delete_game(game_id, game={}):
         return rupdate
 
     return succeed(game)
-
-
-@app.route(f'{URL_BASE}/games', methods=['GET'])
-def get_all_games():
-    games = get_games()
-    if not games[SUCCESS]:
-        return jsonify(games)
-    return jsonify({GAMES: games[OBJECT]})
-
 
 def get_games():
     return succeed(get_all("game"))
