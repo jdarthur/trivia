@@ -14,7 +14,7 @@ type Game struct {
 	CreateDate time.Time   `bson:"create_date" json:"create_date"`
 	Name       string      `json:"name"`
 	Rounds  []string    `json:"rounds"`
-	RoundNames     map[string]string       `json:"round_names"`
+	RoundNames     map[string]string       `bson:"round_names" json:"round_names"`
 }
 
 func (g Game) SetCreateDate(createDate time.Time) Object {
