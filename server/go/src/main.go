@@ -31,9 +31,10 @@ func main() {
 	}
 
 
-	client, err := mgo.Dial("mongodb://" + mongoHost + ":" + mongoPort)
+	mongoAddress := "mongodb://" + mongoHost + ":" + mongoPort
+	client, err := mgo.Dial(mongoAddress)
 	if err != nil {
-		fmt.Println("Unable to connect to mongodb")
+		fmt.Println("Unable to connect to mongodb server at " + mongoAddress)
 		log.Fatal(err)
 	}
 
