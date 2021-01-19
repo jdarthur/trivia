@@ -6,15 +6,16 @@ sys.path.append(os.path.join("..", "src"))
 
 from .api_calls import (create_question, get_question, get_questions,
                         update_question, delete_question,
-                        create_round, delete_round, 
-                        create_game, delete_game)
+                        create_round, delete_round,
+                        create_game, delete_game,
+                        create_session, start_session, add_to_session, delete_session,
+                        create_player, delete_player)
 
 # from editor_server import (create_question, create_round, create_game,
 #                            delete_question, delete_round, delete_game)
 
 # from gameplay_server import (create_player, create_session, delete_player,
 #                              delete_session, start_session, add_to_session)
-
 
 
 def has_errors(response):
@@ -58,9 +59,10 @@ def dummy_question():
     }
 
     created = create_question(qdata)
-    if has_errors(created) == True:
+    if has_errors(created) is True:
         return None
     return created["id"]
+
 
 class DummyQuestion(object):
     def __init__(self):
@@ -91,7 +93,7 @@ def dummy_round(question_ids):
     }
     created = create_round(rdata)
     print(created)
-    if has_errors(created) == True:
+    if has_errors(created) is True:
         return None
     return created["id"]
 
@@ -136,7 +138,7 @@ def dummy_game(rounds):
 
     created = create_game(gdata)
     print(created)
-    if has_errors(created) == True:
+    if has_errors(created) is True:
         return None
     return created["id"]
 
@@ -148,10 +150,10 @@ def dummy_session(game_id):
     }
 
     created = create_session(sdata)
-    if created["success"]:
-        return created["object"]["id"]
+    if has_errors(created):
+        return None
     print(created)
-    return None
+    return created
 
 
 def dummy_player():
@@ -162,10 +164,9 @@ def dummy_player():
     print("create player ")
     created = create_player(pdata)
     print(created)
-    if created["success"]:
-        return created["object"]["id"]
-    print(f"pc f{created}")
-    return None
+    if has_errors(created):
+        return None
+    return created["id"]
 
 
 class DummyGame(object):
@@ -211,7 +212,9 @@ class DummySessionWithPlayers(object):
         self.pcount = players
 
     def __enter__(self):
-        self.session_id = dummy_session(self.game.game_id)
+        self.session = dummy_session(self.game.game_id)
+        self.session_id = self.session["id"]
+        self.mod_id = self.session["mod"]
 
         self.players = []
         for i in range(0, self.pcount):
@@ -225,6 +228,6 @@ class DummySessionWithPlayers(object):
     def __exit__(self, type, value, traceback):
 
         self.game.__exit__(type, value, traceback)
-        delete_session(self.session_id)
+        delete_session(self.session_id, self.mod)
         for player_id in self.players:
             delete_player(player_id)

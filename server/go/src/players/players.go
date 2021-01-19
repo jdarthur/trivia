@@ -1,0 +1,194 @@
+package players
+
+import (
+	"common"
+	"github.com/gin-gonic/gin"
+	"github.com/globalsign/mgo/bson"
+	"models"
+)
+
+type Env common.Env
+
+func (e *Env) CreatePlayer(c *gin.Context) {
+	var data models.Player
+
+	err := c.ShouldBind(&data)
+	if err != nil {
+		common.Respond(c, data, err)
+		return
+	}
+
+	playerId, createDate, err := common.Create((*common.Env)(e), common.PlayerTable, &data)
+	data.ID = playerId
+	data.CreateDate = createDate
+
+	common.Respond(c, data, err)
+}
+
+
+type AddToSession struct {
+	PlayerId string `json:"player_id"`
+	SessionId string `json:"session_id"`
+}
+
+func (e *Env) AddPlayerToSession(c *gin.Context) {
+	sessionId := c.Param("id")
+
+	var requestBody AddToSession
+	requestBody.SessionId = sessionId
+
+	err := c.ShouldBind(&requestBody)
+	if err != nil {
+		common.Respond(c, requestBody, err)
+		return
+	}
+
+	var session models.Session
+	err = common.GetOne((*common.Env)(e), common.SessionTable, sessionId, &session)
+	if err != nil {
+		common.Respond(c, requestBody, err)
+		return
+	}
+
+	//can't add a player to an already-started session
+	if session.Started {
+		common.Respond(c, requestBody, SessionAlreadyStartedError{SessionId: sessionId})
+		return
+	}
+
+	//can't add a player that's already in a session
+	for _, playerId := range session.Players {
+		if playerId == requestBody.PlayerId {
+			common.Respond(c, requestBody, AlreadyInSessionError{SessionId: sessionId, PlayerId: requestBody.PlayerId})
+			return
+		}
+	}
+
+	//verify that player is an actual player ID
+	var player models.Player
+	err = common.GetOne((*common.Env)(e), common.PlayerTable, requestBody.PlayerId, &player)
+	if err != nil {
+		common.Respond(c, requestBody, InvalidPlayerIdError{PlayerId: requestBody.PlayerId})
+		return
+	}
+
+	err = common.Push((*common.Env)(e), common.SessionTable, sessionId, models.Players, requestBody.PlayerId)
+	common.Respond(c, requestBody, err)
+
+	//TODO: increment session state when player is added
+	//TODO (maybe): update player.session_id when player is added to session
+}
+
+
+type RemoveFromSession struct {
+	PlayerId string `json:"player_id"`
+	AdminId string `json:"admin_id"`
+	SessionId string `json:"session_id"`
+}
+func (e *Env) RemovePlayerFromSession(c *gin.Context) {
+
+	sessionId := c.Param("id")
+
+	var requestBody RemoveFromSession
+	requestBody.SessionId = sessionId
+
+	err := c.ShouldBind(&requestBody)
+	if err != nil {
+		common.Respond(c, requestBody, err)
+		return
+	}
+
+	var session models.Session
+	err = common.GetOne((*common.Env)(e), common.SessionTable, sessionId, &session)
+	if err != nil {
+		common.Respond(c, session, err)
+		return
+	}
+
+	//return error if caller didn't pass the correct admin_id for this session
+	if requestBody.AdminId != session.Moderator {
+		common.Respond(c, requestBody, UnauthorizedRemoveError{AdminId: requestBody.AdminId})
+		return
+	}
+
+
+	err = common.Pull((*common.Env)(e), common.SessionTable, sessionId, models.Players, requestBody.PlayerId)
+	common.Respond(c, requestBody, err)
+
+
+	//TODO: increment session state when player is removed
+}
+
+func (e *Env) UpdatePlayer(c *gin.Context) {
+
+	playerId := c.Param("id")
+
+	var requestBody models.Player
+	err := c.ShouldBind(&requestBody)
+	if err != nil {
+		common.Respond(c, requestBody, err)
+		return
+	}
+
+	//TODO: should we prevent player updates after session starts?
+
+	var original models.Player
+	err = common.GetOne((*common.Env)(e), common.PlayerTable, playerId, &original)
+	if err != nil {
+		common.Respond(c, requestBody, err)
+	}
+
+	merge(&requestBody, &original)
+	err = common.Set((*common.Env)(e), common.PlayerTable, playerId, &original)
+
+	common.Respond(c, requestBody, err)
+	//TODO: update session state after player update (if session not started)
+}
+
+
+func (e *Env) DeletePlayer(c *gin.Context) {
+	playerId := c.Param("id")
+
+	var original models.Player
+	err := common.GetOne((*common.Env)(e), common.PlayerTable, playerId, &original)
+	if err != nil {
+		common.Respond(c, nil, err)
+	}
+
+	err = common.Delete((*common.Env)(e), common.PlayerTable, playerId)
+
+	common.Respond(c, original, err)
+}
+
+func (e *Env) GetPlayersInSession(c *gin.Context) {
+	sessionId := c.Param("id")
+	moderatorId := c.Query("mod")
+	var session models.Session
+	err := common.GetOne((*common.Env)(e), common.SessionTable, sessionId, &session)
+	if err != nil {
+		common.Respond(c, nil, err)
+	}
+
+	sessionPlayers := make([]models.Player, 0)
+
+	for _, playerId := range session.Players {
+		var player models.Player
+		err = common.GetOne((*common.Env)(e), common.PlayerTable, playerId, &player)
+		if err != nil {
+			common.Respond(c, nil, err)
+		}
+
+		//strip player ID if called by non-mod
+		if moderatorId !=  session.Moderator {
+			player.ID = bson.Binary{}
+		}
+
+		sessionPlayers = append(sessionPlayers, player)
+	}
+
+	common.Respond(c, gin.H{"players": sessionPlayers}, err)
+}
+
+func merge(update *models.Player, original *models.Player) {
+
+}

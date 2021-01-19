@@ -19,6 +19,8 @@ var Database = "trivia"
 var QuestionTable = "question"
 var RoundTable = "round"
 var GameTable = "game"
+var SessionTable = "session"
+var PlayerTable = "player"
 
 type Env struct {
 	Db *mgo.Session
@@ -33,14 +35,6 @@ type InvalidDataError interface {
 	Field() string
 	Data() interface{}
 	Error() string
-}
-
-type MissingRequiredFieldError struct {
-	Field string
-}
-
-func (e MissingRequiredFieldError) Error() string {
-	return "Missing required field: " + e.Field
 }
 
 // Error thrown when record of type RecordType with ID is not found
@@ -61,17 +55,6 @@ type InvalidUUIDError struct {
 
 func (e InvalidUUIDError) Error() string {
 	return "Invalid UUID: " + e.ID
-}
-
-// Error thrown when attempting to add a
-// question to a round that it's already in
-type QuestionAlreadyInRoundError struct {
-	QuestionId string
-	RoundId    string
-}
-
-func (e QuestionAlreadyInRoundError) Error() string {
-	return "Question " + e.QuestionId + " is already in round " + e.RoundId
 }
 
 //=====================================
@@ -213,6 +196,8 @@ func GetAll(e *Env, objectType string, filters interface{}) (interface{}, error)
 		slice = make([]*models.Round, 0, 0)
 	case GameTable:
 		slice = make([]*models.Game, 0, 0)
+	case SessionTable:
+		slice = make([]*models.Session, 0, 0)
 
 	default:
 		return nil, errors.New("invalid get all table: " + objectType)
@@ -288,10 +273,6 @@ func Respond(c *gin.Context, data interface{}, err error) {
 			c.JSON(http.StatusNotFound, gin.H{"errors": t.Error()})
 		case NonexistentIdError:
 			c.JSON(http.StatusNotFound, gin.H{"errors": t.Error()})
-		case QuestionAlreadyInRoundError:
-			c.JSON(http.StatusConflict, gin.H{"errors": t.Error()})
-		case MissingRequiredFieldError:
-			c.JSON(http.StatusBadRequest, gin.H{"errors": t.Error()})
 		case *json.UnmarshalTypeError:
 			e := "Invalid value for field '" + t.Field + "' (got: " + t.Value + ", required: " + t.Type.String() + ")"
 			c.JSON(http.StatusBadRequest, gin.H{"errors": []string{e}})

@@ -1,36 +1,36 @@
 import requests
 
-base_url = "http://localhost:8080/editor" # golang
-#base_url = "http://localhost:6000/editor" # python
+base_url = "http://localhost:8080" # golang
+#base_url = "http://localhost:6000" # python
 """
 ========================
         Questions
 ========================
 """
 def create_question(data):
-    url = f"{base_url}/question"
+    url = f"{base_url}/editor/question"
     r = requests.post(url, json=data)
     return r.json()
 
 def get_question(question_id):
-    url = f"{base_url}/question/{question_id}"
+    url = f"{base_url}/editor/question/{question_id}"
     r = requests.get(url)
     return r.json()
 
 def get_questions(unused_only=True, text_filter=None):
-    url = f"{base_url}/questions?unused_only={str(unused_only).lower()}"
+    url = f"{base_url}/editor/questions?unused_only={str(unused_only).lower()}"
     if text_filter != None:
     	url += f"&text_filter={text_filter}"
     r = requests.get(url)
     return r.json()["questions"]
 
 def update_question(question_id, data):
-    url = f"{base_url}/question/{question_id}"
+    url = f"{base_url}/editor/question/{question_id}"
     r = requests.put(url, json=data)
     return r.json()
 
 def delete_question(question_id):
-    url = f"{base_url}/question/{question_id}"
+    url = f"{base_url}/editor/question/{question_id}"
     r = requests.delete(url)
     return r.json()
 
@@ -41,29 +41,29 @@ def delete_question(question_id):
 ========================
 """
 def create_round(data):
-    url = f"{base_url}/round"
+    url = f"{base_url}/editor/round"
     r = requests.post(url, json=data)
     return r.json()
 
 def get_round(round_id):
-    url = f"{base_url}/round/{round_id}"
+    url = f"{base_url}/editor/round/{round_id}"
     r = requests.get(url)
     return r.json()
 
 def get_rounds(unused_only=True, text_filter=None):
-    url = f"{base_url}/rounds?unused_only={str(unused_only).lower()}"
+    url = f"{base_url}/editor/rounds?unused_only={str(unused_only).lower()}"
     if text_filter != None:
     	url += f"&text_filter={text_filter}"
     r = requests.get(url)
     return r.json()["rounds"]
 
 def update_round(round_id, data):
-    url = f"{base_url}/round/{round_id}"
+    url = f"{base_url}/editor/round/{round_id}"
     r = requests.put(url, json=data)
     return r.json()
 
 def delete_round(round_id):
-    url = f"{base_url}/round/{round_id}"
+    url = f"{base_url}/editor/round/{round_id}"
     r = requests.delete(url)
     return r.json()
 
@@ -72,30 +72,128 @@ def delete_round(round_id):
         Games
 ========================
 """
+
+
 def create_game(data):
-    url = f"{base_url}/game"
+    url = f"{base_url}/editor/game"
     r = requests.post(url, json=data)
     return r.json()
 
+
 def get_game(game_id):
-    url = f"{base_url}/game/{game_id}"
+    url = f"{base_url}/editor/game/{game_id}"
     r = requests.get(url)
     return r.json()
 
+
 def get_games(unused_only=True, text_filter=None):
-    url = f"{base_url}/games?unused_only={str(unused_only).lower()}"
+    url = f"{base_url}/editor/games?unused_only={str(unused_only).lower()}"
     if text_filter != None:
     	url += f"&text_filter={text_filter}"
     r = requests.get(url)
     return r.json()["games"]
 
+
 def update_game(game_id, data):
-    url = f"{base_url}/game/{game_id}"
+    url = f"{base_url}/editor/game/{game_id}"
     r = requests.put(url, json=data)
     return r.json()
 
+
 def delete_game(game_id):
-    url = f"{base_url}/game/{game_id}"
+    url = f"{base_url}/editor/game/{game_id}"
     r = requests.delete(url)
     return r.json()
 
+
+
+
+"""
+========================
+        Sessions
+========================
+"""
+def create_session(data):
+    url = f"{base_url}/gameplay/session"
+    r = requests.post(url, json=data)
+    return r.json()
+
+
+def get_session(session_id):
+    url = f"{base_url}/gameplay/session/{session_id}"
+    r = requests.get(url)
+    return r.json()
+
+
+def get_sessions():
+    url = f"{base_url}/gameplay/sessions"
+    r = requests.get(url)
+    return r.json()["sessions"]
+
+
+def update_session(session_id, data):
+    url = f"{base_url}/gameplay/session/{session_id}"
+    r = requests.put(url, json=data)
+    return r.json()
+
+
+def delete_session(session_id, mod_id):
+    url = f"{base_url}/gameplay/session/{session_id}?mod={mod_id}"
+    r = requests.delete(url)
+    return r.json()
+
+
+def add_to_session(session_id, data):
+    url = f"{base_url}/gameplay/session/{session_id}/add"
+    r = requests.post(url, json=data)
+    return r.json()
+
+
+def remove_from_session(session_id, data):
+    url = f"{base_url}/gameplay/session/{session_id}/remove"
+    r = requests.post(url, json=data)
+    return r.json()
+
+def start_session(session_id):
+    url = f"{base_url}/gameplay/session/{session_id}/start"
+    r = requests.post(url)
+    return r.json()
+
+
+
+"""
+========================
+        Players
+========================
+"""
+
+def create_player(data):
+    url = f"{base_url}/gameplay/player"
+    r = requests.post(url, json=data)
+    return r.json()
+
+
+def get_player(player_id):
+    url = f"{base_url}/gameplay/player/{player_id}"
+    r = requests.get(url)
+    return r.json()
+
+
+def get_players_in_session(session_id, mod=None):
+    url = f"{base_url}/gameplay/session/{session_id}/players"
+    if mod is not None:
+        url += f"?mod={mod}"
+    r = requests.get(url)
+    return r.json()["players"]
+
+
+def update_player(player_id, data):
+    url = f"{base_url}/gameplay/player/{player_id}"
+    r = requests.put(url, json=data)
+    return r.json()
+
+
+def delete_player(player_id):
+    url = f"{base_url}/gameplay/player/{player_id}"
+    r = requests.delete(url)
+    return r.json()

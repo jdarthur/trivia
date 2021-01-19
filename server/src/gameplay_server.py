@@ -259,7 +259,7 @@ def update_player(player_id, data, player={}):
     if success:
         player.update(data)
 
-        #dirty the session state, so other clients will see this update
+        # dirty the session state, so other clients will see this update
         session_id = player.get(SESSION_ID, None)
         if session_id:
             mongo.incr_state(session_id)

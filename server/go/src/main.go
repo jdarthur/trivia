@@ -8,8 +8,10 @@ import (
 	"github.com/joho/godotenv"
 	"log"
 	"os"
+	"players"
 	"questions"
 	"rounds"
+	"sessions"
 )
 
 func main() {
@@ -63,6 +65,26 @@ func main() {
 	router.POST("/editor/game", g.CreateGame)
 	router.PUT("/editor/game/:id", g.UpdateGame)
 	router.DELETE("/editor/game/:id", g.DeleteGame)
+
+	fmt.Println("\nSession API:")
+	s := sessions.Env{Db: client}
+	router.GET("/gameplay/sessions",s.GetAllSessions)
+	router.GET("/gameplay/session/:id",s.GetOneSession)
+	router.GET("/gameplay/session/:id/scoreboard", s.GetSessionScoreboard)
+	router.POST("/gameplay/session", s.CreateSession)
+	router.PUT("/gameplay/session/:id", s.UpdateSession)
+	router.DELETE("/gameplay/session/:id", s.DeleteSession)
+
+
+	fmt.Println("\nPlayer API:")
+	p := players.Env{Db: client}
+	router.GET("/gameplay/session/:id/players", p.GetPlayersInSession)
+	//router.GET("/gameplay/player/:id", p.GetOnePlayer)
+	router.POST("/gameplay/player", p.CreatePlayer)
+	router.PUT("/gameplay/player/:id", p.UpdatePlayer)
+	router.POST("/gameplay/session/:id/add", p.AddPlayerToSession)
+	router.POST("/gameplay/session/:id/remove", p.RemovePlayerFromSession)
+	router.DELETE("/gameplay/player/:id", p.DeletePlayer)
 
 	fmt.Println()
 	router.Run()
