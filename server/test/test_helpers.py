@@ -150,9 +150,9 @@ def dummy_session(game_id):
     }
 
     created = create_session(sdata)
+    print(created)
     if has_errors(created):
         return None
-    print(created)
     return created
 
 
@@ -186,6 +186,7 @@ class DummyGame(object):
                 rqs.append(question_id)
 
             r = dummy_round(rqs)
+            print("created round:")
             print(r)
             self.rounds.append(r)
 

@@ -1,6 +1,8 @@
 package sessions
 
-import "models"
+import (
+	"models"
+)
 
 //Error when trying to create/start a session which is composed of an empty game
 type GameWithoutRoundsError struct {
@@ -72,11 +74,25 @@ type UnauthorizedSessionActionError struct {
 	ModeratorId string
 }
 func (e UnauthorizedSessionActionError) Error() string {
-	return "Forbidden: ID " + e.ModeratorId + " is not the moderator of session " + e.SessionId
+	return "Forbidden: ID '" + e.ModeratorId + "' is not the moderator of session " + e.SessionId
 }
 func (e UnauthorizedSessionActionError) Field() string {
 	return models.ModeratorId
 }
 func (e UnauthorizedSessionActionError) Data() interface{} {
 	return e.ModeratorId
+}
+
+//Error when trying to start a session that is already started
+type SessionAlreadyStartedError struct {
+	SessionId string
+}
+func (e SessionAlreadyStartedError) Error() string {
+	return "Session " + e.SessionId + " is already started"
+}
+func (e SessionAlreadyStartedError) Field() string {
+	return "id"
+}
+func (e SessionAlreadyStartedError) Data() interface{} {
+	return e.SessionId
 }

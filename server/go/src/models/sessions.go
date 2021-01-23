@@ -8,7 +8,11 @@ import (
 
 var Players = "players"
 var GameId = "game_id"
-var ModeratorId = "moderator_id"
+var ModeratorId = "mod"
+var Started = "started"
+var CurrentRound = "current_round"
+var CurrentQuestion = "current_question"
+var Scoreboard = "scoreboard"
 
 type Session struct {
 	ID              bson.Binary      `bson:"_id" json:"id"`
@@ -18,8 +22,8 @@ type Session struct {
 	Moderator       string           `bson:"mod" json:"mod,omitempty"`
 	Started         bool             `json:"started"`
 	Rounds          []RoundInGame    `json:"rounds,omitempty"`
-	CurrentRound    int              `bson:"current_round" json:"current_round,omitempty"`
-	CurrentQuestion int              `bson:"current_question" json:"current_question,omitempty"`
+	CurrentRound    *int              `bson:"current_round" json:"current_round,omitempty"`
+	CurrentQuestion *int              `bson:"current_question" json:"current_question,omitempty"`
 	Scoreboard      map[string][]int `bson:"scoreboard" json:"scoreboard,omitempty"` //map[PlayerId][...PointsAwarded]
 	Players			[]string		 `bson:"players" json:"players,omitempty"` //[]PlayerId
 }
@@ -59,15 +63,4 @@ type QuestionInRound struct {
 	Answer        string              `json:"answer,omitempty"`
 	PlayerAnswers map[string][]string `bson:"answers" json:"answers,omitempty"` //map[PlayerId][...AnswerIds]
 	Scored        bool                `json:"scored,omitempty"`
-}
-
-type UnauthorizedSession struct {
-	ID              bson.Binary      `bson:"_id" json:"id"`
-	CreateDate      time.Time        `bson:"create_date" json:"create_date"`
-	Name            string           `json:"name"`
-	Started         bool             `json:"started"`
-	Rounds          []RoundInGame    `json:"rounds,omitempty"`
-	CurrentRound    int              `bson:"current_round" json:"current_round,omitempty"`
-	CurrentQuestion int              `bson:"current_question" json:"current_question,omitempty"`
-	Scoreboard      map[string][]int `bson:"scoreboard" json:"scoreboard,omitempty"`
 }

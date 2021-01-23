@@ -39,24 +39,22 @@ func (e *Env) GetOneSession(c *gin.Context) {
 
 func (e *Env) CreateSession(c *gin.Context) {
 
-	var requestBody models.Session
-	err := c.ShouldBind(&requestBody)
+	var session models.Session
+	err := c.ShouldBind(&session)
 	if err != nil {
-		common.Respond(c, requestBody, err)
+		common.Respond(c, session, err)
 		return
 	}
 
-	//make sure this game ID is valid
-	var game models.Game
-	err = common.GetOne((*common.Env)(e), common.GameTable, requestBody.GameId, &game)
+	//verify that this session's game is startable, otherwise just return error before we do anything else
+	_, err = gameIsStartable(e, session.GameId)
 	if err != nil {
-		common.Respond(c, nil, InvalidGameIdError{GameId: models.IdAsString(game.ID)})
+		common.Respond(c, nil, err)
 		return
 	}
 
-	//verify that this game is startable, otherwise just return error before we do anything else
-	err = gameIsStartable(e, game)
-	if err != nil {
+	err = checkLegalSetFields(session)
+	if err !=  nil {
 		common.Respond(c, nil, err)
 		return
 	}
@@ -66,15 +64,14 @@ func (e *Env) CreateSession(c *gin.Context) {
 	moderator.TeamName = "mod"
 	moderator.RealName = "mod"
 
-	moderatorId, _, err := common.Create((*common.Env)(e), common.PlayerTable, moderator)
+	moderatorId, _, err := common.Create((*common.Env)(e), common.PlayerTable, &moderator)
 	if err != nil {
 		common.Respond(c, nil, err)
 		return
 	}
 
-	var session models.Session
 	session.Moderator = models.IdAsString(moderatorId)
-	sessionId, createDate, err := common.Create((*common.Env)(e), common.SessionTable, session)
+	sessionId, createDate, err := common.Create((*common.Env)(e), common.SessionTable, &session)
 	if err != nil {
 		common.Respond(c, nil, err)
 		return
@@ -111,6 +108,12 @@ func (e *Env) UpdateSession(c *gin.Context) {
 		return
 	}
 
+	err = checkLegalSetFields(requestBody)
+	if err !=  nil {
+		common.Respond(c, nil, err)
+		return
+	}
+
 	//name is the only updatable field on created sessions
 	if requestBody.Name != "" {
 		session.Name = requestBody.Name
@@ -142,6 +145,59 @@ func (e *Env) DeleteSession(c *gin.Context) {
 }
 
 
+type SessionActionRequest struct {
+	ModeratorId string `json:"player_id"`
+}
+func (e * Env) StartSession(c *gin.Context) {
+	sessionId := c.Param("id")
+
+	var requestBody SessionActionRequest
+	err := c.ShouldBind(&requestBody)
+	if err != nil {
+		common.Respond(c, nil, err)
+		return
+	}
+
+	var existingSession models.Session
+	err = common.GetOne((*common.Env)(e), common.SessionTable, sessionId, &existingSession)
+	if err != nil {
+		common.Respond(c, existingSession, err)
+		return
+	}
+
+	if requestBody.ModeratorId != existingSession.Moderator {
+		common.Respond(c, existingSession, UnauthorizedSessionActionError{SessionId: sessionId, ModeratorId: requestBody.ModeratorId})
+		return
+	}
+
+	if existingSession.Started {
+		common.Respond(c, existingSession, SessionAlreadyStartedError{SessionId: sessionId})
+		return
+	}
+
+	game, err := gameIsStartable(e, existingSession.GameId)
+	if err != nil {
+		common.Respond(c, existingSession, err)
+		return
+	}
+
+	//set roundId in this sessions Rounds arr
+	existingSession.Started = true
+	for _, roundId := range game.Rounds {
+		var roundInGame models.RoundInGame
+		roundInGame.RoundId = roundId
+		existingSession.Rounds = append(existingSession.Rounds, roundInGame)
+	}
+
+	err = common.Set((*common.Env)(e), common.SessionTable, sessionId, &existingSession)
+	if err != nil {
+		common.Respond(c, existingSession, err)
+		return
+	}
+
+	err = _setCurrentRound(e, &existingSession, 0)
+	common.Respond(c, existingSession, err)
+}
 
 
 func getSessionAsPlayer(session *models.Session, playerId string) models.Session {
@@ -150,21 +206,56 @@ func getSessionAsPlayer(session *models.Session, playerId string) models.Session
 	return *session
 }
 
-func gameIsStartable(e *Env, game models.Game) error {
+func gameIsStartable(e *Env, gameId string) (*models.Game, error) {
+	//make sure this game ID is valid
+	var game models.Game
+	err := common.GetOne((*common.Env)(e), common.GameTable, gameId, &game)
+	if err != nil {
+		return &game, InvalidGameIdError{GameId: gameId}
+	}
+
 	if len(game.Rounds) == 0 {
-		return GameWithoutRoundsError{GameId: models.IdAsString(game.ID)}
+		return &game, GameWithoutRoundsError{GameId: models.IdAsString(game.ID)}
 	}
 
 	for _, roundId := range game.Rounds {
 		var round models.Round
-		err := common.GetOne((*common.Env)(e), common.RoundTable, roundId, &round)
+		err = common.GetOne((*common.Env)(e), common.RoundTable, roundId, &round)
 		if err != nil {
-			return InvalidRoundIdInGameError{RoundId: roundId, GameId: models.IdAsString(game.ID)}
+			return &game, InvalidRoundIdInGameError{RoundId: roundId, GameId: models.IdAsString(game.ID)}
 		}
 
 		if len(round.Questions) == 0 {
-			return RoundWithoutQuestionsError{GameId: models.IdAsString(game.ID), RoundId: roundId}
+			return &game, RoundWithoutQuestionsError{GameId: models.IdAsString(game.ID), RoundId: roundId}
 		}
+	}
+
+	return &game, nil
+}
+
+func checkLegalSetFields(requestBody models.Session) error {
+	if requestBody.Started == true {
+		return models.AttemptedToSetError{Value: requestBody.Started, IllegalField: models.Started}
+	}
+
+	if len(requestBody.Players) != 0 {
+		return models.AttemptedToSetError{Value: requestBody.Players, IllegalField: models.Players}
+	}
+
+	if requestBody.Rounds != nil {
+		return models.AttemptedToSetError{Value: requestBody.Rounds, IllegalField: models.Rounds}
+	}
+
+	if requestBody.CurrentRound != nil {
+		return models.AttemptedToSetError{Value: requestBody.CurrentRound, IllegalField: models.CurrentRound}
+	}
+
+	if requestBody.CurrentQuestion != nil {
+		return models.AttemptedToSetError{Value: requestBody.CurrentQuestion, IllegalField: models.CurrentQuestion}
+	}
+
+	if len(requestBody.Scoreboard) != 0 {
+		return models.AttemptedToSetError{Value: requestBody.Scoreboard, IllegalField: models.Scoreboard}
 	}
 
 	return nil

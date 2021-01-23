@@ -25,39 +25,39 @@ def create_and_print(data):
 """
 
 
-def test_name_is_not_str():
-    print("\nTEST: name attribute is not str")
-    data = {"name": []}
-    created = create_and_print(data)
-    assert has_errors(created)
+# def test_name_is_not_str():
+#     print("\nTEST: name attribute is not str")
+#     data = {"name": []}
+#     created = create_and_print(data)
+#     assert has_errors(created)
 
 
-def test_missing_game_id():
-    print("\nTEST: session is missing game_id")
-    data = {"name": "f"}
-    created = create_and_print(data)
-    assert has_errors(created)
+# def test_missing_game_id():
+#     print("\nTEST: session is missing game_id")
+#     data = {"name": "f"}
+#     created = create_and_print(data)
+#     assert has_errors(created)
 
 
-def test_game_id_is_not_str():
-    print("\nTEST: game_id is not str")
-    data = {"name": "f", "game_id": []}
-    created = create_and_print(data)
-    assert has_errors(created)
+# def test_game_id_is_not_str():
+#     print("\nTEST: game_id is not str")
+#     data = {"name": "f", "game_id": []}
+#     created = create_and_print(data)
+#     assert has_errors(created)
 
 
-def test_game_id_is_not_valid():
-    print("\nTEST: game_id is not valid")
-    data = {"name": "f", "game_id": "f"}
-    created = create_and_print(data)
-    assert has_errors(created)
+# def test_game_id_is_not_valid():
+#     print("\nTEST: game_id is not valid")
+#     data = {"name": "f", "game_id": "f"}
+#     created = create_and_print(data)
+#     assert has_errors(created)
 
 
-def test_game_id_is_valid_but_nonexistent():
-    print("\nTEST: game_id is valid but nonexistent")
-    data = {"name": "f", "game_id": str(uuid.uuid4())}
-    created = create_and_print(data)
-    assert has_errors(created)
+# def test_game_id_is_valid_but_nonexistent():
+#     print("\nTEST: game_id is valid but nonexistent")
+#     data = {"name": "f", "game_id": str(uuid.uuid4())}
+#     created = create_and_print(data)
+#     assert has_errors(created)
 
 
 def test_crud():

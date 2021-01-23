@@ -96,7 +96,7 @@ def test_crud():
 
         print("game created:")
         print(game)
-        assert has_errors(game) == False
+        assert has_errors(game) is False
         print(game)
 
         updated = update_game(game_id, {"rounds": [round_id], "round_names": {round_id: "test1234"}})

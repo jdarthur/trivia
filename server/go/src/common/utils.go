@@ -74,7 +74,7 @@ func (e InvalidUUIDError) Error() string {
 // returns errors (if any):
 //    InvalidUUIDError
 //    NonexistentIdError: if record
-func GetOne(e *Env, objectType string, objectId string, model interface{}) error {
+func GetOne(e *Env, objectType string, objectId string, model models.Object) error {
 	filter, err := byId(objectId)
 	if err != nil {
 		return err
@@ -291,7 +291,7 @@ func Respond(c *gin.Context, data interface{}, err error) {
 func IsValidQuestion(e *Env, questionId string) (interface{}, error) {
 	var data models.Question
 	fmt.Println("is valid question? id: " + questionId)
-	err := GetOne(e, QuestionTable, questionId, &data)
+	err := GetOne(e, QuestionTable, questionId, data)
 
 	if err != nil {
 		switch t := err.(type) {

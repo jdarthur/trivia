@@ -47,11 +47,11 @@ type AttemptedToSetError struct {
 }
 
 func (e AttemptedToSetError) Error() string {
-	return "Attempted to set field: " + e.IllegalField + "(value: " + fmt.Sprintf("%v", e.Value) + ")"
+	return "Attempted to set field: " + e.IllegalField + " (value: " + fmt.Sprintf("%v", e.Value) + ")"
 }
 
 func (e AttemptedToSetError) Field() string {
-	return Games
+	return e.IllegalField
 }
 
 func (e AttemptedToSetError) Data() interface{} {

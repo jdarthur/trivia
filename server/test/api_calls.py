@@ -1,7 +1,7 @@
 import requests
 
-base_url = "http://localhost:8080" # golang
-#base_url = "http://localhost:6000" # python
+#base_url = "http://localhost:8080" # golang
+base_url = "http://localhost:5000" # python
 """
 ========================
         Questions
@@ -154,12 +154,28 @@ def remove_from_session(session_id, data):
     r = requests.post(url, json=data)
     return r.json()
 
-def start_session(session_id):
+
+def start_session(session_id, admin_id):
     url = f"{base_url}/gameplay/session/{session_id}/start"
-    r = requests.post(url)
+    data = {"player_id": admin_id}
+    r = requests.post(url, json=data)
     return r.json()
 
 
+def set_current_question(session_id, admin_id, question_id, round_id):
+    url = f"{base_url}/gameplay/session/{session_id}/current-question"
+    data = {
+        "player_id": admin_id,
+        "question_id": question_id,
+        "round_id": round_id
+    }
+    r = requests.put(url, json=data)
+    return r.json()
+
+def get_current_question(session_id):
+    url = f"{base_url}/gameplay/session/{session_id}/current-question"
+    r = requests.get(url)
+    return r.json()
 
 """
 ========================
