@@ -78,8 +78,14 @@ func main() {
 	fmt.Println("\nAdministration API:")
 	router.POST("/gameplay/session/:id/start", s.StartSession)
 	router.PUT("/gameplay/session/:id/current-round", s.SetCurrentRound)
+	router.GET("/gameplay/session/:id/current-round", s.GetCurrentRound)
 	router.PUT("/gameplay/session/:id/current-question", s.SetCurrentQuestion)
 	router.GET("/gameplay/session/:id/current-question", s.GetCurrentQuestion)
+	router.PUT("/gameplay/session/:id/score", s.ScoreQuestion)
+
+	fmt.Println("\nAnswer API:")
+	router.POST("/gameplay/session/:id/answer", s.AnswerQuestion)
+	router.GET("/gameplay/session/:id/answers", s.GetAnswers)
 
 	fmt.Println("\nPlayer API:")
 	p := players.Env{Db: client}

@@ -223,12 +223,12 @@ class DummySessionWithPlayers(object):
             self.players.append(player_id)
             add_to_session(self.session_id, {"player_id": player_id})
 
-        start_session(self.session_id)
+        start_session(self.session_id, self.mod_id)
         return self
 
     def __exit__(self, type, value, traceback):
 
         self.game.__exit__(type, value, traceback)
-        delete_session(self.session_id, self.mod)
+        delete_session(self.session_id, self.mod_id)
         for player_id in self.players:
             delete_player(player_id)

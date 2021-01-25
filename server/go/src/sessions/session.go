@@ -3,10 +3,9 @@ package sessions
 import (
 	"common"
 	"github.com/gin-gonic/gin"
+	"github.com/globalsign/mgo/bson"
 	"models"
 )
-
-var GameId = "Game"
 
 type Env common.Env
 
@@ -30,7 +29,7 @@ func (e *Env) GetOneSession(c *gin.Context) {
 
 	moderator := session.Moderator
 
-	if playerId != moderator {
+	if models.PlayerId(playerId) != moderator {
 		session = getSessionAsPlayer(&session, playerId)
 	}
 
@@ -70,7 +69,7 @@ func (e *Env) CreateSession(c *gin.Context) {
 		return
 	}
 
-	session.Moderator = models.IdAsString(moderatorId)
+	session.Moderator = models.PlayerId(models.IdAsString(moderatorId))
 	sessionId, createDate, err := common.Create((*common.Env)(e), common.SessionTable, &session)
 	if err != nil {
 		common.Respond(c, nil, err)
@@ -135,8 +134,8 @@ func (e *Env) DeleteSession(c *gin.Context) {
 		return
 	}
 
-	if moderatorId != existingSession.Moderator {
-		common.Respond(c, existingSession, UnauthorizedSessionActionError{SessionId: sessionId, ModeratorId: moderatorId})
+	if models.PlayerId(moderatorId) != existingSession.Moderator {
+		common.Respond(c, existingSession, UnauthorizedSessionActionError{SessionId: sessionId, ModeratorId: models.PlayerId(moderatorId)})
 		return
 	}
 
@@ -165,8 +164,8 @@ func (e * Env) StartSession(c *gin.Context) {
 		return
 	}
 
-	if requestBody.ModeratorId != existingSession.Moderator {
-		common.Respond(c, existingSession, UnauthorizedSessionActionError{SessionId: sessionId, ModeratorId: requestBody.ModeratorId})
+	if models.PlayerId(requestBody.ModeratorId) != existingSession.Moderator {
+		common.Respond(c, existingSession, UnauthorizedSessionActionError{SessionId: sessionId, ModeratorId: models.PlayerId(requestBody.ModeratorId)})
 		return
 	}
 
@@ -259,6 +258,41 @@ func checkLegalSetFields(requestBody models.Session) error {
 	}
 
 	return nil
+}
+
+func (e *Env) GetPlayersInSession(c *gin.Context) {
+	sessionId := c.Param("id")
+	moderatorId := c.Query("mod")
+
+	var session models.Session
+	err := common.GetOne((*common.Env)(e), common.SessionTable, sessionId, &session)
+	if err != nil {
+		common.Respond(c, nil, err)
+		return
+	}
+
+	players, err:= getPlayersInSession(e, session)
+
+	//strip playerIds if called by non-mod
+	if models.PlayerId(moderatorId) != session.Moderator {
+		for i := range players {
+			players[i].ID = bson.Binary{}
+		}
+	}
+	common.Respond(c, gin.H{"players": players}, err)
+}
+
+func getPlayersInSession(e *Env, session models.Session) ([]models.Player, error) {
+	sessionPlayers := make([]models.Player, 0)
+	for _, playerId := range session.Players {
+		var player models.Player
+		err := common.GetOne((*common.Env)(e), common.PlayerTable, string(playerId), &player)
+		if err != nil {
+			return nil, err
+		}
+		sessionPlayers = append(sessionPlayers, player)
+	}
+	return sessionPlayers, nil
 }
 
 

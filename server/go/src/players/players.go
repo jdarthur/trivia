@@ -3,8 +3,8 @@ package players
 import (
 	"common"
 	"github.com/gin-gonic/gin"
-	"github.com/globalsign/mgo/bson"
 	"models"
+	"sessions"
 )
 
 type Env common.Env
@@ -25,10 +25,9 @@ func (e *Env) CreatePlayer(c *gin.Context) {
 	common.Respond(c, data, err)
 }
 
-
 type AddToSession struct {
-	PlayerId string `json:"player_id"`
-	SessionId string `json:"session_id"`
+	PlayerId  models.PlayerId `json:"player_id"`
+	SessionId string          `json:"session_id"`
 }
 
 func (e *Env) AddPlayerToSession(c *gin.Context) {
@@ -66,7 +65,7 @@ func (e *Env) AddPlayerToSession(c *gin.Context) {
 
 	//verify that player is an actual player ID
 	var player models.Player
-	err = common.GetOne((*common.Env)(e), common.PlayerTable, requestBody.PlayerId, &player)
+	err = common.GetOne((*common.Env)(e), common.PlayerTable, string(requestBody.PlayerId), &player)
 	if err != nil {
 		common.Respond(c, requestBody, InvalidPlayerIdError{PlayerId: requestBody.PlayerId})
 		return
@@ -79,12 +78,12 @@ func (e *Env) AddPlayerToSession(c *gin.Context) {
 	//TODO (maybe): update player.session_id when player is added to session
 }
 
-
 type RemoveFromSession struct {
-	PlayerId string `json:"player_id"`
-	AdminId string `json:"admin_id"`
-	SessionId string `json:"session_id"`
+	PlayerId  string          `json:"player_id"`
+	AdminId   models.PlayerId `json:"admin_id"`
+	SessionId string          `json:"session_id"`
 }
+
 func (e *Env) RemovePlayerFromSession(c *gin.Context) {
 
 	sessionId := c.Param("id")
@@ -107,14 +106,12 @@ func (e *Env) RemovePlayerFromSession(c *gin.Context) {
 
 	//return error if caller didn't pass the correct admin_id for this session
 	if requestBody.AdminId != session.Moderator {
-		common.Respond(c, requestBody, UnauthorizedRemoveError{AdminId: requestBody.AdminId})
+		common.Respond(c, requestBody, sessions.UnauthorizedSessionActionError{ModeratorId: requestBody.AdminId})
 		return
 	}
 
-
 	err = common.Pull((*common.Env)(e), common.SessionTable, sessionId, models.Players, requestBody.PlayerId)
 	common.Respond(c, requestBody, err)
-
 
 	//TODO: increment session state when player is removed
 }
@@ -138,13 +135,12 @@ func (e *Env) UpdatePlayer(c *gin.Context) {
 		common.Respond(c, requestBody, err)
 	}
 
-	merge(&requestBody, &original)
+	//merge(&requestBody, &original)
 	err = common.Set((*common.Env)(e), common.PlayerTable, playerId, &original)
 
 	common.Respond(c, requestBody, err)
 	//TODO: update session state after player update (if session not started)
 }
-
 
 func (e *Env) DeletePlayer(c *gin.Context) {
 	playerId := c.Param("id")
@@ -158,37 +154,4 @@ func (e *Env) DeletePlayer(c *gin.Context) {
 	err = common.Delete((*common.Env)(e), common.PlayerTable, playerId)
 
 	common.Respond(c, original, err)
-}
-
-func (e *Env) GetPlayersInSession(c *gin.Context) {
-	sessionId := c.Param("id")
-	moderatorId := c.Query("mod")
-	var session models.Session
-	err := common.GetOne((*common.Env)(e), common.SessionTable, sessionId, &session)
-	if err != nil {
-		common.Respond(c, nil, err)
-	}
-
-	sessionPlayers := make([]models.Player, 0)
-
-	for _, playerId := range session.Players {
-		var player models.Player
-		err = common.GetOne((*common.Env)(e), common.PlayerTable, playerId, &player)
-		if err != nil {
-			common.Respond(c, nil, err)
-		}
-
-		//strip player ID if called by non-mod
-		if moderatorId !=  session.Moderator {
-			player.ID = bson.Binary{}
-		}
-
-		sessionPlayers = append(sessionPlayers, player)
-	}
-
-	common.Respond(c, gin.H{"players": sessionPlayers}, err)
-}
-
-func merge(update *models.Player, original *models.Player) {
-
 }

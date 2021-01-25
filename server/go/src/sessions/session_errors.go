@@ -1,6 +1,7 @@
 package sessions
 
 import (
+	"fmt"
 	"models"
 )
 
@@ -71,10 +72,10 @@ func (e InvalidRoundIdInGameError) Data() interface{} {
 //Error when trying to do some action in a session without the proper moderator ID
 type UnauthorizedSessionActionError struct {
 	SessionId string
-	ModeratorId string
+	ModeratorId models.PlayerId
 }
 func (e UnauthorizedSessionActionError) Error() string {
-	return "Forbidden: ID '" + e.ModeratorId + "' is not the moderator of session " + e.SessionId
+	return fmt.Sprintf("Forbidden: ID '%v' is not the moderator of session %v", e.ModeratorId, e.SessionId)
 }
 func (e UnauthorizedSessionActionError) Field() string {
 	return models.ModeratorId

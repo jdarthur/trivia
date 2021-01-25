@@ -2,15 +2,15 @@ package sessions
 
 import (
 	"common"
+	"fmt"
 	"github.com/gin-gonic/gin"
 	"models"
-	"fmt"
 )
 
 type CurrentQuestionRequest struct {
-	QuestionIndex int `json:"question_id"`
-	RoundIndex    int `json:"round_id"`
-	ModeratorId string `json:"player_id"`
+	QuestionIndex int    `json:"question_id"`
+	RoundIndex    int    `json:"round_id"`
+	ModeratorId   string `json:"player_id"`
 }
 
 func (e *Env) SetCurrentQuestion(c *gin.Context) {
@@ -31,8 +31,8 @@ func (e *Env) SetCurrentQuestion(c *gin.Context) {
 		return
 	}
 
-	if requestBody.ModeratorId != existingSession.Moderator {
-		common.Respond(c, nil, UnauthorizedSessionActionError{ModeratorId: requestBody.ModeratorId, SessionId: sessionId})
+	if models.PlayerId(requestBody.ModeratorId) != existingSession.Moderator {
+		common.Respond(c, nil, UnauthorizedSessionActionError{ModeratorId: models.PlayerId(requestBody.ModeratorId), SessionId: sessionId})
 		return
 	}
 
@@ -51,7 +51,7 @@ func (e *Env) SetCurrentQuestion(c *gin.Context) {
 	}
 
 	//TODO: increment session state
-	err = _setCurrentQuestion(e, &existingSession, requestBody.QuestionIndex,roundObject, &roundInSession)
+	err = _setCurrentQuestion(e, &existingSession, requestBody.QuestionIndex, roundObject, &roundInSession)
 	common.Respond(c, existingSession, err)
 }
 
@@ -78,22 +78,21 @@ func _setCurrentQuestion(e *Env, session *models.Session, questionIndex int, rou
 
 	//if playerAnswers is already there, don't overwrite it
 	if len(questionInRound.PlayerAnswers) == 0 {
-		questionInRound.PlayerAnswers = make(map[string][]string)
+		questionInRound.PlayerAnswers = make(map[models.PlayerId][]models.AnswerId)
 	}
 
 	//set current question field & question text inside this session
 	session.CurrentQuestion = &questionIndex
 	questionInRound.Question = questionObject.Question
+	questionInRound.QuestionId = questionId
 
 	roundInSession.Questions[questionIndex] = questionInRound
 
 	return common.Set((*common.Env)(e), common.SessionTable, models.IdAsString(session.ID), &session)
 }
 
-
-
 type CurrentRoundRequest struct {
-	RoundIndex    int `json:"round_id"`
+	RoundIndex  int    `json:"round_id"`
 	ModeratorId string `json:"player_id"`
 }
 
@@ -115,8 +114,8 @@ func (e *Env) SetCurrentRound(c *gin.Context) {
 	}
 
 	//can't do this if you aren't the mod
-	if requestBody.ModeratorId != session.Moderator {
-		common.Respond(c, nil, UnauthorizedSessionActionError{ModeratorId: requestBody.ModeratorId, SessionId: sessionId})
+	if models.PlayerId(requestBody.ModeratorId) != session.Moderator {
+		common.Respond(c, nil, UnauthorizedSessionActionError{ModeratorId: models.PlayerId(requestBody.ModeratorId), SessionId: sessionId})
 		return
 	}
 
@@ -158,14 +157,12 @@ func _setCurrentRound(e *Env, session *models.Session, roundIndex int) error {
 		}
 	}
 
-
 	//err = common.Set((*common.Env)(e), common.SessionTable, models.IdAsString(session.ID), &session)
 	//if err != nil {
-		//return err
+	//return err
 	//}
 	fmt.Println("roundInSession after q update ")
 	fmt.Println(roundInSession)
-
 
 	session.Rounds[roundIndex] = roundInSession
 	fmt.Printf("%+v\n", session)
@@ -173,24 +170,157 @@ func _setCurrentRound(e *Env, session *models.Session, roundIndex int) error {
 	return _setCurrentQuestion(e, session, 0, round, &roundInSession)
 }
 
-func (e * Env) GetCurrentQuestion(c *gin.Context) {
+func (e *Env) GetCurrentQuestion(c *gin.Context) {
+	question, err := getCurrentQuestion(e, c)
+	common.Respond(c, question, err)
+}
+func getCurrentQuestion(e *Env, c *gin.Context) (models.QuestionInRound, error) {
+
 	sessionId := c.Param("id")
 	var session models.Session
 	err := common.GetOne((*common.Env)(e), common.SessionTable, sessionId, &session)
 	if err != nil {
-		common.Respond(c, nil, err)
-		return
+		return models.QuestionInRound{}, err
 	}
-	currentRound := session.CurrentRound
-	currentQuestion := session.CurrentQuestion
-	if len(session.Rounds) == 0 {
-		fmt.Println("")
-	}
-	common.Respond(c, session.Rounds[*currentRound].Questions[*currentQuestion], err)
 
+	currentRound := *session.CurrentRound
+	currentQuestion := *session.CurrentQuestion
+	if len(session.Rounds) == 0 {
+		fmt.Println("what the")
+	}
+	question := session.Rounds[currentRound].Questions[currentQuestion]
+	question.Index = currentQuestion
+
+	return question, err
 }
 
+type CurrentRoundResponse struct {
+	RoundId    int      `json:"id"`
+	RoundName  string   `json:"name"`
+	Categories []string `json:"categories"`
+}
+
+func (e *Env) GetCurrentRound(c *gin.Context) {
+	round, err := getCurrentRound(e, c)
+	common.Respond(c, round, err)
+}
+func getCurrentRound(e *Env, c *gin.Context) (CurrentRoundResponse, error) {
+	sessionId := c.Param("id")
+	var session models.Session
+	err := common.GetOne((*common.Env)(e), common.SessionTable, sessionId, &session)
+	if err != nil {
+		return CurrentRoundResponse{}, err
+	}
+
+	currentRound := *session.CurrentRound
+	if len(session.Rounds) == 0 {
+		fmt.Println("what the")
+	}
+
+	roundInGame := session.Rounds[currentRound]
+
+	var game models.Game
+	err = common.GetOne((*common.Env)(e), common.GameTable, session.GameId, &game)
+	if err != nil {
+		return CurrentRoundResponse{}, InvalidGameIdError{GameId: session.GameId}
+	}
+
+	var response CurrentRoundResponse
+	response.RoundId = currentRound
+	response.RoundName = game.RoundNames[roundInGame.RoundId]
+	response.Categories = make([]string, 0)
+	for _, question := range roundInGame.Questions {
+		response.Categories = append(response.Categories, question.Category)
+	}
+
+	return response, nil
+}
 
 func (e *Env) ScoreQuestion(c *gin.Context) {
+	response, err := scoreQuestion(e, c)
+	common.Respond(c, response, err)
+}
+
+func scoreQuestion(e *Env, c *gin.Context) (models.ScoreRequest, error) {
+	sessionId := c.Param("id")
+
+	var requestBody models.ScoreRequest
+	err := c.ShouldBind(&requestBody)
+	if err != nil {
+		return models.ScoreRequest{}, err
+	}
+
+	var session models.Session
+	err = common.GetOne((*common.Env)(e), common.SessionTable, sessionId, &session)
+	if err != nil {
+		return models.ScoreRequest{}, err
+	}
+
+	if requestBody.ModeratorId != session.Moderator {
+		return models.ScoreRequest{}, UnauthorizedSessionActionError{SessionId: sessionId, ModeratorId: requestBody.ModeratorId}
+	}
+
+	for _, playerId := range session.Players {
+		if _, ok := requestBody.Players[playerId]; !ok {
+			return models.ScoreRequest{}, UnscoredPlayerError{PlayerId: playerId}
+		}
+	}
+
+	roundIndex := requestBody.RoundIndex
+	questionIndex := requestBody.QuestionIndex
+
+	for playerId, correctOrNot := range requestBody.Players {
+		answerCount := len(session.Rounds[roundIndex].Questions[questionIndex].PlayerAnswers[playerId])
+		if answerCount == 0 {
+			return models.ScoreRequest{}, IllegalScoreError{PlayerId: playerId, RoundIndex: requestBody.RoundIndex, QuestionIndex: requestBody.RoundIndex}
+		}
+
+		lastAnswerId := session.Rounds[roundIndex].Questions[questionIndex].PlayerAnswers[playerId][answerCount-1]
+
+		var answer models.Answer
+		err = common.GetOne((*common.Env)(e), common.AnswerTable, string(lastAnswerId), &answer)
+		if err != nil {
+			return models.ScoreRequest{}, err
+		}
+
+		//override wager if score override is provided.
+		//award 0 points if answer is correct
+		var pointsToAward float64
+		if correctOrNot.Correct {
+			if correctOrNot.ScoreOverride != nil {
+				pointsToAward = *correctOrNot.ScoreOverride
+			} else {
+				pointsToAward = float64(answer.Wager)
+			}
+		} else {
+			pointsToAward = 0
+		}
+
+		answer.PointsAwarded = pointsToAward
+
+		err = common.Set((*common.Env)(e), common.AnswerTable, string(lastAnswerId), &answer)
+		if err != nil {
+			return models.ScoreRequest{}, err
+		}
+
+		//award points in scoreboard
+		session.Scoreboard[playerId] = append(session.Scoreboard[playerId], pointsToAward)
+	}
+
+	questionInRound := session.Rounds[roundIndex].Questions[questionIndex]
+	questionInRound.Scored = true
+
+
+	var question models.Question
+	err = common.GetOne((*common.Env)(e), common.QuestionTable, questionInRound.QuestionId, &question)
+	if err != nil {
+		return models.ScoreRequest{}, err
+	}
+
+	questionInRound.Answer = question.Answer
+	session.Rounds[roundIndex].Questions[questionIndex] = questionInRound
+
+	err = common.Set((*common.Env)(e), common.SessionTable, sessionId, &session)
+	return requestBody, err
 
 }

@@ -2,9 +2,9 @@ package models
 
 type PlayerScore struct {
 	Icon     string `bson:"icon" json:"icon,omitempty"`
-	Score    []int  `bson:"score" json:"score"`
+	Score    []float64  `bson:"score" json:"score"`
 	TeamName string `bson:"team_name" json:"team_name"`
-	PlayerId string `json:"player_id,omitempty"`
+	PlayerId PlayerId	 `json:"player_id,omitempty"`
 }
 
 type PlayerScoreboard struct {

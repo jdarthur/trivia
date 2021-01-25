@@ -1,5 +1,10 @@
 package players
 
+import (
+	"fmt"
+	"models"
+)
+
 var id = "player_id"
 var adminId = "admin_id"
 
@@ -23,11 +28,11 @@ func (e SessionAlreadyStartedError) Data() interface{} {
 //Error when you try to add a player to a session that the player is already in
 type AlreadyInSessionError struct {
 	SessionId string
-	PlayerId  string
+	PlayerId  models.PlayerId
 }
 
 func (e AlreadyInSessionError) Error() string {
-	return "Player " + e.PlayerId + " is already in session " + e.SessionId
+	return fmt.Sprintf("Player %v is already in session %v", e.PlayerId, e.SessionId)
 }
 func (e AlreadyInSessionError) Field() string {
 	return id
@@ -40,32 +45,15 @@ func (e AlreadyInSessionError) Data() interface{} {
 
 //Error when you try to add an invalid player ID to a session
 type InvalidPlayerIdError struct {
-	PlayerId  string
+	PlayerId  models.PlayerId
 }
 
 func (e InvalidPlayerIdError) Error() string {
-	return e.PlayerId + " is not a valid player ID"
+	return fmt.Sprintf("%v is not a valid player ID", e.PlayerId)
 }
 func (e InvalidPlayerIdError) Field() string {
 	return id
 }
 func (e InvalidPlayerIdError) Data() interface{} {
 	return e.PlayerId
-}
-
-
-
-//Error when you try to remove a player from a session, but don't pass the correct mod ID for the session
-type UnauthorizedRemoveError struct {
-	AdminId  string
-}
-
-func (e UnauthorizedRemoveError) Error() string {
-	return e.AdminId + " is not the moderator of this session, cannot remove a player"
-}
-func (e UnauthorizedRemoveError) Field() string {
-	return adminId
-}
-func (e UnauthorizedRemoveError) Data() interface{} {
-	return e.AdminId
 }

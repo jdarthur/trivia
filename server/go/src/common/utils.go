@@ -8,9 +8,11 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/globalsign/mgo"
 	"github.com/globalsign/mgo/bson"
+	"github.com/go-playground/validator"
 	"log"
 	"models"
 	"net/http"
+	"reflect"
 	"strings"
 	"time"
 )
@@ -21,6 +23,7 @@ var RoundTable = "round"
 var GameTable = "game"
 var SessionTable = "session"
 var PlayerTable = "player"
+var AnswerTable = "answer"
 
 type Env struct {
 	Db *mgo.Session
@@ -123,7 +126,7 @@ func Create(e *Env, objectType string, data models.Object) (bson.Binary, time.Ti
 	//find all items of this record type
 	err = collection.Insert(&data)
 	if err != nil {
-		return id, time.Now(), err
+		return bson.Binary{}, time.Time{}, err
 	}
 	return id, createDate, nil
 }
@@ -279,13 +282,27 @@ func Respond(c *gin.Context, data interface{}, err error) {
 		case InvalidDataError:
 			fmt.Println("invalid data error")
 			c.JSON(http.StatusBadRequest, gin.H{"errors": t.Error(), "field": t.Field()})
+		case validator.ValidationErrors:
+			fields := requiredErrorFields(t)
+			c.JSON(http.StatusBadRequest, gin.H{"errors": "Missing required fields", "field": fields})
 
 		default:
+			fmt.Println(reflect.TypeOf(err))
 			log.Fatal(err)
 		}
 	} else {
 		c.JSON(http.StatusOK, data)
 	}
+}
+
+func requiredErrorFields(errors validator.ValidationErrors) []string {
+	fields := make([]string, 0)
+	for _, validationError := range errors {
+		if validationError.Tag() == "required" {
+			fields = append(fields, validationError.Field())
+		}
+	}
+	return fields
 }
 
 func IsValidQuestion(e *Env, questionId string) (interface{}, error) {

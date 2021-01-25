@@ -1,10 +1,13 @@
 from pprint import pprint
-from .api_calls import (delete_session, start_session, set_current_question,
-                        get_current_question, get_session, delete_player, add_to_session)
+from .api_calls import (delete_session, start_session, set_current_question, get_current_question,
+                        get_session, delete_player, add_to_session, delete_game)
 from .test_helpers import DummyGame, dummy_session, dummy_player, indentprint, has_errors
 
 
 def start_game_without_rounds():
+
+
+
     pass
 
 
@@ -12,13 +15,18 @@ def start_game_without_questions():
     pass
 
 
-def start_session_game_id_nonexistent():
-    # create game
-    # create session(game_id)
-    # delete game
-    # start_session
-    # fail
-    pass
+def test_start_session_game_id_nonexistent():
+
+    with DummyGame() as game_id:
+        session = dummy_session(game_id)
+        mod = session["mod"]
+        session_id = session["id"]
+
+        delete_game(game_id)
+
+        started = start_session(session_id, mod)
+        print(started)
+        assert has_errors(started)
 
 
 def test_add_after_starting():
