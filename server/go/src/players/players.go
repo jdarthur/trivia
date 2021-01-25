@@ -9,6 +9,14 @@ import (
 
 type Env common.Env
 
+func (e *Env) GetOnePlayer(c *gin.Context) {
+	playerId := c.Param("id")
+
+	var player models.Player
+	err := common.GetOne((*common.Env)(e), common.PlayerTable, playerId, &player)
+	common.Respond(c, player, err)
+}
+
 func (e *Env) CreatePlayer(c *gin.Context) {
 	var data models.Player
 

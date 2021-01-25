@@ -262,7 +262,7 @@ func checkLegalSetFields(requestBody models.Session) error {
 
 func (e *Env) GetPlayersInSession(c *gin.Context) {
 	sessionId := c.Param("id")
-	moderatorId := c.Query("mod")
+	callerPlayerId := c.Query("player_id")
 
 	var session models.Session
 	err := common.GetOne((*common.Env)(e), common.SessionTable, sessionId, &session)
@@ -274,9 +274,11 @@ func (e *Env) GetPlayersInSession(c *gin.Context) {
 	players, err:= getPlayersInSession(e, session)
 
 	//strip playerIds if called by non-mod
-	if models.PlayerId(moderatorId) != session.Moderator {
+	if models.PlayerId(callerPlayerId) != session.Moderator {
 		for i := range players {
-			players[i].ID = bson.Binary{}
+			if callerPlayerId != models.IdAsString(players[i].ID) {
+				players[i].ID = bson.Binary{}
+			}
 		}
 	}
 	common.Respond(c, gin.H{"players": players}, err)

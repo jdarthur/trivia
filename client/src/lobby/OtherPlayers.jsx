@@ -35,12 +35,12 @@ class OtherPlayers extends React.Component {
             excluded_icons.push(state[i].icon)
           }
         }
-        this.setState({ players: state }, () => { this.set_excluded_icons(excluded_icons) })
+        this.setState({ players: state.players }, () => { this.set_excluded_icons(excluded_icons) })
       })
   }
 
   render() {
-    const players = this.state.players?.map((player) => {
+    const players = this.state.players.map((player) => {
       if (player.id !== this.props.player_id) {
         return <OtherPlayer key={player.team_name} team_name={player.team_name}
           real_name={player.real_name} create_date={player.create_date}

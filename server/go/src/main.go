@@ -90,7 +90,7 @@ func main() {
 
 	fmt.Println("\nPlayer API:")
 	p := players.Env{Db: client}
-	//router.GET("/gameplay/player/:id", p.GetOnePlayer)
+	router.GET("/gameplay/player/:id", p.GetOnePlayer)
 	router.POST("/gameplay/player", p.CreatePlayer)
 	router.PUT("/gameplay/player/:id", p.UpdatePlayer)
 	router.POST("/gameplay/session/:id/add", p.AddPlayerToSession)
