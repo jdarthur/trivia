@@ -79,9 +79,9 @@ def test_crud():
 
         delete_session(session_id, mod)
 
-        sessions = get_sessions()
-        print("get sessions after delete:")
-        assert object_with_id_in_list(sessions, session_id, False)
+        session = get_session(session_id)
+        print(session)
+        assert has_errors(session)
 
 
 def test_add_player_to_session():

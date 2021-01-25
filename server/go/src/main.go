@@ -74,6 +74,7 @@ func main() {
 	router.POST("/gameplay/session", s.CreateSession)
 	router.PUT("/gameplay/session/:id", s.UpdateSession)
 	router.DELETE("/gameplay/session/:id", s.DeleteSession)
+	router.GET("/gameplay/session/:id/players", s.GetPlayersInSession)
 
 	fmt.Println("\nAdministration API:")
 	router.POST("/gameplay/session/:id/start", s.StartSession)
@@ -89,7 +90,6 @@ func main() {
 
 	fmt.Println("\nPlayer API:")
 	p := players.Env{Db: client}
-	//router.GET("/gameplay/session/:id/players", p.GetPlayersInSession)
 	//router.GET("/gameplay/player/:id", p.GetOnePlayer)
 	router.POST("/gameplay/player", p.CreatePlayer)
 	router.PUT("/gameplay/player/:id", p.UpdatePlayer)
