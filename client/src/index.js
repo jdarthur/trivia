@@ -1,11 +1,15 @@
 import React from 'react';
 import ReactDOM from 'react-dom';
-import App from './App.jsx';
+import { Auth0Provider } from "@auth0/auth0-react";
+import App from './common/App.jsx';
 
 ReactDOM.render(
-  <React.StrictMode>
+  <Auth0Provider
+    domain="borttrivia.us.auth0.com"
+    clientId="03cLv60jN7hC79K8oUXHDF1wsenRTMx5"
+    redirectUri={window.location.origin} >
     <App />
-  </React.StrictMode>,
+  </Auth0Provider>,
   document.getElementById('root')
 );
 

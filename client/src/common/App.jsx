@@ -1,8 +1,10 @@
 import React from 'react';
-import './App.css';
-import HomePage from "./homepage/Homepage.jsx"
-import Editor from "./editor/Editor.jsx"
 
+import HomePage from "../homepage/Homepage.jsx"
+import Editor from "../editor/Editor.jsx"
+import AuthButton from "./AuthButton.js"
+
+import './App.css';
 import logo from "./borttrivia.png"
 
 import 'antd/dist/antd.css';
@@ -22,15 +24,13 @@ const ROUND = "Rounds"
 const GAME = "Games"
 
 class App extends React.Component {
-  constructor(props) {
-    super(props)
-    this.state = {
-      selected: PLAY,
-      editor_section: QUESTION,
-      collapsed: true,
-      show_toolbar: true,
-      is_mobile: false
-    }
+
+  state = {
+    selected: PLAY,
+    editor_section: QUESTION,
+    collapsed: true,
+    show_toolbar: true,
+    is_mobile: false
   }
 
   componentDidMount() {
@@ -60,7 +60,7 @@ class App extends React.Component {
     // document.documentElement.style.setProperty('--vh', `${vh}px`);
 
     return (
-      <Layout className="height-trick" style={{minWidth: 'min(1300px, 100vw)', maxWidth: '100vw' }}>
+      <Layout className="height-trick" style={{ minWidth: 'min(1300px, 100vw)', maxWidth: '100vw' }}>
         {
           this.state.is_mobile ? null :
             <Sider collapsible collapsed={this.state.collapsed} onCollapse={this.toggleCollapsed}>
@@ -79,6 +79,8 @@ class App extends React.Component {
                   <Menu.Item key="7" onClick={this.edit_game} disabled={!this.state.show_toolbar} >{GAME}</Menu.Item>
                 </SubMenu>
 
+                <AuthButton />
+
               </Menu>
             </Sider>
         }
@@ -86,7 +88,7 @@ class App extends React.Component {
 
 
         <Layout className="site-layout">
-          <Content style={{display: 'flex', flexDirection: 'column' }}>
+          <Content style={{ display: 'flex', flexDirection: 'column' }}>
 
             <div className="site-layout-background" style={{ minHeight: 360, display: 'flex', flexDirection: 'column', flexGrow: 1 }}>
               {this.state.selected === PLAY ? <HomePage set_toolbar={this.set_show_toolbar} is_mobile={this.state.is_mobile} /> : null}

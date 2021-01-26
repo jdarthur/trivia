@@ -102,7 +102,7 @@ class Homepage extends React.Component {
         session_state={this.state.sess_state} is_mod={this.state.is_mod} />)
     return (
       <div className="homepage">
-        {this.state.session_id === "" ? <NewGameModal /> : null}
+        {this.state.session_id === "" ? <NewGameModal /> : null }
         {this.state.session_id !== "" ? main : null}
       </div>
     );
