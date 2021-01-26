@@ -50,7 +50,7 @@ func (e InvalidRoundIndexError) Data() interface{} {
 //Error when you set the current round with a round index >= session.Rounds.length
 type IllegalWagerError struct {
 	Wager int
-	PlayerId string
+	PlayerId models.PlayerId
 	AvailableWagers []int
 }
 func (e IllegalWagerError) Error() string {

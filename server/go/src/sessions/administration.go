@@ -198,6 +198,7 @@ type CurrentRoundResponse struct {
 	RoundId    int      `json:"id"`
 	RoundName  string   `json:"name"`
 	Categories []string `json:"categories"`
+	Wagers     []int    `json:"wagers"`
 }
 
 func (e *Env) GetCurrentRound(c *gin.Context) {
@@ -229,6 +230,7 @@ func getCurrentRound(e *Env, c *gin.Context) (CurrentRoundResponse, error) {
 	response.RoundId = currentRound
 	response.RoundName = game.RoundNames[roundInGame.RoundId]
 	response.Categories = make([]string, 0)
+	response.Wagers = roundInGame.Wagers
 	for _, question := range roundInGame.Questions {
 		response.Categories = append(response.Categories, question.Category)
 	}
@@ -309,7 +311,6 @@ func scoreQuestion(e *Env, c *gin.Context) (models.ScoreRequest, error) {
 
 	questionInRound := session.Rounds[roundIndex].Questions[questionIndex]
 	questionInRound.Scored = true
-
 
 	var question models.Question
 	err = common.GetOne((*common.Env)(e), common.QuestionTable, questionInRound.QuestionId, &question)

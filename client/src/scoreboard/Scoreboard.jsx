@@ -47,8 +47,8 @@ class Scoreboard extends React.Component {
             sendData(url, "GET")
                 .then((data) => {
                     console.log(data)
-                    sessionStorage.setItem("scoreboard", JSON.stringify(data))
-                    this.setState({ scores: data })
+                    sessionStorage.setItem("scoreboard", JSON.stringify(data.scores))
+                    this.setState({ scores: data.scores })
                 })
         }
     }

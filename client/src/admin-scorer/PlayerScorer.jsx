@@ -15,6 +15,7 @@ class PlayerScorer extends React.Component {
     componentDidMount() {
         const answersStored = JSON.parse(sessionStorage.getItem("answers"))
         if (answersStored) {
+            console.log(answersStored)
             this.setState({answers: answersStored}, () => this.get_answers())
         } else {
             this.get_answers()
@@ -47,9 +48,10 @@ class PlayerScorer extends React.Component {
             sendData(url, "GET")
                 .then((data) => {
                     this.log_answer_lag(data)
-                    sessionStorage.setItem("answers", JSON.stringify(data))
+                    console.log(data)
+                    sessionStorage.setItem("answers", JSON.stringify(data.answers))
                     if (!data.errors) {
-                        this.setState({ answers: data })
+                        this.setState({ answers: data.answers })
                     }
                 })
         }

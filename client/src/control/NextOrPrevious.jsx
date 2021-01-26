@@ -17,11 +17,11 @@ import { Button } from "antd"
 class NextOrPrevious extends React.Component {
 
     render() {
-        const qind = this.props.questions.indexOf(this.props.active_question);
-        const rind = this.props.rounds.indexOf(this.props.active_round);
+        const qind = this.props.questions?.indexOf(this.props.active_question);
+        const rind = this.props.rounds?.indexOf(this.props.active_round);
 
         const prev_q = qind > 0 ? this.props.questions[qind - 1] : null
-        const next_q = qind + 1 < this.props.questions.length ? this.props.questions[qind + 1] : null
+        const next_q = qind + 1 < this.props.questions?.length ? this.props.questions[qind + 1] : null
 
         const prev_r = rind > 0 ? this.props.rounds[rind - 1] : null
         const next_r = rind + 1 < this.props.rounds.length ? this.props.rounds[rind + 1] : null
