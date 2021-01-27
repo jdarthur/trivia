@@ -14,8 +14,9 @@ type Player struct {
 	ID         bson.Binary `bson:"_id" json:"id,omitempty"`
 	CreateDate time.Time   `bson:"create_date" json:"create_date"`
 	TeamName   string      `bson:"team_name" json:"team_name"`
-	RealName   string    `bson:"real_name" json:"real_name"`
-	Icon       string       `json:"icon"`
+	RealName   string      `bson:"real_name" json:"real_name"`
+	Icon       string      `bson:"icon" json:"icon"`
+	SessionId  string      `bson:"session_id" json:"session_id"`
 }
 
 func (p Player) SetCreateDate(createDate time.Time) Object {

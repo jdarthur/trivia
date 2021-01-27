@@ -84,6 +84,7 @@ func main() {
 	router.GET("/gameplay/session/:id/current-question", s.GetCurrentQuestion)
 	router.PUT("/gameplay/session/:id/score", s.ScoreQuestion)
 	router.GET("/gameplay/session/:id/wagers", s.GetWagers)
+	router.GET("/gameplay/session/:id/state", s.GetSessionState)
 
 	fmt.Println("\nAnswer API:")
 	router.POST("/gameplay/session/:id/answer", s.AnswerQuestion)

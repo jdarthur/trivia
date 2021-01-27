@@ -24,6 +24,7 @@ var GameTable = "game"
 var SessionTable = "session"
 var PlayerTable = "player"
 var AnswerTable = "answer"
+var SessionStateTable = "session_state"
 
 type Env struct {
 	Db *mgo.Session
@@ -330,4 +331,48 @@ func IsValidRound(e *Env, roundId string) (interface{}, error) {
 		return nil, NonexistentIdError{ID: roundId, RecordType: RoundTable}
 	}
 	return data, nil
+}
+
+
+type SessionState struct {
+	SessionId  string `bson:"session_id"`
+	State bson.Binary `bson:"state"`
+}
+
+func GetState(e *Env, sessionId string) (sessionState string, err error) {
+
+	collection := e.Db.DB(Database).C(SessionStateTable)
+
+	//find matching item
+	var state SessionState
+	err = collection.Find(bson.M{"session_id" : sessionId}).One(&state)
+	if err != nil {
+		if err == mgo.ErrNotFound {
+			return "", NonexistentIdError{RecordType: SessionStateTable, ID: sessionId}
+		}
+		return "", err
+	}
+
+	return models.IdAsString(state.State), nil
+}
+
+func IncrementState(e *Env, sessionId string) (err error) {
+	fmt.Println("come on")
+	newStateId, err := models.NewId()
+	if err != nil {
+		fmt.Println("err in incr: ", err)
+		return err
+	}
+
+	fmt.Println("sessionId: ", sessionId)
+
+	var newState SessionState
+	newState.SessionId = sessionId
+	newState.State = newStateId
+	fmt.Printf("new state: %+v", newState)
+
+	collection := e.Db.DB(Database).C(SessionStateTable)
+	changeInfo, err := collection.Upsert(bson.M{"session_id" : sessionId}, newState)
+	fmt.Printf("changed: %+v", changeInfo)
+	return err
 }

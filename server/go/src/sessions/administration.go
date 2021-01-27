@@ -50,8 +50,10 @@ func (e *Env) SetCurrentQuestion(c *gin.Context) {
 		return
 	}
 
-	//TODO: increment session state
 	err = _setCurrentQuestion(e, &existingSession, requestBody.QuestionIndex, roundObject, &roundInSession)
+	if err == nil {
+		err = common.IncrementState((*common.Env)(e), sessionId)
+	}
 	common.Respond(c, existingSession, err)
 }
 
@@ -59,6 +61,7 @@ func _setCurrentQuestion(e *Env, session *models.Session, questionIndex int, rou
 
 	//error if question index is out of range for this round
 	if questionIndex >= len(roundInSession.Questions) {
+		fmt.Println("qIndex > Questions.length")
 		return InvalidQuestionIndexError{QuestionIndex: questionIndex}
 	}
 
@@ -120,6 +123,9 @@ func (e *Env) SetCurrentRound(c *gin.Context) {
 	}
 
 	err = _setCurrentRound(e, &session, requestBody.RoundIndex)
+	if err == nil {
+		err = common.IncrementState((*common.Env)(e), sessionId)
+	}
 	common.Respond(c, session, err)
 }
 
@@ -141,7 +147,7 @@ func _setCurrentRound(e *Env, session *models.Session, roundIndex int) error {
 	roundInSession.Wagers = round.Wagers
 	session.CurrentRound = &roundIndex
 	fmt.Println(roundInSession)
-	if roundInSession.Questions == nil {
+	if len(roundInSession.Questions) == 0 {
 		fmt.Println("setting question categories in round")
 		//for each question, set the category in this session.Rounds.Questions array
 		for _, questionId := range round.Questions {
@@ -161,8 +167,8 @@ func _setCurrentRound(e *Env, session *models.Session, roundIndex int) error {
 	//if err != nil {
 	//return err
 	//}
-	fmt.Println("roundInSession after q update ")
-	fmt.Println(roundInSession)
+	fmt.Println("roundInSession after q update \n")
+	fmt.Printf("%+v\n\n", roundInSession)
 
 	session.Rounds[roundIndex] = roundInSession
 	fmt.Printf("%+v\n", session)
@@ -183,19 +189,21 @@ func getCurrentQuestion(e *Env, c *gin.Context) (models.QuestionInRound, error) 
 		return models.QuestionInRound{}, err
 	}
 
-	currentRound := *session.CurrentRound
-	currentQuestion := *session.CurrentQuestion
-	if len(session.Rounds) == 0 {
-		fmt.Println("what the")
-	}
-	question := session.Rounds[currentRound].Questions[currentQuestion]
-	question.Index = currentQuestion
+	//these won't have been set yet before the session is started
+	if session.CurrentRound != nil && session.CurrentQuestion != nil {
+		currentRound := *session.CurrentRound
+		currentQuestion := *session.CurrentQuestion
 
-	return question, err
+		question := session.Rounds[currentRound].Questions[currentQuestion]
+		question.Index = currentQuestion
+		return question, err
+	}
+
+	return models.QuestionInRound{}, err
 }
 
 type CurrentRoundResponse struct {
-	RoundId    int      `json:"id"`
+	RoundIndex    int      `json:"id"`
 	RoundName  string   `json:"name"`
 	Categories []string `json:"categories"`
 	Wagers     []int    `json:"wagers"`
@@ -213,29 +221,31 @@ func getCurrentRound(e *Env, c *gin.Context) (CurrentRoundResponse, error) {
 		return CurrentRoundResponse{}, err
 	}
 
-	currentRound := *session.CurrentRound
-	if len(session.Rounds) == 0 {
-		fmt.Println("what the")
+	//won't have been set yet before the session is started
+	if session.CurrentRound != nil {
+		currentRound := *session.CurrentRound
+		roundInGame := session.Rounds[currentRound]
+
+		var game models.Game
+		err = common.GetOne((*common.Env)(e), common.GameTable, session.GameId, &game)
+		if err != nil {
+			return CurrentRoundResponse{}, InvalidGameIdError{GameId: session.GameId}
+		}
+
+		var response CurrentRoundResponse
+		response.RoundIndex = currentRound
+		response.RoundName = game.RoundNames[roundInGame.RoundId]
+		response.Categories = make([]string, 0)
+		response.Wagers = roundInGame.Wagers
+		for _, question := range roundInGame.Questions {
+			response.Categories = append(response.Categories, question.Category)
+		}
+
+		return response, nil
 	}
 
-	roundInGame := session.Rounds[currentRound]
+	return CurrentRoundResponse{}, nil
 
-	var game models.Game
-	err = common.GetOne((*common.Env)(e), common.GameTable, session.GameId, &game)
-	if err != nil {
-		return CurrentRoundResponse{}, InvalidGameIdError{GameId: session.GameId}
-	}
-
-	var response CurrentRoundResponse
-	response.RoundId = currentRound
-	response.RoundName = game.RoundNames[roundInGame.RoundId]
-	response.Categories = make([]string, 0)
-	response.Wagers = roundInGame.Wagers
-	for _, question := range roundInGame.Questions {
-		response.Categories = append(response.Categories, question.Category)
-	}
-
-	return response, nil
 }
 
 func (e *Env) ScoreQuestion(c *gin.Context) {
@@ -322,6 +332,9 @@ func scoreQuestion(e *Env, c *gin.Context) (models.ScoreRequest, error) {
 	session.Rounds[roundIndex].Questions[questionIndex] = questionInRound
 
 	err = common.Set((*common.Env)(e), common.SessionTable, sessionId, &session)
+	if err == nil {
+		err = common.IncrementState((*common.Env)(e), sessionId)
+	}
 	return requestBody, err
 
 }

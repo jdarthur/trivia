@@ -80,10 +80,16 @@ func (e *Env) AddPlayerToSession(c *gin.Context) {
 	}
 
 	err = common.Push((*common.Env)(e), common.SessionTable, sessionId, models.Players, requestBody.PlayerId)
-	common.Respond(c, requestBody, err)
+	if err == nil {
+		err = common.IncrementState((*common.Env)(e), sessionId)
+	}
 
-	//TODO: increment session state when player is added
-	//TODO (maybe): update player.session_id when player is added to session
+	if err == nil {
+		player.SessionId = sessionId
+		err = common.Set((*common.Env)(e), common.PlayerTable, string(requestBody.PlayerId), player)
+	}
+
+	common.Respond(c, requestBody, err)
 }
 
 type RemoveFromSession struct {
@@ -119,9 +125,10 @@ func (e *Env) RemovePlayerFromSession(c *gin.Context) {
 	}
 
 	err = common.Pull((*common.Env)(e), common.SessionTable, sessionId, models.Players, requestBody.PlayerId)
+	if err == nil {
+		err = common.IncrementState((*common.Env)(e), sessionId)
+	}
 	common.Respond(c, requestBody, err)
-
-	//TODO: increment session state when player is removed
 }
 
 func (e *Env) UpdatePlayer(c *gin.Context) {
@@ -141,13 +148,18 @@ func (e *Env) UpdatePlayer(c *gin.Context) {
 	err = common.GetOne((*common.Env)(e), common.PlayerTable, playerId, &original)
 	if err != nil {
 		common.Respond(c, requestBody, err)
+		return
 	}
 
-	//merge(&requestBody, &original)
-	err = common.Set((*common.Env)(e), common.PlayerTable, playerId, &original)
+	original.TeamName = requestBody.TeamName
+	original.Icon = requestBody.Icon
+	original.RealName = requestBody.RealName
+	err = common.Set((*common.Env)(e), common.PlayerTable, playerId, original)
+	if err == nil {
+		err = common.IncrementState((*common.Env)(e), original.SessionId)
+	}
 
 	common.Respond(c, requestBody, err)
-	//TODO: update session state after player update (if session not started)
 }
 
 func (e *Env) DeletePlayer(c *gin.Context) {

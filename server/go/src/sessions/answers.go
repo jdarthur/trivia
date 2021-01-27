@@ -60,8 +60,11 @@ func (e *Env) AnswerQuestion(c *gin.Context) {
 	spot := fmt.Sprintf("%v.%v.%v.%v.%v.%v", models.Rounds, *answer.RoundIndex, models.Questions, *answer.QuestionIndex, models.Answers, answer.PlayerId)
 	err = common.Push((*common.Env)(e), common.SessionTable, sessionId, spot, models.IdAsString(answerId))
 
-	common.Respond(c, answer, err)
+	if err == nil {
+		err = common.IncrementState((*common.Env)(e), sessionId)
+	}
 
+	common.Respond(c, answer, err)
 }
 
 
@@ -282,21 +285,15 @@ func getAnswersAsMod(e *Env, session models.Session, roundIndex int, questionInd
 }
 
 func retrieveAnswersForPlayer(e *Env, answerIds []models.AnswerId) ([]models.Answer, error) {
-	fmt.Printf("answerIds %v\n", answerIds)
-
 	answers := make([]models.Answer, 0)
 	for _, answerId := range answerIds {
 		var answer models.Answer
 		err := common.GetOne((*common.Env)(e), common.AnswerTable, string(answerId), &answer)
 		if err != nil {
-			fmt.Println(err)
 			return nil, err
 		}
 		answers = append(answers, answer)
 	}
-
-	fmt.Printf("answers %v\n", answers)
-
 	return answers, nil
 }
 

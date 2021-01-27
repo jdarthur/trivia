@@ -18,7 +18,7 @@ class ActiveGame extends React.Component {
       category: "",
       active_question: "",
       active_round: "",
-      questions: [],
+      categories: [],
       wagers: [],
       scored: [],
       round_name: ""
@@ -42,7 +42,7 @@ class ActiveGame extends React.Component {
     fetch(url).then(response => response.json())
       .then(r => {
         console.log(r)
-        this.setState({ questions: r.questions, wagers: r.wagers, active_round: r.id, round_name: r.name || "" })
+        this.setState({ categories: r.categories, wagers: r.wagers, active_round: r.id, round_name: r.name || "" })
       })
   }
 
@@ -62,15 +62,14 @@ class ActiveGame extends React.Component {
 
 
   render() {
-    const questions = this.state.questions?.map((question, index) => index)
-    const categories = this.state.questions?.map(question => question.category)
+    const question_indices = this.state.categories?.map((question, index) => index)
 
     return (
       <div style={{flexGrow: 1, display: 'flex', flexDirection: 'column', maxWidth: '100%'}}>
         <div className="game-and-scoreboard">
           <div className='active-game'>
             <div className="round-and-question">
-              <ActiveRound categories={categories} active_question={this.state.active_question}
+              <ActiveRound categories={this.state.categories} active_question={this.state.active_question}
                 name={this.state.round_name} />
               <ActiveQuestion session_state={this.props.session_state} session_id={this.props.session_id}
                 question={this.state.question} answer={this.state.answer} scored={this.state.scored}
@@ -83,7 +82,7 @@ class ActiveGame extends React.Component {
               scored={this.state.scored} wagers={this.state.wagers}/> : null}
 
             {this.props.is_mod ?
-              <NextOrPrevious questions={questions} rounds={this.props.rounds}
+              <NextOrPrevious questions={question_indices} rounds={this.props.rounds}
                 active_question={this.state.active_question} active_round={this.state.active_round}
                 session_id={this.props.session_id} player_id={this.props.player_id} /> : null}
 
