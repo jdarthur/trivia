@@ -60,14 +60,23 @@ class EditQuestionModal extends React.Component {
             <Button className="button" type="primary" onClick={this.save_self}> {save_text} </Button>
         </div>
 
+        let focus = "category"
+        if (this.props.category) {
+            focus = "question"
+            if (this.props.question && !this.props.answer) {
+                focus = "answer"
+            }
+        }
+
         const view = this.state.selected === EDIT ?
             <div>
-                <TextArea placeholder="Question" value={this.props.question} style={{ marginBottom: 10 }}
+                <TextArea autoFocus={this.props.category} placeholder="Question" value={this.props.question} style={{ marginBottom: 10 }}
                     onChange={this.set_question} autoSize={{ minRows: 4 }} onPressEnter={this.question_enter} />
-                <TextArea placeholder="Answer" value={this.props.answer} autoSize={{ minRows: 2 }}
+                <TextArea autoFocus={this.props.category && this.props.question && !this.props.answer}
+                    placeholder="Answer" value={this.props.answer} autoSize={{ minRows: 2 }}
                     onChange={this.set_answer} onPressEnter={this.answer_enter} />
             </div> :
-            <div style={{border: '1px solid #d9d9d9', borderRadius: 2, padding: 10}}>
+            <div style={{ border: '1px solid #d9d9d9', borderRadius: 2, padding: 10 }}>
                 <FormattedQuestion question={this.props.question}
                     answer={this.props.answer} max_width={425} />
             </div>
@@ -81,7 +90,7 @@ class EditQuestionModal extends React.Component {
                 footer={footer}
                 width="500px">
 
-                <Input placeholder="Category" value={this.props.category} style={{ marginBottom: 10 }}
+                <Input autoFocus={!this.props.category} placeholder="Category" value={this.props.category} style={{ marginBottom: 10 }}
                     onChange={this.set_category} onPressEnter={this.category_enter} />
 
                 <Radio.Group buttonStyle="solid" onChange={this.set_edit} value={this.state.selected}

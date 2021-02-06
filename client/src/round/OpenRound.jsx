@@ -72,7 +72,7 @@ class OpenRound extends React.Component {
                 <div className="open-header"> Edit Round </div>
 
                 <div className="current-questions">
-                    <input className="round-name" value={this.props.name}
+                    <input autoFocus className="round-name" value={this.props.name}
                         onChange={this.set_name} onKeyDown={this.handleKeyPress} placeholder="Round name" />
                     <AddQuestionsModal questions={this.props.questions} save={this.save_self} add_questions={this.add_questions} />
                 </div>

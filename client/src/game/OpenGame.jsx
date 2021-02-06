@@ -70,7 +70,7 @@ class OpenGame extends React.Component {
 
                 <div className="open-header"> Edit Game </div>
                 <div className="current-questions">
-                    <input className="round-name" value={this.props.name}
+                    <input autoFocus className="round-name" value={this.props.name}
                         onChange={this.set_name} onKeyDown={this.handleKeyPress} placeholder="Game name" />
                     <AddRoundsModal rounds={this.props.rounds} add_rounds={this.add_rounds} />
                 </div>
