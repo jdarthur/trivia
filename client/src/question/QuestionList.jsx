@@ -5,7 +5,7 @@ import DeleteConfirm from "../editor/DeleteConfirm"
 import EditorFilter from "../editor/EditorFilter.jsx"
 import LoadingOrView from "../editor/LoadingOrView"
 
-import { Table, Pagination } from "antd"
+import { Table } from "antd"
 
 import {
   PlusSquareOutlined,
@@ -149,13 +149,13 @@ class QuestionList extends React.Component {
 
   render() {
 
-    const delete_edit = (text, record) => <span style={{fontSize: '1.2em'}}>
-      <DeleteConfirm delete={() => this.delete(record.id)} style={{paddingRight: 10}}/>
+    const delete_edit = (text, record) => <span style={{ fontSize: '1.2em' }}>
+      <DeleteConfirm delete={() => this.delete(record.id)} style={{ paddingRight: 10 }} />
       <EditOutlined onClick={() => this.set_selected(record.id)} />
     </span>
 
     const columns = [
-      { title: "", render: delete_edit, width: '7em'},
+      { title: "", render: delete_edit, width: '7em' },
       { title: 'Category', dataIndex: 'category', ellipsis: { showTitle: false } },
       { title: 'Question', dataIndex: 'question', ellipsis: { showTitle: false }, width: '50%' },
       { title: 'Answer', dataIndex: 'answer', ellipsis: { showTitle: false } }
@@ -172,10 +172,14 @@ class QuestionList extends React.Component {
 
 
     const nqb = this.add_newquestion_button() ? <PlusSquareOutlined className="new_button" onClick={this.add_new_question} /> : null
+    const pagination = {
+      total: this.state.questions.length,
+      showTotal: (total, range) => `${range[0]}-${range[1]} of ${total}`
+    }
 
     const table_and_modal = <div>
       {question_editor}
-      <Table columns={columns} dataSource={this.state.questions} pagination={<Pagination />} />
+      <Table columns={columns} dataSource={this.state.questions} pagination={pagination} />
     </div>
 
     return (
