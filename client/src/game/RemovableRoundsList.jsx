@@ -46,7 +46,7 @@ class RemovableRoundsList extends React.Component {
 
         return (
 
-            <div className={"rem-question-list" + show_empty? " centered" : ""}>
+            <div className={"rem-question-list" + (show_empty? " centered" : "")}>
                 {show_empty ? <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="No rounds added"/> : rounds }
                 {this.state.selected_rounds.length > 0 ?
                     <Button className="new_button" danger onClick={this.remove_selected} >

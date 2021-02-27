@@ -3,7 +3,10 @@ import '../modal/Modal.css';
 
 import RoundInGame from "./RoundInGame"
 
-class AddRoundsModal extends React.Component {
+
+import {PlusSquareOutlined} from '@ant-design/icons';
+
+class AddRounds extends React.Component {
 
     constructor(props) {
         super(props)
@@ -31,7 +34,7 @@ class AddRoundsModal extends React.Component {
         if (index === -1) {
             current.push(round_id)
         } else {
-             current.splice(index, index + 1)
+            current.splice(index, index + 1)
         }
 
         this.props.set_rounds(current)
@@ -45,13 +48,14 @@ class AddRoundsModal extends React.Component {
                 rounds.push(<RoundInGame key={round.id} id={round.id}
                                          select={this.select_item}
                                          selected={this.props.selected_rounds.indexOf(round.id) !== -1}
-                                         index={this.props.selected_rounds.indexOf(round.id)} show_title={true}/>)
+                                         index={this.props.selected_rounds.indexOf(round.id)} show_title={true}
+                                         addable={true}/>)
             }
         }
         return (
-            <div> {rounds} </div>
+            <div style={{display: "flex", flexDirection: "row", flexWrap: "wrap"}}> {rounds} </div>
         );
     }
 }
 
-export default AddRoundsModal;
+export default AddRounds

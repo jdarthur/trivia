@@ -1,6 +1,6 @@
 import React from 'react';
 import '../round/OpenRound.css';
-import AddRoundsModal from './AddRoundsModal';
+import AddRounds from './AddRounds';
 import RemovableRoundsList from "./RemovableRoundsList"
 
 import {Button, Modal, Tabs} from 'antd';
@@ -93,7 +93,7 @@ class OpenGame extends React.Component {
             <Modal
                 title="Edit Game"
                 visible={true}
-                width="50vw"
+                width="70vw"
                 footer={footer}
                 onCancel={this.save_and_close}>
 
@@ -115,9 +115,9 @@ class OpenGame extends React.Component {
                             </TabPane>
 
                             <TabPane tab="Add Rounds" key="add_rounds">
-                                <AddRoundsModal rounds={this.props.rounds}
-                                                selected_rounds={this.state.selected_rounds}
-                                                set_rounds={this.set_rounds} />
+                                <AddRounds rounds={this.props.rounds}
+                                           selected_rounds={this.state.selected_rounds}
+                                           set_rounds={this.set_rounds} />
                             </TabPane>
                         </Tabs>
                     </div>
