@@ -60,13 +60,6 @@ class EditQuestionModal extends React.Component {
             <Button className="button" type="primary" onClick={this.save_self}> {save_text} </Button>
         </div>
 
-        let focus = "category"
-        if (this.props.category) {
-            focus = "question"
-            if (this.props.question && !this.props.answer) {
-                focus = "answer"
-            }
-        }
 
         const view = this.state.selected === EDIT ?
             <div>

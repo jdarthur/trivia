@@ -234,7 +234,7 @@ def get_player(player_id):
 def get_players_in_session(session_id, mod=None):
     url = f"{base_url}/gameplay/session/{session_id}/players"
     if mod is not None:
-        url += f"?mod={mod}"
+        url += f"?player_id={mod}"
     r = requests.get(url)
     return r.json()["players"]
 
