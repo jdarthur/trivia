@@ -203,7 +203,7 @@ func getCurrentQuestion(e *Env, c *gin.Context) (models.QuestionInRound, error) 
 }
 
 type CurrentRoundResponse struct {
-	RoundIndex    int      `json:"id"`
+	RoundIndex int      `json:"id"`
 	RoundName  string   `json:"name"`
 	Categories []string `json:"categories"`
 	Wagers     []int    `json:"wagers"`
@@ -281,6 +281,14 @@ func scoreQuestion(e *Env, c *gin.Context) (models.ScoreRequest, error) {
 	roundIndex := requestBody.RoundIndex
 	questionIndex := requestBody.QuestionIndex
 
+	questionIndexOverall, err := getQuestionIndex(session, roundIndex, questionIndex)
+	if err != nil {
+		return models.ScoreRequest{}, err
+	}
+	fmt.Println("Question index: ", questionIndexOverall)
+
+
+
 	for playerId, correctOrNot := range requestBody.Players {
 		answerCount := len(session.Rounds[roundIndex].Questions[questionIndex].PlayerAnswers[playerId])
 		if answerCount == 0 {
@@ -298,6 +306,11 @@ func scoreQuestion(e *Env, c *gin.Context) (models.ScoreRequest, error) {
 		//override wager if score override is provided.
 		//award 0 points if answer is correct
 		var pointsToAward float64
+
+		fmt.Printf("%+v", requestBody)
+
+
+
 		if correctOrNot.Correct {
 			if correctOrNot.ScoreOverride != nil {
 				pointsToAward = *correctOrNot.ScoreOverride
@@ -316,7 +329,8 @@ func scoreQuestion(e *Env, c *gin.Context) (models.ScoreRequest, error) {
 		}
 
 		//award points in scoreboard
-		session.Scoreboard[playerId] = append(session.Scoreboard[playerId], pointsToAward)
+		session.Scoreboard[playerId] = splicePoints(session.Scoreboard[playerId], pointsToAward, questionIndexOverall)
+		fmt.Println(session.Scoreboard[playerId])
 	}
 
 	questionInRound := session.Rounds[roundIndex].Questions[questionIndex]
@@ -337,4 +351,42 @@ func scoreQuestion(e *Env, c *gin.Context) (models.ScoreRequest, error) {
 	}
 	return requestBody, err
 
+}
+
+//get this overall index of this question withing the game
+//e.g. 5x5 game: round 1 question1 is 0, round 2 question 1 is 5, round 5, question  5 is 24
+func getQuestionIndex(session models.Session, roundIndex int, questionIndex int) (int, error) {
+
+	fmt.Println(roundIndex, questionIndex)
+
+	if len(session.Rounds) <= roundIndex {
+		return 0, InvalidRoundIndexError{RoundIndex: roundIndex}
+	}
+
+	r := session.Rounds[roundIndex]
+
+	if len(r.Questions) <= questionIndex {
+		return 0, InvalidQuestionIndexError{QuestionIndex: questionIndex}
+	}
+
+	incr := 0
+	for i := 0; i <= roundIndex; i++ {
+		round := session.Rounds[i]
+		for j, _ := range round.Questions {
+			if questionIndex == j {
+				return incr, nil
+			}
+			incr++
+		}
+	}
+
+	return incr, nil
+}
+
+func splicePoints(pointsArray []float64, pointValue float64, index int) []float64 {
+	if index >= len(pointsArray) {
+		return append(pointsArray, pointValue)
+	}
+	pointsArray[index] = pointValue
+	return pointsArray
 }

@@ -186,7 +186,7 @@ func getAnswersUnscored(e *Env, session models.Session, roundIndex int, question
 		p.TeamName = player.TeamName
 		p.Icon = player.Icon
 
-		if _, ok := playerAnswers[p.PlayerId]; ok {
+		if _, ok := playerAnswers[thisPlayerId]; ok {
 			p.Answered = true
 		}
 

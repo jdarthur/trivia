@@ -250,8 +250,6 @@ func Delete(e *Env, objectType string, objectId string) error {
 //
 // throws InvalidUUIDError
 func byId(id string) (bson.Binary, error) {
-	fmt.Println(id)
-
 	q123 := strings.Replace(id, "-", "", -1)
 	objectId, err := hex.DecodeString(q123)
 	if err != nil {
@@ -357,22 +355,16 @@ func GetState(e *Env, sessionId string) (sessionState string, err error) {
 }
 
 func IncrementState(e *Env, sessionId string) (err error) {
-	fmt.Println("come on")
 	newStateId, err := models.NewId()
 	if err != nil {
-		fmt.Println("err in incr: ", err)
 		return err
 	}
-
-	fmt.Println("sessionId: ", sessionId)
 
 	var newState SessionState
 	newState.SessionId = sessionId
 	newState.State = newStateId
-	fmt.Printf("new state: %+v", newState)
 
 	collection := e.Db.DB(Database).C(SessionStateTable)
-	changeInfo, err := collection.Upsert(bson.M{"session_id" : sessionId}, newState)
-	fmt.Printf("changed: %+v", changeInfo)
+	_, err = collection.Upsert(bson.M{"session_id" : sessionId}, newState)
 	return err
 }
