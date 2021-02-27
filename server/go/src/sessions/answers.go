@@ -230,8 +230,6 @@ func getAnswersScored(e *Env, session models.Session, roundIndex int, questionIn
 			team.Answers = append(team.Answers, a)
 		}
 
-		lastAnswer := thisPlayersAnswers[(len(thisPlayersAnswers) - 1)]
-		team.Correct = lastAnswer.Correct || lastAnswer.PointsAwarded > 0
 		response.Answers = append(response.Answers, team)
 
 	}

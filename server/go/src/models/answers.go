@@ -67,7 +67,6 @@ type ScoredTeam struct {
 	Icon     string         `json:"icon"`
 	PlayerId PlayerId       `json:"player_id,omitempty"`
 	Answers  []ScoredAnswer `json:"answers"`
-	Correct  bool           `json:"correct"`
 }
 
 type ScoredAnswer struct {
