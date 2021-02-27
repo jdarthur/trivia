@@ -1,6 +1,5 @@
 import React from 'react';
 import '../modal/Modal.css';
-import { Modal, Button } from 'antd';
 
 import RoundInGame from "./RoundInGame"
 
@@ -9,9 +8,7 @@ class AddRoundsModal extends React.Component {
     constructor(props) {
         super(props)
         this.state = {
-            rounds: [],
-            selected_rounds: [],
-            is_open: false
+            rounds: []
         }
     }
 
@@ -24,73 +21,36 @@ class AddRoundsModal extends React.Component {
         fetch(url)
             .then(response => response.json())
             .then(state => {
-                console.log("got rounds in addable rounds")
-                console.log(state)
-                this.setState({ rounds: state.rounds })
+                this.setState({rounds: state.rounds})
             })
     }
 
-
-    close_modal = () => {
-        this.setState({ is_open: false, selected_rounds: [], })
-    }
-
-    open_modal = () => {
-        this.setState({ is_open: true }, () => {
-            this.get_rounds()
-        })
-    }
-
     select_item = (round_id) => {
-        const index = this.state.selected_rounds.indexOf(round_id)
+        const current = [...this.props.selected_rounds]
+        const index = current.indexOf(round_id)
         if (index === -1) {
-            this.state.selected_rounds.push(round_id)
+            current.push(round_id)
+        } else {
+             current.splice(index, index + 1)
         }
-        else {
-            this.state.selected_rounds.splice(index, index + 1)
-        }
-        this.setState({ selected_rounds: this.state.selected_rounds })
-    }
 
-    add_rounds_and_close = () => {
-        this.props.add_rounds(this.state.selected_rounds)
-        this.close_modal()
+        this.props.set_rounds(current)
     }
 
     render() {
-        if (this.state.is_open === true) {
-            const rounds = []
-            for (let i = 0; i < this.state.rounds.length; i++) {
-                const round = this.state.rounds[i];
-                if (this.props.rounds.indexOf(round.id) === -1) {
-                    rounds.push(<RoundInGame key={round.id} id={round.id}
-                        select={this.select_item} selected={this.state.selected_rounds.indexOf(round.id) !== -1}
-                        index={this.state.selected_rounds.indexOf(round.id)} show_title={true} />)
-                }
+        const rounds = []
+        for (let i = 0; i < this.state.rounds.length; i++) {
+            const round = this.state.rounds[i];
+            if (this.props.rounds.indexOf(round.id) === -1) {
+                rounds.push(<RoundInGame key={round.id} id={round.id}
+                                         select={this.select_item}
+                                         selected={this.props.selected_rounds.indexOf(round.id) !== -1}
+                                         index={this.props.selected_rounds.indexOf(round.id)} show_title={true}/>)
             }
-            return (
-                <Modal
-                    title="Add Rounds"
-                    visible={this.state.is_open}
-                    onOk={this.add_rounds_and_close}
-                    okText="Add"
-                    onCancel={this.close_modal}
-                    width="50vw">
-
-                    <div className="rem-question-list">
-                        {rounds}
-
-                    </div>
-
-                </Modal>
-            );
         }
-        else {
-            return (
-                <Button type="primary" onClick={this.open_modal} style={{'margin-bottom': '10px', 'margin-top': '10px'}}>
-                    Add rounds
-                </Button>)
-        }
+        return (
+            <div> {rounds} </div>
+        );
     }
 }
 
