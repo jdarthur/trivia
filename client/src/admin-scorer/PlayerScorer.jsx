@@ -82,8 +82,8 @@ class PlayerScorer extends React.Component {
             const url = "/gameplay/session/" + this.props.session_id + "/score"
             const body = {
                 player_id: this.props.player_id,
-                round_id: this.props.round_id,
-                question_id: this.props.question_id,
+                round_index: this.props.round_id,
+                question_index: this.props.question_id,
                 players: this.state.scores
             }
             console.log(url)

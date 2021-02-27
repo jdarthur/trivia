@@ -87,6 +87,7 @@ func _setCurrentQuestion(e *Env, session *models.Session, questionIndex int, rou
 	//set current question field & question text inside this session
 	session.CurrentQuestion = &questionIndex
 	questionInRound.Question = questionObject.Question
+	questionInRound.Answer = questionObject.Answer
 	questionInRound.QuestionId = questionId
 
 	roundInSession.Questions[questionIndex] = questionInRound
@@ -183,6 +184,7 @@ func (e *Env) GetCurrentQuestion(c *gin.Context) {
 func getCurrentQuestion(e *Env, c *gin.Context) (models.QuestionInRound, error) {
 
 	sessionId := c.Param("id")
+	playerId := c.Query("player_id")
 	var session models.Session
 	err := common.GetOne((*common.Env)(e), common.SessionTable, sessionId, &session)
 	if err != nil {
@@ -196,6 +198,11 @@ func getCurrentQuestion(e *Env, c *gin.Context) (models.QuestionInRound, error) 
 
 		question := session.Rounds[currentRound].Questions[currentQuestion]
 		question.Index = currentQuestion
+
+		if models.PlayerId(playerId) != session.Moderator && !question.Scored {
+			question.Answer = ""
+		}
+
 		return question, err
 	}
 
@@ -285,9 +292,6 @@ func scoreQuestion(e *Env, c *gin.Context) (models.ScoreRequest, error) {
 	if err != nil {
 		return models.ScoreRequest{}, err
 	}
-	fmt.Println("Question index: ", questionIndexOverall)
-
-
 
 	for playerId, correctOrNot := range requestBody.Players {
 		answerCount := len(session.Rounds[roundIndex].Questions[questionIndex].PlayerAnswers[playerId])
@@ -306,11 +310,6 @@ func scoreQuestion(e *Env, c *gin.Context) (models.ScoreRequest, error) {
 		//override wager if score override is provided.
 		//award 0 points if answer is correct
 		var pointsToAward float64
-
-		fmt.Printf("%+v", requestBody)
-
-
-
 		if correctOrNot.Correct {
 			if correctOrNot.ScoreOverride != nil {
 				pointsToAward = *correctOrNot.ScoreOverride
@@ -322,6 +321,7 @@ func scoreQuestion(e *Env, c *gin.Context) (models.ScoreRequest, error) {
 		}
 
 		answer.PointsAwarded = pointsToAward
+		answer.Correct = correctOrNot.Correct
 
 		err = common.Set((*common.Env)(e), common.AnswerTable, string(lastAnswerId), &answer)
 		if err != nil {

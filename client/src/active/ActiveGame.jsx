@@ -47,7 +47,7 @@ class ActiveGame extends React.Component {
   }
 
   get_current_question = () => {
-    let url = "/gameplay/session/" + this.props.session_id + "/current-question"
+    let url = "/gameplay/session/" + this.props.session_id + "/current-question?player_id=" + this.props.player_id
     fetch(url).then(response => response.json())
       .then(q => {
         this.setState({

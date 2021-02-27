@@ -205,6 +205,9 @@ func (e *Env) StartSession(c *gin.Context) {
 func getSessionAsPlayer(session *models.Session, playerId string) models.Session {
 	session.GameId = ""
 	session.Moderator = ""
+	session.Players = nil
+	session.Rounds = nil
+	session.Scoreboard = nil
 	return *session
 }
 
