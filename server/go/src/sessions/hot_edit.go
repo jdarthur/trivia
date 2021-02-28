@@ -36,6 +36,8 @@ func (e *Env) HotEditQuestion(c *gin.Context) {
 		questionInRound.Question = request.Question.Question
 		questionInRound.Answer = request.Question.Answer
 		questionInRound.Category = request.Question.Category
+
+		session.Rounds[request.RoundIndex].Questions[request.QuestionIndex] = questionInRound
 		err = common.Set((*common.Env)(e), common.SessionTable, sessionId, &session)
 		if err != nil {
 			common.Respond(c, request, err)

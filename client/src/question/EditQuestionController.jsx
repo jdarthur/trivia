@@ -12,6 +12,7 @@ class EditQuestionController extends React.Component {
         this.props.delete(this.props.id)
     }
     save_self = () => {
+        console.log("save")
         this.props.select("")
     }
 
@@ -34,7 +35,7 @@ class EditQuestionController extends React.Component {
             <EditQuestionModal title={title} cancel_action={cancel_action}
                                save_text={save_text} save_action={this.save_self}
                                question={this.props.question} answer={this.props.answer}
-                               category={this.props.answer} footer={footer}
+                               category={this.props.category} footer={footer}
                                set={this.set_value}/>
         );
     }

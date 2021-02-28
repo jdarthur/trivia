@@ -4,7 +4,7 @@ import './ActiveGame.css';
 import {Breadcrumb, Card} from 'antd';
 import {EditOutlined, PlaySquareOutlined} from '@ant-design/icons';
 import FormattedQuestion from "../question/FormattedQuestion"
-import EditQuestionModal from "../question/EditQuestionModal";
+import HotEditQuestion from "./HotEditQuestion";
 
 class ActiveQuestion extends React.Component {
 
@@ -24,7 +24,10 @@ class ActiveQuestion extends React.Component {
         // const question_newlined = this.props.question?.split("^").map((part, index) => <div key={index} className="linebreak"> {part} </div>)
 
         const extra = this.props.editable ? <EditOutlined onClick={this.open} style={{paddingBottom: 10}}/> : null
-        const editQuestionModal = this.state.editor_open ? <EditQuestionModal /> : null
+        const editQuestionModal = this.state.editor_open ?
+            <HotEditQuestion category={this.props.category} question={this.props.question} answer={this.props.answer}
+                             close={this.close} session_id={this.props.session_id} player_id={this.props.player_id}
+                             round_index={this.props.round_index} question_index={this.props.question_index} /> : null
 
         return (
 

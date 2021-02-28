@@ -91,7 +91,7 @@ func main() {
 	router.GET("/gameplay/session/:id/answers", s.GetAnswers)
 
 	fmt.Println("\nHot-edit API:")
-	router.GET("/gameplay/session/:id/hot-edit-question", s.WithValidSession, s.AsMod, s.HotEditQuestion)
+	router.PUT("/gameplay/session/:id/hot-edit-question", s.WithValidSession, s.AsMod, s.HotEditQuestion)
 	//router.GET("/gameplay/session/:id/hot-edit-round", s.WithValidSession, s.HotEditQuestion)
 
 	fmt.Println("\nPlayer API:")
