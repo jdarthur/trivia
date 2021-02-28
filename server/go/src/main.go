@@ -90,6 +90,10 @@ func main() {
 	router.POST("/gameplay/session/:id/answer", s.AnswerQuestion)
 	router.GET("/gameplay/session/:id/answers", s.GetAnswers)
 
+	fmt.Println("\nHot-edit API:")
+	router.GET("/gameplay/session/:id/hot-edit-question", s.WithValidSession, s.AsMod, s.HotEditQuestion)
+	//router.GET("/gameplay/session/:id/hot-edit-round", s.WithValidSession, s.HotEditQuestion)
+
 	fmt.Println("\nPlayer API:")
 	p := players.Env{Db: client}
 	router.GET("/gameplay/player/:id", p.GetOnePlayer)
@@ -98,6 +102,8 @@ func main() {
 	router.POST("/gameplay/session/:id/add", p.AddPlayerToSession)
 	router.POST("/gameplay/session/:id/remove", p.RemovePlayerFromSession)
 	router.DELETE("/gameplay/player/:id", p.DeletePlayer)
+
+
 
 	fmt.Println()
 	router.Run()

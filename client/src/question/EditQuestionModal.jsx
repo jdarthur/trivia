@@ -1,7 +1,7 @@
 import React from 'react';
 import './Question.css';
 
-import { Input, Button, Modal, Radio } from 'antd';
+import { Input, Modal, Radio } from 'antd';
 import FormattedQuestion from "./FormattedQuestion"
 
 const { TextArea } = Input;
@@ -20,14 +20,10 @@ class EditQuestionModal extends React.Component {
         selected: EDIT
     }
 
-
     set_category = (event) => { this.set_value(event, CATEGORY) }
     set_question = (event) => { this.set_value(event, QUESTION) }
     set_answer = (event) => { this.set_value(event, ANSWER) }
-    set_value = (event, key) => { this.props.set(this.props.id, key, event.target.value) }
-
-    delete_self = () => { this.props.delete(this.props.id) }
-    save_self = () => { this.props.select("") }
+    set_value = (event, key) => { this.props.set(key, event.target.value) }
 
     set_edit = (event) => { this.setState({ selected: event.target.value }) }
 
@@ -41,25 +37,11 @@ class EditQuestionModal extends React.Component {
         }
         else {
             event.preventDefault()
-            this.save_self()
+            this.props.save_action()
         }
     }
 
-    is_empty = () => {
-        return this.props.category === "" && this.props.question === "" && this.props.answer === ""
-    }
-
     render() {
-        const title = this.props.id === "new" ? "Add question" : "Edit question"
-        const save_text = this.props.id === "new" ? "Add" : "Update"
-
-        const cancel_action = this.is_empty() ? this.delete_self : this.save_self
-
-        const footer = <div className="save-delete">
-            <Button danger className="button" onClick={this.delete_self}> Delete</Button>
-            <Button className="button" type="primary" onClick={this.save_self}> {save_text} </Button>
-        </div>
-
 
         const view = this.state.selected === EDIT ?
             <div>
@@ -76,24 +58,25 @@ class EditQuestionModal extends React.Component {
 
         return (
             <Modal
-                title={title}
-                onOk={this.save_self}
                 visible={true}
-                onCancel={cancel_action}
-                footer={footer}
+                onOk={this.props.save_action}
+                title={this.props.title}
+                onCancel={this.props.cancel_action}
+                footer={this.props.footer}
                 width="500px">
 
-                <Input autoFocus={!this.props.category} placeholder="Category" value={this.props.category} style={{ marginBottom: 10 }}
-                    onChange={this.set_category} onPressEnter={this.category_enter} />
+                <div style={{display: "flex", flexDirection: "column"}}>
+                    <Input autoFocus={!this.props.category} placeholder="Category" value={this.props.category}
+                           style={{ marginBottom: 10, width: 300}}
+                           onChange={this.set_category} onPressEnter={this.category_enter} />
 
-                <Radio.Group buttonStyle="solid" onChange={this.set_edit} value={this.state.selected}
-                    defaultValue={EDIT} size="small" style={{ paddingBottom: 5 }}>
-                    <Radio.Button key={EDIT} value={EDIT} > {EDIT} </Radio.Button>
-                    <Radio.Button key={PREVIEW} value={PREVIEW} > {PREVIEW} </Radio.Button>
-                </Radio.Group>
-
-
-                {view}
+                    <Radio.Group buttonStyle="solid" onChange={this.set_edit} value={this.state.selected}
+                                 defaultValue={EDIT} size="small" style={{ paddingBottom: 5 }}>
+                        <Radio.Button key={EDIT} value={EDIT} > {EDIT} </Radio.Button>
+                        <Radio.Button key={PREVIEW} value={PREVIEW} > {PREVIEW} </Radio.Button>
+                    </Radio.Group>
+                    {view}
+                </div>
 
 
             </Modal>

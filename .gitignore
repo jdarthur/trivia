@@ -14,3 +14,6 @@ server/go/src/golang.org
 server/go/src/gopkg.in
 server/go/src/google.golang.org
 server/go/src/.env
+server/__init__.pyc
+server/test/__init__.pyc
+venv/

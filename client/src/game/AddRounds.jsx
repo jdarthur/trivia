@@ -2,10 +2,6 @@ import React from 'react';
 import '../modal/Modal.css';
 
 import RoundInGame from "./RoundInGame"
-
-
-import {PlusSquareOutlined} from '@ant-design/icons';
-
 class AddRounds extends React.Component {
 
     constructor(props) {

@@ -73,7 +73,7 @@ class ActiveGame extends React.Component {
                 name={this.state.round_name} />
               <ActiveQuestion session_state={this.props.session_state} session_id={this.props.session_id}
                 question={this.state.question} answer={this.state.answer} scored={this.state.scored}
-                round_name={this.state.round_name} category={this.state.category}/>
+                round_name={this.state.round_name} category={this.state.category} editable={this.props.is_mod}/>
             </div>
 
             {!this.props.is_mod ? <AnswerQuestion question={this.state.active_question}
