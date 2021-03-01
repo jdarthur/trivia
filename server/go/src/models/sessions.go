@@ -74,7 +74,7 @@ type QuestionInRound struct {
 	PlayerAnswers map[PlayerId][]AnswerId `bson:"answers" json:"answers,omitempty"`
 	Scored        bool                    `json:"scored,omitempty"`
 	Index         int                     `bson:"-" json:"id"`
-	QuestionId    string                  `bson:"question_id", json:"-"`
+	QuestionId    string                  `bson:"question_id" json:"-"`
 }
 
 type ScoreRequest struct {

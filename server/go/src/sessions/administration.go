@@ -201,6 +201,7 @@ func getCurrentQuestion(e *Env, c *gin.Context) (models.QuestionInRound, error) 
 
 		if models.PlayerId(playerId) != session.Moderator && !question.Scored {
 			question.Answer = ""
+			question.QuestionId = ""
 		}
 
 		return question, err

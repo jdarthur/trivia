@@ -13,7 +13,7 @@ func (e *Env) WithValidSession(c *gin.Context) {
 	err := common.GetOne((*common.Env)(e), common.SessionTable, sessionId, &session)
 	if err != nil {
 		common.Respond(c, session, err)
-		return
+		c.Abort()
 	}
 
 	c.Set("session", session)
@@ -29,7 +29,7 @@ func (e *Env) AsMod(c *gin.Context) {
 		playerId := models.PlayerId(c.Query("player_id"))
 		if playerId != session.Moderator {
 			common.Respond(c, session, UnauthorizedSessionActionError{SessionId: models.IdAsString(session.ID), ModeratorId: playerId})
-			return
+			c.Abort()
 		}
 		c.Next()
 	}

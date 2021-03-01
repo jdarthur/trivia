@@ -67,5 +67,52 @@ func (e *Env) HotEditQuestion(c *gin.Context) {
 		err = common.IncrementState((*common.Env)(e), sessionId)
 		common.Respond(c, request, err)
 	}
+}
+
+type EditRoundNameRequest struct {
+	RoundIndex int    `json:"round_index"`
+	RoundName  string `json:"round_name"`
+}
+
+func (e *Env) HotEditRoundName(c *gin.Context) {
+	sessionId := c.Param("id")
+
+	value, ok := c.Get("session")
+	if ok {
+		session := value.(models.Session)
+		var request EditRoundNameRequest
+		err := c.ShouldBind(&request)
+		if err != nil {
+			common.Respond(c, request, err)
+			return
+		}
+
+		if request.RoundIndex >= len(session.Rounds) {
+			common.Respond(c, request, InvalidRoundIndexError{RoundIndex: request.RoundIndex})
+			return
+		}
+
+		//update RoundName in game
+		roundId := session.Rounds[request.RoundIndex].RoundId
+		gameId := session.GameId
+
+		var game models.Game
+		err = common.GetOne((*common.Env)(e), common.GameTable, gameId, &game)
+		if err != nil {
+			common.Respond(c, request, err)
+			return
+		}
+
+		game.RoundNames[roundId] = request.RoundName
+
+		err = common.Set((*common.Env)(e), common.GameTable, gameId, &game)
+		if err != nil {
+			common.Respond(c, request, err)
+			return
+		}
+
+		err = common.IncrementState((*common.Env)(e), sessionId)
+		common.Respond(c, request, err)
+	}
 
 }

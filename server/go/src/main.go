@@ -92,7 +92,7 @@ func main() {
 
 	fmt.Println("\nHot-edit API:")
 	router.PUT("/gameplay/session/:id/hot-edit-question", s.WithValidSession, s.AsMod, s.HotEditQuestion)
-	//router.GET("/gameplay/session/:id/hot-edit-round", s.WithValidSession, s.HotEditQuestion)
+	router.PUT("/gameplay/session/:id/hot-edit-round-name", s.WithValidSession, s.AsMod, s.HotEditRoundName)
 
 	fmt.Println("\nPlayer API:")
 	p := players.Env{Db: client}
