@@ -19,6 +19,8 @@ RUN mkdir /go/src/games
 RUN mkdir /go/src/players
 RUN mkdir /go/src/sessions
 
+ADD go.mod /go/src
+ADD go.sum /go/src
 ADD main.go /go/src
 ADD ./common /go/src/common
 ADD ./models /go/src/models
