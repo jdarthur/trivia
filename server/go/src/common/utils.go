@@ -9,8 +9,8 @@ import (
 	"github.com/globalsign/mgo"
 	"github.com/globalsign/mgo/bson"
 	"github.com/go-playground/validator"
+	"github.com/jdarthur/trivia/models"
 	"log"
-	"models"
 	"net/http"
 	"reflect"
 	"strings"
@@ -331,10 +331,9 @@ func IsValidRound(e *Env, roundId string) (interface{}, error) {
 	return data, nil
 }
 
-
 type SessionState struct {
-	SessionId  string `bson:"session_id"`
-	State bson.Binary `bson:"state"`
+	SessionId string      `bson:"session_id"`
+	State     bson.Binary `bson:"state"`
 }
 
 func GetState(e *Env, sessionId string) (sessionState string, err error) {
@@ -343,7 +342,7 @@ func GetState(e *Env, sessionId string) (sessionState string, err error) {
 
 	//find matching item
 	var state SessionState
-	err = collection.Find(bson.M{"session_id" : sessionId}).One(&state)
+	err = collection.Find(bson.M{"session_id": sessionId}).One(&state)
 	if err != nil {
 		if err == mgo.ErrNotFound {
 			return "", NonexistentIdError{RecordType: SessionStateTable, ID: sessionId}
@@ -365,6 +364,6 @@ func IncrementState(e *Env, sessionId string) (err error) {
 	newState.State = newStateId
 
 	collection := e.Db.DB(Database).C(SessionStateTable)
-	_, err = collection.Upsert(bson.M{"session_id" : sessionId}, newState)
+	_, err = collection.Upsert(bson.M{"session_id": sessionId}, newState)
 	return err
 }

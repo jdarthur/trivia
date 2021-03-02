@@ -2,7 +2,7 @@ package players
 
 import (
 	"fmt"
-	"models"
+	"github.com/jdarthur/trivia/models"
 )
 
 var id = "player_id"

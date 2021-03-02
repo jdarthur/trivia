@@ -1,11 +1,11 @@
 package questions
 
 import (
-	"common"
 	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/globalsign/mgo/bson"
-	"models"
+	"github.com/jdarthur/trivia/common"
+	"github.com/jdarthur/trivia/models"
 	"strings"
 )
 
@@ -25,7 +25,7 @@ func createFilters(c *gin.Context) map[string]interface{} {
 	//unused_only means that rounds_used = []
 	unusedOnly := c.DefaultQuery("unused_only", "false")
 	if strings.ToLower(unusedOnly) == "true" {
-		filter[models.RoundsUsed + ".0"] = bson.M{"$exists": false}
+		filter[models.RoundsUsed+".0"] = bson.M{"$exists": false}
 	}
 
 	//text_filter means that the search string appears in category/question/answer (case-insensitive)
@@ -112,7 +112,6 @@ func (e *Env) UpdateQuestion(c *gin.Context) {
 func (e *Env) DeleteQuestion(c *gin.Context) {
 	questionId := c.Param("id")
 
-
 	var existingQuestion models.Question
 	err := common.GetOne((*common.Env)(e), common.QuestionTable, questionId, &existingQuestion)
 	if err != nil {
@@ -138,7 +137,6 @@ func (e *Env) DeleteQuestion(c *gin.Context) {
 	common.Respond(c, existingQuestion, err)
 }
 
-
 //Merge update body into existing question
 func merge(update *models.Question, original *models.Question) {
 
@@ -156,6 +154,7 @@ func merge(update *models.Question, original *models.Question) {
 type AttemptedToSetRoundsUsedError struct {
 	RoundsUsed interface{}
 }
+
 func (e AttemptedToSetRoundsUsedError) Error() string {
 	return "Attempted to set field: 'rounds_used'"
 }
@@ -167,6 +166,3 @@ func (e AttemptedToSetRoundsUsedError) Field() string {
 func (e AttemptedToSetRoundsUsedError) Data() interface{} {
 	return e.RoundsUsed
 }
-
-
-

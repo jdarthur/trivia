@@ -2,16 +2,16 @@ package main
 
 import (
 	"fmt"
-	"games"
 	"github.com/gin-gonic/gin"
 	"github.com/globalsign/mgo"
+	"github.com/jdarthur/trivia/games"
+	"github.com/jdarthur/trivia/players"
+	"github.com/jdarthur/trivia/questions"
+	"github.com/jdarthur/trivia/rounds"
+	"github.com/jdarthur/trivia/sessions"
 	"github.com/joho/godotenv"
 	"log"
 	"os"
-	"players"
-	"questions"
-	"rounds"
-	"sessions"
 )
 
 func main() {
@@ -31,7 +31,6 @@ func main() {
 	if len(mongoPort) == 0 {
 		mongoPort = "27017"
 	}
-
 
 	mongoAddress := "mongodb://" + mongoHost + ":" + mongoPort
 	client, err := mgo.Dial(mongoAddress)
@@ -69,7 +68,7 @@ func main() {
 	fmt.Println("\nSession API:")
 	s := sessions.Env{Db: client}
 	//router.GET("/gameplay/sessions",s.GetAllSessions)
-	router.GET("/gameplay/session/:id",s.GetOneSession)
+	router.GET("/gameplay/session/:id", s.GetOneSession)
 	router.GET("/gameplay/session/:id/scoreboard", s.GetSessionScoreboard)
 	router.POST("/gameplay/session", s.CreateSession)
 	router.PUT("/gameplay/session/:id", s.UpdateSession)
@@ -102,8 +101,6 @@ func main() {
 	router.POST("/gameplay/session/:id/add", p.AddPlayerToSession)
 	router.POST("/gameplay/session/:id/remove", p.RemovePlayerFromSession)
 	router.DELETE("/gameplay/player/:id", p.DeletePlayer)
-
-
 
 	fmt.Println()
 	router.Run()

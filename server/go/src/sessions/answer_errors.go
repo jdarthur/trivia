@@ -2,7 +2,7 @@ package sessions
 
 import (
 	"fmt"
-	"models"
+	"github.com/jdarthur/trivia/models"
 )
 
 //Error when try to answer a question thats already scored

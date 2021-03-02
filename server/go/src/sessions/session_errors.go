@@ -2,7 +2,7 @@ package sessions
 
 import (
 	"fmt"
-	"models"
+	"github.com/jdarthur/trivia/models"
 )
 
 //Error when trying to create/start a session which is composed of an empty game

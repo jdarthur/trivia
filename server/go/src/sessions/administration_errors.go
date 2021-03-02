@@ -2,7 +2,7 @@ package sessions
 
 import (
 	"fmt"
-	"models"
+	"github.com/jdarthur/trivia/models"
 )
 
 //Error when you set the current question with a round index that is not hre current round index

@@ -1,10 +1,10 @@
 package players
 
 import (
-	"common"
+	"github.com/jdarthur/trivia/common"
 	"github.com/gin-gonic/gin"
-	"models"
-	"sessions"
+	"github.com/jdarthur/trivia/models"
+	"github.com/jdarthur/trivia/sessions"
 )
 
 type Env common.Env

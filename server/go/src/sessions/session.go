@@ -1,10 +1,10 @@
 package sessions
 
 import (
-	"common"
+	"github.com/jdarthur/trivia/common"
 	"github.com/gin-gonic/gin"
 	"github.com/globalsign/mgo/bson"
-	"models"
+	"github.com/jdarthur/trivia/models"
 	"time"
 )
 
