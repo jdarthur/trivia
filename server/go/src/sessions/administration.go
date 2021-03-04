@@ -385,7 +385,7 @@ func getQuestionIndex(session models.Session, roundIndex int, questionIndex int)
 }
 
 func splicePoints(pointsArray []float64, pointValue float64, index int) []float64 {
-	if index >= len(pointsArray) {
+	if index >= (len(pointsArray) - 1) {
 		return append(pointsArray, pointValue)
 	}
 	pointsArray[index] = pointValue
