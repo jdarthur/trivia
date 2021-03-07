@@ -61,6 +61,9 @@ class Scoreboard extends React.Component {
         const scores_sorted = this.state.scores?.sort((a, b) => {
             const score_a = sum(a.score)
             const score_b = sum(b.score)
+            if (score_a === score_b) {
+                return a.team_name > b.team_name ? 1 : -1
+            }
             return (score_a > score_b) ? -1 : 1
         })
 

@@ -294,6 +294,10 @@ func scoreQuestion(e *Env, c *gin.Context) (models.ScoreRequest, error) {
 		return models.ScoreRequest{}, err
 	}
 
+
+	questionInRound := session.Rounds[roundIndex].Questions[questionIndex]
+	rescore := questionInRound.Scored
+
 	for playerId, correctOrNot := range requestBody.Players {
 		answerCount := len(session.Rounds[roundIndex].Questions[questionIndex].PlayerAnswers[playerId])
 		if answerCount == 0 {
@@ -330,11 +334,10 @@ func scoreQuestion(e *Env, c *gin.Context) (models.ScoreRequest, error) {
 		}
 
 		//award points in scoreboard
-		session.Scoreboard[playerId] = splicePoints(session.Scoreboard[playerId], pointsToAward, questionIndexOverall)
+		session.Scoreboard[playerId] = splicePoints(session.Scoreboard[playerId], pointsToAward, questionIndexOverall, rescore)
 		fmt.Println(session.Scoreboard[playerId])
 	}
 
-	questionInRound := session.Rounds[roundIndex].Questions[questionIndex]
 	questionInRound.Scored = true
 
 	var question models.Question
@@ -384,8 +387,8 @@ func getQuestionIndex(session models.Session, roundIndex int, questionIndex int)
 	return incr, nil
 }
 
-func splicePoints(pointsArray []float64, pointValue float64, index int) []float64 {
-	if index >= (len(pointsArray) - 1) {
+func splicePoints(pointsArray []float64, pointValue float64, index int, rescore bool) []float64 {
+	if !rescore && index >= (len(pointsArray) - 1) {
 		return append(pointsArray, pointValue)
 	}
 	pointsArray[index] = pointValue
