@@ -39,7 +39,14 @@ func main() {
 		log.Fatal(err)
 	}
 
+	imageDir := os.Getenv("IMAGE_DIR")
+	if len(imageDir) == 0 {
+		imageDir = "images"
+	}
+	_ = os.Mkdir(imageDir, os.ModeDir)
+
 	router := gin.Default()
+	router.Static("/images", imageDir)
 
 	fmt.Println("\nQuestions API:")
 	q := questions.Env{Db: client}
@@ -48,6 +55,7 @@ func main() {
 	router.POST("/editor/question", q.CreateQuestion)
 	router.PUT("/editor/question/:id", q.UpdateQuestion)
 	router.DELETE("/editor/question/:id", q.DeleteQuestion)
+	router.POST("/editor/image", q.UploadImage)
 
 	fmt.Println("\nRounds API:")
 	r := rounds.Env{Db: client}
@@ -104,4 +112,8 @@ func main() {
 
 	fmt.Println()
 	router.Run()
+}
+
+func createImageDirIfNotExists() {
+
 }

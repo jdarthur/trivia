@@ -16,4 +16,5 @@ server/go/src/google.golang.org
 server/go/src/.env
 server/__init__.pyc
 server/test/__init__.pyc
+server/go/src/images
 venv/

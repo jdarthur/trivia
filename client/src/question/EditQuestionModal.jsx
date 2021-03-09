@@ -113,6 +113,18 @@ class EditQuestionModal extends React.Component {
         }
     }
 
+    insert = (text) => {
+        const activeElement = document.getElementById(this.state.focused)
+        if (activeElement) {
+            if (activeElement.id === QUESTION || activeElement.id === CATEGORY) {
+                this.props.set(QUESTION, this.props.question + text)
+            }
+            if (activeElement.id === ANSWER) {
+                this.props.set(ANSWER, this.props.answer + text)
+            }
+        }
+    }
+
 
     render() {
 
@@ -153,7 +165,7 @@ class EditQuestionModal extends React.Component {
                                 <Radio.Button key={PREVIEW} value={PREVIEW}> {PREVIEW} </Radio.Button>
                             </Radio.Group>
 
-                            <EditorToolbar wrap={this.wrap} wrap_line={this.wrap_line}/>
+                            <EditorToolbar wrap={this.wrap} wrap_line={this.wrap_line} insert={this.insert}/>
                         </span>
 
                     {view}
