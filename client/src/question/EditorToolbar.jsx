@@ -12,7 +12,7 @@ class EditorToolbar extends React.Component {
         this.props.wrap("_")
     }
     strikethrough = () => {
-        this.props.wrap("~")
+        this.props.wrap("~~")
     }
     code = () => {
         this.props.wrap("\n```\n")
