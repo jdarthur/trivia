@@ -377,7 +377,7 @@ func getQuestionIndex(session models.Session, roundIndex int, questionIndex int)
 	for i := 0; i <= roundIndex; i++ {
 		round := session.Rounds[i]
 		for j, _ := range round.Questions {
-			if questionIndex == j {
+			if roundIndex == i && questionIndex == j  {
 				return incr, nil
 			}
 			incr++
