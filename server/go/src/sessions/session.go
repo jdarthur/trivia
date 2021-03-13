@@ -194,7 +194,7 @@ func (e *Env) StartSession(c *gin.Context) {
 		return
 	}
 
-	err = _setCurrentRound(e, &existingSession, 0)
+	err = _setCurrentRound(e, &existingSession, 0, 0)
 
 	if err == nil {
 		err = common.IncrementState((*common.Env)(e), sessionId)

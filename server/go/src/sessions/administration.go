@@ -1,9 +1,9 @@
 package sessions
 
 import (
-	"github.com/jdarthur/trivia/common"
 	"fmt"
 	"github.com/gin-gonic/gin"
+	"github.com/jdarthur/trivia/common"
 	"github.com/jdarthur/trivia/models"
 )
 
@@ -96,8 +96,9 @@ func _setCurrentQuestion(e *Env, session *models.Session, questionIndex int, rou
 }
 
 type CurrentRoundRequest struct {
-	RoundIndex  int    `json:"round_id"`
-	ModeratorId string `json:"player_id"`
+	RoundIndex    int    `json:"round_id"`
+	QuestionIndex int    `json:"question_id"`
+	ModeratorId   string `json:"player_id"`
 }
 
 func (e *Env) SetCurrentRound(c *gin.Context) {
@@ -123,14 +124,14 @@ func (e *Env) SetCurrentRound(c *gin.Context) {
 		return
 	}
 
-	err = _setCurrentRound(e, &session, requestBody.RoundIndex)
+	err = _setCurrentRound(e, &session, requestBody.RoundIndex, requestBody.QuestionIndex)
 	if err == nil {
 		err = common.IncrementState((*common.Env)(e), sessionId)
 	}
 	common.Respond(c, session, err)
 }
 
-func _setCurrentRound(e *Env, session *models.Session, roundIndex int) error {
+func _setCurrentRound(e *Env, session *models.Session, roundIndex int, questionIndex int) error {
 
 	//can't set round index larger than session.Rounds length
 	if roundIndex >= len(session.Rounds) {
@@ -164,17 +165,8 @@ func _setCurrentRound(e *Env, session *models.Session, roundIndex int) error {
 		}
 	}
 
-	//err = common.Set((*common.Env)(e), common.SessionTable, models.IdAsString(session.ID), &session)
-	//if err != nil {
-	//return err
-	//}
-	fmt.Println("roundInSession after q update \n")
-	fmt.Printf("%+v\n\n", roundInSession)
-
 	session.Rounds[roundIndex] = roundInSession
-	fmt.Printf("%+v\n", session)
-
-	return _setCurrentQuestion(e, session, 0, round, &roundInSession)
+	return _setCurrentQuestion(e, session, questionIndex, round, &roundInSession)
 }
 
 func (e *Env) GetCurrentQuestion(c *gin.Context) {
@@ -294,7 +286,6 @@ func scoreQuestion(e *Env, c *gin.Context) (models.ScoreRequest, error) {
 		return models.ScoreRequest{}, err
 	}
 
-
 	questionInRound := session.Rounds[roundIndex].Questions[questionIndex]
 	rescore := questionInRound.Scored
 
@@ -388,7 +379,7 @@ func getQuestionIndex(session models.Session, roundIndex int, questionIndex int)
 }
 
 func splicePoints(pointsArray []float64, pointValue float64, index int, rescore bool) []float64 {
-	if !rescore && index >= (len(pointsArray) - 1) {
+	if !rescore && index >= (len(pointsArray)-1) {
 		return append(pointsArray, pointValue)
 	}
 	pointsArray[index] = pointValue

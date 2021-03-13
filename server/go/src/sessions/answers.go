@@ -34,6 +34,16 @@ func (e *Env) AnswerQuestion(c *gin.Context) {
 		return
 	}
 
+	err = checkValidRoundAndQuestionIndex(session, *answer.RoundIndex, *answer.QuestionIndex)
+	if err != nil {
+		common.Respond(c, nil, err)
+		return
+	}
+
+	if session.Rounds[*answer.RoundIndex].Questions[*answer.QuestionIndex].Scored {
+		common.Respond(c, nil, QuestionAlreadyScoredError{QuestionIndex: *answer.QuestionIndex})
+		return
+	}
 
 	availableWagers, err := getWagers(e, session, *answer.RoundIndex, models.PlayerId(answer.PlayerId))
 	if err != nil {

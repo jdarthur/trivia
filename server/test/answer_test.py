@@ -2,7 +2,8 @@ import random
 from pprint import pprint
 
 from .api_calls import (get_current_question, answer_question, get_current_round,
-                        get_answers, get_scoreboard, get_session, score_question, set_current_question)
+                        get_answers, get_scoreboard, get_session, score_question,
+                        set_current_question, set_current_round)
 from .test_helpers import DummySessionWithPlayers, has_errors
 
 
@@ -99,6 +100,26 @@ def create_score(mod, question_index, round_index, player_id, override=None) -> 
 #         answer_body['wager'] = 69
 #         answer = answer_question(session.session_id, answer_body)
 #         assert has_errors(answer) is True
+
+
+def test_answer_already_scored():
+    with DummySessionWithPlayers() as session:
+        session_id = session.session_id
+        mod = session.mod_id
+        player_id = session.players[0]
+
+        answer_body = compose_answer(session)
+        print(answer_body)
+        answer = answer_question(session_id, answer_body)
+        assert has_errors(answer) is False
+
+        score_body = create_score(mod, 0, 0, player_id, override=5)
+        score_question(session_id, score_body)
+
+        answer_body = compose_answer(session)
+        answer = answer_question(session_id, answer_body)
+        assert has_errors(answer) is True
+        assert "already scored" in answer["errors"]
 
 
 def test_successful_answer():
@@ -317,3 +338,47 @@ def test_rescore_answers():
             scoreboard = get_scoreboard(session_id, mod)
             pprint(scoreboard)
             assert get_score(scoreboard, player_id)["score"][i] == 5
+
+
+def test_multi_round():
+    with DummySessionWithPlayers(rounds=2, questions_per_round=2) as session:
+        session_id = session.session_id
+        mod = session.mod_id
+        player_id = session.players[0]
+
+        for roundIndex in range(0, 2):
+            for questionIndex in range(0, 2):
+                # answer question
+                answer_body = compose_answer(session)
+                answer_body["wager"] = questionIndex + 1
+                print(answer_body)
+                resp = answer_question(session_id, answer_body)
+                pprint(resp)
+                assert has_errors(resp) is False
+
+                # score question
+                score_body = create_score(mod, questionIndex, roundIndex, player_id)
+                resp = score_question(session_id, score_body)
+                pprint(resp)
+                assert has_errors(resp) is False
+
+                # set next question
+                if questionIndex == 0:
+                    set_current_question(session_id, mod, questionIndex + 1, roundIndex)
+                else:
+                    set_current_round(session_id, mod, roundIndex + 1, 0)
+
+        scoreboard = get_scoreboard(session_id, mod)
+        pprint(scoreboard)
+        assert get_score(scoreboard, player_id)["score"] == [1, 2, 1, 2]
+
+        for questionIndex in range(0, 2):
+            for roundIndex in range(0, 2):
+                # score question with override
+                score_body = create_score(mod, questionIndex, roundIndex, player_id, override=5)
+                score_question(session_id, score_body)
+
+                scoreboard = get_scoreboard(session_id, mod)
+                pprint(scoreboard)
+                totalIndex = roundIndex * 2 + questionIndex
+                assert get_score(scoreboard, player_id)["score"][totalIndex] == 5
