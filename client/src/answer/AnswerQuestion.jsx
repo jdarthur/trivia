@@ -69,6 +69,7 @@ class AnswerQuestion extends React.Component {
         const button_class = this.sendable() ? "" : "disabled"
         const send_text = this.state.answered ? "Update" : "Answer"
         return (
+            this.props.player_id ?
             <Card style={{ width: 'min(400px, 100%)', marginTop: 15}} bodyStyle={{ padding: 15 }}  >
                 <TextArea placeholder="Your answer" value={this.state.answer}
                     onChange={this.set_answer} autoSize={{ minRows: 3 }}
@@ -82,6 +83,7 @@ class AnswerQuestion extends React.Component {
                         onClick={this.send} disabled={!this.sendable()}> {send_text} </Button>
                 </div>
             </Card>
+            : null
         );
     }
 }

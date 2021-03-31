@@ -10,7 +10,6 @@ import (
 	"github.com/globalsign/mgo/bson"
 	"github.com/go-playground/validator"
 	"github.com/jdarthur/trivia/models"
-	"log"
 	"net/http"
 	"reflect"
 	"strings"
@@ -287,7 +286,7 @@ func Respond(c *gin.Context, data interface{}, err error) {
 
 		default:
 			fmt.Println(reflect.TypeOf(err))
-			log.Fatal(err)
+			fmt.Printf("ERROR: %+v", err)
 		}
 	} else {
 		c.JSON(http.StatusOK, data)
