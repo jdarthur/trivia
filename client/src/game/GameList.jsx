@@ -145,7 +145,7 @@ class GameList extends React.Component {
     add_new_game = () => {
 
         const today = new Date()
-        const label = today.getDay() + " " + today.toLocaleString('default', {month: 'long'}) + " " + today.getFullYear()
+        const label = today.getDate() + " " + today.toLocaleString('default', {month: 'long'}) + " " + today.getFullYear()
 
         const game = {
             [NAME]: label,
