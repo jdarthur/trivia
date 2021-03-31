@@ -98,16 +98,19 @@ class EditQuestionModal extends React.Component {
             const selectionEnd = activeElement.selectionEnd
 
             if (activeElement.id === QUESTION) {
-                const lines = this.props.question.split("\n")
-                console.log(lines)
                 let value = this.props.question.slice(0, selectionStart)
-                lines.forEach( line => value += [wrapWithBefore, line, wrapWithAfter ? wrapWithAfter : ""].join(""))
+                const selected = this.props.question.slice(selectionStart, selectionEnd)
+                const selected_lines = selected.split("\n")
+
+                selected_lines.forEach( line => value += [wrapWithBefore, line, wrapWithAfter ? wrapWithAfter : ""].join(""))
                 this.props.set(QUESTION, value + this.props.question.slice(selectionEnd))
             }
             if (activeElement.id === ANSWER) {
-                const lines = this.props.answer.split("\\n")
                 let value = this.props.answer.slice(0, selectionStart)
-                lines.forEach( line => value += [wrapWithBefore, line, wrapWithAfter ? wrapWithAfter : ""].join(""))
+                const selected = this.props.answer.slice(selectionStart, selectionEnd)
+                const selected_lines = selected.split("\n")
+
+                selected_lines.forEach( line => value += [wrapWithBefore, line, wrapWithAfter ? wrapWithAfter : ""].join(""))
                 this.props.set(ANSWER, value + this.props.answer.slice(selectionEnd))
             }
         }
