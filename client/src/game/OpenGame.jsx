@@ -1,16 +1,22 @@
 import React from 'react';
 import '../round/OpenRound.css';
-import AddRoundsModal from './AddRoundsModal';
+import AddRounds from './AddRounds';
 import RemovableRoundsList from "./RemovableRoundsList"
 
-import { Collapse, Button } from 'antd';
-const { Panel } = Collapse;
+import {Button, Modal, Tabs} from 'antd';
+
+const {TabPane} = Tabs;
 
 const NAME = "name"
 const ROUNDS = "rounds"
 const ROUND_NAMES = "round_names"
 
 class OpenGame extends React.Component {
+
+    state = {
+        tab: 1,
+        selected_rounds: []
+    }
 
     set_name = (event) => {
         this.props.set(this.props.id, NAME, event.target.value, false)
@@ -20,15 +26,20 @@ class OpenGame extends React.Component {
         this.props.set_round_name(this.props.id, round_id, name)
     }
 
-    add_rounds = (rounds_list) => {
-        for (let i = 0; i < rounds_list.length; i++) {
-            this.props.round_names[rounds_list[i]] = "Round " + (i + 1)
+    set_rounds = (rounds_list) => {
+        this.setState({selected_rounds: rounds_list})
+    }
+
+    add_rounds = (close) => {
+        for (let i = 0; i < this.state.selected_rounds.length; i++) {
+            this.props.round_names[this.state.selected_rounds[i]] = "Round " + (i + 1)
         }
         const update = {
-            [ROUNDS]: this.props.rounds.concat(rounds_list),
+            [ROUNDS]: this.props.rounds.concat(this.state.selected_rounds),
             [ROUND_NAMES]: this.props.round_names
         }
-        this.props.set_multi(this.props.id, update, true)
+        this.props.set_multi(this.props.id, update, close, close)
+        this.setState({selected_rounds: []})
     }
 
     remove_rounds = (rounds_list) => {
@@ -51,7 +62,11 @@ class OpenGame extends React.Component {
         this.props.delete(this.props.id)
     }
 
-    save_self = () => {
+    save_and_close = () => {
+        if (this.state.selected_rounds.length > 0) {
+            this.add_rounds(true)
+            return
+        }
         this.props.set_selected("")
     }
 
@@ -62,37 +77,56 @@ class OpenGame extends React.Component {
         }
     }
 
-    render() {
+    switch = (newTab) => {
+        if (newTab === "edit") {
+            this.add_rounds()
+        }
+    }
 
+    render() {
+        const footer = <div className="save-delete">
+            <Button onClick={this.delete_self} className="button" danger> Delete game </Button>
+            <Button type="primary" onClick={this.save_and_close} className="button"> Save </Button>
+        </div>
 
         return (
-            <div className="open-round">
+            <Modal
+                title="Edit Game"
+                visible={true}
+                width="70vw"
+                footer={footer}
+                onCancel={this.save_and_close}>
 
-                <div className="open-header"> Edit Game </div>
-                <div className="current-questions">
-                    <input className="round-name" value={this.props.name}
-                        onChange={this.set_name} onKeyDown={this.handleKeyPress} placeholder="Game name" />
-                    <AddRoundsModal rounds={this.props.rounds} add_rounds={this.add_rounds} />
+                <div className="rem-question-list">
+                    <div>
+                        <Tabs defaultActiveKey="1" onChange={this.switch}>
+                            <TabPane tab="Edit" key="edit" type="card">
+                                <div>
+                                    <input autoFocus className="round-name" value={this.props.name}
+                                           onChange={this.set_name} onKeyDown={this.handleKeyPress}
+                                           placeholder="Game name"/>
+
+                                    <RemovableRoundsList rounds={this.props.rounds}
+                                                         remove_rounds={this.remove_rounds}
+                                                         set_round_name={this.set_round_name}
+                                                         round_names={this.props.round_names}
+                                                         handleKeyPress={this.handleKeyPress}/>
+                                </div>
+                            </TabPane>
+
+                            <TabPane tab="Add Rounds" key="add_rounds">
+                                <AddRounds rounds={this.props.rounds}
+                                           selected_rounds={this.state.selected_rounds}
+                                           set_rounds={this.set_rounds} />
+                            </TabPane>
+                        </Tabs>
+                    </div>
                 </div>
-
-                <Collapse defaultActiveKey={['1']}
-                    style={{ width: "100%", 'border-left': 0, 'border-right': 0 }}>
-                    <Panel header="Rounds" key="1">
-                        <RemovableRoundsList rounds={this.props.rounds} remove_rounds={this.remove_rounds}
-                            set_round_name={this.set_round_name} round_names={this.props.round_names}
-                            handleKeyPress={this.handleKeyPress} />
-                    </Panel>
-                </Collapse>
-
-                <div className="save-delete">
-                    <Button onClick={this.delete_self} className="button" danger> Delete game </Button>
-                    <Button type="primary" onClick={this.save_self} className="button" > Save </Button>
-                </div>
-
-            </div>
+            </Modal>
 
 
-        );
+        )
+            ;
     }
 }
 

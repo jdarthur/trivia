@@ -1,10 +1,11 @@
 package sessions
 
 import (
-	"common"
+	"github.com/jdarthur/trivia/common"
 	"github.com/gin-gonic/gin"
 	"github.com/globalsign/mgo/bson"
-	"models"
+	"github.com/jdarthur/trivia/models"
+	"time"
 )
 
 type Env common.Env
@@ -13,7 +14,6 @@ func (e *Env) GetAllSessions(c *gin.Context) {
 	sessions, err := common.GetAll((*common.Env)(e), common.SessionTable, nil)
 	common.Respond(c, gin.H{"sessions": sessions}, err)
 }
-
 
 func (e *Env) GetOneSession(c *gin.Context) {
 	sessionId := c.Param("id")
@@ -53,7 +53,7 @@ func (e *Env) CreateSession(c *gin.Context) {
 	}
 
 	err = checkLegalSetFields(session)
-	if err !=  nil {
+	if err != nil {
 		common.Respond(c, nil, err)
 		return
 	}
@@ -79,6 +79,7 @@ func (e *Env) CreateSession(c *gin.Context) {
 	session.ID = sessionId
 	session.CreateDate = createDate
 
+	err = common.IncrementState((*common.Env)(e), models.IdAsString(sessionId))
 	common.Respond(c, session, err)
 }
 
@@ -108,7 +109,7 @@ func (e *Env) UpdateSession(c *gin.Context) {
 	}
 
 	err = checkLegalSetFields(requestBody)
-	if err !=  nil {
+	if err != nil {
 		common.Respond(c, nil, err)
 		return
 	}
@@ -121,7 +122,6 @@ func (e *Env) UpdateSession(c *gin.Context) {
 	err = common.Set((*common.Env)(e), common.SessionTable, sessionId, &session)
 	common.Respond(c, session, err)
 }
-
 
 func (e *Env) DeleteSession(c *gin.Context) {
 	sessionId := c.Param("id")
@@ -143,11 +143,11 @@ func (e *Env) DeleteSession(c *gin.Context) {
 	common.Respond(c, existingSession, err)
 }
 
-
 type SessionActionRequest struct {
 	ModeratorId string `json:"player_id"`
 }
-func (e * Env) StartSession(c *gin.Context) {
+
+func (e *Env) StartSession(c *gin.Context) {
 	sessionId := c.Param("id")
 
 	var requestBody SessionActionRequest
@@ -194,14 +194,20 @@ func (e * Env) StartSession(c *gin.Context) {
 		return
 	}
 
-	err = _setCurrentRound(e, &existingSession, 0)
+	err = _setCurrentRound(e, &existingSession, 0, 0)
+
+	if err == nil {
+		err = common.IncrementState((*common.Env)(e), sessionId)
+	}
 	common.Respond(c, existingSession, err)
 }
-
 
 func getSessionAsPlayer(session *models.Session, playerId string) models.Session {
 	session.GameId = ""
 	session.Moderator = ""
+	session.Players = nil
+	session.Rounds = nil
+	session.Scoreboard = nil
 	return *session
 }
 
@@ -271,7 +277,7 @@ func (e *Env) GetPlayersInSession(c *gin.Context) {
 		return
 	}
 
-	players, err:= getPlayersInSession(e, session)
+	players, err := getPlayersInSession(e, session)
 
 	//strip playerIds if called by non-mod
 	if models.PlayerId(callerPlayerId) != session.Moderator {
@@ -297,4 +303,33 @@ func getPlayersInSession(e *Env, session models.Session) ([]models.Player, error
 	return sessionPlayers, nil
 }
 
+func (e *Env) GetSessionState(c *gin.Context) {
+	sessionId := c.Param("id")
+	requestState := c.Query("current")
+	if requestState == "" {
+		time.Sleep(3 * time.Second)
+	}
 
+	sleepTime := 500 * time.Millisecond
+	timeout := 90 * time.Second
+	totalAttempts := timeout.Milliseconds() / sleepTime.Milliseconds()
+
+	attempts := int64(0)
+	for attempts < totalAttempts {
+
+		dbState, err := common.GetState((*common.Env)(e), sessionId)
+		if err != nil {
+			common.Respond(c, nil, err)
+			return
+		}
+
+		if requestState != dbState {
+			common.Respond(c, gin.H{"state": dbState, "wait_ms": attempts * sleepTime.Milliseconds()}, nil)
+			return
+		}
+
+		time.Sleep(sleepTime)
+		attempts += 1
+	}
+	common.Respond(c, gin.H{"state": requestState}, nil)
+}

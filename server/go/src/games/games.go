@@ -1,11 +1,11 @@
 package games
 
 import (
-	"common"
 	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/globalsign/mgo/bson"
-	"models"
+	"github.com/jdarthur/trivia/common"
+	"github.com/jdarthur/trivia/models"
 )
 
 type Env common.Env
@@ -157,8 +157,6 @@ func (e *Env) validateRoundNamesAndRoundIds(updateBody models.Game) error {
 		return InvalidRoundNameLengthError{RoundNameLength: len(updateBody.RoundNames), RoundsLength: len(updateBody.Rounds)}
 	}
 
-
-
 	//wagers cannot be 0 or negative
 	for _, roundId := range updateBody.Rounds {
 
@@ -230,12 +228,11 @@ func (e *Env) merge(update *models.Game, original *models.Game) error {
 	//if Rounds or RoundNames len is zero, clear out both fields.
 	if len(update.Rounds) == 0 || len(update.RoundNames) == 0 {
 		original.Rounds = make([]string, 0)
-		original.RoundNames =  make(map[string]string)
+		original.RoundNames = make(map[string]string)
 	}
 
 	return nil
 }
-
 
 //for each roundId in update,
 // if not in existing Rounds: [...], add it to round's Games: [...]

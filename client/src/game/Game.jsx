@@ -9,7 +9,7 @@ import { Card } from 'antd';
 
 class Game extends React.Component {
   set_selected = () => {
-    this.props.set_selected(this.props.id, !this.props.selected)
+    this.props.set_selected(this.props.id)
   }
 
   render() {

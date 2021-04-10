@@ -1,11 +1,11 @@
 package rounds
 
 import (
-	"common"
 	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/globalsign/mgo/bson"
-	"models"
+	"github.com/jdarthur/trivia/common"
+	"github.com/jdarthur/trivia/models"
 	"strings"
 )
 
@@ -69,7 +69,7 @@ func (e *Env) CreateRound(c *gin.Context) {
 
 	//games: [...] cannot be set by this API (indirectly on a round in the games API)
 	if len(data.Games) != 0 {
-		common.Respond(c, data, models.AttemptedToSetError{IllegalField: models.Games, Value:  data.Games})
+		common.Respond(c, data, models.AttemptedToSetError{IllegalField: models.Games, Value: data.Games})
 		return
 	}
 
@@ -176,7 +176,6 @@ func (e *Env) DeleteRound(c *gin.Context) {
 		}
 	}
 
-
 	//TODO: remove this roundId from rounds on all downstream games
 
 	common.Respond(c, existingRound, err)
@@ -252,7 +251,6 @@ func (e *Env) merge(update *models.Round, original *models.Round) error {
 
 	return e.updateRoundsUsedInQuestions(update.Questions, original)
 }
-
 
 //for each questionId in update,
 // if not in existing questions list, add it to question's rounds_used

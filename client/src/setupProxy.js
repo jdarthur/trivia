@@ -15,4 +15,5 @@ console.log("gameplay: " + GAMEPLAY_PORT)
 module.exports = function(app) {
   app.use('/editor', createProxyMiddleware({ target: 'http://' + EDITOR_HOST + ':' + EDITOR_PORT}));
   app.use('/gameplay', createProxyMiddleware({ target: 'http://' + GAMEPLAY_HOST + ':' + GAMEPLAY_PORT}));
+  app.use('/images', createProxyMiddleware({ target: 'http://' + EDITOR_HOST + ':' + EDITOR_PORT}));
 };

@@ -1,7 +1,7 @@
 package games
 
 import (
-	"models"
+	"github.com/jdarthur/trivia/models"
 	"strconv"
 )
 

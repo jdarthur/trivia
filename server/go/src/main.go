@@ -2,16 +2,16 @@ package main
 
 import (
 	"fmt"
-	"games"
 	"github.com/gin-gonic/gin"
 	"github.com/globalsign/mgo"
+	"github.com/jdarthur/trivia/games"
+	"github.com/jdarthur/trivia/players"
+	"github.com/jdarthur/trivia/questions"
+	"github.com/jdarthur/trivia/rounds"
+	"github.com/jdarthur/trivia/sessions"
 	"github.com/joho/godotenv"
 	"log"
 	"os"
-	"players"
-	"questions"
-	"rounds"
-	"sessions"
 )
 
 func main() {
@@ -32,7 +32,6 @@ func main() {
 		mongoPort = "27017"
 	}
 
-
 	mongoAddress := "mongodb://" + mongoHost + ":" + mongoPort
 	client, err := mgo.Dial(mongoAddress)
 	if err != nil {
@@ -40,7 +39,14 @@ func main() {
 		log.Fatal(err)
 	}
 
+	imageDir := os.Getenv("IMAGE_DIR")
+	if len(imageDir) == 0 {
+		imageDir = "images"
+	}
+	_ = os.Mkdir(imageDir, os.ModeDir)
+
 	router := gin.Default()
+	router.Static("/images", imageDir)
 
 	fmt.Println("\nQuestions API:")
 	q := questions.Env{Db: client}
@@ -49,6 +55,7 @@ func main() {
 	router.POST("/editor/question", q.CreateQuestion)
 	router.PUT("/editor/question/:id", q.UpdateQuestion)
 	router.DELETE("/editor/question/:id", q.DeleteQuestion)
+	router.POST("/editor/image", q.UploadImage)
 
 	fmt.Println("\nRounds API:")
 	r := rounds.Env{Db: client}
@@ -69,7 +76,7 @@ func main() {
 	fmt.Println("\nSession API:")
 	s := sessions.Env{Db: client}
 	//router.GET("/gameplay/sessions",s.GetAllSessions)
-	router.GET("/gameplay/session/:id",s.GetOneSession)
+	router.GET("/gameplay/session/:id", s.GetOneSession)
 	router.GET("/gameplay/session/:id/scoreboard", s.GetSessionScoreboard)
 	router.POST("/gameplay/session", s.CreateSession)
 	router.PUT("/gameplay/session/:id", s.UpdateSession)
@@ -83,10 +90,16 @@ func main() {
 	router.PUT("/gameplay/session/:id/current-question", s.SetCurrentQuestion)
 	router.GET("/gameplay/session/:id/current-question", s.GetCurrentQuestion)
 	router.PUT("/gameplay/session/:id/score", s.ScoreQuestion)
+	router.GET("/gameplay/session/:id/wagers", s.GetWagers)
+	router.GET("/gameplay/session/:id/state", s.GetSessionState)
 
 	fmt.Println("\nAnswer API:")
 	router.POST("/gameplay/session/:id/answer", s.AnswerQuestion)
 	router.GET("/gameplay/session/:id/answers", s.GetAnswers)
+
+	fmt.Println("\nHot-edit API:")
+	router.PUT("/gameplay/session/:id/hot-edit-question", s.WithValidSession, s.AsMod, s.HotEditQuestion)
+	router.PUT("/gameplay/session/:id/hot-edit-round-name", s.WithValidSession, s.AsMod, s.HotEditRoundName)
 
 	fmt.Println("\nPlayer API:")
 	p := players.Env{Db: client}
@@ -99,4 +112,8 @@ func main() {
 
 	fmt.Println()
 	router.Run()
+}
+
+func createImageDirIfNotExists() {
+
 }

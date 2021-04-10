@@ -2,7 +2,7 @@ from pprint import pprint
 # from editor_server import (delete_question, get_question,
                            # update_question, get_questions)
 from .test_helpers import dummy_question, object_with_id_in_list, has_errors, DummyQuestion
-from .api_calls import create_question, get_question, get_questions, update_question, delete_question
+from .api_calls import create_question, get_question, get_questions, update_question, delete_question, create_round, delete_round
 
 
 def create_and_print(data):
@@ -103,6 +103,12 @@ def test_create_with_extra_fields():
 
 
 def test_get_questionss_with_exclusion_filter():
+    q = {"question": "test1234", "answer": "answer", "category": "birds", "extra1": "something"}
+    created_q = create_question(q)
+
+    r = {"name": "f", "questions": [created_q["id"]], "wagers": [1]}
+    created_r = create_round(r)
+
     print("\nTEST: get rounds with filtering")
     questions = get_questions(unused_only=False)
     all_questions_len = len(questions)
@@ -113,6 +119,9 @@ def test_get_questionss_with_exclusion_filter():
     filtered_questions_len = len(questions)
     print(f"all rounds ({filtered_questions_len}):")
     pprint(questions)
+
+    delete_question(created_q["id"])
+    delete_round(created_r["id"])
 
     assert all_questions_len > filtered_questions_len
 

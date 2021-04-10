@@ -1,9 +1,9 @@
 package sessions
 
 import (
-	"common"
+	"github.com/jdarthur/trivia/common"
 	"github.com/gin-gonic/gin"
-	"models"
+	"github.com/jdarthur/trivia/models"
 )
 
 func (e *Env) GetSessionScoreboard(c *gin.Context) {

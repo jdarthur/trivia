@@ -79,3 +79,30 @@ blockquote {
 	padding-left: 10px;
 	font-style: italic;
 }
+
+.editor-toolbar-button {
+	font-family: Georgia, serif;
+	font-size: 1.2em;
+	width: 30px;
+	border-radius: 2px;
+	background: white;
+	margin-right: 5px;
+	cursor: pointer;
+	border: 1px solid white
+}
+
+.editor-toolbar-button:hover {
+	color: #1890ff;
+}
+
+.editor-toolbar-button:active {
+	outline : 0;
+	-moz-outline : 0;
+	border : 0
+}
+
+.editor-toolbar-button:focus {
+	outline : 0;
+	-moz-outline : 0;
+	border : 0
+}

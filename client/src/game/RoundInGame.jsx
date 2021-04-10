@@ -2,6 +2,11 @@ import React from 'react';
 import "./OpenGame.css"
 import QuestionInRound from "./QuestionInRound"
 
+import {Card, Collapse} from 'antd'
+import {PlusSquareOutlined} from "@ant-design/icons";
+
+const {Panel} = Collapse;
+
 /**
  * This is a round inside of an open game. It shows
  * its questions and can be deleted from the game.
@@ -34,31 +39,44 @@ class RoundInGame extends React.Component {
             })
     }
 
-    select_self = () => {
-        this.props.select(this.props.id)
-    }
-
     remove_self = () => {
         this.props.remove(this.props.id)
     }
 
+    select_self = () => {
+        this.props.select(this.props.id)
+    }
+
+
     render() {
         const questions = this.state.questions.map((question_id) => (
-            <QuestionInRound key={question_id} id={question_id} />))
+            <QuestionInRound key={question_id} id={question_id}/>))
 
-        const containerClass = "round-and-index"
-        const subContainerClass = (this.props.show_title ? "round-in-game" : "") + (this.props.selected ? " selected" : "")
+        let border = ""
+        let extra = null
+        if (this.props.addable) {
+            extra = <PlusSquareOutlined style={{fontSize: "1.5em"}} onClick={this.select_self}/>
+            border = this.props.selected ? "2px solid black" : ""
+        }
+
+
+
         return (
-            <div className={containerClass}>
-                <div className={subContainerClass} onClick={this.select_self}>
-                    {this.props.show_title ? <div className="round-title"> {this.state.round_name}: </div> : null}
-                    {questions.length > 0 ? questions : (<div className="empty-round">no questions</div>)}
-                </div>
-                {this.props.index !== -1 && this.props.index !== undefined ? this.props.index + 1 : null}
-            </div>
-
-        );
+            <div>
+                <Card title={this.props.show_title ? this.state.round_name : null} size="small"
+                      style={{width: 225, margin: 5, border: border}} bodyStyle={{padding: 0}} extra={extra}>
+                    <Collapse defaultActiveKey={['1']}>
+                        <Panel header={questions.length + " Questions "} key="3">
+                            <div>
+                                {questions.length > 0 ? questions : (
+                                    <div className="empty-round"> No questions </div>)}
+                            </div>
+                        </Panel>
+                    </Collapse>
+                </Card>
+            </div>)
     }
 }
+
 
 export default RoundInGame

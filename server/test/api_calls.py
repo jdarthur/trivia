@@ -176,6 +176,7 @@ def start_session(session_id, admin_id):
 
 
 def set_current_question(session_id, admin_id, question_id, round_id):
+    print(f"set round {round_id}, question {question_id}")
     url = f"{base_url}/gameplay/session/{session_id}/current-question"
     data = {
         "player_id": admin_id,
@@ -195,6 +196,18 @@ def get_current_question(session_id):
 def get_current_round(session_id):
     url = f"{base_url}/gameplay/session/{session_id}/current-round"
     r = requests.get(url)
+    return r.json()
+
+
+def set_current_round(session_id: str, admin_id: str, round_id: int, question_id=0):
+    print(f"set round {round_id}, question {question_id}")
+    url = f"{base_url}/gameplay/session/{session_id}/current-round"
+    data = {
+        "player_id": admin_id,
+        "question_id": question_id,
+        "round_id": round_id
+    }
+    r = requests.put(url, json=data)
     return r.json()
 
 
@@ -234,7 +247,7 @@ def get_player(player_id):
 def get_players_in_session(session_id, mod=None):
     url = f"{base_url}/gameplay/session/{session_id}/players"
     if mod is not None:
-        url += f"?mod={mod}"
+        url += f"?player_id={mod}"
     r = requests.get(url)
     return r.json()["players"]
 

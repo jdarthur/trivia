@@ -9,8 +9,7 @@ import (
 	"github.com/globalsign/mgo"
 	"github.com/globalsign/mgo/bson"
 	"github.com/go-playground/validator"
-	"log"
-	"models"
+	"github.com/jdarthur/trivia/models"
 	"net/http"
 	"reflect"
 	"strings"
@@ -24,6 +23,7 @@ var GameTable = "game"
 var SessionTable = "session"
 var PlayerTable = "player"
 var AnswerTable = "answer"
+var SessionStateTable = "session_state"
 
 type Env struct {
 	Db *mgo.Session
@@ -249,8 +249,6 @@ func Delete(e *Env, objectType string, objectId string) error {
 //
 // throws InvalidUUIDError
 func byId(id string) (bson.Binary, error) {
-	fmt.Println(id)
-
 	q123 := strings.Replace(id, "-", "", -1)
 	objectId, err := hex.DecodeString(q123)
 	if err != nil {
@@ -288,7 +286,7 @@ func Respond(c *gin.Context, data interface{}, err error) {
 
 		default:
 			fmt.Println(reflect.TypeOf(err))
-			log.Fatal(err)
+			fmt.Printf("ERROR: %+v", err)
 		}
 	} else {
 		c.JSON(http.StatusOK, data)
@@ -330,4 +328,41 @@ func IsValidRound(e *Env, roundId string) (interface{}, error) {
 		return nil, NonexistentIdError{ID: roundId, RecordType: RoundTable}
 	}
 	return data, nil
+}
+
+type SessionState struct {
+	SessionId string      `bson:"session_id"`
+	State     bson.Binary `bson:"state"`
+}
+
+func GetState(e *Env, sessionId string) (sessionState string, err error) {
+
+	collection := e.Db.DB(Database).C(SessionStateTable)
+
+	//find matching item
+	var state SessionState
+	err = collection.Find(bson.M{"session_id": sessionId}).One(&state)
+	if err != nil {
+		if err == mgo.ErrNotFound {
+			return "", NonexistentIdError{RecordType: SessionStateTable, ID: sessionId}
+		}
+		return "", err
+	}
+
+	return models.IdAsString(state.State), nil
+}
+
+func IncrementState(e *Env, sessionId string) (err error) {
+	newStateId, err := models.NewId()
+	if err != nil {
+		return err
+	}
+
+	var newState SessionState
+	newState.SessionId = sessionId
+	newState.State = newStateId
+
+	collection := e.Db.DB(Database).C(SessionStateTable)
+	_, err = collection.Upsert(bson.M{"session_id": sessionId}, newState)
+	return err
 }

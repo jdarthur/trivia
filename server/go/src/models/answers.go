@@ -13,13 +13,13 @@ var Wager = "wager"
 type Answer struct {
 	ID            bson.Binary `bson:"_id" json:"id"`
 	CreateDate    time.Time   `bson:"create_date" json:"create_date"`
-	QuestionIndex *int        `bson:"-" json:"question_id" binding:"required"`
-	RoundIndex    *int        `bson:"-" json:"round_id" binding:"required"`
-	PlayerId      string      `bson:"player_id" json:"player_id" binding:"required"`
+	QuestionIndex *int        `bson:"-" json:"question_id,omitempty" binding:"required"`
+	RoundIndex    *int        `bson:"-" json:"round_id,omitempty" binding:"required"`
+	PlayerId      PlayerId    `bson:"player_id" json:"player_id" binding:"required"`
 	Answer        string      `bson:"answer" json:"answer" binding:"required"`
 	Wager         int         `bson:"wager" json:"wager" binding:"required"`
 	Correct       bool        `bson:"correct" json:"correct,omitempty"`
-	PointsAwarded float64 `bson:"points_awarded" json:"points_awarded,omitempty"`
+	PointsAwarded float64     `bson:"points_awarded" json:"points_awarded,omitempty"`
 }
 
 func (a Answer) SetCreateDate(createDate time.Time) Object {
@@ -63,14 +63,15 @@ type AnswersResponseScored struct {
 }
 
 type ScoredTeam struct {
-	TeamName string   `json:"team_name"`
-	Icon     string   `json:"icon"`
-	PlayerId PlayerId `json:"player_id,omitempty"`
-	Answers  []ScoredAnswer
+	TeamName string         `json:"team_name"`
+	Icon     string         `json:"icon"`
+	PlayerId PlayerId       `json:"player_id,omitempty"`
+	Answers  []ScoredAnswer `json:"answers"`
 }
 
 type ScoredAnswer struct {
-	Wager         int         `json:"wager"`
-	Correct       bool        `json:"correct"`
+	Wager         int     `json:"wager"`
+	Correct       bool    `json:"correct"`
 	PointsAwarded float64 `json:"points_awarded"`
+	Answer        string  `json:"answer""`
 }

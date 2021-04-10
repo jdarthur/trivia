@@ -17,7 +17,7 @@ class FormattedQuestion extends React.Component {
         return (
             <div>
                 <ReactMarkdown source={this.props.question} renderers={renderers} />
-                <ReactMarkdown source={this.props.answer} className="answer" />
+                <ReactMarkdown source={this.props.answer} renderers={renderers} className="answer" />
             </div>
         );
     }

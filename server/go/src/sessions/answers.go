@@ -1,10 +1,10 @@
 package sessions
 
 import (
-	"common"
+	"github.com/jdarthur/trivia/common"
 	"fmt"
 	"github.com/gin-gonic/gin"
-	"models"
+	"github.com/jdarthur/trivia/models"
 	"strconv"
 )
 
@@ -34,6 +34,16 @@ func (e *Env) AnswerQuestion(c *gin.Context) {
 		return
 	}
 
+	err = checkValidRoundAndQuestionIndex(session, *answer.RoundIndex, *answer.QuestionIndex)
+	if err != nil {
+		common.Respond(c, nil, err)
+		return
+	}
+
+	if session.Rounds[*answer.RoundIndex].Questions[*answer.QuestionIndex].Scored {
+		common.Respond(c, nil, QuestionAlreadyScoredError{QuestionIndex: *answer.QuestionIndex})
+		return
+	}
 
 	availableWagers, err := getWagers(e, session, *answer.RoundIndex, models.PlayerId(answer.PlayerId))
 	if err != nil {
@@ -60,11 +70,40 @@ func (e *Env) AnswerQuestion(c *gin.Context) {
 	spot := fmt.Sprintf("%v.%v.%v.%v.%v.%v", models.Rounds, *answer.RoundIndex, models.Questions, *answer.QuestionIndex, models.Answers, answer.PlayerId)
 	err = common.Push((*common.Env)(e), common.SessionTable, sessionId, spot, models.IdAsString(answerId))
 
-	common.Respond(c, answer, err)
+	if err == nil {
+		err = common.IncrementState((*common.Env)(e), sessionId)
+	}
 
+	common.Respond(c, answer, err)
+}
+
+
+func (e *Env) GetWagers(c *gin.Context) {
+	sessionId := c.Param("id")
+	playerId := c.Query("player_id")
+	r := c.Query("round_id")
+
+	roundIndex, err := strconv.Atoi(r)
+	if err != nil {
+		common.Respond(c, nil, InvalidRoundIndexError{RoundIndex: r})
+		return
+	}
+
+	var session models.Session
+	err = common.GetOne((*common.Env)(e), common.SessionTable, sessionId, &session)
+	if err != nil {
+
+	}
+
+	wagers, err := getWagers(e, session, roundIndex, models.PlayerId(playerId))
+	common.Respond(c, wagers, err)
 }
 
 func getWagers(e *Env, session models.Session, roundIndex int, playerId models.PlayerId) ([]int, error) {
+	if !playerInSession(session, playerId) {
+
+	}
+
 	round := session.Rounds[roundIndex]
 	allWagers := round.Wagers
 	for _, question := range round.Questions {
@@ -111,7 +150,7 @@ func getAnswers(e *Env, c *gin.Context) (interface{}, error) {
 	}
 
 	if models.PlayerId(callerPlayerId) == session.Moderator {
-		return retrieveAllAnswers(e, session, roundIndex, questionIndex)
+		return getAnswersAsMod(e, session, roundIndex, questionIndex)
 	}
 
 	question := session.Rounds[roundIndex].Questions[questionIndex]
@@ -157,7 +196,7 @@ func getAnswersUnscored(e *Env, session models.Session, roundIndex int, question
 		p.TeamName = player.TeamName
 		p.Icon = player.Icon
 
-		if _, ok := playerAnswers[p.PlayerId]; ok {
+		if _, ok := playerAnswers[thisPlayerId]; ok {
 			p.Answered = true
 		}
 
@@ -173,6 +212,7 @@ func getAnswersScored(e *Env, session models.Session, roundIndex int, questionIn
 		return models.AnswersResponseScored{}, err
 	}
 	var response models.AnswersResponseScored
+	response.Scored = true
 	for _, player := range players {
 		var team models.ScoredTeam
 		playerId := models.PlayerId(models.IdAsString(player.ID))
@@ -193,25 +233,35 @@ func getAnswersScored(e *Env, session models.Session, roundIndex int, questionIn
 
 		for _, answer := range thisPlayersAnswers {
 			var a models.ScoredAnswer
+			a.Answer = answer.Answer
 			a.Wager = answer.Wager
 			a.Correct = answer.Correct
 			a.PointsAwarded = answer.PointsAwarded
 			team.Answers = append(team.Answers, a)
 		}
+
 		response.Answers = append(response.Answers, team)
+
 	}
 
 	return response, nil
 }
 
-type RawAnswers struct {
+type AnswersAsMod struct {
 	Scored bool `json:"scored"`
-	Answers map[models.PlayerId][]models.Answer `json:"answers"`
+	Answers []IndividualAnswerAsMod `json:"answers"`
 }
 
-func retrieveAllAnswers(e *Env, session models.Session, roundIndex int, questionIndex int) (RawAnswers, error) {
-	var answers RawAnswers
-	answers.Answers = make(map[models.PlayerId][]models.Answer)
+type IndividualAnswerAsMod struct {
+	PlayerId models.PlayerId `json:"player_id"`
+	TeamName string `json:"team_name"`
+	Answered bool `json:"answered"`
+	Answers []models.Answer `json:"answers"`
+}
+
+func getAnswersAsMod(e *Env, session models.Session, roundIndex int, questionIndex int) (AnswersAsMod, error) {
+	var answers AnswersAsMod
+	answers.Answers = make([]IndividualAnswerAsMod, 0)
 	players, err := getPlayersInSession(e, session)
 	if err != nil {
 		return answers, err
@@ -219,7 +269,11 @@ func retrieveAllAnswers(e *Env, session models.Session, roundIndex int, question
 
 	for _, player := range players {
 		playerId := models.PlayerId(models.IdAsString(player.ID))
-		answers.Answers[playerId] = make([]models.Answer, 0)
+
+		var teamAnswer IndividualAnswerAsMod
+		teamAnswer.PlayerId = playerId
+		teamAnswer.TeamName = player.TeamName
+		teamAnswer.Answers = make([]models.Answer, 0)
 
 		fmt.Printf("player ID inside get answers: %v\n", playerId)
 		playerAnswers := session.Rounds[roundIndex].Questions[questionIndex].PlayerAnswers
@@ -227,40 +281,37 @@ func retrieveAllAnswers(e *Env, session models.Session, roundIndex int, question
 		if answerIds, ok := playerAnswers[playerId]; ok {
 			answerContents, err := retrieveAnswersForPlayer(e, answerIds)
 			if err != nil {
-				return RawAnswers{}, nil
+				return AnswersAsMod{}, nil
 			}
+			teamAnswer.Answered = len(answerContents) > 0
 			for _, individualAnswer := range answerContents {
-				answers.Answers[playerId] = append(answers.Answers[playerId], individualAnswer)
+				teamAnswer.Answers = append(teamAnswer.Answers, individualAnswer)
 				fmt.Println(answers)
 			}
 		}
+
+		answers.Answers = append(answers.Answers, teamAnswer)
 	}
 
 	return answers, nil
 }
 
 func retrieveAnswersForPlayer(e *Env, answerIds []models.AnswerId) ([]models.Answer, error) {
-	fmt.Printf("answerIds %v\n", answerIds)
-
 	answers := make([]models.Answer, 0)
 	for _, answerId := range answerIds {
 		var answer models.Answer
 		err := common.GetOne((*common.Env)(e), common.AnswerTable, string(answerId), &answer)
 		if err != nil {
-			fmt.Println(err)
 			return nil, err
 		}
 		answers = append(answers, answer)
 	}
-
-	fmt.Printf("answers %v\n", answers)
-
 	return answers, nil
 }
 
-func playerInSession(session models.Session, target string) bool {
+func playerInSession(session models.Session, target models.PlayerId) bool {
 	for _, playerId := range session.Players {
-		if string(playerId) == target {
+		if playerId == target {
 			return true
 		}
 	}

@@ -2,7 +2,7 @@ package sessions
 
 import (
 	"fmt"
-	"models"
+	"github.com/jdarthur/trivia/models"
 )
 
 //Error when try to answer a question thats already scored
@@ -22,7 +22,7 @@ func (e QuestionAlreadyScoredError) Data() interface{} {
 
 //Error when you try to answer a question as a player that's not in this session
 type PlayerNotInSessionError struct {
-	PlayerId string
+	PlayerId models.PlayerId
 	SessionId string
 }
 func (e PlayerNotInSessionError) Error() string {
