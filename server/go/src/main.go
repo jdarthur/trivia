@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/globalsign/mgo"
+	"github.com/jdarthur/trivia/common"
 	"github.com/jdarthur/trivia/games"
 	"github.com/jdarthur/trivia/players"
 	"github.com/jdarthur/trivia/questions"
@@ -39,6 +40,13 @@ func main() {
 		log.Fatal(err)
 	}
 
+	err = common.LoadCerts()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	fmt.Printf("%+v\n", common.JwtKeys)
+
 	imageDir := os.Getenv("IMAGE_DIR")
 	if len(imageDir) == 0 {
 		imageDir = "images"
@@ -47,6 +55,8 @@ func main() {
 
 	router := gin.Default()
 	router.Static("/images", imageDir)
+
+	auth := common.Env{Db: client}
 
 	fmt.Println("\nQuestions API:")
 	q := questions.Env{Db: client}
@@ -67,11 +77,11 @@ func main() {
 
 	fmt.Println("\nGames API:")
 	g := games.Env{Db: client}
-	router.GET("/editor/games", g.GetAllGames)
-	router.GET("/editor/game/:id", g.GetOneGame)
-	router.POST("/editor/game", g.CreateGame)
-	router.PUT("/editor/game/:id", g.UpdateGame)
-	router.DELETE("/editor/game/:id", g.DeleteGame)
+	router.GET("/editor/games", auth.AsUser, g.GetAllGames)
+	router.GET("/editor/game/:id", auth.AsUser, g.GetOneGame)
+	router.POST("/editor/game", auth.AsUser, g.CreateGame)
+	router.PUT("/editor/game/:id", auth.AsUser, g.UpdateGame)
+	router.DELETE("/editor/game/:id", auth.AsUser, g.DeleteGame)
 
 	fmt.Println("\nSession API:")
 	s := sessions.Env{Db: client}

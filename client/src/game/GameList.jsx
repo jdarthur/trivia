@@ -31,7 +31,11 @@ class GameList extends React.Component {
     get_games = () => {
         let url = "/editor/games"
 
-        fetch(url)
+
+        fetch(url, {
+            mode: 'cors',
+            headers: new Headers({'Content-Type': 'application/json', 'borttrivia-token': this.props.token}),
+        })
             .then(response => response.json())
             .then(state => {
                 console.log("got games")
@@ -82,7 +86,7 @@ class GameList extends React.Component {
             const game = find(game_id, this.state.games)
             if (game_id === NEW) { //create new game
                 console.log("create game", game)
-                sendData(null, "POST", game)
+                sendData(null, "POST", game, this.props.token)
                     .then((data) => {
                         game.id = data.id
                         const to_save = {games: this.state.games, dirty: ""}
@@ -97,7 +101,7 @@ class GameList extends React.Component {
                     })
             } else { //update existing game
                 console.log("save game", game)
-                sendData(game_id, "PUT", game)
+                sendData(game_id, "PUT", game, this.props.token)
                     .then((data) => {
                         this.setState({dirty: "", selected: selected})
                     })
@@ -113,7 +117,7 @@ class GameList extends React.Component {
             this.delete_and_update_state(game)
         } else {
             console.log("delete game", game)
-            sendData(game_id, "DELETE").then((data) => {
+            sendData(game_id, "DELETE", undefined, this.props.token).then((data) => {
                 this.delete_and_update_state(game)
             })
         }
@@ -161,7 +165,7 @@ class GameList extends React.Component {
 
 
     render() {
-        const games = this.state.games.map((game, index) => (
+        const games = this.state.games?.map((game, index) => (
             <Game key={game.id} id={game.id} name={game.name} create_date={game.create_date}
                   rounds={game.rounds} round_names={game.round_names}
                   selected={(this.state.selected === game.id) ? true : false}
@@ -203,7 +207,7 @@ function find(object_id, object_list) {
     throw new Error("Could not find object with ID '" + object_id + "'!")
 }
 
-async function sendData(game_id, method, game_data) {
+async function sendData(game_id, method, game_data, token) {
     const url = "/editor/game" + (game_id != null ? "/" + game_id : "")
     let body = ""
     if (game_data !== undefined) {
@@ -217,8 +221,9 @@ async function sendData(game_id, method, game_data) {
 
 
     const response = await fetch(url, {
+        mode: 'cors',
         method: method,
-        headers: {'Content-Type': 'application/json'},
+        headers: new Headers({'Content-Type': 'application/json', 'borttrivia-token': token}),
         body: body
     })
     return response.json()

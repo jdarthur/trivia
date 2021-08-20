@@ -21,6 +21,11 @@ func (e *Env) GetAllGames(c *gin.Context) {
 //create unused_only and text_filter mongodb queries from request
 func createFilters(c *gin.Context) map[string]interface{} {
 	filter := make(map[string]interface{})
+	value, ok := c.Get(common.USER_ID)
+	if ok {
+		userId := value.(string)
+		filter["user_id"] = userId
+	}
 
 	//text_filter means that the search string appears in name (case-insensitive)
 	textFilter := c.Query("text_filter")
@@ -38,11 +43,27 @@ func (e *Env) GetOneGame(c *gin.Context) {
 	var data models.Game
 	err := common.GetOne((*common.Env)(e), common.GameTable, gameId, &data)
 
+	if err != nil {
+		value, ok := c.Get(common.USER_ID)
+		if ok {
+			userId := value.(string)
+			if data.UserId != userId {
+				err = common.InvalidUserError{UserId: userId}
+			}
+		}
+	}
+
 	common.Respond(c, data, err)
 }
 
 func (e *Env) CreateGame(c *gin.Context) {
 	var data models.Game
+
+	value, ok := c.Get(common.USER_ID)
+	if ok {
+		userId := value.(string)
+		data.UserId = userId
+	}
 
 	//bind JSON data from request to Question model
 	err := c.ShouldBind(&data)
@@ -110,6 +131,15 @@ func (e *Env) UpdateGame(c *gin.Context) {
 		return
 	}
 
+	value, ok := c.Get(common.USER_ID)
+	if ok {
+		userId := value.(string)
+		if existingGame.UserId != userId {
+			common.Respond(c, existingGame, common.InvalidUserError{UserId: userId})
+			return
+		}
+	}
+
 	//compose update body and games on rounds
 	err = e.merge(&updateBody, &existingGame)
 	if err != nil {
@@ -130,6 +160,15 @@ func (e *Env) DeleteGame(c *gin.Context) {
 	if err != nil {
 		common.Respond(c, existingGame, err)
 		return
+	}
+
+	value, ok := c.Get(common.USER_ID)
+	if ok {
+		userId := value.(string)
+		if existingGame.UserId != userId {
+			common.Respond(c, existingGame, common.InvalidUserError{UserId: userId})
+			return
+		}
 	}
 
 	err = common.Delete((*common.Env)(e), common.GameTable, gameId)

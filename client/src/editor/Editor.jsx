@@ -21,9 +21,9 @@ class Editor extends React.Component {
                 </Breadcrumb>
 
                 <div className="editor">
-                    {this.props.section === ROUNDS ? <RoundList /> : null}
-                    {this.props.section === QUESTIONS ? <QuestionList /> : null}
-                    {this.props.section === GAMES ? <GameList /> : null}
+                    {this.props.section === ROUNDS ? <RoundList token={this.props.token} /> : null}
+                    {this.props.section === QUESTIONS ? <QuestionList token={this.props.token} /> : null}
+                    {this.props.section === GAMES ? <GameList token={this.props.token} /> : null}
                 </div>
             </div>
         );

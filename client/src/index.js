@@ -7,7 +7,8 @@ ReactDOM.render(
   <Auth0Provider
     domain="borttrivia.us.auth0.com"
     clientId="03cLv60jN7hC79K8oUXHDF1wsenRTMx5"
-    redirectUri={window.location.origin} >
+    redirectUri={window.location.origin}
+    audience="https://borttrivia.com/editor" >
     <App />
   </Auth0Provider>,
   document.getElementById('root')

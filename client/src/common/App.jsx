@@ -29,20 +29,27 @@ class App extends React.Component {
     selected: PLAY,
     editor_section: QUESTION,
     collapsed: true,
-    show_toolbar: true,
-    is_mobile: false
+    show_editor: false,
+    is_mobile: false,
+    token: ""
   }
 
   componentDidMount() {
     let search = window.location.search;
     let params = new URLSearchParams(search);
     let key = params.get("key");
+
     const is_mobile = window.matchMedia("only screen and (max-width: 760px)").matches;
-    this.setState({ key: key, show_toolbar: key === "12344321", is_mobile: is_mobile })
+    this.setState({ key: key, is_mobile: is_mobile })
   }
 
-  set_show_toolbar = (value) => {
-    this.setState({ show_toolbar: value })
+  set_show_editor = (value) => {
+    this.setState({ show_editor: value })
+  }
+
+  set_token = (value) => {
+    const showEditor = value === "" ? false : true
+    this.setState({ token: value, show_editor: showEditor })
   }
 
   play = () => { this.setState({ selected: PLAY }) }
@@ -69,17 +76,17 @@ class App extends React.Component {
                 {this.state.collapsed ? null : <div> bort trivia </div>}
               </div>
               <Menu defaultSelectedKeys={['2']} mode="inline" theme="dark" inlineCollapsed={this.state.collapsed}
-                defaultOpenKeys={(this.state.show_toolbar && !this.state.collapsed) ? ['sub1'] : []} >
+                defaultOpenKeys={(this.state.show_editor && !this.state.collapsed) ? ['sub1'] : []} >
 
                 <Menu.Item key="2" icon={<PlaySquareOutlined />} onClick={this.play}> Play </Menu.Item>
 
-                <SubMenu key="sub1" icon={<FormOutlined />} title="Editor" disabled={!this.state.show_toolbar} >
-                  <Menu.Item key="5" onClick={this.edit_question} disabled={!this.state.show_toolbar} >{QUESTION}</Menu.Item>
-                  <Menu.Item key="6" onClick={this.edit_round} disabled={!this.state.show_toolbar} >{ROUND}</Menu.Item>
-                  <Menu.Item key="7" onClick={this.edit_game} disabled={!this.state.show_toolbar} >{GAME}</Menu.Item>
+                <SubMenu key="sub1" icon={<FormOutlined />} title="Editor" disabled={!this.state.show_editor} >
+                  <Menu.Item key="5" onClick={this.edit_question} disabled={!this.state.show_editor} >{QUESTION}</Menu.Item>
+                  <Menu.Item key="6" onClick={this.edit_round} disabled={!this.state.show_editor} >{ROUND}</Menu.Item>
+                  <Menu.Item key="7" onClick={this.edit_game} disabled={!this.state.show_editor} >{GAME}</Menu.Item>
                 </SubMenu>
 
-                <AuthButton />
+                <AuthButton set_token={this.set_token}/>
 
               </Menu>
             </Sider>
@@ -91,8 +98,8 @@ class App extends React.Component {
           <Content style={{ display: 'flex', flexDirection: 'column' }}>
 
             <div className="site-layout-background" style={{ minHeight: 360, display: 'flex', flexDirection: 'column', flexGrow: 1 }}>
-              {this.state.selected === PLAY ? <HomePage set_toolbar={this.set_show_toolbar} is_mobile={this.state.is_mobile} /> : null}
-              {this.state.selected === EDITOR ? <Editor section={this.state.editor_section} /> : null}
+              {this.state.selected === PLAY ? <HomePage show_editor={this.set_show_editor} is_mobile={this.state.is_mobile} /> : null}
+              {this.state.selected === EDITOR ? <Editor section={this.state.editor_section} token={this.state.token} /> : null}
             </div>
           </Content>
         </Layout>
