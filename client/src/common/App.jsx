@@ -86,7 +86,7 @@ class App extends React.Component {
                   <Menu.Item key="7" onClick={this.edit_game} disabled={!this.state.show_editor} >{GAME}</Menu.Item>
                 </SubMenu>
 
-                <AuthButton set_token={this.set_token}/>
+                <AuthButton set_token={this.set_token} />
 
               </Menu>
             </Sider>
@@ -98,8 +98,11 @@ class App extends React.Component {
           <Content style={{ display: 'flex', flexDirection: 'column' }}>
 
             <div className="site-layout-background" style={{ minHeight: 360, display: 'flex', flexDirection: 'column', flexGrow: 1 }}>
-              {this.state.selected === PLAY ? <HomePage show_editor={this.set_show_editor} is_mobile={this.state.is_mobile} /> : null}
-              {this.state.selected === EDITOR ? <Editor section={this.state.editor_section} token={this.state.token} /> : null}
+              {this.state.selected === PLAY ?
+                <HomePage show_editor={this.set_show_editor}
+                  is_mobile={this.state.is_mobile} token={this.state.token} /> : null}
+              {this.state.selected === EDITOR ?
+                <Editor section={this.state.editor_section} token={this.state.token} /> : null}
             </div>
           </Content>
         </Layout>

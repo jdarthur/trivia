@@ -39,6 +39,7 @@ class RemovableQuestionsList extends React.Component {
         const questions = this.props.questions.map((question_id) => (
             <RemovableQuestion key={question_id} id={question_id} select={this.select_item}
                 selected={this.state.selected_questions.indexOf(question_id) !== -1}
+                token={this.props.token}
             />)
         )
         const show_empty = this.props.questions.length > 0 ? false : true

@@ -17,7 +17,7 @@ class AddRounds extends React.Component {
 
     get_rounds = () => {
         let url = "/editor/rounds?unused_only=true"
-        fetch(url)
+        fetch(url, {headers:{"borttrivia-token": this.props.token}})
             .then(response => response.json())
             .then(state => {
                 this.setState({rounds: state.rounds})
@@ -38,14 +38,14 @@ class AddRounds extends React.Component {
 
     render() {
         const rounds = []
-        for (let i = 0; i < this.state.rounds.length; i++) {
+        for (let i = 0; i < this.state.rounds?.length; i++) {
             const round = this.state.rounds[i];
             if (this.props.rounds.indexOf(round.id) === -1) {
                 rounds.push(<RoundInGame key={round.id} id={round.id}
                                          select={this.select_item}
                                          selected={this.props.selected_rounds.indexOf(round.id) !== -1}
                                          index={this.props.selected_rounds.indexOf(round.id)} show_title={true}
-                                         addable={true}/>)
+                                         addable={true} token={this.props.token}/>)
             }
         }
         return (

@@ -18,7 +18,7 @@ class RemovableQuestion extends React.Component {
     get_question = () => {
         let url = "/editor/question/" + this.props.id
 
-        fetch(url)
+        fetch(url, {headers:{"borttrivia-token": this.props.token}})
             .then(response => response.json())
             .then(state => {
                 this.setState(

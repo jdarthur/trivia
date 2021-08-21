@@ -86,7 +86,6 @@ class Homepage extends React.Component {
           }
 
           this.setState(update, () => this.get_session_state())
-          this.props.set_toolbar(state.mod !== undefined)
         })
     }
   }
@@ -102,7 +101,7 @@ class Homepage extends React.Component {
         session_state={this.state.sess_state} is_mod={this.state.is_mod} />)
     return (
       <div className="homepage">
-        {this.state.session_id === "" ? <NewGameModal /> : null }
+        {this.state.session_id === "" ? <NewGameModal token={this.props.token} /> : null }
         {this.state.session_id !== "" ? main : null}
       </div>
     );

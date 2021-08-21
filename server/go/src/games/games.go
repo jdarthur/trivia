@@ -44,13 +44,7 @@ func (e *Env) GetOneGame(c *gin.Context) {
 	err := common.GetOne((*common.Env)(e), common.GameTable, gameId, &data)
 
 	if err != nil {
-		value, ok := c.Get(common.USER_ID)
-		if ok {
-			userId := value.(string)
-			if data.UserId != userId {
-				err = common.InvalidUserError{UserId: userId}
-			}
-		}
+		err = common.AssertUser(c, data.UserId)
 	}
 
 	common.Respond(c, data, err)
@@ -131,13 +125,10 @@ func (e *Env) UpdateGame(c *gin.Context) {
 		return
 	}
 
-	value, ok := c.Get(common.USER_ID)
-	if ok {
-		userId := value.(string)
-		if existingGame.UserId != userId {
-			common.Respond(c, existingGame, common.InvalidUserError{UserId: userId})
-			return
-		}
+	err = common.AssertUser(c, existingGame.UserId)
+	if err != nil {
+		common.Respond(c, existingGame, err)
+		return
 	}
 
 	//compose update body and games on rounds
@@ -162,13 +153,10 @@ func (e *Env) DeleteGame(c *gin.Context) {
 		return
 	}
 
-	value, ok := c.Get(common.USER_ID)
-	if ok {
-		userId := value.(string)
-		if existingGame.UserId != userId {
-			common.Respond(c, existingGame, common.InvalidUserError{UserId: userId})
-			return
-		}
+	err = common.AssertUser(c, existingGame.UserId)
+	if err != nil {
+		common.Respond(c, existingGame, err)
+		return
 	}
 
 	err = common.Delete((*common.Env)(e), common.GameTable, gameId)

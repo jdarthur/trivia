@@ -40,7 +40,7 @@ class RemovableRound extends React.Component {
 
                 </span>
                 <RoundInGame key={this.props.id} id={this.props.id}
-                             selected={this.props.selected} show_title={false}/>
+                             selected={this.props.selected} show_title={false} token={this.props.token} />
             </div>
         );
     }

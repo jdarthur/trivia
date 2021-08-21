@@ -15,6 +15,7 @@ type Question struct {
 	Question   string      `json:"question" form:"question"`
 	Answer     string      `json:"answer" form:"answer"`
 	RoundsUsed []string    `bson:"rounds_used" json:"rounds_used" form:"rounds_used"`
+	UserId     string      `bson:"user_id"`
 }
 
 func (q Question) SetCreateDate(createDate time.Time) Object {

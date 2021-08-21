@@ -74,7 +74,8 @@ class OpenRound extends React.Component {
                 <div className="current-questions">
                     <input autoFocus className="round-name" value={this.props.name}
                         onChange={this.set_name} onKeyDown={this.handleKeyPress} placeholder="Round name" />
-                    <AddQuestionsModal questions={this.props.questions} save={this.save_self} add_questions={this.add_questions} />
+                    <AddQuestionsModal questions={this.props.questions} save={this.save_self}
+                        add_questions={this.add_questions} token={this.props.token} />
                 </div>
 
 
@@ -84,7 +85,8 @@ class OpenRound extends React.Component {
                         {wagers}
                     </Panel>
                     <Panel header="Questions" key="2" >
-                        <RemovableQuestionsList questions={this.props.questions} remove_questions={this.remove_questions} />
+                        <RemovableQuestionsList questions={this.props.questions}
+                            remove_questions={this.remove_questions} token={this.props.token} />
                     </Panel>
                 </Collapse>
 

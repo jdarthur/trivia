@@ -21,7 +21,7 @@ class GameNames extends React.Component {
 
   get_games = () => {
     let url = "/editor/games"
-    fetch(url)
+    fetch(url, {headers:{"borttrivia-token": this.props.token}})
       .then(response => response.json())
       .then(state => {
         console.log(state.games)

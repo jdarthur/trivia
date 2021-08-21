@@ -180,7 +180,8 @@ class GameList extends React.Component {
             open_game = <OpenGame key={g.id} id={g.id} name={g.name}
                                   rounds={g.rounds} round_names={g.round_names} set={this.set_value}
                                   set_selected={this.set_selected} delete={this.delete}
-                                  set_round_name={this.set_round_name} set_multi={this.set_multi}/>
+                                  set_round_name={this.set_round_name} set_multi={this.set_multi}
+                                  token={this.props.token}/>
         }
         return (
             <div className="round-and-open-question">

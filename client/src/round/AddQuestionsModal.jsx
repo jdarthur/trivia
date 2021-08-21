@@ -33,7 +33,7 @@ class AddQuestionsModal extends React.Component {
         //   url += "&unused_only=true"
         // }
 
-        fetch(url)
+        fetch(url, {headers: {"borttrivia-token": this.props.token}})
             .then(response => response.json())
             .then(state => {
                 console.log("got questions in addable questions")

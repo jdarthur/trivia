@@ -60,20 +60,20 @@ func main() {
 
 	fmt.Println("\nQuestions API:")
 	q := questions.Env{Db: client}
-	router.GET("/editor/questions", q.GetAllQuestions)
-	router.GET("/editor/question/:id", q.GetOneQuestion)
-	router.POST("/editor/question", q.CreateQuestion)
-	router.PUT("/editor/question/:id", q.UpdateQuestion)
-	router.DELETE("/editor/question/:id", q.DeleteQuestion)
+	router.GET("/editor/questions", auth.AsUser, q.GetAllQuestions)
+	router.GET("/editor/question/:id", auth.AsUser, q.GetOneQuestion)
+	router.POST("/editor/question", auth.AsUser, q.CreateQuestion)
+	router.PUT("/editor/question/:id", auth.AsUser, q.UpdateQuestion)
+	router.DELETE("/editor/question/:id", auth.AsUser, q.DeleteQuestion)
 	router.POST("/editor/image", q.UploadImage)
 
 	fmt.Println("\nRounds API:")
 	r := rounds.Env{Db: client}
-	router.GET("/editor/rounds", r.GetAllRounds)
-	router.GET("/editor/round/:id", r.GetOneRound)
-	router.POST("/editor/round", r.CreateRound)
-	router.PUT("/editor/round/:id", r.UpdateRound)
-	router.DELETE("/editor/round/:id", r.DeleteRound)
+	router.GET("/editor/rounds", auth.AsUser, r.GetAllRounds)
+	router.GET("/editor/round/:id", auth.AsUser, r.GetOneRound)
+	router.POST("/editor/round", auth.AsUser, r.CreateRound)
+	router.PUT("/editor/round/:id", auth.AsUser, r.UpdateRound)
+	router.DELETE("/editor/round/:id", auth.AsUser, r.DeleteRound)
 
 	fmt.Println("\nGames API:")
 	g := games.Env{Db: client}

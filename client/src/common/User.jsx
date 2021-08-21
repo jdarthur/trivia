@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect } from "react";
 
 import { Popover } from 'antd'
 import { useAuth0 } from "@auth0/auth0-react";
@@ -7,9 +7,10 @@ import LogoutButton from "./Logout2";
 const User = (props) => {
 
     const { user, getAccessTokenSilently } = useAuth0();
+
+    const userSub =  user?.sub
     useEffect(() => {
         const getEditorJwt = async () => {
-          const domain = "borttrivia.us.auth0.com";
 
           try {
             const accessToken = await getAccessTokenSilently({
@@ -25,9 +26,9 @@ const User = (props) => {
         };
 
         getEditorJwt();
-      }, [getAccessTokenSilently, user?.sub]);
+      }, [getAccessTokenSilently, userSub]); // eslint-disable-line react-hooks/exhaustive-deps
 
-    const { name, picture, email } = user;
+    const { name, picture } = user;
 
     console.log(user)
 

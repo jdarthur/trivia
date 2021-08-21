@@ -48,7 +48,7 @@ class RoundList extends React.Component {
         }
 
         this.setState({ loading: true }, () => {
-            fetch(url)
+            fetch(url, {headers: {"borttrivia-token": this.props.token}})
                 .then(response => response.json())
                 .then(state => {
                     console.log(state)
@@ -106,7 +106,7 @@ class RoundList extends React.Component {
             const round = find(round_id, this.state.rounds)
             if (round_id === NEW) { //create new round
                 console.log("create round", round)
-                sendData(null, "POST", round)
+                sendData(null, "POST", round, this.props.token)
                     .then((data) => {
                         round.id = data.id
                         this.setState({
@@ -118,7 +118,7 @@ class RoundList extends React.Component {
             }
             else { //update existing round
                 console.log("save round", round)
-                sendData(round_id, "PUT", round)
+                sendData(round_id, "PUT", round, this.props.token)
                     .then((data) => { this.setState({ dirty: "" }) })
             }
         }
@@ -131,7 +131,7 @@ class RoundList extends React.Component {
         }
         else {
             console.log("delete round", round)
-            sendData(round_id, "DELETE").then((data) => {
+            sendData(round_id, "DELETE", undefined, this.props.token).then((data) => {
                 this.delete_and_update_state(round)
             })
         }
@@ -141,11 +141,8 @@ class RoundList extends React.Component {
      * delete a round by value & update the state of the rounds list
      */
     delete_and_update_state = (round) => {
-        const index = this.state.rounds.map(function (e) { return e.id; }).indexOf(round.id);
-        console.log(this.state.rounds)
-        this.state.rounds.splice(index, 1)
-        console.log(this.state.rounds)
-        this.setState({ rounds: this.state.rounds, dirty: "", selected: "" })
+        const data = this.state.rounds.filter(item => item.id !== round.id);
+        this.setState({ rounds: data, dirty: "", selected: "" })
     }
 
     /**
@@ -169,8 +166,10 @@ class RoundList extends React.Component {
             [WAGERS]: [],
             [ID]: NEW
         }
-        this.state.rounds.push(round)
-        this.setState({ rounds: this.state.rounds }, () => {
+
+        const data =  this.state.rounds? [...this.state.rounds] : []
+        data.push(round)
+        this.setState({ rounds: data }, () => {
             this.set_selected(NEW)
         })
     }
@@ -191,7 +190,7 @@ class RoundList extends React.Component {
             open_round = <OpenRound key={r.id} id={r.id} name={r.name}
                 questions={r.questions} wagers={r.wagers} set={this.set_value}
                 set_selected={this.set_selected} delete={this.delete}
-                save={this.save} set_multi={this.set_multi} />
+                save={this.save} set_multi={this.set_multi} token={this.props.token} />
         }
         return (
             <div className="round-and-open-question">
@@ -222,7 +221,7 @@ function find(object_id, object_list) {
     throw new Error("Could not find object with ID '" + object_id + "'!")
 }
 
-async function sendData(round_id, method, round_data) {
+async function sendData(round_id, method, round_data, token) {
     const url = "/editor/round" + (round_id != null ? "/" + round_id : "")
     let body = ""
     if (round_data !== undefined) {
@@ -238,7 +237,7 @@ async function sendData(round_id, method, round_data) {
 
     const response = await fetch(url, {
         method: method,
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', "borttrivia-token": token },
         body: body
     })
     return response.json()

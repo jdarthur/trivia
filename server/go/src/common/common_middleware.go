@@ -7,6 +7,7 @@ import (
 	"github.com/dgrijalva/jwt-go"
 	"github.com/gin-gonic/gin"
 	"net/http"
+	"time"
 )
 
 //Error when calling a user-controlled endpoint without a valid JWT
@@ -107,7 +108,23 @@ func DecodeToken(jwtToken string) (jwt.MapClaims, error) {
 
 	if err != nil {
 		fmt.Println(err)
-		return nil, InvalidTokenError{Token: jwtToken}
+		validation, ok := err.(*jwt.ValidationError)
+		if ok {
+			isNotValidYet := validation.Errors ^ jwt.ValidationErrorIssuedAt
+			if isNotValidYet == 0 {
+				val := token.Claims.(jwt.MapClaims)["iat"]
+				issuedAt := val.(float64)
+				difference := issuedAt - float64(time.Now().Unix())
+				if difference < 30 {
+					fmt.Printf("%f seconds early, good enough\n", difference)
+					token.Valid = true
+				}
+			} else {
+				return nil, InvalidTokenError{Token: jwtToken}
+			}
+		} else {
+			return nil, InvalidTokenError{Token: jwtToken}
+		}
 	}
 
 	if !token.Valid {
@@ -148,4 +165,17 @@ func (e *Env) AsUser(c *gin.Context) {
 		c.Abort()
 		return
 	}
+}
+
+func AssertUser(c *gin.Context, correctUserId string) error {
+	value, ok := c.Get(USER_ID)
+	if ok {
+		userIdFromRequest := value.(string)
+		if correctUserId != userIdFromRequest {
+			return InvalidUserError{UserId: userIdFromRequest}
+		}
+	} else {
+		return InvalidUserError{UserId: ""}
+	}
+	return nil
 }

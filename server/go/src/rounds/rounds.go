@@ -22,6 +22,11 @@ func (e *Env) GetAllRounds(c *gin.Context) {
 //create unused_only and text_filter mongodb queries from request
 func createFilters(c *gin.Context) map[string]interface{} {
 	filter := make(map[string]interface{})
+	value, ok := c.Get(common.USER_ID)
+	if ok {
+		userId := value.(string)
+		filter["user_id"] = userId
+	}
 
 	//unused_only means that games = []
 	unusedOnly := c.DefaultQuery("unused_only", "false")
@@ -45,6 +50,10 @@ func (e *Env) GetOneRound(c *gin.Context) {
 	var data models.Round
 	err := common.GetOne((*common.Env)(e), common.RoundTable, roundId, &data)
 
+	if err == nil {
+		err = common.AssertUser(c, data.UserId)
+	}
+
 	common.Respond(c, data, err)
 }
 
@@ -57,6 +66,12 @@ func (e *Env) CreateRound(c *gin.Context) {
 	if err != nil {
 		common.Respond(c, data, err)
 		return
+	}
+
+	value, ok := c.Get(common.USER_ID)
+	if ok {
+		userId := value.(string)
+		data.UserId = userId
 	}
 
 	//fil questions and wagers with empty lists if they are not provided
@@ -130,6 +145,12 @@ func (e *Env) UpdateRound(c *gin.Context) {
 		return
 	}
 
+	err = common.AssertUser(c, existingRound.UserId)
+	if err != nil {
+		common.Respond(c, existingRound, err)
+		return
+	}
+
 	//compose update body and update rounds_used on questions
 	err = e.merge(&updateBody, &existingRound)
 	if err != nil {
@@ -147,6 +168,12 @@ func (e *Env) DeleteRound(c *gin.Context) {
 
 	var existingRound models.Round
 	err := common.GetOne((*common.Env)(e), common.RoundTable, roundId, &existingRound)
+	if err != nil {
+		common.Respond(c, existingRound, err)
+		return
+	}
+
+	err = common.AssertUser(c, existingRound.UserId)
 	if err != nil {
 		common.Respond(c, existingRound, err)
 		return

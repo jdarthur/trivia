@@ -13,6 +13,7 @@ class PlayerScorer extends React.Component {
     }
 
     componentDidMount() {
+        console.log(sessionStorage)
         const answersStored = JSON.parse(sessionStorage.getItem("answers"))
         if (answersStored) {
             console.log(answersStored)
