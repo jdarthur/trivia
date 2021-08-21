@@ -78,7 +78,7 @@ class OpenGame extends React.Component {
     handleKeyPress = (event) => {
         if (event.key === 'Enter' && !event.altKey) {
             event.preventDefault()
-            this.save_self()
+            this.save_and_close()
         }
     }
 
