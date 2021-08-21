@@ -7,13 +7,10 @@ import { useAuth0 } from "@auth0/auth0-react";
 
 const AuthenticationButton = (props) => {
     const { isAuthenticated } = useAuth0();
-    return <div style={{ display: 'flex', flexDirection: 'row', justifyContent: 'center' }}>
-
-        {isAuthenticated ?
-            <User set_token={props.set_token} /> :
-            <LoginButton set_token={props.set_token} />}
-
-    </div>
+    if (isAuthenticated) {
+        return <User set_token={props.set_token} />
+    }
+    return <LoginButton set_token={props.set_token} />
 };
 
 export default AuthenticationButton

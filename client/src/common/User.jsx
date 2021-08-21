@@ -37,7 +37,7 @@ const User = (props) => {
     </div>
 
     return (
-        <Popover content={content} title={name} trigger="click" placement="right">
+        <Popover content={content} title={name} trigger="click" placement="bottomRight">
             <img src={picture} alt={name} style={{ width: 40, height: 40, cursor: 'pointer' }} />
         </Popover>
 

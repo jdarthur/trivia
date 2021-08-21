@@ -1,8 +1,10 @@
 import React from 'react';
 import './Homepage.css';
 
-import { Modal, Button } from 'antd';
+import { Modal, Button, Breadcrumb } from 'antd';
 import GameNames from "./GameNames"
+
+import { PlusSquareOutlined } from "@ant-design/icons";
 
 class NewGameModal extends React.Component {
 
@@ -66,9 +68,23 @@ class NewGameModal extends React.Component {
     }
 
     return (
-      <Button type="primary" disabled={this.props.token === ""} onClick={this.open} style={{ margin: 50 }}>
-        New Game
-      </Button>
+      <div>
+        <Breadcrumb style={{ margin: 16 }}>
+          <Breadcrumb.Item>BortTrivia</Breadcrumb.Item>
+          <Breadcrumb.Item>Home</Breadcrumb.Item>
+        </Breadcrumb>
+
+        <Button type="primary" disabled={this.props.token === ""} onClick={this.open} style={{ margin: 50 }}>
+          <span>
+
+            <PlusSquareOutlined style={{ marginRight: 5 }} />
+            New Game
+          </span>
+
+
+        </Button>
+      </div>
+
     );
   }
 }

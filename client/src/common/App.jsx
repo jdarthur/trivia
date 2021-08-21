@@ -14,7 +14,7 @@ import {
   PlaySquareOutlined
 } from '@ant-design/icons';
 
-const { Content, Sider } = Layout;
+const { Content, Header } = Layout;
 const { SubMenu } = Menu;
 
 const PLAY = "Play"
@@ -31,7 +31,9 @@ class App extends React.Component {
     collapsed: true,
     show_editor: false,
     is_mobile: false,
-    token: ""
+    token: "",
+    in_game: false,
+    is_mod: false,
   }
 
   componentDidMount() {
@@ -52,6 +54,10 @@ class App extends React.Component {
     this.setState({ token: value, show_editor: showEditor })
   }
 
+  set_in_game = (value, is_mod) =>  {
+    this.setState({ in_game: value, is_mod: is_mod })
+  }
+
   play = () => { this.setState({ selected: PLAY }) }
 
   edit_question = () => { this.setState({ selected: EDITOR, editor_section: QUESTION }) }
@@ -66,30 +72,39 @@ class App extends React.Component {
     // // Then we set the value in the --vh custom property to the root of the document
     // document.documentElement.style.setProperty('--vh', `${vh}px`);
 
+    let showToolbar = true;
+    if (this.state.is_mobile && this.state.in_game && !this.state.is_mod) {
+      showToolbar = false
+    }
+
     return (
       <Layout className="height-trick" style={{ minWidth: 'min(1300px, 100vw)', maxWidth: '100vw' }}>
         {
-          this.state.is_mobile ? null :
-            <Sider collapsible collapsed={this.state.collapsed} onCollapse={this.toggleCollapsed}>
+          showToolbar ?
+            <Header >
+              <span>
               <div className={this.state.collapsed ? "logo logo-min" : "logo"}>
                 <img src={logo} className="icon" alt="Bort Trivia" />
                 {this.state.collapsed ? null : <div> bort trivia </div>}
               </div>
-              <Menu defaultSelectedKeys={['2']} mode="inline" theme="dark" inlineCollapsed={this.state.collapsed}
+              <Menu defaultSelectedKeys={['2']} mode="horizontal" theme="dark"
                 defaultOpenKeys={(this.state.show_editor && !this.state.collapsed) ? ['sub1'] : []} >
-
-                <Menu.Item key="2" icon={<PlaySquareOutlined />} onClick={this.play}> Play </Menu.Item>
+                <Menu.Item key="1" icon={<PlaySquareOutlined />} onClick={this.play}> Play </Menu.Item>
 
                 <SubMenu key="sub1" icon={<FormOutlined />} title="Editor" disabled={!this.state.show_editor} >
-                  <Menu.Item key="5" onClick={this.edit_question} disabled={!this.state.show_editor} >{QUESTION}</Menu.Item>
-                  <Menu.Item key="6" onClick={this.edit_round} disabled={!this.state.show_editor} >{ROUND}</Menu.Item>
-                  <Menu.Item key="7" onClick={this.edit_game} disabled={!this.state.show_editor} >{GAME}</Menu.Item>
+                  <Menu.Item key="2" onClick={this.edit_question} disabled={!this.state.show_editor} >{QUESTION}</Menu.Item>
+                  <Menu.Item key="3" onClick={this.edit_round} disabled={!this.state.show_editor} >{ROUND}</Menu.Item>
+                  <Menu.Item key="4" onClick={this.edit_game} disabled={!this.state.show_editor} >{GAME}</Menu.Item>
                 </SubMenu>
 
-                <AuthButton set_token={this.set_token} />
+                <Menu.Item key="5" style={{float: "right"}} className="nohover" > <AuthButton set_token={this.set_token} /> </Menu.Item>
 
               </Menu>
-            </Sider>
+
+
+              </span>
+
+            </Header> : null
         }
 
 
@@ -99,7 +114,7 @@ class App extends React.Component {
 
             <div className="site-layout-background" style={{ minHeight: 360, display: 'flex', flexDirection: 'column', flexGrow: 1 }}>
               {this.state.selected === PLAY ?
-                <HomePage show_editor={this.set_show_editor}
+                <HomePage show_editor={this.set_show_editor} set_started={this.set_in_game}
                   is_mobile={this.state.is_mobile} token={this.state.token} /> : null}
               {this.state.selected === EDITOR ?
                 <Editor section={this.state.editor_section} token={this.state.token} /> : null}

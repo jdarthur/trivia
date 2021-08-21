@@ -15,10 +15,13 @@ class Editor extends React.Component {
     render() {
         return (
             <div >
-                <Breadcrumb style={{ margin: 16 }}>
-                    <Breadcrumb.Item>Editor</Breadcrumb.Item>
-                    <Breadcrumb.Item>{this.props.section}</Breadcrumb.Item>
-                </Breadcrumb>
+                <span>
+                    <Breadcrumb style={{ margin: 16, display: "flex" }}>
+                        <Breadcrumb.Item>Editor</Breadcrumb.Item>
+                        <Breadcrumb.Item>{this.props.section}</Breadcrumb.Item>
+                    </Breadcrumb>
+                </span>
+
 
                 <div className="editor">
                     {this.props.section === ROUNDS ? <RoundList token={this.props.token} /> : null}

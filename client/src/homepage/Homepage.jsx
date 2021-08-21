@@ -42,6 +42,9 @@ class Homepage extends React.Component {
       state.is_mod = true
     }
 
+    console.log(session_id)
+    this.props.set_started(session_id !== null, state.is_mod)
+
     this.setState(state, () => this.get_session())
   }
 
