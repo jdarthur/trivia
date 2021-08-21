@@ -28,7 +28,7 @@ class RoundInGame extends React.Component {
     get_round = () => {
         let url = "/editor/round/" + this.props.id
 
-        fetch(url)
+        fetch(url, {headers:{"borttrivia-token": this.props.token}})
             .then(response => response.json())
             .then(state => {
                 console.log(state)
@@ -50,7 +50,7 @@ class RoundInGame extends React.Component {
 
     render() {
         const questions = this.state.questions.map((question_id) => (
-            <QuestionInRound key={question_id} id={question_id}/>))
+            <QuestionInRound key={question_id} id={question_id} token={this.props.token}/>))
 
         let border = ""
         let extra = null

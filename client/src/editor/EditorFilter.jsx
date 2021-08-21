@@ -18,7 +18,7 @@ class EditorFilter extends React.Component {
 
     render() {
         return (
-            <div style={{display: 'flex', flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start'}}>
+            <div style={{display: 'flex', flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', paddingLeft: 25}}>
                 <div className="filter_holder">
                     {/* <Input.Group compact> */}
                     <Input.Search placeholder="Text filters" style={{ width: '50%' }} className="filter-subitem" onSearch={this.set_text_filter} />

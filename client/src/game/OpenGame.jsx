@@ -43,16 +43,21 @@ class OpenGame extends React.Component {
     }
 
     remove_rounds = (rounds_list) => {
-        console.log(rounds_list)
-        for (let i = 0; i < rounds_list.length; i++) {
-            const index = this.props.rounds.indexOf(rounds_list[i])
-            this.props.rounds.splice(index, index + 1)
-            delete this.props.round_names[rounds_list[i]]
+
+        const data = [...this.props.rounds]
+        let roundNames = {}
+        roundNames = Object.assign(roundNames, this.props.round_names)
+        this.setState({ rounds: data, dirty: "", selected: "" })
+
+        for (let i = 0; i < this.props.rounds.length; i++) {
+            const index = data.indexOf(rounds_list[i])
+            data.splice(index, index + 1)
+            delete roundNames[rounds_list[i]]
         }
 
         const update = {
-            [ROUNDS]: this.props.rounds,
-            [ROUND_NAMES]: this.props.round_names
+            [ROUNDS]: data,
+            [ROUND_NAMES]: roundNames
         }
         this.props.set_multi(this.props.id, update, true)
 
@@ -73,7 +78,7 @@ class OpenGame extends React.Component {
     handleKeyPress = (event) => {
         if (event.key === 'Enter' && !event.altKey) {
             event.preventDefault()
-            this.save_self()
+            this.save_and_close()
         }
     }
 
@@ -110,14 +115,15 @@ class OpenGame extends React.Component {
                                                          remove_rounds={this.remove_rounds}
                                                          set_round_name={this.set_round_name}
                                                          round_names={this.props.round_names}
-                                                         handleKeyPress={this.handleKeyPress}/>
+                                                         handleKeyPress={this.handleKeyPress}
+                                                         token={this.props.token}/>
                                 </div>
                             </TabPane>
 
                             <TabPane tab="Add Rounds" key="add_rounds">
                                 <AddRounds rounds={this.props.rounds}
                                            selected_rounds={this.state.selected_rounds}
-                                           set_rounds={this.set_rounds} />
+                                           set_rounds={this.set_rounds} token={this.props.token} />
                             </TabPane>
                         </Tabs>
                     </div>

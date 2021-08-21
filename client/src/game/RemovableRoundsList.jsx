@@ -40,7 +40,8 @@ class RemovableRoundsList extends React.Component {
             <RemovableRound key={round_id} id={round_id} select={this.select_item}
                 selected={this.state.selected_rounds.indexOf(round_id) !== -1}
                 show_title={false} set_round_name={this.props.set_round_name}
-                name={this.props.round_names[round_id]} handleKeyPress={this.props.handleKeyPress}/>))
+                name={this.props.round_names[round_id]} handleKeyPress={this.props.handleKeyPress}
+                token={this.props.token}/>))
 
         const show_empty = this.props.rounds?.length > 0 ? false : true
 

@@ -17,6 +17,7 @@ type Round struct {
 	Questions  []string    `json:"questions"`
 	Wagers     []int       `json:"wagers"`
 	Games      []string    `json:"games"`
+	UserId     string      `bson:"user_id"`
 }
 
 func (r Round) SetCreateDate(createDate time.Time) Object {

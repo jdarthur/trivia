@@ -3,10 +3,12 @@
   "version": "0.1.0",
   "private": true,
   "dependencies": {
+    "@auth0/auth0-react": "^1.2.0",
     "@testing-library/jest-dom": "^4.2.4",
     "@testing-library/react": "^9.5.0",
     "@testing-library/user-event": "^7.2.1",
     "antd": "^4.6.5",
+    "auth0-lock": "^11.27.1",
     "http-proxy-middleware": "^1.0.3",
     "react": "^16.13.1",
     "react-addons-css-transition-group": "^15.6.2",
@@ -17,7 +19,7 @@
     "react-transition-group": "^4.4.1"
   },
   "scripts": {
-    "start": "PORT=443 HTTPS=true SSL_CRT_FILE=cert/private.pem SSL_KEY_FILE=cert/private.key react-scripts start",
+    "start": "HOST=0.0.0.0 PORT=443 HTTPS=true SSL_CRT_FILE=cert/private.pem SSL_KEY_FILE=cert/private.key react-scripts start",
     "build": "react-scripts build",
     "test": "react-scripts test",
     "eject": "react-scripts eject"

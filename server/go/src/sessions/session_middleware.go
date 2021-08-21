@@ -1,8 +1,8 @@
 package sessions
 
 import (
-	"github.com/jdarthur/trivia/common"
 	"github.com/gin-gonic/gin"
+	"github.com/jdarthur/trivia/common"
 	"github.com/jdarthur/trivia/models"
 )
 

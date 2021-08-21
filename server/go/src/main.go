@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/globalsign/mgo"
+	"github.com/jdarthur/trivia/common"
 	"github.com/jdarthur/trivia/games"
 	"github.com/jdarthur/trivia/players"
 	"github.com/jdarthur/trivia/questions"
@@ -39,6 +40,13 @@ func main() {
 		log.Fatal(err)
 	}
 
+	err = common.LoadCerts()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	fmt.Printf("%+v\n", common.JwtKeys)
+
 	imageDir := os.Getenv("IMAGE_DIR")
 	if len(imageDir) == 0 {
 		imageDir = "images"
@@ -48,30 +56,32 @@ func main() {
 	router := gin.Default()
 	router.Static("/images", imageDir)
 
+	auth := common.Env{Db: client}
+
 	fmt.Println("\nQuestions API:")
 	q := questions.Env{Db: client}
-	router.GET("/editor/questions", q.GetAllQuestions)
-	router.GET("/editor/question/:id", q.GetOneQuestion)
-	router.POST("/editor/question", q.CreateQuestion)
-	router.PUT("/editor/question/:id", q.UpdateQuestion)
-	router.DELETE("/editor/question/:id", q.DeleteQuestion)
+	router.GET("/editor/questions", auth.AsUser, q.GetAllQuestions)
+	router.GET("/editor/question/:id", auth.AsUser, q.GetOneQuestion)
+	router.POST("/editor/question", auth.AsUser, q.CreateQuestion)
+	router.PUT("/editor/question/:id", auth.AsUser, q.UpdateQuestion)
+	router.DELETE("/editor/question/:id", auth.AsUser, q.DeleteQuestion)
 	router.POST("/editor/image", q.UploadImage)
 
 	fmt.Println("\nRounds API:")
 	r := rounds.Env{Db: client}
-	router.GET("/editor/rounds", r.GetAllRounds)
-	router.GET("/editor/round/:id", r.GetOneRound)
-	router.POST("/editor/round", r.CreateRound)
-	router.PUT("/editor/round/:id", r.UpdateRound)
-	router.DELETE("/editor/round/:id", r.DeleteRound)
+	router.GET("/editor/rounds", auth.AsUser, r.GetAllRounds)
+	router.GET("/editor/round/:id", auth.AsUser, r.GetOneRound)
+	router.POST("/editor/round", auth.AsUser, r.CreateRound)
+	router.PUT("/editor/round/:id", auth.AsUser, r.UpdateRound)
+	router.DELETE("/editor/round/:id", auth.AsUser, r.DeleteRound)
 
 	fmt.Println("\nGames API:")
 	g := games.Env{Db: client}
-	router.GET("/editor/games", g.GetAllGames)
-	router.GET("/editor/game/:id", g.GetOneGame)
-	router.POST("/editor/game", g.CreateGame)
-	router.PUT("/editor/game/:id", g.UpdateGame)
-	router.DELETE("/editor/game/:id", g.DeleteGame)
+	router.GET("/editor/games", auth.AsUser, g.GetAllGames)
+	router.GET("/editor/game/:id", auth.AsUser, g.GetOneGame)
+	router.POST("/editor/game", auth.AsUser, g.CreateGame)
+	router.PUT("/editor/game/:id", auth.AsUser, g.UpdateGame)
+	router.DELETE("/editor/game/:id", auth.AsUser, g.DeleteGame)
 
 	fmt.Println("\nSession API:")
 	s := sessions.Env{Db: client}

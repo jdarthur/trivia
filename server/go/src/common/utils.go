@@ -283,6 +283,12 @@ func Respond(c *gin.Context, data interface{}, err error) {
 		case validator.ValidationErrors:
 			fields := requiredErrorFields(t)
 			c.JSON(http.StatusBadRequest, gin.H{"errors": "Missing required fields", "field": fields})
+		case InvalidTokenError:
+			c.JSON(http.StatusUnauthorized, gin.H{"errors": t.Error()})
+		case InvalidUserError:
+			c.JSON(http.StatusUnauthorized, gin.H{"errors": t.Error()})
+		case MissingTokenError:
+			c.JSON(http.StatusUnauthorized, gin.H{"errors": t.Error()})
 
 		default:
 			fmt.Println(reflect.TypeOf(err))

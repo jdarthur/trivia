@@ -6,7 +6,6 @@
     align-items: flex-start;
     max-width: calc(100vw);
     overflow-x: hidden;
-    padding: 10px;
 }
 
 .new-game-button {

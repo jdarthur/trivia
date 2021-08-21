@@ -44,7 +44,7 @@ class QuestionList extends React.Component {
         }
 
         this.setState({loading: true}, () => {
-            fetch(url)
+            fetch(url, {headers: {"borttrivia-token": this.props.token}})
                 .then(response => response.json())
                 .then(state => {
                     console.log(state)
@@ -92,14 +92,14 @@ class QuestionList extends React.Component {
             if (question_id === NEW) { //create new question
                 delete question.id
                 console.log("create question", question)
-                sendData(null, "POST", question)
+                sendData(null, "POST", question, this.props.token)
                     .then((data) => {
                         console.log(data)
                         question.id = data.id
                         this.setState({questions: this.state.questions, dirty: ""})
                     })
             } else {
-                sendData(question_id, "PUT", question)
+                sendData(question_id, "PUT", question, this.props.token)
                     .then((data) => {
                         this.setState({dirty: ""})
                     })
@@ -113,7 +113,7 @@ class QuestionList extends React.Component {
             this.delete_and_update_state(question)
         } else {
             console.log("delete question", question)
-            sendData(question_id, "DELETE")
+            sendData(question_id, "DELETE", undefined, this.props.token)
                 .then((data) => {
                     this.delete_and_update_state(question)
                 })
@@ -144,7 +144,8 @@ class QuestionList extends React.Component {
             [CATEGORY]: "",
             [ID]: NEW
         }
-        const data = [...this.state.questions]
+
+        const data =  this.state.questions? [...this.state.questions] : []
         data.push(question)
         this.setState({questions: data}, () => {
             this.set_selected(NEW)
@@ -179,7 +180,7 @@ class QuestionList extends React.Component {
         const nqb = this.add_newquestion_button() ?
             <PlusSquareOutlined className="new_button" onClick={this.add_new_question}/> : null
         const pagination = {
-            total: this.state.questions.length,
+            total: this.state.questions?.length || 0,
             showTotal: (total, range) => `${range[0]}-${range[1]} of ${total}`
         }
 
@@ -214,7 +215,7 @@ function find(object_id, object_list) {
     throw new Error("Could not find object with ID '" + object_id + "'!")
 }
 
-async function sendData(question_id, method, question_data) {
+async function sendData(question_id, method, question_data, token) {
     const url = "/editor/question" + (question_id != null ? "/" + question_id : "")
     let body = ""
     if (question_data !== undefined) {
@@ -228,7 +229,7 @@ async function sendData(question_id, method, question_data) {
     JSON.stringify(question_data)
     const response = await fetch(url, {
         method: method,
-        headers: {'Content-Type': 'application/json'},
+        headers: {'Content-Type': 'application/json', "borttrivia-token": token},
         body: body
     })
     return response.json()

@@ -21,6 +21,11 @@ func (e *Env) GetAllQuestions(c *gin.Context) {
 //create unused_only and text_filter mongodb queries from request
 func createFilters(c *gin.Context) map[string]interface{} {
 	filter := make(map[string]interface{})
+	value, ok := c.Get(common.USER_ID)
+	if ok {
+		userId := value.(string)
+		filter["user_id"] = userId
+	}
 
 	//unused_only means that rounds_used = []
 	unusedOnly := c.DefaultQuery("unused_only", "false")
@@ -46,6 +51,10 @@ func (e *Env) GetOneQuestion(c *gin.Context) {
 	var data models.Question
 	err := common.GetOne((*common.Env)(e), common.QuestionTable, questionId, &data)
 
+	if err == nil {
+		err = common.AssertUser(c, data.UserId)
+	}
+
 	common.Respond(c, data, err)
 }
 
@@ -60,6 +69,12 @@ func (e *Env) CreateQuestion(c *gin.Context) {
 	if err != nil {
 		common.Respond(c, data, err)
 		return
+	}
+
+	value, ok := c.Get(common.USER_ID)
+	if ok {
+		userId := value.(string)
+		data.UserId = userId
 	}
 
 	//rounds_used cannot be set by this API (it is set indirectly on a question in the rounds API)
@@ -103,6 +118,12 @@ func (e *Env) UpdateQuestion(c *gin.Context) {
 		return
 	}
 
+	err = common.AssertUser(c, question.UserId)
+	if err != nil {
+		common.Respond(c, question, err)
+		return
+	}
+
 	merge(&updateBody, &question)
 	err = common.Set((*common.Env)(e), common.QuestionTable, questionId, question)
 
@@ -114,6 +135,12 @@ func (e *Env) DeleteQuestion(c *gin.Context) {
 
 	var existingQuestion models.Question
 	err := common.GetOne((*common.Env)(e), common.QuestionTable, questionId, &existingQuestion)
+	if err != nil {
+		common.Respond(c, existingQuestion, err)
+		return
+	}
+
+	err = common.AssertUser(c, existingQuestion.UserId)
 	if err != nil {
 		common.Respond(c, existingQuestion, err)
 		return

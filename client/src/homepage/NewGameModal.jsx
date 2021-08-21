@@ -1,18 +1,17 @@
 import React from 'react';
 import './Homepage.css';
 
-import { Modal, Button } from 'antd';
+import { Modal, Button, Breadcrumb } from 'antd';
 import GameNames from "./GameNames"
+
+import { PlusSquareOutlined } from "@ant-design/icons";
 
 class NewGameModal extends React.Component {
 
-  constructor(props) {
-    super(props)
-    this.state = {
-      open: false,
-      selected_game: "",
-      name: ""
-    }
+  state = {
+    open: false,
+    selected_game: "",
+    name: ""
   }
 
   open = () => { this.setState({ open: true }) }
@@ -62,16 +61,30 @@ class NewGameModal extends React.Component {
 
           <div>
             <input value={this.state.name} onChange={this.set_name} placeholder="Game name" />
-            <GameNames select={this.select_game} selected={this.state.selected_game} />
+            <GameNames select={this.select_game} selected={this.state.selected_game} token={this.props.token} />
           </div>
         </Modal>
       )
     }
 
     return (
-      <Button type="primary" onClick={this.open} style={{margin: 50}}>
-        New Game
-      </Button>
+      <div>
+        <Breadcrumb style={{ margin: 16 }}>
+          <Breadcrumb.Item>BortTrivia</Breadcrumb.Item>
+          <Breadcrumb.Item>Home</Breadcrumb.Item>
+        </Breadcrumb>
+
+        <Button type="primary" disabled={this.props.token === ""} onClick={this.open} style={{ margin: 50 }}>
+          <span>
+
+            <PlusSquareOutlined style={{ marginRight: 5 }} />
+            New Game
+          </span>
+
+
+        </Button>
+      </div>
+
     );
   }
 }
