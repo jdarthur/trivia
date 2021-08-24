@@ -8,6 +8,8 @@ ReactDOM.render(
     domain="borttrivia.us.auth0.com"
     clientId="03cLv60jN7hC79K8oUXHDF1wsenRTMx5"
     redirectUri={window.location.origin}
+    useRefreshTokens={true}
+    cacheLocation="localstorage"
     audience="https://borttrivia.com/editor" >
     <App />
   </Auth0Provider>,

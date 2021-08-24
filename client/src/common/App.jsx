@@ -39,10 +39,9 @@ class App extends React.Component {
   componentDidMount() {
     let search = window.location.search;
     let params = new URLSearchParams(search);
-    let key = params.get("key");
 
     const is_mobile = window.matchMedia("only screen and (max-width: 760px)").matches;
-    this.setState({ key: key, is_mobile: is_mobile })
+    this.setState({ is_mobile: is_mobile })
   }
 
   set_show_editor = (value) => {
