@@ -37,9 +37,6 @@ class App extends React.Component {
   }
 
   componentDidMount() {
-    let search = window.location.search;
-    let params = new URLSearchParams(search);
-
     const is_mobile = window.matchMedia("only screen and (max-width: 760px)").matches;
     this.setState({ is_mobile: is_mobile })
   }

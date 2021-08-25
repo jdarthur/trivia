@@ -10,7 +10,8 @@ ReactDOM.render(
     redirectUri={window.location.origin}
     useRefreshTokens={true}
     cacheLocation="localstorage"
-    audience="https://borttrivia.com/editor" >
+    audience="https://borttrivia.com/editor"
+    scope="openid profile email offline_access read:current_user" >
     <App />
   </Auth0Provider>,
   document.getElementById('root')
