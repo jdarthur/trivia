@@ -16,7 +16,7 @@ class Editor extends React.Component {
         return (
             <div style={{overflowY: "auto"}}>
                 <span>
-                    <Breadcrumb style={{ margin: 16, display: "flex" }}>
+                    <Breadcrumb style={{ marginLeft: 15, marginTop: 10, display: "flex" }}>
                         <Breadcrumb.Item>Editor</Breadcrumb.Item>
                         <Breadcrumb.Item>{this.props.section}</Breadcrumb.Item>
                     </Breadcrumb>

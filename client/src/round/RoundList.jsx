@@ -5,10 +5,7 @@ import Round from "./Round.jsx"
 import OpenRound from "./OpenRound.jsx"
 import EditorFilter from "../editor/EditorFilter.jsx"
 import LoadingOrView from "../editor/LoadingOrView"
-
-import {
-    PlusSquareOutlined,
-} from '@ant-design/icons';
+import NewButton from '../editor/NewButton';
 
 
 
@@ -182,7 +179,7 @@ class RoundList extends React.Component {
                 selected={(this.state.selected === round.id) ? true : false}
                 set_selected={this.set_selected} delete={this.delete} />))
 
-        const nrb = this.add_newround_button() ? <PlusSquareOutlined className="new_button" onClick={this.add_new_round} /> : null
+        const nrb = this.add_newround_button() ? <NewButton on_click={this.add_new_round} /> : null
 
         let open_round = null
         if (this.state.selected !== "") {

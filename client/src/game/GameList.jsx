@@ -6,6 +6,7 @@ import OpenGame from "./OpenGame.jsx"
 
 
 import {PlusSquareOutlined} from '@ant-design/icons';
+import NewButton from '../editor/NewButton';
 
 //JSON keys
 const NAME = "name"
@@ -172,7 +173,7 @@ class GameList extends React.Component {
                   set_selected={this.set_selected} delete={this.delete}/>))
 
         const ngb = this.add_newgame_button() ?
-            <PlusSquareOutlined className="new_button" onClick={this.add_new_game}/> : null
+            <NewButton on_click={this.add_new_game}/> : null
 
         let open_game = null
         if (this.state.selected !== "") {

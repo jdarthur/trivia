@@ -5,10 +5,11 @@ import DeleteConfirm from "../editor/DeleteConfirm"
 import EditorFilter from "../editor/EditorFilter.jsx"
 import LoadingOrView from "../editor/LoadingOrView"
 import EditQuestionController from './EditQuestionController';
+import NewButton from "../editor/NewButton"
 
 import { Table } from "antd"
 
-import { EditOutlined, PlusSquareOutlined } from '@ant-design/icons';
+import { EditOutlined } from '@ant-design/icons';
 
 
 //JSON keys
@@ -178,9 +179,8 @@ class QuestionList extends React.Component {
                 id={this.state.selected} delete={this.delete} />
         }
 
-
         const nqb = this.add_newquestion_button() ?
-            <PlusSquareOutlined className="new_button" onClick={this.add_new_question} /> : null
+            <NewButton on_click={this.add_new_question} /> : null
         const pagination = {
             total: this.state.questions?.length || 0,
             showTotal: (total, range) => `${range[0]}-${range[1]} of ${total}`

@@ -69,7 +69,7 @@ class NewGameModal extends React.Component {
 
     return (
       <div>
-        <Breadcrumb style={{ margin: 16 }}>
+        <Breadcrumb style={{ marginLeft: 15, marginTop: 10 }}>
           <Breadcrumb.Item>BortTrivia</Breadcrumb.Item>
           <Breadcrumb.Item>Home</Breadcrumb.Item>
         </Breadcrumb>
