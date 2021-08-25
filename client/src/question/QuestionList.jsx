@@ -6,9 +6,9 @@ import EditorFilter from "../editor/EditorFilter.jsx"
 import LoadingOrView from "../editor/LoadingOrView"
 import EditQuestionController from './EditQuestionController';
 
-import {Table} from "antd"
+import { Table } from "antd"
 
-import {EditOutlined, PlusSquareOutlined} from '@ant-design/icons';
+import { EditOutlined, PlusSquareOutlined } from '@ant-design/icons';
 
 
 //JSON keys
@@ -43,24 +43,24 @@ class QuestionList extends React.Component {
             url += "&unused_only=true"
         }
 
-        this.setState({loading: true}, () => {
-            fetch(url, {headers: {"borttrivia-token": this.props.token}})
+        this.setState({ loading: true }, () => {
+            fetch(url, { headers: { "borttrivia-token": this.props.token } })
                 .then(response => response.json())
                 .then(state => {
                     console.log(state)
-                    this.setState({questions: state.questions, loading: false})
+                    this.setState({ questions: state.questions, loading: false })
                 })
         })
     }
 
     set_unused_only = (value) => {
-        this.setState({unused_only: value}, () => {
+        this.setState({ unused_only: value }, () => {
             this.get_questions()
         })
     }
 
     set_text_filter = (value) => {
-        this.setState({text_filter: value}, () => {
+        this.setState({ text_filter: value }, () => {
             this.get_questions()
         })
     }
@@ -68,7 +68,7 @@ class QuestionList extends React.Component {
     set_selected = (question_id) => {
         if (this.state.selected !== question_id) {
             this.save(this.state.selected)
-            this.setState({selected: question_id});
+            this.setState({ selected: question_id });
         }
     }
 
@@ -83,7 +83,7 @@ class QuestionList extends React.Component {
     set_value = (question_id, key, value) => {
         const question = find(question_id, this.state.questions)
         question[key] = value
-        this.setState({questions: this.state.questions, dirty: question_id});
+        this.setState({ questions: this.state.questions, dirty: question_id });
     }
 
     save = (question_id) => {
@@ -96,12 +96,12 @@ class QuestionList extends React.Component {
                     .then((data) => {
                         console.log(data)
                         question.id = data.id
-                        this.setState({questions: this.state.questions, dirty: ""})
+                        this.setState({ questions: this.state.questions, dirty: "" })
                     })
             } else {
                 sendData(question_id, "PUT", question, this.props.token)
                     .then((data) => {
-                        this.setState({dirty: ""})
+                        this.setState({ dirty: "" })
                     })
             }
         }
@@ -125,7 +125,7 @@ class QuestionList extends React.Component {
      */
     delete_and_update_state = (question) => {
         const data = this.state.questions.filter(item => item.id !== question.id);//   this.state.questions.splice(index, 1)
-        this.setState({questions: data, dirty: "", selected: ""})
+        this.setState({ questions: data, dirty: "", selected: "" })
     }
 
     add_newquestion_button = () => {
@@ -145,25 +145,27 @@ class QuestionList extends React.Component {
             [ID]: NEW
         }
 
-        const data =  this.state.questions? [...this.state.questions] : []
+        const data = this.state.questions ? [...this.state.questions] : []
         data.push(question)
-        this.setState({questions: data}, () => {
+        this.setState({ questions: data }, () => {
             this.set_selected(NEW)
         })
     }
 
     render() {
 
-        const delete_edit = (text, record) => <span style={{fontSize: '1.2em'}}>
-      <DeleteConfirm delete={() => this.delete(record.id)} style={{paddingRight: 10}}/>
-      <EditOutlined onClick={() => this.set_selected(record.id)}/>
-    </span>
+        const delete_edit = (text, record) => <span style={{ fontSize: '1.2em' }}>
+            <DeleteConfirm delete={() => this.delete(record.id)} style={{ paddingRight: 10 }} />
+            <EditOutlined onClick={() => this.set_selected(record.id)} />
+        </span>
+
+
 
         const columns = [
-            {title: "", render: delete_edit, width: '7em'},
-            {title: 'Category', dataIndex: 'category', ellipsis: {showTitle: false}},
-            {title: 'Question', dataIndex: 'question', ellipsis: {showTitle: false}, width: '50%'},
-            {title: 'Answer', dataIndex: 'answer', ellipsis: {showTitle: false}}
+            { title: "", render: delete_edit, width: '5em' },
+            { title: 'Category', dataIndex: 'category', ellipsis: { showTitle: false } },
+            { title: 'Question', dataIndex: 'question', ellipsis: { showTitle: false }, width: '50%' },
+            { title: 'Answer', dataIndex: 'answer', ellipsis: { showTitle: false } }
         ]
 
 
@@ -171,32 +173,38 @@ class QuestionList extends React.Component {
         if (this.state.selected) {
             const selected = find(this.state.selected, this.state.questions)
             question_editor = <EditQuestionController answer={selected.answer} question={selected.question}
-                                                      category={selected.category} select={this.set_selected}
-                                                      set={this.set_value}
-                                                      id={this.state.selected} delete={this.delete}/>
+                category={selected.category} select={this.set_selected}
+                set={this.set_value}
+                id={this.state.selected} delete={this.delete} />
         }
 
 
         const nqb = this.add_newquestion_button() ?
-            <PlusSquareOutlined className="new_button" onClick={this.add_new_question}/> : null
+            <PlusSquareOutlined className="new_button" onClick={this.add_new_question} /> : null
         const pagination = {
             total: this.state.questions?.length || 0,
             showTotal: (total, range) => `${range[0]}-${range[1]} of ${total}`
         }
 
+        const scroll = {
+            x: true,
+            y: false
+        }
+
         const table_and_modal = <div>
             {question_editor}
-            <Table columns={columns} dataSource={this.state.questions} pagination={pagination}/>
+            <Table columns={columns} dataSource={this.state.questions} pagination={pagination}
+             scroll={scroll} size="small"/>
         </div>
 
         return (
             <div className="ql_and_filter">
                 <EditorFilter set_text_filter={this.set_text_filter} set_unused_only={this.set_unused_only}
-                              data_type="questions"
-                              text_filter={this.state.text_filter} unused_only={this.state.unused_only}
-                              add_button={nqb}/>
+                    data_type="questions"
+                    text_filter={this.state.text_filter} unused_only={this.state.unused_only}
+                    add_button={nqb} />
                 <LoadingOrView loading={this.state.loading} class_name="question-list"
-                               empty={this.state.questions?.length === 0} loaded_view={table_and_modal}/>
+                    empty={this.state.questions?.length === 0} loaded_view={table_and_modal} />
             </div>
         );
     }
@@ -229,7 +237,7 @@ async function sendData(question_id, method, question_data, token) {
     JSON.stringify(question_data)
     const response = await fetch(url, {
         method: method,
-        headers: {'Content-Type': 'application/json', "borttrivia-token": token},
+        headers: { 'Content-Type': 'application/json', "borttrivia-token": token },
         body: body
     })
     return response.json()

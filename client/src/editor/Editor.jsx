@@ -14,7 +14,7 @@ const GAMES = "Games"
 class Editor extends React.Component {
     render() {
         return (
-            <div >
+            <div style={{overflowY: "auto"}}>
                 <span>
                     <Breadcrumb style={{ margin: 16, display: "flex" }}>
                         <Breadcrumb.Item>Editor</Breadcrumb.Item>
