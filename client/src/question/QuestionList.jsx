@@ -187,14 +187,14 @@ class QuestionList extends React.Component {
         }
 
         const scroll = {
-            x: true,
+            x: 500,
             y: false
         }
 
         const table_and_modal = <div>
             {question_editor}
             <Table columns={columns} dataSource={this.state.questions} pagination={pagination}
-             scroll={scroll} size="small"/>
+             scroll={scroll} size="small" style={{maxWidth: 1500}}/>
         </div>
 
         return (
