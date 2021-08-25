@@ -3,9 +3,6 @@ import '../round/RoundList.css';
 
 import Game from "./Game.jsx"
 import OpenGame from "./OpenGame.jsx"
-
-
-import {PlusSquareOutlined} from '@ant-design/icons';
 import NewButton from '../editor/NewButton';
 
 //JSON keys

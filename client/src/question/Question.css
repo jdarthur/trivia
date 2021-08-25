@@ -83,10 +83,10 @@ blockquote {
 .editor-toolbar-button {
 	font-family: Georgia, serif;
 	font-size: 1.2em;
-	width: 30px;
+	width: 25px;
 	border-radius: 2px;
 	background: white;
-	margin-right: 5px;
+	margin-right: 3px;
 	cursor: pointer;
 	border: 1px solid white
 }
