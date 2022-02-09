@@ -6,20 +6,14 @@
     align-items: center;
     align-content: flex-start;
     width: 100%;
-    padding: 25px;
+    padding: 5px;
     flex: 1 1 auto;
 }
-
-.new_button {
-    padding-left: 50px;
-    font-size: 2em;
-}
-
 
 .ql_and_filter {
 	display: flex;
     flex-direction: column;
     align-items: center;
-    margin: 10px;
+    margin: 5px;
     flex: 1 1 auto;
 }

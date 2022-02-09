@@ -12,6 +12,7 @@ class FormattedQuestion extends React.Component {
                 <img alt={alt} src={src} title={alt}
                     style={{ maxWidth: this.props.max_width, maxHeight: '30vh' }} />),
             paragraph: ({ value, children }) => (<p style={{ "marginBottom": 5 }} > {children} </p>),
+            blockquote: (({ value, children }) => (<blockquote style={{ paddingRight: 10 }} > {children} </blockquote>)),
             // text: ({ value, children }) => (<p style={{ "marginBottom": 5 }} > {children} </p>)
         };
         return (
