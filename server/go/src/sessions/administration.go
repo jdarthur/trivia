@@ -74,8 +74,6 @@ func _setCurrentQuestion(e *Env, session *models.Session, questionIndex int, rou
 		return InvalidQuestionIndexError{QuestionIndex: questionIndex}
 	}
 
-	fmt.Println("inside _setCurrentQuestion")
-	fmt.Println(roundInSession)
 	//get question object inside this round
 	questionInRound := roundInSession.Questions[questionIndex]
 
@@ -148,7 +146,6 @@ func _setCurrentRound(e *Env, session *models.Session, roundIndex int, questionI
 
 	roundInSession.Wagers = round.Wagers
 	session.CurrentRound = &roundIndex
-	fmt.Println(roundInSession)
 	if len(roundInSession.Questions) == 0 {
 		fmt.Println("setting question categories in round")
 		//for each question, set the category in this session.Rounds.Questions array
@@ -368,7 +365,7 @@ func getQuestionIndex(session models.Session, roundIndex int, questionIndex int)
 	for i := 0; i <= roundIndex; i++ {
 		round := session.Rounds[i]
 		for j, _ := range round.Questions {
-			if roundIndex == i && questionIndex == j  {
+			if roundIndex == i && questionIndex == j {
 				return incr, nil
 			}
 			incr++

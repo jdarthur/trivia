@@ -136,8 +136,6 @@ func DecodeToken(jwtToken string) (jwt.MapClaims, error) {
 		return nil, errors.New("failed to get claims")
 	}
 
-	fmt.Println(claims)
-
 	return claims, nil
 }
 
