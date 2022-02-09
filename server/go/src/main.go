@@ -123,7 +123,3 @@ func main() {
 	fmt.Println()
 	router.Run()
 }
-
-func createImageDirIfNotExists() {
-
-}

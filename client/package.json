@@ -10,6 +10,7 @@
     "antd": "^4.6.5",
     "auth0-lock": "^11.27.1",
     "http-proxy-middleware": "^1.0.3",
+    "n": "^8.0.2",
     "react": "^16.13.1",
     "react-addons-css-transition-group": "^15.6.2",
     "react-dom": "^16.13.1",
@@ -19,7 +20,7 @@
     "react-transition-group": "^4.4.1"
   },
   "scripts": {
-    "start": "HOST=0.0.0.0 PORT=443 HTTPS=true SSL_CRT_FILE=cert/private.pem SSL_KEY_FILE=cert/private.key react-scripts start",
+    "start": "react-scripts start",
     "build": "react-scripts build",
     "test": "react-scripts test",
     "eject": "react-scripts eject"

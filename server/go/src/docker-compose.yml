@@ -4,7 +4,11 @@ services:
     build: .
     ports:
       - "8080:8080"
+    volumes:
+      - ./.env:/go/src/.env:Z
   mongo:
     image: "mongo"
+#    ports:
+#      - "27017:27017"
     volumes:
-      - ~/trivdata:/data/db
+      - ~/trivdata:/data/db:Z
