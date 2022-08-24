@@ -232,3 +232,5 @@ class DummySessionWithPlayers(object):
         delete_session(self.session_id, self.mod_id)
         for player_id in self.players:
             delete_player(player_id)
+
+

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/globalsign/mgo"
+	"github.com/jdarthur/trivia/collections"
 	"github.com/jdarthur/trivia/common"
 	"github.com/jdarthur/trivia/games"
 	"github.com/jdarthur/trivia/players"
@@ -119,6 +120,14 @@ func main() {
 	router.POST("/gameplay/session/:id/add", p.AddPlayerToSession)
 	router.POST("/gameplay/session/:id/remove", p.RemovePlayerFromSession)
 	router.DELETE("/gameplay/player/:id", p.DeletePlayer)
+
+	fmt.Println("\nCollection API:")
+	coll := collections.Env{Db: client}
+	router.GET("/editor/collections", auth.AsUser, coll.GetAllCollections)
+	router.GET("/editor/collections/:id", auth.AsUser, coll.GetOneCollection)
+	router.POST("/editor/collections", auth.AsUser, coll.CreateCollection)
+	router.DELETE("/editor/collections/:id", auth.AsUser, coll.DeleteCollection)
+	router.POST("/editor/collections/:id/import", auth.AsUser, coll.ImportCollection)
 
 	fmt.Println()
 	router.Run()

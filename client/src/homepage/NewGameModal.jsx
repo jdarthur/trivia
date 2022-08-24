@@ -1,10 +1,11 @@
 import React from 'react';
 import './Homepage.css';
 
-import { Modal, Button, Breadcrumb } from 'antd';
+import { Modal, Button } from 'antd';
 import GameNames from "./GameNames"
 
 import { PlusSquareOutlined } from "@ant-design/icons";
+import PageHeader from "../common/PageHeader";
 
 class NewGameModal extends React.Component {
 
@@ -69,10 +70,7 @@ class NewGameModal extends React.Component {
 
     return (
       <div>
-        <Breadcrumb style={{ marginLeft: 15, marginTop: 10 }}>
-          <Breadcrumb.Item>BortTrivia</Breadcrumb.Item>
-          <Breadcrumb.Item>Home</Breadcrumb.Item>
-        </Breadcrumb>
+        <PageHeader breadcrumbs={["Home"]} />
 
         <Button type="primary" disabled={this.props.token === ""} onClick={this.open} style={{ margin: 50 }}>
           <span>

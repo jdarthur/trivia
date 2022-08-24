@@ -77,7 +77,7 @@ class Homepage extends React.Component {
           const update = {
             is_mod: state.mod !== undefined,
             name: state.name,
-            started: state.started ? true : false,
+            started: !!state.started,
             rounds: rounds
           }
 

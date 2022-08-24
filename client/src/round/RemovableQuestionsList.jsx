@@ -42,10 +42,14 @@ class RemovableQuestionsList extends React.Component {
                 token={this.props.token}
             />)
         )
-        const show_empty = this.props.questions.length > 0 ? false : true
+        const show_empty = this.props.questions.length <= 0
+        let className = "rem-question-list"
+        if (show_empty) {
+            className += " centered"
+        }
 
         return (
-            <div className={"rem-question-list" + show_empty? " centered" : ""}  >
+            <div className={className} >
                 {show_empty ? <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="No questions added"/> : questions }
 
                 {this.state.selected_questions.length > 0 ?

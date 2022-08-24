@@ -177,3 +177,13 @@ func AssertUser(c *gin.Context, correctUserId string) error {
 	}
 	return nil
 }
+
+func AssertHasUserId(c *gin.Context) (string, error) {
+	value, ok := c.Get(USER_ID)
+	if ok {
+		userIdFromRequest := value.(string)
+		return userIdFromRequest, nil
+	} else {
+		return "", InvalidUserError{UserId: ""}
+	}
+}

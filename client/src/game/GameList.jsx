@@ -4,6 +4,8 @@ import '../round/RoundList.css';
 import Game from "./Game.jsx"
 import OpenGame from "./OpenGame.jsx"
 import NewButton from '../editor/NewButton';
+import PageHeader from "../common/PageHeader";
+import LoadingOrView from "../editor/LoadingOrView";
 
 //JSON keys
 const NAME = "name"
@@ -166,7 +168,7 @@ class GameList extends React.Component {
         const games = this.state.games?.map((game, index) => (
             <Game key={game.id} id={game.id} name={game.name} create_date={game.create_date}
                   rounds={game.rounds} round_names={game.round_names}
-                  selected={(this.state.selected === game.id) ? true : false}
+                  selected={(this.state.selected === game.id)}
                   set_selected={this.set_selected} delete={this.delete}/>))
 
         const ngb = this.add_newgame_button() ?
@@ -183,9 +185,10 @@ class GameList extends React.Component {
         }
         return (
             <div className="round-and-open-question">
-                <div className="round_list">
-                    {games}
-                    {ngb}
+                <div className="ql_and_filter">
+                    <PageHeader breadcrumbs={["Editor", "Games"]} header={ngb} style={{marginBottom: 10}}/>
+                    <LoadingOrView class_name="round_list"
+                                   empty={this.state.games?.length === 0} loaded_view={games} />
                 </div>
                 {open_game}
             </div>

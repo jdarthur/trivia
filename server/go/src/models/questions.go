@@ -10,7 +10,7 @@ var RoundsUsed = "rounds_used"
 
 type Question struct {
 	ID         bson.Binary `bson:"_id" json:"id"`
-	CreateDate time.Time   `bson:"create_date" json:"create_date""`
+	CreateDate time.Time   `bson:"create_date" json:"create_date"`
 	Category   string      `json:"category" form:"category"`
 	Question   string      `json:"question" form:"question"`
 	Answer     string      `json:"answer" form:"answer"`

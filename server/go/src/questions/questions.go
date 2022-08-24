@@ -161,7 +161,40 @@ func (e *Env) DeleteQuestion(c *gin.Context) {
 		}
 	}
 
+	err = e.deleteFromCollections(c, questionId)
 	common.Respond(c, existingQuestion, err)
+}
+
+func (e *Env) deleteFromCollections(c *gin.Context, targetQuestionId string) error {
+	filter := make(map[string]interface{})
+	userId, err := common.AssertHasUserId(c)
+	if err != nil {
+		return err
+	}
+	filter["user_id"] = userId
+
+	collections, err := common.GetAll((*common.Env)(e), common.CollectionTable, filter)
+	for _, collection := range collections.([]*models.Collection) {
+		for _, questionId := range collection.Questions {
+			if questionId == targetQuestionId {
+
+				collectionId := models.IdAsString(collection.ID)
+
+				if len(collection.Questions) == 1 {
+					fmt.Println("no remaining questions... delete collection " + collectionId)
+					err = common.Delete((*common.Env)(e), common.CollectionTable, collectionId)
+					if err != nil {
+						return err
+					}
+				} else {
+					fmt.Println("remove question ID " + questionId + " from collection " + collectionId)
+					err = common.Pull((*common.Env)(e), common.CollectionTable, collectionId, models.Questions, questionId)
+				}
+			}
+		}
+	}
+
+	return nil
 }
 
 //Merge update body into existing question

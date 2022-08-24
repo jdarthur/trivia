@@ -1,8 +1,9 @@
 from pprint import pprint
 # from editor_server import (delete_question, get_question,
-                           # update_question, get_questions)
+# update_question, get_questions)
 from .test_helpers import dummy_question, object_with_id_in_list, has_errors, DummyQuestion
-from .api_calls import create_question, get_question, get_questions, update_question, delete_question, create_round, delete_round
+from .api_calls import create_question, get_question, get_questions, update_question, delete_question, create_round, \
+    delete_round
 
 
 def create_and_print(data):
@@ -37,7 +38,7 @@ def test_question_is_dict():
     print("\nTEST: question is dict")
     q = {"question": {"test": "123"}, "answer": "answer", "category": "birds"}
     created = create_and_print(q)
-    assert has_errors(created) == True
+    assert has_errors(created) is True
 
 
 def test_crud():
@@ -66,7 +67,6 @@ def test_crud():
 def test_update_with_invalid_value():
     print("\nTEST: update a question with an invalid value")
     with DummyQuestion() as question_id:
-
         updated = update_question(question_id, {"answer": 3})
         print("   updated: {}".format(updated))
         assert has_errors(updated) == True
@@ -75,10 +75,10 @@ def test_update_with_invalid_value():
         print("   got: {}".format(obj))
         assert obj["answer"] != 3
 
+
 def test_update_rounds_used():
     print("\nTEST: update a question's 'rounds_used' field")
     with DummyQuestion() as question_id:
-
         updated = update_question(question_id, {"rounds_used": ["test1234"]})
         print("   updated: {}".format(updated))
         assert has_errors(updated) == True
@@ -87,11 +87,13 @@ def test_update_rounds_used():
         print("   got: {}".format(obj))
         assert len(obj["rounds_used"]) == 0
 
+
 def test_create_with_rounds_used():
     print("\nTEST: create a question with 'rounds_used' field filled out")
     q = {"question": "test1234", "answer": "answer", "category": "birds", "rounds_used": ["test1234"]}
     created = create_and_print(q)
     assert has_errors(created) == True
+
 
 def test_create_with_extra_fields():
     print("\nTEST: create a question with extra fields and make sure they are ignored")
@@ -102,7 +104,7 @@ def test_create_with_extra_fields():
     delete_question(created["id"])
 
 
-def test_get_questionss_with_exclusion_filter():
+def test_get_questions_with_exclusion_filter():
     q = {"question": "test1234", "answer": "answer", "category": "birds", "extra1": "something"}
     created_q = create_question(q)
 
@@ -124,4 +126,3 @@ def test_get_questionss_with_exclusion_filter():
     delete_round(created_r["id"])
 
     assert all_questions_len > filtered_questions_len
-

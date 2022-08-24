@@ -24,6 +24,7 @@ var SessionTable = "session"
 var PlayerTable = "player"
 var AnswerTable = "answer"
 var SessionStateTable = "session_state"
+var CollectionTable = "collection"
 
 type Env struct {
 	Db *mgo.Session
@@ -169,8 +170,6 @@ func update(e *Env, objectType string, objectId string, change bson.M) error {
 	//set MongoDB database & record type
 	collection := e.Db.DB(Database).C(objectType)
 
-	fmt.Println("update: " + fmt.Sprint("%v", change))
-
 	//update a record by ID
 	err = collection.UpdateId(filter, change)
 	if err != nil {
@@ -201,6 +200,8 @@ func GetAll(e *Env, objectType string, filters interface{}) (interface{}, error)
 		slice = make([]*models.Game, 0, 0)
 	case SessionTable:
 		slice = make([]*models.Session, 0, 0)
+	case CollectionTable:
+		slice = make([]*models.Collection, 0, 0)
 
 	default:
 		return nil, errors.New("invalid get all table: " + objectType)
