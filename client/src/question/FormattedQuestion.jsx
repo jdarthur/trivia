@@ -5,28 +5,32 @@ import remarkGfm from 'remark-gfm'
 
 import './Question.css';
 
-class FormattedQuestion extends React.Component {
+export default function FormattedQuestion(props) {
 
-    render() {
-        const renderers = {
-            img: ({ alt, src }) => (
-                <img alt={alt} src={src} title={alt}
-                    style={{ maxWidth: this.props.max_width, maxHeight: '30vh' }} />),
-            p: ({ value, children }) => (<p style={{ "marginBottom": 5 }} > {children} </p>),
-            blockquote: (({ value, children }) => (<blockquote style={{ paddingRight: 10 }} >{children}</blockquote>)),
-            code: (({ value, children }) => (<pre style={{ background: "#262626", color: "#fafafa" }} >{asCode(children.toString())}</pre>)),
-            // text: ({ value, children }) => (<p style={{ "marginBottom": 5 }} > {children} </p>)
-        };
-        return (
-            <div>
-                <ReactMarkdown components={renderers}
-                               children={this.props.question}
-                               remarkPlugins={[remarkGfm]}
-                />
-                <ReactMarkdown components={renderers} className="answer"  children={this.props.answer}/>
-            </div>
-        );
+    let answer = props?.answer
+    if (!answer) {
+       answer = "[no answer]"
     }
+
+    const renderers = {
+        img: ({alt, src}) => (
+            <img alt={alt} src={src} title={alt}
+                 style={{maxWidth: props.max_width, maxHeight: '30vh'}}/>),
+        p: ({value, children}) => (<p style={{"marginBottom": 5}}> {children} </p>),
+        blockquote: (({value, children}) => (<blockquote style={{paddingRight: 10}}>{children}</blockquote>)),
+        code: (({value, children}) => (
+            <pre style={{background: "#262626", color: "#fafafa"}}>{asCode(children.toString())}</pre>)),
+        // text: ({ value, children }) => (<p style={{ "marginBottom": 5 }} > {children} </p>)
+    };
+    return (
+        <div>
+            <ReactMarkdown components={renderers}
+                           children={props.question}
+                           remarkPlugins={[remarkGfm]}
+            />
+            <ReactMarkdown components={renderers} className="answer" children={answer}/>
+        </div>
+    );
 }
 
 const lineNumberBaseStyle = {
@@ -54,5 +58,3 @@ function asCode(rawText) {
         </div>
     })
 }
-
-export default FormattedQuestion

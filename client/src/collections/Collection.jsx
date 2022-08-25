@@ -28,19 +28,17 @@ export default function Collection(props) {
     }
 
     const copyShareLink = () => {
-        const copyText = document.getElementById(INVITE_LINK);
-        navigator.clipboard.writeText(copyText.value).then(() => {
+        navigator.clipboard.writeText(invite_link()).then(() => {
             notify(true, 'Copied link to clipboard', true)
         });
     }
 
     const invite_link = () => {
-        return window.location.href + "collections/import/" + props.id
+        return window.location.origin + "/collections?import="+ props.id
     }
 
     const extra = <div style={{display: "flex", alignItems: "center", fontSize: "1.2em"}}>
         <DeleteConfirm delete={deleteSelf} />
-        <input className="invite-link" id={INVITE_LINK} readOnly hidden value={invite_link()} />
         <ShareAltOutlined id={INVITE_LINK + props.id} style={{cursor: "pointer"}} onClick={copyShareLink}/>
     </div>
 

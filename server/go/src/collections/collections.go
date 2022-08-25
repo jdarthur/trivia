@@ -26,7 +26,19 @@ func (e *Env) GetOneCollection(c *gin.Context) {
 	collectionId := c.Param("id")
 
 	var data models.Collection
+	data.QuestionData = make([]models.Question, 0)
 	err := common.GetOne((*common.Env)(e), common.CollectionTable, collectionId, &data)
+
+	//load all the question data since another user would be able to query these question IDs
+	for _, questionId := range data.Questions {
+		var question models.Question
+		err := common.GetOne((*common.Env)(e), common.QuestionTable, questionId, &question)
+		if err != nil {
+			common.Respond(c, nil, err)
+			return
+		}
+		data.QuestionData = append(data.QuestionData, question)
+	}
 
 	//don't need to assert user ID is correct.
 	//Collections are designed to be created and shared with another user
@@ -139,6 +151,7 @@ func (e *Env) ImportCollection(c *gin.Context) {
 		fmt.Println("copy question: ", question)
 
 		question.UserId = userId
+		question.RoundsUsed = make([]string, 0)
 		id, createDate, err := common.Create((*common.Env)(e), common.QuestionTable, &question)
 
 		question.ID = id

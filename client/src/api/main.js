@@ -52,7 +52,7 @@ export const mainApi = createApi({
         importCollection: builder.mutation({
             query: (id) => ({
                 url: `editor/collections/${id}/import`,
-                method: "DELETE"
+                method: "POST"
             }),
         }),
         getQuestions: builder.query({

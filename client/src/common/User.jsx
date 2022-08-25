@@ -21,8 +21,8 @@ const User = (props) => {
                 const token = await getAccessTokenSilently({
                     audience: `https://borttrivia.com/editor`,
                     scope: "read:current_user",
+
                 });
-                console.log(token)
                 dispatch(setToken({token}));
                 props.set_token(token)
             } catch (e) {

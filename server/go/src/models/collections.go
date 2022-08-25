@@ -9,11 +9,12 @@ import (
 var QuestionIds = "questions"
 
 type Collection struct {
-	ID         bson.Binary `bson:"_id" json:"id"`
-	Name       string      `json:"name"`
-	CreateDate time.Time   `bson:"create_date" json:"create_date"`
-	Questions  []string    `json:"questions"`
-	UserId     string      `json:"user_id" bson:"user_id"`
+	ID           bson.Binary `bson:"_id" json:"id"`
+	Name         string      `json:"name"`
+	CreateDate   time.Time   `bson:"create_date" json:"create_date"`
+	Questions    []string    `json:"questions"`
+	QuestionData []Question  `json:"question_data"`
+	UserId       string      `json:"user_id" bson:"user_id"`
 }
 
 func (c Collection) SetCreateDate(createDate time.Time) Object {
