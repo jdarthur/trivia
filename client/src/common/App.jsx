@@ -2,18 +2,26 @@ import React, {useEffect, useState} from 'react';
 import {Link, Outlet, Route, Routes} from "react-router-dom";
 
 import HomePage from "../homepage/Homepage.jsx"
-import AuthButton from "./AuthButton.js"
 
 import './App.css';
 import logo from "./borttrivia.png"
 
 import 'antd/dist/antd.css';
-import {Layout, Menu} from 'antd';
+import {Layout, Menu, Spin} from 'antd';
 import {FormOutlined} from '@ant-design/icons';
 import QuestionList from "../question/QuestionList";
 import RoundList from "../round/RoundList";
 import GameList from "../game/GameList";
 import CollectionList from "../collections/CollectionList";
+import {ProtectedRoute} from "./ProtectedRoute";
+import {useAuth0} from "@auth0/auth0-react";
+import {CallbackPage} from "./CallbackPage";
+import {useDispatch} from "react-redux";
+import Auth, {setToken as setAuthToken} from "../api/auth";
+import AuthButton from "./AuthButton";
+import {HistoryRouter} from "redux-first-history/rr6";
+import {createBrowserHistory} from "history";
+import AuthRequired from "./AuthRequired";
 
 const {Content, Header} = Layout;
 const {SubMenu} = Menu;
@@ -23,6 +31,8 @@ const ROUND = "Rounds"
 const GAME = "Games"
 const COLLECTION = "Collections"
 
+export const history = createBrowserHistory();
+
 export default function App() {
 
     const [token, setToken] = useState("")
@@ -30,18 +40,35 @@ export default function App() {
     const [isMod, setIsMod] = useState(false)
     const [isMobile, setIsMobile] = useState(false)
 
-    const showEditor = !!token
+    const {getAccessTokenSilently} = useAuth0();
+    const dispatch = useDispatch();
 
     useEffect(() => {
         const is_mobile = window.matchMedia("only screen and (max-width: 760px)").matches;
         setIsMobile(is_mobile)
-    }, [])
 
-    // componentDidMount()
-    // {
-    //     const is_mobile = window.matchMedia("only screen and (max-width: 760px)").matches;
-    //     this.setState({is_mobile: is_mobile})
-    // }
+        const getEditorJwt = async () => {
+
+            try {
+                const authToken = await getAccessTokenSilently({
+                    audience: "https://borttrivia.com/editor",
+                    scope: "openid profile email offline_access read:current_user",
+                });
+                console.log(authToken)
+                setToken(authToken)
+                dispatch(setAuthToken({authToken}));
+            } catch (e) {
+                console.log(e.message);
+            }
+        };
+
+        getEditorJwt();
+    }, [getAccessTokenSilently]); // eslint-disable-line react-hooks/exhaustive-deps
+
+
+    const {isLoading: authIsLoading} = useAuth0();
+
+    const showEditor = !!token
 
     const nothingView = <main style={{padding: "1rem"}}>
         <p>There's nothing here!</p>
@@ -79,41 +106,43 @@ export default function App() {
                   </Menu.Item>
                 </SubMenu>
 
-                <Menu.Item key="6" style={{float: "right"}} className="nohover"> <AuthButton
-                    set_token={setToken}/> </Menu.Item>
+                  <Menu.Item key="6" style={{float: "right"}} className="nohover">
+                      <AuthButton loading={authIsLoading}/>
+                  </Menu.Item>
 
               </Menu>
               </span>
 
     </Header>
 
+    const authRequired = <Outlet/>
 
     return (
         <Layout className="height-trick" style={{minWidth: 'min(1300px, 100vw)', maxWidth: '100vw'}}>
-            {showToolbar?  menu : null}
+
             <Layout className="site-layout">
                 <Content style={{display: 'flex', flexDirection: 'column'}}>
-                    <Routes>
-                        <Route path="/" element={<Outlet/>}>
-                            <Route path="questions" element={<Outlet/>}>
-                                <Route index element={<QuestionList token={token}/>}/>
-                            </Route>
-                            <Route path="rounds" element={<Outlet/>}>
+                    <HistoryRouter history={history}>
+                        {showToolbar ? menu : null}
+                        <Routes>
+                            <Route path="/" element={<HomePage set_started={setInGame}
+                                                               is_mobile={isMobile}
+                                                               set_is_mod={setIsMod}
+                                                               token={token}/>}/>
+                            <Route path="questions"
+                                   element={<AuthRequired token={token} component={<QuestionList />} />}/>
+                            <Route path="rounds" element={authRequired}>
                                 <Route index element={<RoundList token={token}/>}/>
                             </Route>
-                            <Route path="games" element={<Outlet/>}>
+                            <Route path="games" element={authRequired}>
                                 <Route index element={<GameList token={token}/>}/>
                             </Route>
-                            <Route path="collections" element={<Outlet/>}>
-                                <Route index element={<CollectionList />}/>
+                            <Route path="collections" element={authRequired}>
+                                <Route index element={<AuthRequired token={token} component={<CollectionList />} />}/>
                             </Route>
-                            <Route index element={<HomePage set_started={setInGame}
-                                                            is_mobile={isMobile}
-                                                            set_is_mod={setIsMod}
-                                                            token={token}/>} />
                             <Route path="*" element={nothingView}/>
-                        </Route>
-                    </Routes>
+                        </Routes>
+                    </HistoryRouter>
                 </Content>
             </Layout>
         </Layout>

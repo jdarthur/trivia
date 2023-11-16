@@ -9,7 +9,8 @@ class HotEditQuestion extends React.Component {
     state = {
         category: this.props.category,
         question: this.props.question,
-        answer: this.props.answer
+        answer: this.props.answer,
+        scoring_note: this.props.scoring_note,
     }
 
     set_value = (key, value) => {
@@ -25,11 +26,14 @@ class HotEditQuestion extends React.Component {
             question: {
                 category: this.state.category,
                 question: this.state.question,
-                answer: this.state.answer
+                answer: this.state.answer,
+                scoring_note: this.state.scoring_note
             }
         }
 
-        save(this.props.session_id, this.props.player_id, question).then((data) => {this.props.close()})
+        save(this.props.session_id, this.props.player_id, question).then((data) => {
+            this.props.close()
+        })
     }
 
     disabled = () => {
@@ -44,11 +48,16 @@ class HotEditQuestion extends React.Component {
 
 
         return (
-            <EditQuestionModal title="Edit Question" cancel_action={this.props.close}
+            <EditQuestionModal title="Edit Question" cancel={this.props.close}
                                save_text="Update" save_action={this.save_self}
                                question={this.state.question} answer={this.state.answer}
                                category={this.state.category} footer={footer}
-                               set={this.set_value}/>
+                               set_question={(value) => this.set_value("question", value)}
+                               set_category={(value) => this.set_value("category", value)}
+                               set_answer={(value) => this.set_value("answer", value)}
+                               scoring_note={this.state.scoring_note}
+                               set_scoring_note={(value) => this.set_value("scoring_note", value)}
+                               visible={true}/>
         );
     }
 }

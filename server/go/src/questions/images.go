@@ -1,7 +1,6 @@
 package questions
 
 import (
-	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/jdarthur/trivia/common"
@@ -13,7 +12,7 @@ type ImageResponse struct {
 	FileName string ``
 }
 
-func (e Env) UploadImage(c *gin.Context) {
+func (e *Env) UploadImage(c *gin.Context) {
 	imageDir := os.Getenv("IMAGE_DIR")
 	if len(imageDir) == 0 {
 		imageDir = "images"
@@ -26,8 +25,6 @@ func (e Env) UploadImage(c *gin.Context) {
 	}
 
 	uploadedFileName := file.Filename
-	fmt.Println(file.Header)
-	fmt.Println(uploadedFileName)
 	parts := strings.Split(uploadedFileName, ".")
 	extension := parts[len(parts)-1]
 
@@ -37,8 +34,7 @@ func (e Env) UploadImage(c *gin.Context) {
 		return
 	}
 
-	responseFileName := imageDir+"/" + uuidFilename.String() + "." + extension
-	fmt.Println(responseFileName)
+	responseFileName := imageDir + "/" + uuidFilename.String() + "." + extension
 
 	err = c.SaveUploadedFile(file, responseFileName)
 	if err != nil {

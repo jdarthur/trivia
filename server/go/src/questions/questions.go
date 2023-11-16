@@ -7,58 +7,27 @@ import (
 	"github.com/jdarthur/trivia/common"
 	"github.com/jdarthur/trivia/models"
 	"strings"
+	"time"
 )
 
 type Env common.Env
 
-//Get all questions
 func (e *Env) GetAllQuestions(c *gin.Context) {
 	filter := createFilters(c)
 	questions, err := common.GetAll((*common.Env)(e), common.QuestionTable, filter)
 	common.Respond(c, gin.H{"questions": questions}, err)
 }
 
-//create unused_only and text_filter mongodb queries from request
-func createFilters(c *gin.Context) map[string]interface{} {
-	filter := make(map[string]interface{})
-	value, ok := c.Get(common.USER_ID)
-	if ok {
-		userId := value.(string)
-		filter["user_id"] = userId
-	}
-
-	//unused_only means that rounds_used = []
-	unusedOnly := c.DefaultQuery("unused_only", "false")
-	if strings.ToLower(unusedOnly) == "true" {
-		filter[models.RoundsUsed+".0"] = bson.M{"$exists": false}
-	}
-
-	//text_filter means that the search string appears in category/question/answer (case-insensitive)
-	textFilter := c.Query("text_filter")
-	if textFilter != "" {
-		search := bson.M{"$regex": bson.RegEx{Pattern: ".*" + textFilter + ".*", Options: "i"}}
-		filter["$or"] = []bson.M{{"question": search}, {"answer": search}, {"category": search}}
-	}
-	return filter
-}
-
-//Get one question by ID
 func (e *Env) GetOneQuestion(c *gin.Context) {
 	//get 'id' path param from query
 	questionId := c.Param("id")
+	userId := common.GetUserId(c)
 
-	//make a copy of the data model struct
-	var data models.Question
-	err := common.GetOne((*common.Env)(e), common.QuestionTable, questionId, &data)
+	question, err := GetOneQuestion(e, userId, questionId)
 
-	if err == nil {
-		err = common.AssertUser(c, data.UserId)
-	}
-
-	common.Respond(c, data, err)
+	common.Respond(c, question, err)
 }
 
-//create a new question
 func (e *Env) CreateQuestion(c *gin.Context) {
 
 	var data models.Question
@@ -71,26 +40,10 @@ func (e *Env) CreateQuestion(c *gin.Context) {
 		return
 	}
 
-	value, ok := c.Get(common.USER_ID)
-	if ok {
-		userId := value.(string)
-		data.UserId = userId
-	}
+	userId := common.GetUserId(c)
 
-	//rounds_used cannot be set by this API (it is set indirectly on a question in the rounds API)
-	if len(data.RoundsUsed) != 0 {
-		common.Respond(c, data, AttemptedToSetRoundsUsedError{RoundsUsed: data.RoundsUsed})
-		return
-	}
-
-	//set MongoDB database & record type
-	id, createDate, err := common.Create((*common.Env)(e), common.QuestionTable, &data)
-
-	//set these new items so that they appear in the API response
-	data.ID = id
-	data.CreateDate = createDate
-
-	common.Respond(c, data, err)
+	question, err := CreateOneQuestion(e, userId, data)
+	common.Respond(c, question, err)
 }
 
 func (e *Env) UpdateQuestion(c *gin.Context) {
@@ -104,74 +57,23 @@ func (e *Env) UpdateQuestion(c *gin.Context) {
 		return
 	}
 
-	//rounds_used cannot be set by this API (it is set indirectly on a question in the rounds API)
-	if len(updateBody.RoundsUsed) != 0 {
-		common.Respond(c, updateBody, AttemptedToSetRoundsUsedError{RoundsUsed: updateBody.RoundsUsed})
-		return
-	}
-
-	//get existing question from DB and return 404 if not found
-	var question models.Question
-	err = common.GetOne((*common.Env)(e), common.QuestionTable, questionId, &question)
-	if err != nil {
-		common.Respond(c, question, err)
-		return
-	}
-
-	err = common.AssertUser(c, question.UserId)
-	if err != nil {
-		common.Respond(c, question, err)
-		return
-	}
-
-	merge(&updateBody, &question)
-	err = common.Set((*common.Env)(e), common.QuestionTable, questionId, question)
+	userId := common.GetUserId(c)
+	question, err := UpdateOneQuestion(e, userId, questionId, updateBody)
 
 	common.Respond(c, question, err)
 }
 
 func (e *Env) DeleteQuestion(c *gin.Context) {
 	questionId := c.Param("id")
+	userId := common.GetUserId(c)
 
-	var existingQuestion models.Question
-	err := common.GetOne((*common.Env)(e), common.QuestionTable, questionId, &existingQuestion)
-	if err != nil {
-		common.Respond(c, existingQuestion, err)
-		return
-	}
+	question, err := DeleteOneQuestion(e, userId, questionId)
 
-	err = common.AssertUser(c, existingQuestion.UserId)
-	if err != nil {
-		common.Respond(c, existingQuestion, err)
-		return
-	}
-
-	err = common.Delete((*common.Env)(e), common.QuestionTable, questionId)
-	if err != nil {
-		common.Respond(c, existingQuestion, err)
-		return
-	}
-
-	for _, roundId := range existingQuestion.RoundsUsed {
-		fmt.Println("remove question ID " + models.IdAsString(existingQuestion.ID) + " from round " + roundId)
-		err = common.Pull((*common.Env)(e), common.RoundTable, roundId, models.Questions, models.IdAsString(existingQuestion.ID))
-		if err != nil {
-			common.Respond(c, existingQuestion, err)
-			return
-		}
-	}
-
-	err = e.deleteFromCollections(c, questionId)
-	common.Respond(c, existingQuestion, err)
+	common.Respond(c, question, err)
 }
 
-func (e *Env) deleteFromCollections(c *gin.Context, targetQuestionId string) error {
-	filter := make(map[string]interface{})
-	userId, err := common.AssertHasUserId(c)
-	if err != nil {
-		return err
-	}
-	filter["user_id"] = userId
+func (e *Env) deleteFromCollections(userId, targetQuestionId string) error {
+	filter := map[string]string{"user_id": userId}
 
 	collections, err := common.GetAll((*common.Env)(e), common.CollectionTable, filter)
 	for _, collection := range collections.([]*models.Collection) {
@@ -209,6 +111,8 @@ func merge(update *models.Question, original *models.Question) {
 	if update.Answer != "" {
 		original.Answer = update.Answer
 	}
+
+	original.ScoringNote = update.ScoringNote
 }
 
 type AttemptedToSetRoundsUsedError struct {
@@ -225,4 +129,151 @@ func (e AttemptedToSetRoundsUsedError) Field() string {
 
 func (e AttemptedToSetRoundsUsedError) Data() interface{} {
 	return e.RoundsUsed
+}
+
+func GetAllQuestions(e *Env, userId string) ([]*models.Question, error) {
+	filter := map[string]string{"user_id": userId}
+	data, err := common.GetAll((*common.Env)(e), common.QuestionTable, filter)
+	if err != nil {
+		return nil, err
+	}
+
+	questions := data.([]*models.Question)
+	return questions, nil
+}
+
+//create unused_only and text_filter mongodb queries from request
+func createFilters(c *gin.Context) map[string]interface{} {
+	filter := make(map[string]interface{})
+	value, ok := c.Get(common.USER_ID)
+	if ok {
+		userId := value.(string)
+		filter["user_id"] = userId
+	}
+
+	//unused_only means that rounds_used = []
+	unusedOnly := c.DefaultQuery("unused_only", "false")
+	if strings.ToLower(unusedOnly) == "true" {
+		filter[models.RoundsUsed+".0"] = bson.M{"$exists": false}
+	}
+
+	//text_filter means that the search string appears in category/question/answer (case-insensitive)
+	textFilter := c.Query("text_filter")
+	if textFilter != "" {
+		search := bson.M{"$regex": bson.RegEx{Pattern: ".*" + textFilter + ".*", Options: "i"}}
+		filter["$or"] = []bson.M{{"question": search}, {"answer": search}, {"category": search}}
+	}
+	return filter
+}
+
+func GetOneQuestion(e *Env, userId, questionId string) (models.Question, error) {
+	var data models.Question
+	err := common.GetOne((*common.Env)(e), common.QuestionTable, questionId, &data)
+	if err != nil {
+		return models.Question{}, err
+	}
+
+	err = common.AssertUserId(userId, data.UserId)
+	if err != nil {
+		return models.Question{}, err
+	}
+
+	return data, nil
+}
+
+func DeleteOneQuestion(e *Env, userId, questionId string) (models.Question, error) {
+	question, err := GetOneQuestion(e, userId, questionId)
+	if err != nil {
+		return models.Question{}, err
+	}
+
+	err = common.AssertUserId(userId, question.UserId)
+	if err != nil {
+		return models.Question{}, err
+	}
+
+	err = common.Delete((*common.Env)(e), common.QuestionTable, questionId)
+	if err != nil {
+		return models.Question{}, err
+	}
+
+	for _, roundId := range question.RoundsUsed {
+		fmt.Println("remove question ID " + models.IdAsString(question.ID) + " from round " + roundId)
+		err = common.Pull((*common.Env)(e), common.RoundTable, roundId, models.Questions, models.IdAsString(question.ID))
+		if err != nil {
+			return models.Question{}, err
+		}
+	}
+
+	return question, e.deleteFromCollections(userId, questionId)
+}
+
+func CreateOneQuestion(e *Env, userId string, data models.Question) (models.Question, error) {
+
+	data.UserId = userId
+
+	//rounds_used cannot be set by this API (it is set indirectly on a question in the rounds API)
+	if len(data.RoundsUsed) != 0 {
+		return models.Question{}, AttemptedToSetRoundsUsedError{RoundsUsed: data.RoundsUsed}
+	}
+
+	id, createDate, err := common.Create((*common.Env)(e), common.QuestionTable, &data)
+	if err != nil {
+		return models.Question{}, err
+	}
+
+	data.ID = id
+	data.CreateDate = createDate
+
+	if data.ScoringNote != "" {
+		err = UpdateLastUsedForScoringNote(e, userId, data.ScoringNote)
+	}
+
+	return data, err
+}
+
+func UpdateOneQuestion(e *Env, userId, questionId string, data models.Question) (models.Question, error) {
+
+	data.UserId = userId
+
+	//rounds_used cannot be set by this API (it is set indirectly on a question in the rounds API)
+	if len(data.RoundsUsed) != 0 {
+		return models.Question{}, AttemptedToSetRoundsUsedError{RoundsUsed: data.RoundsUsed}
+	}
+
+	if data.ScoringNote != "" {
+		_, err := GetOneScoringNote(e, userId, data.ScoringNote)
+		if err != nil {
+			return models.Question{}, err
+		}
+	}
+
+	question, err := GetOneQuestion(e, userId, questionId)
+	if err != nil {
+		return models.Question{}, err
+	}
+
+	merge(&data, &question)
+
+	err = common.Set((*common.Env)(e), common.QuestionTable, questionId, question)
+	if err != nil {
+		return models.Question{}, err
+	}
+
+	if data.ScoringNote != "" {
+		err = UpdateLastUsedForScoringNote(e, userId, data.ScoringNote)
+	}
+
+	return data, err
+}
+
+func UpdateLastUsedForScoringNote(e *Env, userId, scoringNoteId string) error {
+	note, err := GetOneScoringNote(e, userId, scoringNoteId)
+	if err != nil {
+		return err
+	}
+
+	note.LastUsed = time.Now()
+
+	return common.Set((*common.Env)(e), common.ScoringNoteTable, scoringNoteId, note)
 }

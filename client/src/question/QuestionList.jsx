@@ -20,6 +20,7 @@ export default function QuestionList() {
     const [textFilter, setTextFilter] = useState("")
     const [showModal, setShowModal] = useState(false)
     const [selected, setSelected] = useState({})
+    const [scoringNoteWasCleared, setScoringNoteWasCleared] = useState(false)
 
     let query = ""
     if (unusedOnly) {
@@ -67,11 +68,16 @@ export default function QuestionList() {
         {title: 'Category', dataIndex: 'category', ellipsis: {showTitle: false}},
         {title: 'Question', dataIndex: 'question', ellipsis: {showTitle: false}, width: '50%'},
         {title: 'Answer', dataIndex: 'answer', ellipsis: {showTitle: false}}
+
     ]
 
 
-    let question_editor = <EditQuestionController selected={selected} visible={showModal}
-                                                  delete={null} close={() => setShowModal(false)}/>
+    let question_editor = <EditQuestionController
+        selected={selected} visible={showModal}
+        delete={null} close={() => setShowModal(false)}
+        scoringNoteWasCleared={scoringNoteWasCleared}
+        setScoringNoteWasCleared={setScoringNoteWasCleared}
+    />
 
     const nqb = <NewButton on_click={newQuestion}/>
     const pagination = {
@@ -87,7 +93,7 @@ export default function QuestionList() {
     const table_and_modal = <div>
         {question_editor}
         <Table columns={columns} dataSource={questions} pagination={pagination}
-               scroll={scroll} size="small" style={{maxWidth: 1500}}/>
+               scroll={scroll} size="small" style={{maxWidth: 1500}} rowKey={"id"}/>
     </div>
 
     const header = <EditorFilter set_text_filter={setTextFilter} set_unused_only={setUnusedOnly}

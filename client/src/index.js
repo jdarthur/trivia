@@ -1,11 +1,16 @@
 import React from 'react';
 import ReactDOM from 'react-dom';
 import {Auth0Provider} from "@auth0/auth0-react";
-import App from './common/App.jsx';
+import App, {history} from './common/App.jsx';
 
 import {store} from './api/store';
 import {Provider} from "react-redux";
-import {BrowserRouter} from "react-router-dom";
+
+function redirectCallBack(appState) {
+    if (appState?.returnTo) {
+        history.replace((appState && appState.returnTo) || window.location.pathname);
+    }
+}
 
 ReactDOM.render(
     <Auth0Provider
@@ -15,12 +20,11 @@ ReactDOM.render(
         useRefreshTokens={true}
         cacheLocation="localstorage"
         audience="https://borttrivia.com/editor"
+        onRedirectCallback={redirectCallBack}
         scope="openid profile email offline_access read:current_user">
         <Provider store={store}>
-            <BrowserRouter>
-                <App/>
-            </BrowserRouter>
-        </Provider>
+                <App />
+            </Provider>
     </Auth0Provider>,
     document.getElementById('root')
 );

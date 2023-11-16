@@ -3,7 +3,7 @@ import {createApi, fetchBaseQuery, retry} from '@reduxjs/toolkit/query/react';
 
 export const baseQuery = retry(fetchBaseQuery({
     baseUrl: '/',
-    prepareHeaders: (headers, { getState }) => {
+    prepareHeaders: (headers, {getState}) => {
         const userToken = getState().auth.token;
 
         if (userToken) {
@@ -57,7 +57,7 @@ export const mainApi = createApi({
         }),
         getQuestions: builder.query({
             query: (queryParams) => ({
-                url: `editor/questions${queryParams? queryParams : ""}`,
+                url: `editor/questions${queryParams ? queryParams : ""}`,
             }),
             providesTags: ["questions"]
         }),
@@ -84,6 +84,27 @@ export const mainApi = createApi({
             }),
             invalidatesTags: ["questions"]
         }),
+        getScoringNotes: builder.query({
+            query: (queryParams) => ({
+                url: `editor/scoring_notes`,
+            }),
+            providesTags: ["scoring_notes"]
+        }),
+        createScoringNote: builder.mutation({
+            query: (body) => ({
+                url: `editor/scoring_notes`,
+                method: "POST",
+                body: body
+            }),
+            invalidatesTags: ["scoring_notes"]
+        }),
+        deleteScoringNote: builder.mutation({
+            query: (id) => ({
+                url: `editor/scoring_notes/${id}`,
+                method: "DELETE",
+            }),
+            invalidatesTags: ["scoring_notes", "questions"]
+        }),
     })
 })
 
@@ -97,4 +118,7 @@ export const {
     useCreateQuestionMutation,
     useUpdateQuestionMutation,
     useDeleteQuestionMutation,
+    useGetScoringNotesQuery,
+    useCreateScoringNoteMutation,
+    useDeleteScoringNoteMutation,
 } = mainApi

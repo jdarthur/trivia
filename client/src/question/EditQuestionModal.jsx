@@ -5,6 +5,7 @@ import {Input, Modal, Radio} from 'antd';
 import FormattedQuestion from "./FormattedQuestion"
 import EditorToolbar from "./EditorToolbar";
 import {ANSWER, CATEGORY, QUESTION} from "./EditQuestionController";
+import ScoringNote from "./ScoringNote";
 
 const {TextArea} = Input;
 
@@ -15,33 +16,6 @@ export default function EditQuestionModal(props) {
 
     const [selectedTab, setSelectedTab] = useState(EDIT)
     const [focusedInput, setFocusedInput] = useState(CATEGORY)
-
-    // componentDidMount() {
-    //     let active = "";
-    //     if (document.activeElement.id === CATEGORY) {
-    //         active = CATEGORY
-    //     }
-    //     if (document.activeElement.id === QUESTION) {
-    //         active = QUESTION
-    //     }
-    //     if (document.activeElement.id === ANSWER) {
-    //         active = ANSWER
-    //     }
-    //
-    //     this.setState({focused: active})
-    // }
-
-
-
-
-    // const handleEnter = (event, source) => {
-    //     if (event.shiftKey && (source === QUESTION || source === ANSWER)) {
-    //         console.log("alt-enter")
-    //     } else {
-    //         event.preventDefault()
-    //         props.save_action()
-    //     }
-    // }
 
     const wrap = (wrapWith) => {
         const activeElement = document.getElementById(focusedInput)
@@ -124,9 +98,16 @@ export default function EditQuestionModal(props) {
             width="500px">
 
             <div style={{display: "flex", flexDirection: "column"}}>
-                <Input autoFocus={!props.category} placeholder="Category" value={props.category}
-                       style={{marginBottom: 10, width: 300}} onClick={setFocusedInput} id={CATEGORY}
-                       onChange={(event) => props.set_category(event.target.value)} onPressEnter={null}/>
+                <span style={{display: "flex", marginBottom: 10}}>
+    <Input autoFocus={!props.category} placeholder="Category" value={props.category}
+           onClick={setFocusedInput} id={CATEGORY}
+           onChange={(event) => props.set_category(event.target.value)} onPressEnter={null}/>
+                <ScoringNote scoring_note={props.scoring_note}
+                             set_scoring_note={props.set_scoring_note}
+                             set_scoring_note_was_cleared={props.set_scoring_note_was_cleared}
+                />
+                </span>
+
                 <span style={{display: "flex", justifyContent: "space-between", alignItems: "center"}}>
 
                             <Radio.Group buttonStyle="solid" onChange={(event) => setSelectedTab(event.target.value)}

@@ -8,8 +8,8 @@ import './Question.css';
 export default function FormattedQuestion(props) {
 
     let answer = props?.answer
-    if (!answer) {
-       answer = "[no answer]"
+    if (!answer && props.scored) {
+        answer = "[no answer]"
     }
 
     const renderers = {

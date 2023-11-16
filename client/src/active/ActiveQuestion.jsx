@@ -1,8 +1,8 @@
 import React from 'react';
 import './ActiveGame.css';
 
-import {Breadcrumb, Card} from 'antd';
-import {EditOutlined, PlaySquareOutlined} from '@ant-design/icons';
+import {Breadcrumb, Card, Tooltip} from 'antd';
+import {EditOutlined, InfoCircleOutlined, PlaySquareOutlined} from '@ant-design/icons';
 import FormattedQuestion from "../question/FormattedQuestion"
 import HotEditQuestion from "./HotEditQuestion";
 import HotEditRoundName from "./HotEditRoundName";
@@ -36,10 +36,12 @@ class ActiveQuestion extends React.Component {
     render() {
         // const question_newlined = this.props.question?.split("^").map((part, index) => <div key={index} className="linebreak"> {part} </div>)
 
-        const extra = this.props.editable ? <EditOutlined onClick={this.open_question_editor} style={{paddingBottom: 10}}/> : null
+        const extra = this.props.editable ?
+            <EditOutlined onClick={this.open_question_editor} style={{paddingBottom: 10}}/> : null
         const editQuestionModal = this.state.question_editor_open ?
             <HotEditQuestion category={this.props.category} question={this.props.question} answer={this.props.answer}
-                             close={this.close_question_editor} session_id={this.props.session_id} player_id={this.props.player_id}
+                             close={this.close_question_editor} session_id={this.props.session_id}
+                             player_id={this.props.player_id}
                              round_index={this.props.round_index} question_index={this.props.question_index}/> : null
 
 
@@ -49,6 +51,11 @@ class ActiveQuestion extends React.Component {
                               player_id={this.props.player_id}/> :
             <span onClick={this.open_round_editor}> {this.props.round_name} </span>
 
+        const scoringNote = this.props.scoring_note !== "" ?
+            <Tooltip title={this.props.scoring_note} placement={"bottom"}>
+                <InfoCircleOutlined style={{marginLeft: "0.5em"}}/>
+            </Tooltip> : null
+
         return (
             <Card style={{width: 'min(400px, 100%)', marginTop: 10}} bodyStyle={{padding: 20}}>
                 <span style={{display: "flex", justifyContent: "space-between", alignItems: "center", width: "100%"}}>
@@ -57,7 +64,10 @@ class ActiveQuestion extends React.Component {
                             <PlaySquareOutlined/>
                         </Breadcrumb.Item>
                         <Breadcrumb.Item> {roundName} </Breadcrumb.Item>
-                        <Breadcrumb.Item> {this.props.category} </Breadcrumb.Item>
+                        <Breadcrumb.Item>
+                            {this.props.category}
+                            {scoringNote}
+                        </Breadcrumb.Item>
                     </Breadcrumb>
                     {extra}
                 </span>
@@ -65,7 +75,9 @@ class ActiveQuestion extends React.Component {
 
                 <div className="active-question-box">
                     <FormattedQuestion question={this.props.question}
-                                       answer={this.props.answer} max_width={350}/>
+                                       answer={this.props.answer} max_width={350}
+                                       scored={this.props.scored}
+                    />
                     {editQuestionModal}
                 </div>
             </Card>

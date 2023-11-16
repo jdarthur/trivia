@@ -15,14 +15,20 @@ export default function EditQuestionController(props) {
     const [category, setCategory] = useState("")
     const [question, setQuestion] = useState("")
     const [answer, setAnswer] = useState("")
+    const [scoringNote, setScoringNote] = useState("")
 
     useEffect(() => {
-        console.log("set selected: ", props.selected)
+        console.log("useEffect: ", props.selected)
         setCategory(props.selected?.category || "")
         setQuestion(props.selected?.question || "")
         setAnswer(props.selected?.answer || "")
 
-    }, [props.selected])
+        if (props.scoringNoteWasCleared === false) {
+            setScoringNote(props.selected?.scoring_note || "")
+        } else {
+            setScoringNote("")
+        }
+    }, [props.selected, props.scoringNoteWasCleared])
 
     const [createQuestion] = useCreateQuestionMutation()
     const [updateQuestion] = useUpdateQuestionMutation()
@@ -45,7 +51,8 @@ export default function EditQuestionController(props) {
         const body = {
             category: category,
             question: question,
-            answer: answer
+            answer: answer,
+            scoring_note: scoringNote
         }
 
         const response = !!id ? await updateQuestion({id: props.selected?.id, body: body}) : createQuestion(body)
@@ -60,6 +67,7 @@ export default function EditQuestionController(props) {
 
         console.log("save question", body)
         props.close()
+        props.setScoringNoteWasCleared(false)
     }
 
     const is_empty = () => {
@@ -83,6 +91,8 @@ export default function EditQuestionController(props) {
                            set_category={setCategory} category={category}
                            set_question={setQuestion} question={question}
                            set_answer={setAnswer} answer={answer}
+                           set_scoring_note={setScoringNote} scoring_note={scoringNote}
+                           set_scoring_note_was_cleared={props.setScoringNoteWasCleared}
                            visible={props.visible}/>
     );
 }
