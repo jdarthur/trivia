@@ -1,4 +1,4 @@
-import React, {useEffect} from "react";
+import React from "react";
 
 import {Popover} from 'antd'
 import LogoutButton from "./Logout2";
@@ -11,7 +11,7 @@ const User = () => {
     const {name, picture} = user;
 
     const content = <div style={{display: 'flex', flexDirection: 'row', justifyContent: 'center'}}>
-        <LogoutButton />
+        <LogoutButton/>
     </div>
 
     return (

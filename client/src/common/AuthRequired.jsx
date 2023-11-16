@@ -1,13 +1,12 @@
 import React from "react";
-import {useAuth} from "../api/auth";
 import {Spin} from "antd";
 import {useAuth0} from "@auth0/auth0-react";
 
 export default function AuthRequired(props) {
-    const { isLoading } = useAuth0()
+    const {isLoading} = useAuth0()
 
     if (isLoading) {
-        return <Spin />
+        return <Spin/>
     }
 
     if (!props.token) {

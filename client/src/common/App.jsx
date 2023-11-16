@@ -7,17 +7,15 @@ import './App.css';
 import logo from "./borttrivia.png"
 
 import 'antd/dist/antd.css';
-import {Layout, Menu, Spin} from 'antd';
+import {Layout, Menu} from 'antd';
 import {FormOutlined} from '@ant-design/icons';
 import QuestionList from "../question/QuestionList";
 import RoundList from "../round/RoundList";
 import GameList from "../game/GameList";
 import CollectionList from "../collections/CollectionList";
-import {ProtectedRoute} from "./ProtectedRoute";
 import {useAuth0} from "@auth0/auth0-react";
-import {CallbackPage} from "./CallbackPage";
 import {useDispatch} from "react-redux";
-import Auth, {setToken as setAuthToken} from "../api/auth";
+import {setToken as setAuthToken} from "../api/auth";
 import AuthButton from "./AuthButton";
 import {HistoryRouter} from "redux-first-history/rr6";
 import {createBrowserHistory} from "history";
@@ -130,7 +128,7 @@ export default function App() {
                                                                set_is_mod={setIsMod}
                                                                token={token}/>}/>
                             <Route path="questions"
-                                   element={<AuthRequired token={token} component={<QuestionList />} />}/>
+                                   element={<AuthRequired token={token} component={<QuestionList/>}/>}/>
                             <Route path="rounds" element={authRequired}>
                                 <Route index element={<RoundList token={token}/>}/>
                             </Route>
@@ -138,7 +136,7 @@ export default function App() {
                                 <Route index element={<GameList token={token}/>}/>
                             </Route>
                             <Route path="collections" element={authRequired}>
-                                <Route index element={<AuthRequired token={token} component={<CollectionList />} />}/>
+                                <Route index element={<AuthRequired token={token} component={<CollectionList/>}/>}/>
                             </Route>
                             <Route path="*" element={nothingView}/>
                         </Routes>

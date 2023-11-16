@@ -5,7 +5,7 @@ import NewCollection from "./NewCollection";
 import NewButton from "../editor/NewButton";
 import {useGetCollectionsQuery} from "../api/main";
 import PageHeader from "../common/PageHeader";
-import {useLocation, useSearchParams} from "react-router-dom";
+import {useSearchParams} from "react-router-dom";
 import * as PropTypes from "prop-types";
 import ImportCollection from "./ImportCollection";
 
@@ -25,18 +25,17 @@ export default function CollectionList() {
 
     const collections = c?.map((collection) => (
         <Collection key={collection.id} id={collection.id} name={collection.name}
-                    create_date={collection.create_date} questions={collection.questions} />))
-
+                    create_date={collection.create_date} questions={collection.questions}/>))
 
 
     return <div style={{display: "flex", flexWrap: "wrap", margin: 10, alignItems: "center"}}>
         <div className="ql_and_filter">
             <PageHeader breadcrumbs={["Editor", "Collections"]} header={newButton} style={{marginBottom: 10}}/>
             <LoadingOrView class_name="round_list" loading={isLoading}
-                           empty={c?.length === 0} loaded_view={collections} />
+                           empty={c?.length === 0} loaded_view={collections}/>
         </div>
 
-        {collectionId? <ImportCollection id={collectionId} /> : null}
+        {collectionId ? <ImportCollection id={collectionId}/> : null}
         {newCollection}
     </div>
 

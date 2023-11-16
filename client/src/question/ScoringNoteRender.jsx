@@ -1,4 +1,4 @@
-import {Popover, Select, Tooltip} from "antd";
+import {Popover} from "antd";
 import {InfoCircleOutlined} from "@ant-design/icons";
 import React from "react";
 import DeleteConfirm from "../editor/DeleteConfirm";

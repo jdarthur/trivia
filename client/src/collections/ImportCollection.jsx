@@ -16,7 +16,7 @@ export default function ImportCollection(props) {
     const [success, setSuccess] = useState(false);
     const [message, setMessage] = useState(null)
 
-    const {data, isFetching} = useGetCollectionQuery(props.id)
+    const {data} = useGetCollectionQuery(props.id)
     const navigate = useNavigate();
 
     const [importCollection, importResult] = useImportCollectionMutation()
@@ -28,7 +28,14 @@ export default function ImportCollection(props) {
             notify(false, desc)
         } else {
             setSuccess(true)
-            const message = (<div style={{fontSize: "1.3em", display: "flex", flexDirection: "column", alignItems: "center", minHeight: 200, justifyContent: "space-around"}}>
+            const message = (<div style={{
+                fontSize: "1.3em",
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                minHeight: 200,
+                justifyContent: "space-around"
+            }}>
                 <div>
                     Successfully imported collection
                     <Tag style={{fontSize: '1em', margin: 5}}>{data?.name}</Tag>
@@ -68,14 +75,14 @@ export default function ImportCollection(props) {
         <Modal
             title={title}
             visible={true}
-            width={success? "500" : "70vw"}
+            width={success ? "500" : "70vw"}
             onCancel={() => navigate("/collections")}
-            footer={success? null : footer} >
+            footer={success ? null : footer}>
             {success ? null : "Questions:"}
             <div style={{display: "flex", flexWrap: "wrap"}}>
                 {success ? null : questions}
             </div>
-            {success ? message: null}
+            {success ? message : null}
         </Modal>
     )
 }
