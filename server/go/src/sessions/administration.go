@@ -88,6 +88,17 @@ func _setCurrentQuestion(e *Env, session *models.Session, questionIndex int, rou
 	questionInRound.Answer = questionObject.Answer
 	questionInRound.QuestionId = questionId
 
+	if questionObject.ScoringNote != "" {
+		var note models.ScoringNote
+		err := common.GetOne((*common.Env)(e), common.ScoringNoteTable, questionObject.ScoringNote, &note)
+		if err != nil {
+			fmt.Println("failed to retrieve scoring note by ID inside of SetCurrentQuestion")
+			return InvalidQuestionIndexError{QuestionIndex: questionIndex}
+		}
+
+		questionInRound.ScoringNote = note.Description
+	}
+
 	roundInSession.Questions[questionIndex] = questionInRound
 
 	return common.Set((*common.Env)(e), common.SessionTable, models.IdAsString(session.ID), &session)
@@ -364,7 +375,7 @@ func getQuestionIndex(session models.Session, roundIndex int, questionIndex int)
 	incr := 0
 	for i := 0; i <= roundIndex; i++ {
 		round := session.Rounds[i]
-		for j, _ := range round.Questions {
+		for j := range round.Questions {
 			if roundIndex == i && questionIndex == j {
 				return incr, nil
 			}

@@ -6,6 +6,7 @@ import OpenRound from "./OpenRound.jsx"
 import EditorFilter from "../editor/EditorFilter.jsx"
 import LoadingOrView from "../editor/LoadingOrView"
 import NewButton from '../editor/NewButton';
+import PageHeader from "../common/PageHeader";
 
 
 
@@ -173,10 +174,10 @@ class RoundList extends React.Component {
 
 
     render() {
-        const rounds = this.state.rounds.map((round, index) => (
+        const rounds = this.state.rounds?.map((round, index) => (
             <Round key={round.id} id={round.id} name={round.name} create_date={round.create_date}
                 questions={round.questions} wagers={round.wagers}
-                selected={(this.state.selected === round.id) ? true : false}
+                selected={(this.state.selected === round.id)}
                 set_selected={this.set_selected} delete={this.delete} />))
 
         const nrb = this.add_newround_button() ? <NewButton on_click={this.add_new_round} /> : null
@@ -189,12 +190,14 @@ class RoundList extends React.Component {
                 set_selected={this.set_selected} delete={this.delete}
                 save={this.save} set_multi={this.set_multi} token={this.props.token} />
         }
+
+        const header = <EditorFilter set_text_filter={this.set_text_filter} set_unused_only={this.set_unused_only} data_type="rounds"
+                                     text_filter={this.state.text_filter} unused_only={this.state.unused_only} add_button={nrb} />
+
         return (
             <div className="round-and-open-question">
                 <div className="ql_and_filter">
-                    <EditorFilter set_text_filter={this.set_text_filter} set_unused_only={this.set_unused_only} data_type="rounds"
-                        text_filter={this.state.text_filter} unused_only={this.state.unused_only} add_button={nrb} />
-
+                    <PageHeader breadcrumbs={["Editor", "Rounds"]} header={header} style={{marginBottom: 10}}/>
                     <LoadingOrView loading={this.state.loading} class_name="round_list"
                         empty={rounds?.length === 0} loaded_view={rounds} />
                 </div>

@@ -1,126 +1,150 @@
-import React from 'react';
+import React, {useEffect, useState} from 'react';
+import {Link, Outlet, Route, Routes} from "react-router-dom";
 
 import HomePage from "../homepage/Homepage.jsx"
-import Editor from "../editor/Editor.jsx"
-import AuthButton from "./AuthButton.js"
 
 import './App.css';
 import logo from "./borttrivia.png"
 
 import 'antd/dist/antd.css';
-import { Layout, Menu } from 'antd';
-import {
-  FormOutlined,
-  PlaySquareOutlined
-} from '@ant-design/icons';
+import {Layout, Menu, Spin} from 'antd';
+import {FormOutlined} from '@ant-design/icons';
+import QuestionList from "../question/QuestionList";
+import RoundList from "../round/RoundList";
+import GameList from "../game/GameList";
+import CollectionList from "../collections/CollectionList";
+import {ProtectedRoute} from "./ProtectedRoute";
+import {useAuth0} from "@auth0/auth0-react";
+import {CallbackPage} from "./CallbackPage";
+import {useDispatch} from "react-redux";
+import Auth, {setToken as setAuthToken} from "../api/auth";
+import AuthButton from "./AuthButton";
+import {HistoryRouter} from "redux-first-history/rr6";
+import {createBrowserHistory} from "history";
+import AuthRequired from "./AuthRequired";
 
-const { Content, Header } = Layout;
-const { SubMenu } = Menu;
+const {Content, Header} = Layout;
+const {SubMenu} = Menu;
 
-const PLAY = "Play"
-const EDITOR = "Editor"
 const QUESTION = "Questions"
 const ROUND = "Rounds"
 const GAME = "Games"
+const COLLECTION = "Collections"
 
-class App extends React.Component {
+export const history = createBrowserHistory();
 
-  state = {
-    selected: PLAY,
-    editor_section: QUESTION,
-    collapsed: true,
-    show_editor: false,
-    is_mobile: false,
-    token: "",
-    in_game: false,
-    is_mod: false,
-  }
+export default function App() {
 
-  componentDidMount() {
-    const is_mobile = window.matchMedia("only screen and (max-width: 760px)").matches;
-    this.setState({ is_mobile: is_mobile })
-  }
+    const [token, setToken] = useState("")
+    const [inGame, setInGame] = useState(false)
+    const [isMod, setIsMod] = useState(false)
+    const [isMobile, setIsMobile] = useState(false)
 
-  set_show_editor = (value) => {
-    this.setState({ show_editor: value })
-  }
+    const {getAccessTokenSilently} = useAuth0();
+    const dispatch = useDispatch();
 
-  set_token = (value) => {
-    const showEditor = value === "" ? false : true
-    this.setState({ token: value, show_editor: showEditor })
-  }
+    useEffect(() => {
+        const is_mobile = window.matchMedia("only screen and (max-width: 760px)").matches;
+        setIsMobile(is_mobile)
 
-  set_in_game = (value, is_mod) =>  {
-    this.setState({ in_game: value, is_mod: is_mod })
-  }
+        const getEditorJwt = async () => {
 
-  play = () => { this.setState({ selected: PLAY }) }
+            try {
+                const authToken = await getAccessTokenSilently({
+                    audience: "https://borttrivia.com/editor",
+                    scope: "openid profile email offline_access read:current_user",
+                });
+                console.log(authToken)
+                setToken(authToken)
+                dispatch(setAuthToken({authToken}));
+            } catch (e) {
+                console.log(e.message);
+            }
+        };
 
-  edit_question = () => { this.setState({ selected: EDITOR, editor_section: QUESTION }) }
-  edit_round = () => { this.setState({ selected: EDITOR, editor_section: ROUND }) }
-  edit_game = () => { this.setState({ selected: EDITOR, editor_section: GAME }) }
+        getEditorJwt();
+    }, [getAccessTokenSilently]); // eslint-disable-line react-hooks/exhaustive-deps
 
 
-  toggleCollapsed = () => { this.setState({ collapsed: !this.state.collapsed }); }
+    const {isLoading: authIsLoading} = useAuth0();
 
-  render() {
-    // let vh = window.innerHeight * 0.01;
-    // // Then we set the value in the --vh custom property to the root of the document
-    // document.documentElement.style.setProperty('--vh', `${vh}px`);
+    const showEditor = !!token
+
+    const nothingView = <main style={{padding: "1rem"}}>
+        <p>There's nothing here!</p>
+    </main>
+
 
     let showToolbar = true;
-    if (this.state.is_mobile && this.state.in_game && !this.state.is_mod) {
-      showToolbar = false
+    if (isMobile && inGame && !isMod) {
+        showToolbar = false
     }
 
-    return (
-      <Layout className="height-trick" style={{ minWidth: 'min(1300px, 100vw)', maxWidth: '100vw' }}>
-        {
-          showToolbar ?
-            <Header >
+    const menu = <Header>
               <span>
-              <div className={this.state.collapsed ? "logo logo-min" : "logo"}>
-                <img src={logo} className="icon" alt="Bort Trivia" />
-                {this.state.collapsed ? null : <div> bort trivia </div>}
+              <div className="logo">
+                <img src={logo} className="icon" alt="Bort Trivia"/>
               </div>
               <Menu defaultSelectedKeys={['2']} mode="horizontal" theme="dark"
-                defaultOpenKeys={(this.state.show_editor && !this.state.collapsed) ? ['sub1'] : []} >
-                <Menu.Item key="1" icon={<PlaySquareOutlined />} onClick={this.play}> Play </Menu.Item>
+                    defaultOpenKeys={showEditor ? ['sub1'] : []}>
+                <Menu.Item key="1">
+                    <Link to={"/"}>Play</Link>
+                </Menu.Item>
 
-                <SubMenu key="sub1" icon={<FormOutlined />} title="Editor" disabled={!this.state.show_editor} >
-                  <Menu.Item key="2" onClick={this.edit_question} disabled={!this.state.show_editor} >{QUESTION}</Menu.Item>
-                  <Menu.Item key="3" onClick={this.edit_round} disabled={!this.state.show_editor} >{ROUND}</Menu.Item>
-                  <Menu.Item key="4" onClick={this.edit_game} disabled={!this.state.show_editor} >{GAME}</Menu.Item>
+                <SubMenu key="sub1" icon={<FormOutlined/>} title="Editor" disabled={!showEditor}>
+                  <Menu.Item key="2" disabled={!showEditor}>
+                    <Link to={"questions"}>{QUESTION}</Link>
+                  </Menu.Item>
+                  <Menu.Item key="3" disabled={!showEditor}>
+                      <Link to={"rounds"}>{ROUND}</Link>
+                  </Menu.Item>
+                  <Menu.Item key="4" disabled={!showEditor}>
+                      <Link to={"games"}>{GAME}</Link>
+                  </Menu.Item>
+                  <Menu.Item key="5" disabled={!showEditor}>
+                      <Link to={"collections"}>{COLLECTION}</Link>
+                  </Menu.Item>
                 </SubMenu>
 
-                <Menu.Item key="5" style={{float: "right"}} className="nohover" > <AuthButton set_token={this.set_token} /> </Menu.Item>
+                  <Menu.Item key="6" style={{float: "right"}} className="nohover">
+                      <AuthButton loading={authIsLoading}/>
+                  </Menu.Item>
 
               </Menu>
-
-
               </span>
 
-            </Header> : null
-        }
+    </Header>
 
+    const authRequired = <Outlet/>
 
+    return (
+        <Layout className="height-trick" style={{minWidth: 'min(1300px, 100vw)', maxWidth: '100vw'}}>
 
-        <Layout className="site-layout">
-          <Content style={{ display: 'flex', flexDirection: 'column' }}>
-
-            <div className="site-layout-background" style={{ minHeight: 360, display: 'flex', flexDirection: 'column', flexGrow: 1 }}>
-              {this.state.selected === PLAY ?
-                <HomePage show_editor={this.set_show_editor} set_started={this.set_in_game}
-                  is_mobile={this.state.is_mobile} token={this.state.token} /> : null}
-              {this.state.selected === EDITOR ?
-                <Editor section={this.state.editor_section} token={this.state.token} /> : null}
-            </div>
-          </Content>
+            <Layout className="site-layout">
+                <Content style={{display: 'flex', flexDirection: 'column'}}>
+                    <HistoryRouter history={history}>
+                        {showToolbar ? menu : null}
+                        <Routes>
+                            <Route path="/" element={<HomePage set_started={setInGame}
+                                                               is_mobile={isMobile}
+                                                               set_is_mod={setIsMod}
+                                                               token={token}/>}/>
+                            <Route path="questions"
+                                   element={<AuthRequired token={token} component={<QuestionList />} />}/>
+                            <Route path="rounds" element={authRequired}>
+                                <Route index element={<RoundList token={token}/>}/>
+                            </Route>
+                            <Route path="games" element={authRequired}>
+                                <Route index element={<GameList token={token}/>}/>
+                            </Route>
+                            <Route path="collections" element={authRequired}>
+                                <Route index element={<AuthRequired token={token} component={<CollectionList />} />}/>
+                            </Route>
+                            <Route path="*" element={nothingView}/>
+                        </Routes>
+                    </HistoryRouter>
+                </Content>
+            </Layout>
         </Layout>
-      </Layout>
     );
-  }
-
 }
-
-export default App;

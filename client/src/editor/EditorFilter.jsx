@@ -21,9 +21,9 @@ class EditorFilter extends React.Component {
             <div style={{display: 'flex', flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', paddingLeft: 5}}>
                 <div className="filter_holder">
                     {/* <Input.Group compact> */}
-                    <Input.Search placeholder="Search" style={{ width: 150 }} className="filter-subitem" onSearch={this.set_text_filter} />
-                    <div className="filter-subitem">
-                        <Checkbox onChange={this.set_unused_only} checked={this.props.unused_only} > Unused {this.props.data_type} only </Checkbox>
+                    <Input.Search placeholder="Search" style={{ width: 150 }} onSearch={this.set_text_filter} />
+                    <div style={{marginLeft: 10}}>
+                        <Checkbox onChange={this.set_unused_only} checked={this.props.unused_only} > Unused only </Checkbox>
                     </div>
                     {/* </Input.Group> */}
                 </div>

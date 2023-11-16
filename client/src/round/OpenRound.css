@@ -2,13 +2,12 @@
     /* padding: 20px; */
     display: flex;
     flex-direction: column;
-    justify-content: space-between;
     align-items: center;
     border: 1px solid #d9d9d9;
     border-radius: 2px;
     min-width: 25vw;
     max-width: 35vw;
-    height: 100%;
+    /*height: 100%;*/
     flex-grow: 1;
 }
 
@@ -73,10 +72,6 @@
 
 .actionable-question {
     cursor: pointer;
-}
-
-.centered {
-    justify-content: "center";
 }
 
 .current-questions {

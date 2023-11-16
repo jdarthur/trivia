@@ -5,10 +5,12 @@ import RoundList from "../round/RoundList"
 import GameList from "../game/GameList"
 
 import { Breadcrumb } from 'antd';
+import CollectionList from "../collections/CollectionList";
 
 const QUESTIONS = "Questions"
 const ROUNDS = "Rounds"
 const GAMES = "Games"
+const COLLECTIONS = "Collections"
 
 
 class Editor extends React.Component {
@@ -27,6 +29,7 @@ class Editor extends React.Component {
                     {this.props.section === ROUNDS ? <RoundList token={this.props.token} /> : null}
                     {this.props.section === QUESTIONS ? <QuestionList token={this.props.token} /> : null}
                     {this.props.section === GAMES ? <GameList token={this.props.token} /> : null}
+                    {this.props.section === COLLECTIONS ? <CollectionList token={this.props.token} /> : null}
                 </div>
             </div>
         );

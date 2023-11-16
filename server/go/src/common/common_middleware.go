@@ -68,7 +68,7 @@ func LoadCerts() error {
 
 func getPemCert(token *jwt.Token) (string, error) {
 	cert := ""
-	for k, _ := range JwtKeys.Keys {
+	for k := range JwtKeys.Keys {
 		if token.Header["kid"] == JwtKeys.Keys[k].Kid {
 			cert = "-----BEGIN CERTIFICATE-----\n" + JwtKeys.Keys[k].X5c[0] + "\n-----END CERTIFICATE-----"
 		}
@@ -166,14 +166,37 @@ func (e *Env) AsUser(c *gin.Context) {
 }
 
 func AssertUser(c *gin.Context, correctUserId string) error {
+
+	userIdFromRequest := GetUserId(c)
+
+	if userIdFromRequest == "" {
+		return InvalidUserError{UserId: ""}
+	}
+
+	return AssertUserId(userIdFromRequest, correctUserId)
+}
+
+func GetUserId(c *gin.Context) string {
+	value, ok := c.Get(USER_ID)
+	if ok {
+		return value.(string)
+	}
+	return ""
+}
+
+func AssertUserId(userIdInRequest, userIdInDatabase string) error {
+	if userIdInRequest != userIdInDatabase {
+		return InvalidUserError{UserId: userIdInRequest}
+	}
+	return nil
+}
+
+func AssertHasUserId(c *gin.Context) (string, error) {
 	value, ok := c.Get(USER_ID)
 	if ok {
 		userIdFromRequest := value.(string)
-		if correctUserId != userIdFromRequest {
-			return InvalidUserError{UserId: userIdFromRequest}
-		}
+		return userIdFromRequest, nil
 	} else {
-		return InvalidUserError{UserId: ""}
+		return "", InvalidUserError{UserId: ""}
 	}
-	return nil
 }

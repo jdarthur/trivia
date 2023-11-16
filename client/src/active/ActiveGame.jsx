@@ -60,7 +60,8 @@ class ActiveGame extends React.Component {
                     answer: q.answer,
                     category: q.category,
                     active_question: q.id,
-                    scored: q.scored === true
+                    scored: q.scored === true,
+                    scoring_note: q.scoring_note
                 })
             })
     }
@@ -82,7 +83,8 @@ class ActiveGame extends React.Component {
                                             round_name={this.state.round_name} category={this.state.category}
                                             editable={this.props.is_mod}
                                             player_id={this.props.player_id} round_index={this.state.active_round}
-                                            question_index={this.state.active_question}/>
+                                            question_index={this.state.active_question}
+                                            scoring_note={this.state.scoring_note}/>
                         </div>
 
                         {!this.props.is_mod ? <AnswerQuestion question={this.state.active_question}

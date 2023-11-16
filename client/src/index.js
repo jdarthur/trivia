@@ -1,20 +1,32 @@
 import React from 'react';
 import ReactDOM from 'react-dom';
-import { Auth0Provider } from "@auth0/auth0-react";
-import App from './common/App.jsx';
+import {Auth0Provider} from "@auth0/auth0-react";
+import App, {history} from './common/App.jsx';
+
+import {store} from './api/store';
+import {Provider} from "react-redux";
+
+function redirectCallBack(appState) {
+    if (appState?.returnTo) {
+        history.replace((appState && appState.returnTo) || window.location.pathname);
+    }
+}
 
 ReactDOM.render(
-  <Auth0Provider
-    domain="borttrivia.us.auth0.com"
-    clientId="03cLv60jN7hC79K8oUXHDF1wsenRTMx5"
-    redirectUri={window.location.origin}
-    useRefreshTokens={true}
-    cacheLocation="localstorage"
-    audience="https://borttrivia.com/editor"
-    scope="openid profile email offline_access read:current_user" >
-    <App />
-  </Auth0Provider>,
-  document.getElementById('root')
+    <Auth0Provider
+        domain="borttrivia.us.auth0.com"
+        clientId="03cLv60jN7hC79K8oUXHDF1wsenRTMx5"
+        redirectUri={window.location.origin}
+        useRefreshTokens={true}
+        cacheLocation="localstorage"
+        audience="https://borttrivia.com/editor"
+        onRedirectCallback={redirectCallBack}
+        scope="openid profile email offline_access read:current_user">
+        <Provider store={store}>
+                <App />
+            </Provider>
+    </Auth0Provider>,
+    document.getElementById('root')
 );
 
 let vh = window.innerHeight * 0.01;
@@ -22,26 +34,26 @@ let vh = window.innerHeight * 0.01;
 document.documentElement.style.setProperty('--vh', `${vh}px`);
 
 window.addEventListener('resize', () => {
-  // We execute the same script as before
-  let vh = window.innerHeight * 0.01;
-  document.documentElement.style.setProperty('--vh', `${vh}px`);
+    // We execute the same script as before
+    let vh = window.innerHeight * 0.01;
+    document.documentElement.style.setProperty('--vh', `${vh}px`);
 });
 
 const sendData = async function sendData(url, method, data) {
-  let body
-  if (data !== undefined) {
-    const copy = Object.assign({}, data)
-    delete copy.id
-    delete copy.create_date
-    body = JSON.stringify(copy)
-  }
+    let body
+    if (data !== undefined) {
+        const copy = Object.assign({}, data)
+        delete copy.id
+        delete copy.create_date
+        body = JSON.stringify(copy)
+    }
 
-  const response = await fetch(url, {
-    method: method,
-    headers: { 'Content-Type': 'application/json' },
-    body: body
-  })
-  return response.json()
+    const response = await fetch(url, {
+        method: method,
+        headers: {'Content-Type': 'application/json'},
+        body: body
+    })
+    return response.json()
 }
 
 export default sendData

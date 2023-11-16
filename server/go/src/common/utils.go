@@ -10,7 +10,9 @@ import (
 	"github.com/globalsign/mgo/bson"
 	"github.com/go-playground/validator"
 	"github.com/jdarthur/trivia/models"
+	"github.com/joho/godotenv"
 	"net/http"
+	"os"
 	"reflect"
 	"strings"
 	"time"
@@ -24,6 +26,8 @@ var SessionTable = "session"
 var PlayerTable = "player"
 var AnswerTable = "answer"
 var SessionStateTable = "session_state"
+var CollectionTable = "collection"
+var ScoringNoteTable = "scoring_note"
 
 type Env struct {
 	Db *mgo.Session
@@ -34,13 +38,25 @@ type Env struct {
 //           Custom Errors
 //=====================================
 //=====================================
+
+// InvalidDataError is an interface to implement when a particular
+// record type has to enforce specific rules on its own fields.
+//
+// For example, indirectly-set fields (such as models.Question's
+// RoundsUsed) are not able to be set in the create/update endpoints
+// for that data type (instead, that RoundsUsed field is updated when
+// that particular question is added to a models.Round)
 type InvalidDataError interface {
 	Field() string
 	Data() interface{}
 	Error() string
 }
 
-// Error thrown when record of type RecordType with ID is not found
+func InvalidDataErrorToString(e InvalidDataError, message string) string {
+	return fmt.Sprintf("Invalid data error: field: %s, data: %v, error: %s", e.Field(), e.Data(), message)
+}
+
+// NonexistentIdError is thrown when record of type RecordType with ID is not found
 type NonexistentIdError struct {
 	ID         string // valid UUID
 	RecordType string // record type, e.g. QuestionTable or RoundTable
@@ -50,7 +66,7 @@ func (e NonexistentIdError) Error() string {
 	return "Invalid " + e.RecordType + " ID: " + e.ID
 }
 
-// Error thrown when attempting to
+// InvalidUUIDError is thrown when attempting to
 // convert an invalid UUID string to bson.Binary
 type InvalidUUIDError struct {
 	ID string // UUID that is invalid
@@ -66,7 +82,7 @@ func (e InvalidUUIDError) Error() string {
 //=====================================
 //=====================================
 
-// Get one record of a certain type by ID
+// GetOne record of a certain type by ID
 //
 // args:
 //	  e: Environment (i.e. mongo session)
@@ -89,7 +105,7 @@ func GetOne(e *Env, objectType string, objectId string, model models.Object) err
 	//find matching item
 	err = collection.FindId(filter).One(model)
 	if err != nil {
-		if err == mgo.ErrNotFound {
+		if errors.Is(err, mgo.ErrNotFound) {
 			return NonexistentIdError{RecordType: objectType, ID: objectId}
 		}
 		return err
@@ -169,8 +185,6 @@ func update(e *Env, objectType string, objectId string, change bson.M) error {
 	//set MongoDB database & record type
 	collection := e.Db.DB(Database).C(objectType)
 
-	fmt.Println("update: " + fmt.Sprint("%v", change))
-
 	//update a record by ID
 	err = collection.UpdateId(filter, change)
 	if err != nil {
@@ -182,7 +196,7 @@ func update(e *Env, objectType string, objectId string, change bson.M) error {
 	return nil
 }
 
-// Get all records of a certain type
+// GetAll records of a certain type
 //
 // args:
 //	  e: Environment (i.e. mongo session)
@@ -194,13 +208,17 @@ func GetAll(e *Env, objectType string, filters interface{}) (interface{}, error)
 	var slice interface{}
 	switch objectType {
 	case QuestionTable:
-		slice = make([]*models.Question, 0, 0)
+		slice = make([]*models.Question, 0)
 	case RoundTable:
-		slice = make([]*models.Round, 0, 0)
+		slice = make([]*models.Round, 0)
 	case GameTable:
-		slice = make([]*models.Game, 0, 0)
+		slice = make([]*models.Game, 0)
 	case SessionTable:
-		slice = make([]*models.Session, 0, 0)
+		slice = make([]*models.Session, 0)
+	case CollectionTable:
+		slice = make([]*models.Collection, 0)
+	case ScoringNoteTable:
+		slice = make([]*models.ScoringNote, 0)
 
 	default:
 		return nil, errors.New("invalid get all table: " + objectType)
@@ -230,7 +248,7 @@ func Delete(e *Env, objectType string, objectId string) error {
 	//find matching item
 	err = collection.RemoveId(filter)
 	if err != nil {
-		if err == mgo.ErrNotFound {
+		if errors.Is(err, mgo.ErrNotFound) {
 			return NonexistentIdError{RecordType: objectType, ID: objectId}
 		}
 		return err
@@ -371,4 +389,30 @@ func IncrementState(e *Env, sessionId string) (err error) {
 	collection := e.Db.DB(Database).C(SessionStateTable)
 	_, err = collection.Upsert(bson.M{"session_id": sessionId}, newState)
 	return err
+}
+
+func GetDatabaseConnection() (*mgo.Session, error) {
+	err := godotenv.Load()
+	if err != nil {
+		fmt.Println("Unable to load .env")
+	}
+
+	mongoHost := os.Getenv("MONGO_HOST")
+	if len(mongoHost) == 0 {
+		mongoHost = "localhost"
+	}
+
+	mongoPort := os.Getenv("MONGO_PORT")
+	if len(mongoPort) == 0 {
+		mongoPort = "27017"
+	}
+
+	mongoAddress := "mongodb://" + mongoHost + ":" + mongoPort
+	client, err := mgo.Dial(mongoAddress)
+	if err != nil {
+		fmt.Println("Unable to connect to mongodb server at " + mongoAddress)
+		return nil, err
+	}
+
+	return client, err
 }

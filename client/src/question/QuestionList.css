@@ -13,7 +13,7 @@
 .ql_and_filter {
 	display: flex;
     flex-direction: column;
-    align-items: center;
+    align-items: flex-start;
     margin: 5px;
     flex: 1 1 auto;
 }

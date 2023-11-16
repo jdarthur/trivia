@@ -3,42 +3,20 @@ package main
 import (
 	"fmt"
 	"github.com/gin-gonic/gin"
-	"github.com/globalsign/mgo"
+	"github.com/jdarthur/trivia/collections"
 	"github.com/jdarthur/trivia/common"
 	"github.com/jdarthur/trivia/games"
 	"github.com/jdarthur/trivia/players"
 	"github.com/jdarthur/trivia/questions"
 	"github.com/jdarthur/trivia/rounds"
 	"github.com/jdarthur/trivia/sessions"
-	"github.com/joho/godotenv"
 	"log"
 	"os"
 )
 
 func main() {
 
-	err := godotenv.Load()
-	if err != nil {
-		fmt.Println("Unable to load .env")
-		log.Fatal(err)
-	}
-
-	mongoHost := os.Getenv("MONGO_HOST")
-	if len(mongoHost) == 0 {
-		mongoHost = "localhost"
-	}
-
-	mongoPort := os.Getenv("MONGO_PORT")
-	if len(mongoPort) == 0 {
-		mongoPort = "27017"
-	}
-
-	mongoAddress := "mongodb://" + mongoHost + ":" + mongoPort
-	client, err := mgo.Dial(mongoAddress)
-	if err != nil {
-		fmt.Println("Unable to connect to mongodb server at " + mongoAddress)
-		log.Fatal(err)
-	}
+	client, err := common.GetDatabaseConnection()
 
 	err = common.LoadCerts()
 	if err != nil {
@@ -119,6 +97,19 @@ func main() {
 	router.POST("/gameplay/session/:id/add", p.AddPlayerToSession)
 	router.POST("/gameplay/session/:id/remove", p.RemovePlayerFromSession)
 	router.DELETE("/gameplay/player/:id", p.DeletePlayer)
+
+	fmt.Println("\nCollection API:")
+	coll := collections.Env{Db: client}
+	router.GET("/editor/collections", auth.AsUser, coll.GetAllCollections)
+	router.GET("/editor/collections/:id", auth.AsUser, coll.GetOneCollection)
+	router.POST("/editor/collections", auth.AsUser, coll.CreateCollection)
+	router.DELETE("/editor/collections/:id", auth.AsUser, coll.DeleteCollection)
+	router.POST("/editor/collections/:id/import", auth.AsUser, coll.ImportCollection)
+
+	router.GET("/editor/scoring_notes", auth.AsUser, q.GetAllScoringNotes)
+	router.GET("/editor/scoring_notes/:id", auth.AsUser, q.GetOneScoringNote)
+	router.POST("/editor/scoring_notes", auth.AsUser, q.CreateScoringNote)
+	router.DELETE("/editor/scoring_notes/:id", auth.AsUser, q.DeleteScoringNote)
 
 	fmt.Println()
 	router.Run()
