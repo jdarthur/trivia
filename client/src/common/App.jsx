@@ -61,7 +61,7 @@ export default function App() {
         };
 
         getEditorJwt();
-    }, [getAccessTokenSilently]); // eslint-disable-line react-hooks/exhaustive-deps
+    }, [getAccessTokenSilently]);
 
 
     const {isLoading: authIsLoading} = useAuth0();
