@@ -1,14 +1,14 @@
 version: "3.9"
 services:
-#  editor-server:
-#    build: .
-#    ports:
-#      - "8080:8080"
-#    volumes:
-#      - ./.env:/go/src/.env:Z
+  editor-server:
+    build: .
+    ports:
+      - "127.0.0.1:8080:8080"
+    volumes:
+      - ./.env:/go/src/.env:Z
   mongo:
     image: "mongo"
     ports:
-      - "27017:27017"
+      - "127.0.0.1:27017:27017"
     volumes:
       - ~/trivdata:/data/db:Z
