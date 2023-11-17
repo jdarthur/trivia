@@ -18,13 +18,14 @@ ReactDOM.render(
         clientId="03cLv60jN7hC79K8oUXHDF1wsenRTMx5"
         redirectUri={window.location.origin}
         useRefreshTokens={true}
+        useRefreshTokensFallback={true}
         cacheLocation="localstorage"
         audience="https://borttrivia.com/editor"
         onRedirectCallback={redirectCallBack}
         scope="openid profile email offline_access read:current_user">
         <Provider store={store}>
-                <App />
-            </Provider>
+            <App/>
+        </Provider>
     </Auth0Provider>,
     document.getElementById('root')
 );
