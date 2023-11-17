@@ -6,7 +6,7 @@ import HomePage from "../homepage/Homepage.jsx"
 import './App.css';
 import logo from "./borttrivia.png"
 
-import 'antd/dist/antd.css';
+import 'antd/dist/reset.css';
 import {Layout, Menu} from 'antd';
 import {FormOutlined} from '@ant-design/icons';
 import QuestionList from "../question/QuestionList";
@@ -49,8 +49,10 @@ export default function App() {
 
             try {
                 const authToken = await getAccessTokenSilently({
-                    audience: "https://borttrivia.com/editor",
-                    scope: "openid profile email offline_access read:current_user",
+                    authorizationParams: {
+                        audience: "https://borttrivia.com/editor",
+                        scope: "openid profile email offline_access read:current_user",
+                    }
                 });
                 console.log(authToken)
                 setToken(authToken)

@@ -6,7 +6,7 @@ import { UserOutlined } from "@ant-design/icons";
 
 const LoginButton = () => {
 
-    const { loginWithRedirect } = useAuth0();
+    const { loginWithRedirect, getAccessTokenSilently } = useAuth0();
 
     const login = async () => {
         console.log("about to log in from ", window.location.href)

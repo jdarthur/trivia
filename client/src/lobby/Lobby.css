@@ -1,5 +1,5 @@
 .game-lobby {
-    padding: 20px;
+    padding: 10px;
     display: flex;
     min-height: 30vh;
     flex-direction: row;
@@ -16,11 +16,13 @@
 .invite {
     display: flex;
     flex-direction: row;
-    align-items: flex-start;
+    align-items: center;
     padding-top: 10px
 }
+
 .invite-button {
-    margin-left: 15px;
+    margin-top: 15px;
+    align-self: flex-end;
 }
 
 .invite-link {
