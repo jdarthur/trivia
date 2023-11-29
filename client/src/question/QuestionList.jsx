@@ -13,6 +13,20 @@ import {EditOutlined} from '@ant-design/icons';
 import PageHeader from "../common/PageHeader";
 import {useDeleteQuestionMutation, useGetQuestionsQuery} from "../api/main";
 import notify, {errorMessage} from "../common/notify";
+import ScoringNoteRenderInList from "./ScoringNoteRenderInList";
+
+function renderCategory(text, element) {
+
+    let note = null
+    if (element.scoring_note) {
+        note = <ScoringNoteRenderInList id={element.scoring_note}/>
+    }
+
+    return <span style={{display: "flex", alignItems: "center"}}>
+        {text}
+        {note}
+    </span>
+}
 
 export default function QuestionList() {
 
@@ -65,7 +79,12 @@ export default function QuestionList() {
 
     const columns = [
         {title: "", render: delete_edit, width: '5em'},
-        {title: 'Category', dataIndex: 'category', ellipsis: {showTitle: false}},
+        {
+            title: 'Category',
+            dataIndex: 'category',
+            ellipsis: {showTitle: false},
+            render: renderCategory
+        },
         {title: 'Question', dataIndex: 'question', ellipsis: {showTitle: false}, width: '50%'},
         {title: 'Answer', dataIndex: 'answer', ellipsis: {showTitle: false}}
 

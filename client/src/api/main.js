@@ -85,10 +85,15 @@ export const mainApi = createApi({
             invalidatesTags: ["questions"]
         }),
         getScoringNotes: builder.query({
-            query: (queryParams) => ({
+            query: () => ({
                 url: `editor/scoring_notes`,
             }),
             providesTags: ["scoring_notes"]
+        }),
+        getOneScoringNote: builder.query({
+            query: (id) => ({
+                url: `editor/scoring_notes/${id}`,
+            }),
         }),
         createScoringNote: builder.mutation({
             query: (body) => ({
@@ -119,6 +124,7 @@ export const {
     useUpdateQuestionMutation,
     useDeleteQuestionMutation,
     useGetScoringNotesQuery,
+    useGetOneScoringNoteQuery,
     useCreateScoringNoteMutation,
     useDeleteScoringNoteMutation,
 } = mainApi

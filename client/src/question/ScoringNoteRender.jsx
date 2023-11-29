@@ -4,23 +4,23 @@ import React from "react";
 import DeleteConfirm from "../editor/DeleteConfirm";
 import {useDeleteScoringNoteMutation} from "../api/main";
 
-export default function ScoringNoteRender(props) {
+export default function ScoringNoteRender({id, name, onScoringDelete, description,}) {
     const [deleteScoringNote] = useDeleteScoringNoteMutation()
 
     const deleteSelf = () => {
-        props.onScoringDelete(props.id)
-        deleteScoringNote(props.id)
+        onScoringDelete(id)
+        deleteScoringNote(id)
     }
 
-    const content = <div style={{maxWidth: 200}}>{props.description}</div>
+    const content = <div style={{maxWidth: 200}}>{description}</div>
 
     const title = <span style={{display: "flex", alignItems: "center", justifyContent: "space-between"}}>
-        <span>{props.name}</span>
+        <span>{name}</span>
         <DeleteConfirm delete={deleteSelf} style={{cursor: "pointer"}}/>
     </span>
 
     return <span style={{display: "flex", justifyContent: "space-between", alignItems: "center"}}>
-        <span>{props.name}</span>
+        <span>{name}</span>
         <Popover title={title} content={content} zIndex={99999} placement={"right"}>
             <InfoCircleOutlined/>
         </Popover>
