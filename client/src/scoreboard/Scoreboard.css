@@ -3,6 +3,8 @@
     flex-direction: column;
     align-items: center;
     justify-content: flex-start;
+    max-height: 80vh;
+    overflow-y: auto;
 }
 
 .one-player-score {
@@ -32,7 +34,6 @@
     background: rgb(228, 228, 228);
     flex-grow: 1;
 }
-
 
 
 .scoreboard-title {

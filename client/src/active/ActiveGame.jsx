@@ -71,7 +71,7 @@ class ActiveGame extends React.Component {
         const question_indices = this.state.categories?.map((question, index) => index)
 
         return (
-            <div style={{flexGrow: 1, display: 'flex', flexDirection: 'column', maxWidth: '100%'}}>
+            <div style={{flexGrow: 1, display: 'flex', flexDirection: 'column', maxWidth: '100%', padding: 5}}>
                 <div className="game-and-scoreboard">
                     <div className='active-game'>
                         <div className="round-and-question">
