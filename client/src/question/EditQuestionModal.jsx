@@ -90,7 +90,7 @@ export default function EditQuestionModal(props) {
 
     return (
         <Modal
-            visible={props.visible}
+            open={props.visible}
             onOk={props.save}
             title={props.title}
             onCancel={props.cancel}

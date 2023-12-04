@@ -110,7 +110,7 @@ export default function QuestionList() {
     }
 
     const table_and_modal = <div>
-        {question_editor}
+
         <Table columns={columns} dataSource={questions} pagination={pagination}
                scroll={scroll} size="small" style={{maxWidth: 1500}} rowKey={"id"}/>
     </div>
@@ -122,7 +122,7 @@ export default function QuestionList() {
     return (
         <div className="ql_and_filter">
             <PageHeader breadcrumbs={["Editor", "Questions"]} header={header} style={{marginBottom: 10}}/>
-
+            {question_editor}
             <LoadingOrView loading={isFetching} class_name="question-list"
                            empty={questions?.length === 0} loaded_view={table_and_modal}/>
         </div>

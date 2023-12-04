@@ -7,7 +7,7 @@ import EditorFilter from "../editor/EditorFilter.jsx"
 import LoadingOrView from "../editor/LoadingOrView"
 import NewButton from '../editor/NewButton';
 import PageHeader from "../common/PageHeader";
-
+import {Flex} from "antd";
 
 
 //JSON keys
@@ -45,39 +45,42 @@ class RoundList extends React.Component {
             url += "&unused_only=true"
         }
 
-        this.setState({ loading: true }, () => {
+        this.setState({loading: true}, () => {
             fetch(url, {headers: {"borttrivia-token": this.props.token}})
                 .then(response => response.json())
                 .then(state => {
                     console.log(state)
-                    this.setState({ rounds: state.rounds, loading: false })
+                    this.setState({rounds: state.rounds, loading: false})
                 })
         })
     }
 
     set_unused_only = (value) => {
-        this.setState({ unused_only: value, selected: "" }, () => { this.get_rounds() })
+        this.setState({unused_only: value, selected: ""}, () => {
+            this.get_rounds()
+        })
     }
 
     set_text_filter = (value) => {
-        this.setState({ text_filter: value, selected: "" }, () => { this.get_rounds() })
+        this.setState({text_filter: value, selected: ""}, () => {
+            this.get_rounds()
+        })
     }
 
     set_selected = (round_id, value) => {
         if (this.state.selected !== round_id) {
             this.save(this.state.selected)
-            this.setState({ selected: round_id })
-        }
-        else if (!value) {
+            this.setState({selected: round_id})
+        } else if (!value) {
             this.save(this.state.selected)
-            this.setState({ selected: "" })
+            this.setState({selected: ""})
         }
     }
 
     set_value = (round_id, key, value, save) => {
         const round = find(round_id, this.state.rounds)
         round[key] = value
-        this.setState({ rounds: this.state.rounds, dirty: round_id }, () => {
+        this.setState({rounds: this.state.rounds, dirty: round_id}, () => {
             if (save) {
                 this.save(round_id)
             }
@@ -90,7 +93,7 @@ class RoundList extends React.Component {
             round[key] = update_dict[key]
         }
 
-        this.setState({ rounds: this.state.rounds, dirty: round_id }, () => {
+        this.setState({rounds: this.state.rounds, dirty: round_id}, () => {
             if (save) {
                 this.save(round_id)
             }
@@ -113,11 +116,12 @@ class RoundList extends React.Component {
                             selected: round.id
                         })
                     })
-            }
-            else { //update existing round
+            } else { //update existing round
                 console.log("save round", round)
                 sendData(round_id, "PUT", round, this.props.token)
-                    .then((data) => { this.setState({ dirty: "" }) })
+                    .then((data) => {
+                        this.setState({dirty: ""})
+                    })
             }
         }
     }
@@ -126,8 +130,7 @@ class RoundList extends React.Component {
         const round = find(round_id, this.state.rounds)
         if (round_id === NEW) {
             this.delete_and_update_state(round)
-        }
-        else {
+        } else {
             console.log("delete round", round)
             sendData(round_id, "DELETE", undefined, this.props.token).then((data) => {
                 this.delete_and_update_state(round)
@@ -140,7 +143,7 @@ class RoundList extends React.Component {
      */
     delete_and_update_state = (round) => {
         const data = this.state.rounds.filter(item => item.id !== round.id);
-        this.setState({ rounds: data, dirty: "", selected: "" })
+        this.setState({rounds: data, dirty: "", selected: ""})
     }
 
     /**
@@ -150,8 +153,9 @@ class RoundList extends React.Component {
         try {
             find(NEW, this.state.rounds)
             return false
+        } catch (Error) {
+            return this.state.loading === false
         }
-        catch (Error) { return this.state.loading === false }
     }
 
     /**
@@ -165,9 +169,9 @@ class RoundList extends React.Component {
             [ID]: NEW
         }
 
-        const data =  this.state.rounds? [...this.state.rounds] : []
+        const data = this.state.rounds ? [...this.state.rounds] : []
         data.push(round)
-        this.setState({ rounds: data }, () => {
+        this.setState({rounds: data}, () => {
             this.set_selected(NEW)
         })
     }
@@ -176,30 +180,43 @@ class RoundList extends React.Component {
     render() {
         const rounds = this.state.rounds?.map((round, index) => (
             <Round key={round.id} id={round.id} name={round.name} create_date={round.create_date}
-                questions={round.questions} wagers={round.wagers}
-                selected={(this.state.selected === round.id)}
-                set_selected={this.set_selected} delete={this.delete} />))
+                   questions={round.questions} wagers={round.wagers}
+                   selected={(this.state.selected === round.id)}
+                   set_selected={this.set_selected} delete={this.delete}/>))
 
-        const nrb = this.add_newround_button() ? <NewButton on_click={this.add_new_round} /> : null
+        const nrb = this.add_newround_button() ? <NewButton on_click={this.add_new_round}/> : null
 
         let open_round = null
         if (this.state.selected !== "") {
             const r = find(this.state.selected, this.state.rounds)
             open_round = <OpenRound key={r.id} id={r.id} name={r.name}
-                questions={r.questions} wagers={r.wagers} set={this.set_value}
-                set_selected={this.set_selected} delete={this.delete}
-                save={this.save} set_multi={this.set_multi} token={this.props.token} />
+                                    questions={r.questions} wagers={r.wagers} set={this.set_value}
+                                    set_selected={this.set_selected} delete={this.delete}
+                                    save={this.save} set_multi={this.set_multi} token={this.props.token}/>
         }
 
-        const header = <EditorFilter set_text_filter={this.set_text_filter} set_unused_only={this.set_unused_only} data_type="rounds"
-                                     text_filter={this.state.text_filter} unused_only={this.state.unused_only} add_button={nrb} />
+        const header = <EditorFilter set_text_filter={this.set_text_filter} set_unused_only={this.set_unused_only}
+                                     data_type="rounds"
+                                     text_filter={this.state.text_filter} unused_only={this.state.unused_only}
+                                     add_button={nrb}/>
+
+        const view = <div
+            style={{
+                display: "flex",
+                maxWidth: "100%",
+                maxHeight: "100%",
+                flexWrap: "wrap",
+                overflowY: "auto"
+            }}>
+            {rounds}
+        </div>
 
         return (
             <div className="round-and-open-question">
                 <div className="ql_and_filter">
                     <PageHeader breadcrumbs={["Editor", "Rounds"]} header={header} style={{marginBottom: 10}}/>
                     <LoadingOrView loading={this.state.loading} class_name="round_list"
-                        empty={rounds?.length === 0} loaded_view={rounds} />
+                                   empty={rounds?.length === 0} loaded_view={view}/>
                 </div>
 
                 {open_round}
@@ -237,7 +254,7 @@ async function sendData(round_id, method, round_data, token) {
 
     const response = await fetch(url, {
         method: method,
-        headers: { 'Content-Type': 'application/json', "borttrivia-token": token },
+        headers: {'Content-Type': 'application/json', "borttrivia-token": token},
         body: body
     })
     return response.json()

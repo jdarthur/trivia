@@ -13,12 +13,10 @@ class PlayerScorer extends React.Component {
     }
 
     componentDidMount() {
-        console.log(sessionStorage)
         const answers = sessionStorage.getItem("answers")
         if (answers && answers !== "undefined") {
             const answersStored = JSON.parse(answers)
             if (answersStored) {
-                console.log(answersStored)
                 this.setState({answers: answersStored}, () => this.get_answers())
             } else {
                 this.get_answers()
@@ -89,12 +87,9 @@ class PlayerScorer extends React.Component {
                 question_index: this.props.question_id,
                 players: this.state.scores
             }
-            console.log(url)
-            console.log(body)
 
             sendData(url, "PUT", body)
                 .then((data) => {
-                    console.log(data)
                 })
         }
     }
@@ -122,7 +117,7 @@ class PlayerScorer extends React.Component {
         for (let i = 0; i < this.state.answers.length; i++) {
             if (this.state.answers[i].player_id === player_id) {
                 return this.state.answers?.length > 0 ?
-                    this.state.answers[i].answers[this.state.answers[i].answers.length - 1].wager
+                    this.state.answers[i].answers[this.state.answers[i].answers.length - 1]?.wager
                     : null
             }
         }
