@@ -70,14 +70,14 @@ class EditorToolbar extends React.Component {
         </Tooltip>
         const picture =
             <Tooltip
-                title={"Upload an embedded image. Change the text between the square brackets afterwards to customize the alt text displayed on mouseover"}>
+                title={"Upload an embedded image. Change the text between the square brackets afterwards to customize the alt text displayed on mouseover."}>
                 <PictureOutlined className="editor-toolbar-button" onClick={this.image}/>
             </Tooltip>
 
 
         const audio =
             <Tooltip
-                title={"Upload an MP3 or WAV file for audio-based questions. Change the text between the square brackets afterwards to customize the text of the hyperlinkgit s"}>
+                title={"Upload an MP3 or WAV file for audio-based questions. Change the text between the square brackets afterwards to customize the text of the hyperlink."}>
                 <SoundOutlined className="editor-toolbar-button" onClick={this.audio}/>
             </Tooltip>
         const code = <span>
