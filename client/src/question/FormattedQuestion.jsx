@@ -2,6 +2,7 @@ import React from 'react';
 
 import ReactMarkdown from "react-markdown";
 import remarkGfm from 'remark-gfm'
+import {Image} from 'antd'
 
 import './Question.css';
 
@@ -13,10 +14,9 @@ export default function FormattedQuestion(props) {
     }
 
     const renderers = {
-        img: ({alt, src}) => (
-            <img alt={alt} src={src} title={alt}
-                 style={{maxWidth: props.max_width, maxHeight: '30vh'}}/>),
+        img: ({alt, src}) => image(alt, src, props.max_width),
         p: ({value, children}) => (<p style={{"marginBottom": 5}}> {children} </p>),
+        a: ({href, children}) => (<a href={href} target={"_blank"}>{children}</a>),
         blockquote: (({value, children}) => (<blockquote style={{paddingRight: 10}}>{children}</blockquote>)),
         code: (({value, children}) => (
             <pre style={{background: "#262626", color: "#fafafa"}}>{asCode(children.toString())}</pre>)),
@@ -40,6 +40,10 @@ const lineNumberBaseStyle = {
     paddingLeft: 10,
     marginRight: 10,
     paddingTop: 5
+}
+
+function image(alt, src, maxWidth) {
+    return <Image style={{maxWidth: maxWidth, maxHeight: '30vh'}} src={src} title={alt} alt={alt}/>
 }
 
 function asCode(rawText) {

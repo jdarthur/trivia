@@ -12,7 +12,7 @@ type ImageResponse struct {
 	FileName string ``
 }
 
-func (e *Env) UploadImage(c *gin.Context) {
+func (e *Env) UploadFile(c *gin.Context) {
 	imageDir := os.Getenv("IMAGE_DIR")
 	if len(imageDir) == 0 {
 		imageDir = "images"
