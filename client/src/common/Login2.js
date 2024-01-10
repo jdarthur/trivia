@@ -1,12 +1,12 @@
 import React from "react";
-import { useAuth0 } from "@auth0/auth0-react";
-import { Button } from "antd"
+import {useAuth0} from "@auth0/auth0-react";
+import {Button} from "antd"
 
-import { UserOutlined } from "@ant-design/icons";
+import {UserOutlined} from "@ant-design/icons";
 
 const LoginButton = () => {
 
-    const { loginWithRedirect, getAccessTokenSilently } = useAuth0();
+    const {loginWithRedirect} = useAuth0();
 
     const login = async () => {
         console.log("about to log in from ", window.location.href)
@@ -20,10 +20,10 @@ const LoginButton = () => {
     }
 
     return (
-        <Button type="primary" style={{ paddingLeft: 10, paddingRight: 10 }}
-            onClick={login}>
+        <Button type="primary" style={{paddingLeft: 10, paddingRight: 10}}
+                onClick={login}>
             <span>
-                <UserOutlined style={{ marginRight: 5 }} />
+                <UserOutlined style={{marginRight: 5}}/>
                 Log In
             </span>
         </Button>

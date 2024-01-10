@@ -16,7 +16,7 @@ export default function FormattedQuestion(props) {
     const renderers = {
         img: ({alt, src}) => image(alt, src, props.max_width),
         p: ({value, children}) => (<p style={{"marginBottom": 5}}> {children} </p>),
-        a: ({href, children}) => (<a href={href} target={"_blank"}>{children}</a>),
+        a: ({href, children}) => embeddedLink(href, children),
         blockquote: (({value, children}) => (<blockquote style={{paddingRight: 10}}>{children}</blockquote>)),
         code: (({value, children}) => (
             <pre style={{background: "#262626", color: "#fafafa"}}>{asCode(children.toString())}</pre>)),
@@ -44,6 +44,28 @@ const lineNumberBaseStyle = {
 
 function image(alt, src, maxWidth) {
     return <Image style={{maxWidth: maxWidth, maxHeight: '30vh'}} src={src} title={alt} alt={alt}/>
+}
+
+function embeddedLink(href, children) {
+
+    const isMp3 = href.toString().toLowerCase().endsWith(".mp3")
+    const isWav = href.toString().toLowerCase().endsWith(".wav")
+    console.log(isMp3 || isWav)
+
+    if (isMp3 || isWav) {
+
+        let type = "audio/mpeg"
+        if (isWav) {
+            type = "audio/wav"
+        }
+
+        return <audio controls>
+            <source src={href} type={type}/>
+            {children}
+        </audio>
+    } else {
+        return <a href={href} target={"_blank"}>{children}</a>
+    }
 }
 
 function asCode(rawText) {
