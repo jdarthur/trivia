@@ -3,7 +3,7 @@ import './ActiveGame.css';
 
 import {Breadcrumb, Card, Tooltip} from 'antd';
 import {EditOutlined, InfoCircleOutlined, PlaySquareOutlined} from '@ant-design/icons';
-import FormattedQuestion from "../question/FormattedQuestion"
+import FormattedQuestion, {MemoFormattedQuestion} from "../question/FormattedQuestion"
 import HotEditQuestion from "./HotEditQuestion";
 import HotEditRoundName from "./HotEditRoundName";
 
@@ -74,9 +74,9 @@ class ActiveQuestion extends React.Component {
 
 
                 <div className="active-question-box">
-                    <FormattedQuestion question={this.props.question}
-                                       answer={this.props.answer} max_width={350}
-                                       scored={this.props.scored}
+                    <MemoFormattedQuestion question={this.props.question}
+                                           answer={this.props.answer} max_width={350}
+                                           scored={this.props.scored}
                     />
                     {editQuestionModal}
                 </div>
