@@ -1,8 +1,10 @@
 package sessions
 
 import (
-	"github.com/jdarthur/trivia/common"
+	"errors"
+	"fmt"
 	"github.com/gin-gonic/gin"
+	"github.com/jdarthur/trivia/common"
 	"github.com/jdarthur/trivia/models"
 )
 
@@ -25,6 +27,8 @@ func (e *Env) HotEditQuestion(c *gin.Context) {
 			return
 		}
 
+		fmt.Println(request)
+
 		err = checkValidRoundAndQuestionIndex(session, request.RoundIndex, request.QuestionIndex)
 		if err != nil {
 			common.Respond(c, request, err)
@@ -36,6 +40,21 @@ func (e *Env) HotEditQuestion(c *gin.Context) {
 		questionInRound.Question = request.Question.Question
 		questionInRound.Answer = request.Question.Answer
 		questionInRound.Category = request.Question.Category
+
+		if request.Question.ScoringNote != "" {
+			var note models.ScoringNote
+			err := common.GetOne((*common.Env)(e), common.ScoringNoteTable, request.Question.ScoringNote, &note)
+			if err != nil {
+				common.Respond(c, request, errors.New("unable to get scoring note by ID"))
+				return
+			}
+
+			questionInRound.ScoringNote = note.Description
+			questionInRound.ScoringNoteId = request.Question.ScoringNote
+		} else {
+			questionInRound.ScoringNote = ""
+			questionInRound.ScoringNoteId = ""
+		}
 
 		session.Rounds[request.RoundIndex].Questions[request.QuestionIndex] = questionInRound
 		err = common.Set((*common.Env)(e), common.SessionTable, sessionId, &session)
@@ -57,6 +76,7 @@ func (e *Env) HotEditQuestion(c *gin.Context) {
 		question.Question = request.Question.Question
 		question.Answer = request.Question.Answer
 		question.Category = request.Question.Category
+		question.ScoringNote = request.Question.ScoringNote
 
 		err = common.Set((*common.Env)(e), common.QuestionTable, questionId, &question)
 		if err != nil {

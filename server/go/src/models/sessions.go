@@ -76,6 +76,7 @@ type QuestionInRound struct {
 	Index         int                     `bson:"-" json:"id"`
 	QuestionId    string                  `bson:"question_id" json:"-"`
 	ScoringNote   string                  `bson:"scoring_note" json:"scoring_note"`
+	ScoringNoteId string                  `bson:"scoring_note_id" json:"scoring_note_id"`
 }
 
 type ScoreRequest struct {

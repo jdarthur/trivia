@@ -3,7 +3,7 @@ import sendData from "../index"
 import AnsweredOrNot from "./AnsweredOrNot"
 import CorrectOrNot from "./CorrectOrNot"
 import "./Players.css"
-import { Modal } from 'antd';
+import {Button, Modal} from 'antd';
 
 
 class PlayerStatus extends React.Component {
@@ -16,7 +16,7 @@ class PlayerStatus extends React.Component {
     componentDidMount() {
         const statusStored = JSON.parse(sessionStorage.getItem("status"))
         if (statusStored) {
-            this.setState({ answers: statusStored }, () => this.get_answers())
+            this.setState({answers: statusStored}, () => this.get_answers())
         } else {
             this.get_answers()
         }
@@ -25,11 +25,9 @@ class PlayerStatus extends React.Component {
     componentDidUpdate(prevProps) {
         if (this.props.session_state !== prevProps.session_state) {
             this.get_answers()
-        }
-        else if (this.props.question_id !== prevProps.question_id) {
+        } else if (this.props.question_id !== prevProps.question_id) {
             this.get_answers()
-        }
-        else if (this.props.round_id !== prevProps.round_id) {
+        } else if (this.props.round_id !== prevProps.round_id) {
             this.get_answers()
         }
     }
@@ -49,14 +47,22 @@ class PlayerStatus extends React.Component {
                     console.log(data)
                     if (data.answers) {
                         sessionStorage.setItem("status", JSON.stringify(data.answers))
-                        this.setState({ answers: data.answers })
+                        this.setState({answers: data.answers})
                     }
                 })
         }
     }
 
-    open_modal = () => { this.setState({ modal_open: true }) }
-    close_modal = () => { this.setState({ modal_open: false }) }
+    open_modal = () => {
+        this.setState({modal_open: true})
+    }
+    close_modal = () => {
+        this.setState({modal_open: false})
+    }
+
+    prevq = () => {
+
+    }
 
     render() {
 
@@ -64,31 +70,37 @@ class PlayerStatus extends React.Component {
 
             if (this.props.scored)
                 return <CorrectOrNot key={player.team_name} player_name={player.team_name}
-                    answers={player.answers} icon_name={player.icon}
-                    current_player={this.props.player_id} player_id={player.player_id}
-                    is_mobile={this.props.is_mobile} />
+                                     answers={player.answers} icon_name={player.icon}
+                                     current_player={this.props.player_id} player_id={player.player_id}
+                                     is_mobile={this.props.is_mobile}/>
             else return <AnsweredOrNot key={player.team_name} player_name={player.team_name}
-                answered={player.answered} icon_name={player.icon} is_mobile={this.props.is_mobile}
-                current_player={this.props.player_id} player_id={player.player_id} />
+                                       answered={player.answered} icon_name={player.icon}
+                                       is_mobile={this.props.is_mobile}
+                                       current_player={this.props.player_id} player_id={player.player_id}/>
         })
 
         const modal_answers = this.state.answers?.map(player => {
             return <CorrectOrNot key={player.team_name} player_name={player.team_name}
-                answers={player.answers} wager={player.wager} correct={player.correct}
-                points_awarded={player.points_awarded} icon_name={player.icon}
-                current_player={this.props.player_id} player_id={player.player_id}
-                is_mobile={false} />
+                                 answers={player.answers} wager={player.wager} correct={player.correct}
+                                 points_awarded={player.points_awarded} icon_name={player.icon}
+                                 current_player={this.props.player_id} player_id={player.player_id}
+                                 is_mobile={false}/>
 
         })
         const modal = <Modal title={null} visible={this.state.modal_open} onCancel={this.close_modal}
-            centered={true} width='min(250px, 70vw)' footer={null} >
+                             centered={true} width='min(250px, 70vw)' footer={null}>
             <div> {modal_answers} </div>
         </Modal>
 
         return (
             <div>
-                <div className="player-status-bar" onClick={this.open_modal}> {answers} </div>
+                <div className="player-status-bar" onClick={this.open_modal}>
+                    <Button> prev </Button>
+                    {answers}
+                    <Button> next </Button>
+                </div>
                 {(this.props.is_mobile && this.props.scored) ? modal : null}
+
             </div>
         );
     }

@@ -2,7 +2,7 @@ import React from 'react';
 import "./control.css"
 import SetQuestion from "./SetQuestion"
 import SetRound from "./SetRound"
-import { Button } from "antd"
+import {Button} from "antd"
 
 /**
  * mod controller for next/previous question,
@@ -18,7 +18,9 @@ class NextOrPrevious extends React.Component {
 
     render() {
         const qind = this.props.questions?.indexOf(this.props.active_question);
-        const rind = this.props.rounds?.indexOf(this.props.active_round);
+        const rind = this.props.rounds?.indexOf(this.props.active_round)
+
+        console.log(this.props)
 
         const prev_q = qind > 0 ? this.props.questions[qind - 1] : null
         const next_q = qind + 1 < this.props.questions?.length ? this.props.questions[qind + 1] : null
@@ -34,19 +36,25 @@ class NextOrPrevious extends React.Component {
 
         const spacer = prev_q === null && prev_r === null ? <div></div> : null //left spacer to fix alignment in first round
 
+        let last_q_in_prev_r = 0
+        if (show_pr) {
+            last_q_in_prev_r = this.props.fullRounds[prev_r]?.questions?.length - 1 || 0
+            console.log(last_q_in_prev_r)
+        }
+
         return (
             <div className="next-or-previous">
                 {show_pq ? <SetQuestion target={prev_q} label="Previous Question" round_id={this.props.active_round}
-                    session_id={this.props.session_id} player_id={this.props.player_id} /> : spacer}
-                {show_pr ? <SetRound target={prev_r} label="Previous Round"
-                    session_id={this.props.session_id} player_id={this.props.player_id} /> : spacer}
+                                        session_id={this.props.session_id} player_id={this.props.player_id}/> : spacer}
+                {show_pr ? <SetRound target={prev_r} label="Previous Round" question_target={last_q_in_prev_r}
+                                     session_id={this.props.session_id} player_id={this.props.player_id}/> : spacer}
 
                 {show_nq ? <SetQuestion target={next_q} label="Next Question" round_id={this.props.active_round}
-                    session_id={this.props.session_id} player_id={this.props.player_id} /> : null}
+                                        session_id={this.props.session_id} player_id={this.props.player_id}/> : null}
                 {show_nr ? <SetRound target={next_r} label="Next Round"
-                    session_id={this.props.session_id} player_id={this.props.player_id} /> : null}
+                                     session_id={this.props.session_id} player_id={this.props.player_id}/> : null}
 
-                {show_end ? <Button type="primary"> End game </Button>: null}
+                {show_end ? <Button type="primary"> End game </Button> : null}
             </div>
         );
     }

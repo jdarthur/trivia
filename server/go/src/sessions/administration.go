@@ -87,6 +87,7 @@ func _setCurrentQuestion(e *Env, session *models.Session, questionIndex int, rou
 	questionInRound.Question = questionObject.Question
 	questionInRound.Answer = questionObject.Answer
 	questionInRound.QuestionId = questionId
+	questionInRound.ScoringNoteId = questionObject.ScoringNote
 
 	if questionObject.ScoringNote != "" {
 		var note models.ScoringNote

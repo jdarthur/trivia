@@ -20,8 +20,6 @@ export default function ScoringNoteRender({id, name, onScoringDelete, descriptio
         shortName = name.substring(0, 8) + "..."
     }
 
-    console.log(name, ",", shortName)
-
     const title = <span style={{display: "flex", alignItems: "center", justifyContent: "space-between"}}>
         <ShortTextWithPopover text={name} maxLength={20}/>
         <DeleteConfirm delete={deleteSelf} style={{cursor: "pointer"}}/>

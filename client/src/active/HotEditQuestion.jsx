@@ -14,6 +14,7 @@ class HotEditQuestion extends React.Component {
     }
 
     set_value = (key, value) => {
+        console.log("set ", key, " to ", value)
         this.setState({[key]: value})
     }
 

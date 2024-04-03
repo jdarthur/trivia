@@ -55,13 +55,15 @@ class ActiveGame extends React.Component {
         let url = "/gameplay/session/" + this.props.session_id + "/current-question?player_id=" + this.props.player_id
         fetch(url).then(response => response.json())
             .then(q => {
+                console.log(q)
                 this.setState({
                     question: q.question,
                     answer: q.answer,
                     category: q.category,
                     active_question: q.id,
                     scored: q.scored === true,
-                    scoring_note: q.scoring_note
+                    scoring_note: q.scoring_note,
+                    scoring_note_id: q.scoring_note_id,
                 })
             })
     }
@@ -84,7 +86,9 @@ class ActiveGame extends React.Component {
                                             editable={this.props.is_mod}
                                             player_id={this.props.player_id} round_index={this.state.active_round}
                                             question_index={this.state.active_question}
-                                            scoring_note={this.state.scoring_note}/>
+                                            scoring_note={this.state.scoring_note}
+                                            scoring_note_id={this.state.scoring_note_id}
+                            />
                         </div>
 
                         {!this.props.is_mod ? <AnswerQuestion question={this.state.active_question}
@@ -100,7 +104,9 @@ class ActiveGame extends React.Component {
                                             active_question={this.state.active_question}
                                             active_round={this.state.active_round}
                                             session_id={this.props.session_id}
-                                            player_id={this.props.player_id}/> : null}
+                                            player_id={this.props.player_id}
+                                            fullRounds={this.props.fullRounds}
+                            /> : null}
 
                     </div>
                     <Scoreboard round_id={this.state.active_round} session_id={this.props.session_id}

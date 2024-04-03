@@ -42,14 +42,22 @@ class ActiveQuestion extends React.Component {
             <HotEditQuestion category={this.props.category} question={this.props.question} answer={this.props.answer}
                              close={this.close_question_editor} session_id={this.props.session_id}
                              player_id={this.props.player_id}
-                             round_index={this.props.round_index} question_index={this.props.question_index}/> : null
+                             round_index={this.props.round_index}
+                             scoring_note={this.props.scoring_note_id}
+                             question_index={this.props.question_index}
+            /> : null
 
 
         const roundName = this.state.round_editor_open ?
             <HotEditRoundName round_index={this.props.round_index} round_name={this.props.round_name}
                               close={this.close_round_editor} session_id={this.props.session_id}
                               player_id={this.props.player_id}/> :
-            <span onClick={this.open_round_editor}> {this.props.round_name} </span>
+            <span>
+                {this.props.round_name}
+                {this.props.editable ?
+                    <EditOutlined onClick={this.open_round_editor}
+                                  style={{fontSize: '0.9em', cursor: 'pointer', paddingLeft: '0.5em'}}/> : null}
+            </span>
 
         const scoringNote = this.props.scoring_note !== "" ?
             <Tooltip title={this.props.scoring_note} placement={"bottom"}>
