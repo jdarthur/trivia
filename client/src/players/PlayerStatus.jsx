@@ -95,9 +95,7 @@ class PlayerStatus extends React.Component {
         return (
             <div>
                 <div className="player-status-bar" onClick={this.open_modal}>
-                    <Button> prev </Button>
                     {answers}
-                    <Button> next </Button>
                 </div>
                 {(this.props.is_mobile && this.props.scored) ? modal : null}
 
