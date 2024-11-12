@@ -1,99 +1,94 @@
-import React from 'react';
+import React, {useState} from 'react';
 import '../modal/Modal.css';
 
-import { Modal, Button, Table } from 'antd';
+import {Button, Modal, Space, Table} from 'antd';
+import EditorFilter from "../editor/EditorFilter";
+import {useGetQuestionsQuery} from "../api/main";
 
 const columns = [
-    { title: 'Category', dataIndex: 'category', ellipsis: { showTitle: false } },
-    { title: 'Question', dataIndex: 'question', ellipsis: { showTitle: false}, width: '50%' },
-    { title: 'Answer', dataIndex: 'answer', ellipsis: { showTitle: false } }
+    {title: 'Category', dataIndex: 'category', ellipsis: {showTitle: false}},
+    {title: 'Question', dataIndex: 'question', ellipsis: {showTitle: false}, width: '50%'},
+    {title: 'Answer', dataIndex: 'answer', ellipsis: {showTitle: false}}
 ]
 
-class AddQuestionsModal extends React.Component {
+export default function AddQuestionsModal({add_questions, }) {
 
+    const [unusedOnly, setUnusedOnly] = useState(false)
+    const [textFilter, setTextFilter] = useState("")
+    const [selectedQuestions, setSelectedQuestions] = useState([])
+    const [isOpen, setIsOpen] = useState(false)
 
-    state = {
-        questions: [],
-        selected_questions: [],
-        is_open: false
+    let query = ""
+    if (unusedOnly) {
+        query += "?unused_only=true"
+    }
+    if (textFilter) {
+        query += unusedOnly ? "&text_filter=" + textFilter : "?text_filter=" + textFilter
     }
 
+    const {data, isFetching} = useGetQuestionsQuery(query)
+    const questions = data?.questions;
+    //console.log(questions)
 
-    componentDidMount() {
-        this.get_questions()
+    const header = <EditorFilter set_text_filter={setTextFilter} set_unused_only={setUnusedOnly}
+                                 data_type="questions" text_filter={textFilter} unused_only={unusedOnly}/>
+
+    const close_modal = () => {
+        setSelectedQuestions([])
+        setIsOpen(false)
     }
 
-    get_questions = () => {
-        let url = "/editor/questions?unused_only=true"
-        // if (this.state.text_filter !== "") {
-        //   url += "text_filter=" + this.state.text_filter
-        // }
-
-        // if (this.state.unused_only === true) {
-        //   url += "&unused_only=true"
-        // }
-
-        fetch(url, {headers: {"borttrivia-token": this.props.token}})
-            .then(response => response.json())
-            .then(state => {
-                console.log("got questions in addable questions")
-                console.log(state)
-                this.setState({ questions: state.questions })
-            })
+    const add_questions_and_close = () => {
+        add_questions(selectedQuestions)
+        close_modal()
     }
 
-
-    close_modal = () => {
-        this.setState({ is_open: false, selected_questions: [], })
-    }
-
-    open_modal = () => {
-        this.setState({ is_open: true }, () => {
-            this.get_questions()
-        })
-    }
-
-    add_questions_and_close = () => {
-        this.props.add_questions(this.state.selected_questions)
-        this.close_modal()
-    }
-
-    onSelectChange = selected_questions => {
+    const onSelectChange = (selected_questions) => {
         console.log('selected_questions changed: ', selected_questions);
-        this.setState({ selected_questions });
+        setSelectedQuestions(selected_questions)
     };
 
-    render() {
-        if (this.state.is_open === true) {
-            this.state.questions.map((question) => question.key = question.id)
+    const title = <Space>
+        <span>Add questions</span>
+        {header}
+    </Space>
 
-            const { selected_questions } = this.state;
-            const rowSelection = {
-                selected_questions,
-                onChange: this.onSelectChange,
-            };
 
-            return (
-                <Modal
-                    title="Add Questions" visible={this.state.is_open}
-                    onOk={this.add_questions_and_close} okText="Add"
-                    onCancel={this.close_modal} width="70vw" >
+    if (isOpen) {
 
-                    <Table rowSelection={rowSelection} columns={columns}
-                        dataSource={this.state.questions} pagination={false} />
+        const x = questions?.map((question) => {
+            return {...question, key: question.id};
+        })
+        console.log(x)
 
-                </Modal>
-            );
+        const rowSelection = {
+            x,
+            onChange: onSelectChange,
+        };
+
+        const pagination = {
+            total: questions?.length || 0,
+            showTotal: (total, range) => `${range[0]}-${range[1]} of ${total}`
         }
-        else {
-            return (
 
-                <Button type="primary" onClick={this.open_modal} style={{ 'margin-bottom': '10px', 'margin-top': '10px' }}>
-                    Add questions
-                </Button>
-            )
-        }
+        return (
+            <Modal
+                title={title} open={isOpen}
+                onOk={add_questions_and_close} okText="Add"
+                onCancel={close_modal} width="70vw">
+
+                <Table rowSelection={rowSelection} columns={columns}
+                       dataSource={x} pagination={pagination}/>
+
+            </Modal>
+        );
+    } else {
+        return (
+            <Button type="primary" onClick={() => setIsOpen(true)}
+                    style={{marginBottom: 10, marginTop: 10}}>
+                Add questions
+            </Button>
+        )
     }
-}
 
-export default AddQuestionsModal;
+}
