@@ -18,11 +18,10 @@ class WagerManager extends React.Component {
 
     componentDidUpdate(prevProps) {
         printDiffs(this.props, prevProps)
-        if (this.props.question_id !== prevProps.question_id) {
-            this.get_available_wagers()
-        }
-        if (this.props.round_id !== prevProps.round_id) {
-            this.get_available_wagers()
+        if (this.props.question_id !== prevProps.question_id || this.props.round_id !== prevProps.round_id) {
+            this.setState({ available_wagers: [], avail_count: {} }, () => {
+                this.get_available_wagers()
+            })
         }
     }
 
@@ -54,6 +53,9 @@ class WagerManager extends React.Component {
                 .then((data) => {
                     console.log(data)
                     this.set_available_wagers(data)
+                })
+                .catch((err) => {
+                    console.error("Failed to fetch available wagers:", err)
                 })
         }
     }
