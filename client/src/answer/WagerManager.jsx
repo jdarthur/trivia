@@ -10,6 +10,7 @@ class WagerManager extends React.Component {
         this.state = {
             available_wagers: [],
         }
+        this.fetchCounter = 0
     }
 
     componentDidMount() {
@@ -19,9 +20,7 @@ class WagerManager extends React.Component {
     componentDidUpdate(prevProps) {
         printDiffs(this.props, prevProps)
         if (this.props.question_id !== prevProps.question_id || this.props.round_id !== prevProps.round_id) {
-            this.setState({ available_wagers: [], avail_count: {} }, () => {
-                this.get_available_wagers()
-            })
+            this.get_available_wagers()
         }
     }
 
@@ -44,6 +43,9 @@ class WagerManager extends React.Component {
     get_available_wagers = () => {
         //get available wagers and truncate duplicates
         if (this.props.round_id !== "" && this.props.question_id !== "") {
+            this.fetchCounter += 1
+            const currentFetch = this.fetchCounter
+
             let url = "/gameplay/session/" + this.props.session_id + "/wagers"
             url += "?player_id=" + this.props.player_id
             url += "&round_id=" + this.props.round_id
@@ -52,7 +54,10 @@ class WagerManager extends React.Component {
             sendData(url, "GET")
                 .then((data) => {
                     console.log(data)
-                    this.set_available_wagers(data)
+                    // Only apply if this is still the latest request
+                    if (currentFetch === this.fetchCounter) {
+                        this.set_available_wagers(data)
+                    }
                 })
                 .catch((err) => {
                     console.error("Failed to fetch available wagers:", err)
