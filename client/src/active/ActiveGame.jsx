@@ -32,14 +32,13 @@ class ActiveGame extends React.Component {
 
     componentDidUpdate(prevProps) {
         if (this.props.session_state !== prevProps.session_state) {
-            this.get_current_question()
-            this.get_round()
+            this.get_current_question().then(() => this.get_round())
         }
     }
 
     get_round = () => {
         let url = "/gameplay/session/" + this.props.session_id + "/current-round"
-        fetch(url).then(response => response.json())
+        return fetch(url).then(response => response.json())
             .then(r => {
                 console.log(r)
                 this.setState({
@@ -53,7 +52,7 @@ class ActiveGame extends React.Component {
 
     get_current_question = () => {
         let url = "/gameplay/session/" + this.props.session_id + "/current-question?player_id=" + this.props.player_id
-        fetch(url).then(response => response.json())
+        return fetch(url).then(response => response.json())
             .then(q => {
                 console.log(q)
                 this.setState({
