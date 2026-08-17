@@ -73,5 +73,5 @@ type ScoredAnswer struct {
 	Wager         int     `json:"wager"`
 	Correct       bool    `json:"correct"`
 	PointsAwarded float64 `json:"points_awarded"`
-	Answer        string  `json:"answer""`
+	Answer        string  `json:"answer"`
 }

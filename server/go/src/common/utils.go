@@ -8,7 +8,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/globalsign/mgo"
 	"github.com/globalsign/mgo/bson"
-	"github.com/go-playground/validator"
+	"github.com/go-playground/validator/v10"
 	"github.com/jdarthur/trivia/models"
 	"github.com/joho/godotenv"
 	"net/http"

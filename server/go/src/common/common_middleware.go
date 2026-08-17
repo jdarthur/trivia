@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/gin-gonic/gin"
-	"github.com/golang-jwt/jwt/v4"
+	"github.com/golang-jwt/jwt/v5"
 	"net/http"
 	"sync"
 	"time"
@@ -63,7 +63,7 @@ var lastCertLoad time.Time
 // sending tokens with random `kid` headers could make us hammer Auth0.
 const minCertReloadInterval = time.Minute
 
-// Tolerated clock skew between Auth0 and this server for the `iat` claim.
+// Tolerated clock skew between Auth0 and this server for time-based claims.
 const maxClockSkew = 30 * time.Second
 
 func LoadCerts() error {
@@ -149,54 +149,36 @@ func getPemCert(token *jwt.Token) (string, error) {
 func DecodeToken(jwtToken string) (jwt.MapClaims, error) {
 
 	token, err := jwt.Parse(jwtToken, func(token *jwt.Token) (interface{}, error) {
-
-		// Only RS256 is acceptable here. Auth0 signs with RSA, and pinning the
-		// family keeps an attacker from steering us at a different algorithm.
-		if _, ok := token.Method.(*jwt.SigningMethodRSA); !ok {
-			return nil, fmt.Errorf("unexpected signing method %v", token.Header["alg"])
-		}
-
-		claims, ok := token.Claims.(jwt.MapClaims)
-		if !ok {
-			return nil, errors.New("failed to get claims")
-		}
-
-		// The `true` argument makes these claims required. With `false`, a token
-		// carrying no aud/iss at all would pass verification.
-		if !claims.VerifyAudience(audience, true) {
-			return nil, errors.New("invalid audience")
-		}
-		if !claims.VerifyIssuer(auth0Domain, true) {
-			return nil, errors.New("invalid issuer")
-		}
-
 		cert, err := getPemCert(token)
 		if err != nil {
 			return nil, err
 		}
 
 		return jwt.ParseRSAPublicKeyFromPEM([]byte(cert))
-	})
+	},
+		// Auth0 signs with RS256, so accept nothing else. This keeps an attacker
+		// from steering us at a different algorithm.
+		jwt.WithValidMethods([]string{"RS256"}),
+
+		// aud and iss must be present and match. v5 requires the claim whenever
+		// an expected value is configured, so a token carrying neither is rejected.
+		jwt.WithAudience(audience),
+		jwt.WithIssuer(auth0Domain),
+
+		// exp is optional per the spec; require it rather than accepting a token
+		// that never expires.
+		jwt.WithExpirationRequired(),
+
+		// Check iat, but tolerate a small window: a token issued a second or two
+		// in the future is a clock-skew artifact, not a forgery. The leeway also
+		// applies to exp and nbf.
+		jwt.WithIssuedAt(),
+		jwt.WithLeeway(maxClockSkew),
+	)
 
 	if err != nil {
-		// A token whose only problem is an `iat` slightly in the future is a
-		// clock-skew artifact, not a forgery, so tolerate a small window. Any
-		// other validation error (bad signature, expired, wrong audience) is
-		// fatal, including iat combined with something else.
-		validation, ok := err.(*jwt.ValidationError)
-		if !ok || validation.Errors != jwt.ValidationErrorIssuedAt || token == nil {
-			fmt.Printf("rejecting token: %v\n", err)
-			return nil, InvalidTokenError{Token: jwtToken}
-		}
-
-		skew, skewErr := issuedAtSkew(token)
-		if skewErr != nil || skew > maxClockSkew {
-			fmt.Printf("rejecting token: iat skew %v (%v)\n", skew, skewErr)
-			return nil, InvalidTokenError{Token: jwtToken}
-		}
-
-		fmt.Printf("token issued %v early, within tolerance\n", skew)
-		token.Valid = true
+		fmt.Printf("rejecting token: %v\n", err)
+		return nil, InvalidTokenError{Token: jwtToken}
 	}
 
 	if !token.Valid {
@@ -208,35 +190,7 @@ func DecodeToken(jwtToken string) (jwt.MapClaims, error) {
 		return nil, errors.New("failed to get claims")
 	}
 
-	// v4 treats `exp` as optional, so require it explicitly rather than
-	// accepting a token that never expires.
-	if _, ok := claims["exp"]; !ok {
-		return nil, InvalidTokenError{Token: jwtToken}
-	}
-
 	return claims, nil
-}
-
-// issuedAtSkew returns how far in the future a token's `iat` claim is. A
-// negative result means it was issued in the past, which is the normal case.
-func issuedAtSkew(token *jwt.Token) (time.Duration, error) {
-	claims, ok := token.Claims.(jwt.MapClaims)
-	if !ok {
-		return 0, errors.New("failed to get claims")
-	}
-
-	raw, ok := claims["iat"]
-	if !ok {
-		return 0, errors.New("token has no iat claim")
-	}
-
-	issuedAt, ok := raw.(float64)
-	if !ok {
-		return 0, fmt.Errorf("iat claim is %T, not a number", raw)
-	}
-
-	seconds := issuedAt - float64(time.Now().Unix())
-	return time.Duration(seconds) * time.Second, nil
 }
 
 func (e *Env) AsUser(c *gin.Context) {

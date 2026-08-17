@@ -1,4 +1,4 @@
-FROM golang:1.21-alpine
+FROM golang:1.26-alpine
 
 RUN apk add --no-cache git
 
@@ -21,10 +21,10 @@ ADD main.go /go/src
 ADD ./common /go/src/common
 ADD ./models /go/src/models
 
-RUN go get "github.com/gin-gonic/gin"
-RUN go get "github.com/globalsign/mgo"
-RUN go get "github.com/google/uuid"
-RUN go get "github.com/joho/godotenv"
+# Cache the module downloads in their own layer. `go get` here would resolve
+# and rewrite go.mod inside the image rather than honouring the versions we
+# committed, so download exactly what go.mod/go.sum pin instead.
+RUN go mod download
 
 # editor server
 ADD ./questions /go/src/questions
