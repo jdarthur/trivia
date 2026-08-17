@@ -9,10 +9,9 @@ const LoginButton = () => {
     const {loginWithRedirect} = useAuth0();
 
     const login = async () => {
-        console.log("about to log in from ", window.location.href)
+        // audience/scope are inherited from the Auth0Provider's
+        // authorizationParams, so they don't need to be repeated here.
         await loginWithRedirect({
-            audience: "https://borttrivia.com/editor",
-            scope: "openid profile email offline_access read:current_user",
             appState: {
                 returnTo: window.location.href,
             }

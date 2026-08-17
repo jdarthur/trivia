@@ -13,14 +13,28 @@ export const baseQuery = retry(fetchBaseQuery({
         return headers;
     },
     fetchFn: (input) => {
-        //regular fetch on input but don't actually send it if we don't have a token
-        if (input.headers.get('borttrivia-token')) {
-            return fetch(input)
+        // Don't bother sending editor requests we know will be rejected. Return
+        // a real 401 Response rather than undefined, so the caller always has
+        // something it can await and read a status off of.
+        if (!input.headers.get('borttrivia-token')) {
+            return Promise.resolve(new Response(JSON.stringify({error: 'no auth token'}), {
+                status: 401,
+                headers: {'Content-Type': 'application/json'},
+            }))
         }
+        return fetch(input)
     }
 
 }), {
-    maxRetries: 5,
+    // Note: retryCondition replaces maxRetries, so the attempt cap lives here.
+    // Retrying an auth failure just burns five round-trips, since the token
+    // can't change in the middle of a retry loop.
+    retryCondition: (error, args, {attempt}) => {
+        if (error.status === 401 || error.status === 403) {
+            return false
+        }
+        return attempt <= 5
+    },
 })
 
 export const mainApi = createApi({

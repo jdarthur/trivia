@@ -23,7 +23,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	fmt.Printf("%+v\n", common.JwtKeys)
+	fmt.Printf("loaded %d Auth0 signing key(s)\n", len(common.JwtKeys.Keys))
 
 	imageDir := os.Getenv("IMAGE_DIR")
 	if len(imageDir) == 0 {

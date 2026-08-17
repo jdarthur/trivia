@@ -1,10 +1,11 @@
 import React from 'react';
-import ReactDOM from 'react-dom';
+import {createRoot} from 'react-dom/client';
 import {Auth0Provider} from "@auth0/auth0-react";
-import App, {history} from './common/App.jsx';
+import App from './common/App.jsx';
 
-import {store} from './api/store';
+import {store, history} from './api/store';
 import {Provider} from "react-redux";
+import {AUDIENCE, SCOPE} from "./common/authConfig";
 
 function redirectCallBack(appState) {
     if (appState?.returnTo) {
@@ -12,22 +13,26 @@ function redirectCallBack(appState) {
     }
 }
 
-ReactDOM.render(
+createRoot(document.getElementById('root')).render(
     <Auth0Provider
         domain="borttrivia.us.auth0.com"
         clientId="03cLv60jN7hC79K8oUXHDF1wsenRTMx5"
-        redirectUri={window.location.origin}
         useRefreshTokens={true}
-        useRefreshTokensFallback={true}
+        // Leave the iframe fallback off: it needs a third-party cookie on the
+        // Auth0 domain, which Safari/Firefox/Brave block. With offline_access
+        // requested below we have a real refresh token and don't need it.
+        useRefreshTokensFallback={false}
         cacheLocation="localstorage"
-        audience="https://borttrivia.com/editor"
         onRedirectCallback={redirectCallBack}
-        scope="openid profile email offline_access read:current_user">
+        authorizationParams={{
+            redirect_uri: window.location.origin,
+            audience: AUDIENCE,
+            scope: SCOPE,
+        }}>
         <Provider store={store}>
             <App/>
         </Provider>
-    </Auth0Provider>,
-    document.getElementById('root')
+    </Auth0Provider>
 );
 
 let vh = window.innerHeight * 0.01;
