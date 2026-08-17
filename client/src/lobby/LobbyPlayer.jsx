@@ -1,7 +1,7 @@
 import React from 'react';
 import './Lobby.css';
 
-import {ICONS} from "./Icons.js"
+import {ICONS} from "./Icons.jsx"
 
 import {Card, Input, Button, Tooltip} from 'antd';
 

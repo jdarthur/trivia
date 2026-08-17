@@ -1,6 +1,6 @@
 import React from 'react';
 
-import {ICONS} from "./Icons.js"
+import {ICONS} from "./Icons.jsx"
 
 class PlayerIcon extends React.Component {
 

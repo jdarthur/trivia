@@ -6,10 +6,8 @@ import NewButton from "../editor/NewButton";
 import {useGetCollectionsQuery} from "../api/main";
 import PageHeader from "../common/PageHeader";
 import {useSearchParams} from "react-router-dom";
-import * as PropTypes from "prop-types";
 import ImportCollection from "./ImportCollection";
 
-ImportCollection.propTypes = {id: PropTypes.string};
 export default function CollectionList() {
 
     const [modalOpen, setModalOpen] = useState(false)
