@@ -51,4 +51,7 @@ export const store = configureStore({
         }).concat(api.middleware, mainApi.middleware, routerMiddleware)
 });
 
+// The single history instance for the app. This is the redux-enhanced history,
+// so it must be what <HistoryRouter> navigates with -- otherwise the router and
+// the `router` slice of the store track two different histories.
 export const history = createReduxHistory(store);

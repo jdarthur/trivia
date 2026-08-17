@@ -15,11 +15,12 @@ import GameList from "../game/GameList";
 import CollectionList from "../collections/CollectionList";
 import {useAuth0} from "@auth0/auth0-react";
 import {useDispatch} from "react-redux";
-import {setToken as setAuthToken} from "../api/auth";
+import {setToken as setAuthToken, logoutUser} from "../api/auth";
 import AuthButton from "./AuthButton";
 import {HistoryRouter} from "redux-first-history/rr6";
-import {createBrowserHistory} from "history";
+import {history} from "../api/store";
 import AuthRequired from "./AuthRequired";
+import {AUDIENCE, SCOPE} from "./authConfig";
 
 const {Content, Header} = Layout;
 const {SubMenu} = Menu;
@@ -29,8 +30,6 @@ const ROUND = "Rounds"
 const GAME = "Games"
 const COLLECTION = "Collections"
 
-export const history = createBrowserHistory();
-
 export default function App() {
 
     const [token, setToken] = useState("")
@@ -38,35 +37,45 @@ export default function App() {
     const [isMod, setIsMod] = useState(false)
     const [isMobile, setIsMobile] = useState(false)
 
-    const {getAccessTokenSilently} = useAuth0();
+    const {getAccessTokenSilently, isAuthenticated, isLoading: authIsLoading} = useAuth0();
     const dispatch = useDispatch();
 
     useEffect(() => {
         const is_mobile = window.matchMedia("only screen and (max-width: 760px)").matches;
         setIsMobile(is_mobile)
+    }, []);
+
+    useEffect(() => {
+        // Wait for the SDK to finish handling the redirect callback, otherwise
+        // we ask for a token before there is a session to get one from.
+        if (authIsLoading) {
+            return
+        }
+
+        // Not logged in: make sure we aren't holding a token that redux-persist
+        // rehydrated from a previous session, or every request 401s.
+        if (!isAuthenticated) {
+            setToken("")
+            dispatch(logoutUser())
+            return
+        }
 
         const getEditorJwt = async () => {
-
             try {
                 const authToken = await getAccessTokenSilently({
-                    authorizationParams: {
-                        audience: "https://borttrivia.com/editor",
-                        scope: "openid profile email offline_access read:current_user",
-                    }
+                    authorizationParams: {audience: AUDIENCE, scope: SCOPE}
                 });
-                console.log(authToken)
                 setToken(authToken)
                 dispatch(setAuthToken({authToken}));
             } catch (e) {
-                console.log(e.message);
+                console.error("could not get an editor access token:", e.error || e.message);
+                setToken("")
+                dispatch(logoutUser())
             }
         };
 
         getEditorJwt();
-    }, [getAccessTokenSilently]);
-
-
-    const {isLoading: authIsLoading} = useAuth0();
+    }, [getAccessTokenSilently, isAuthenticated, authIsLoading, dispatch]);
 
     const showEditor = !!token
 
