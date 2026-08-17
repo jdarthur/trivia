@@ -52,7 +52,10 @@ It reads `MONGO_HOST` and `MONGO_PORT` from `server/go/src/.env` (both default
 to `localhost:27017`) and `IMAGE_DIR` for uploaded question images, which
 defaults to `images` relative to the working directory.
 
-The client proxies `/editor`, `/gameplay` and `/images` through to the API:
+### Development: two servers
+
+The client runs its own dev server and proxies `/editor`, `/gameplay` and
+`/images` through to the API:
 
 ```sh
 cd client
@@ -74,6 +77,32 @@ separately.
 
 `npm start` serves over HTTPS using the certificate in `client/cert/`, which is
 self-signed — expect a browser warning on first load.
+
+### Deployment: one server
+
+The API can serve the built client itself, so there is no separate node process
+and no proxy in front of the two. Build the client, then bring the stack up:
+
+```sh
+cd client && npm run build
+cd ../server/go/src && docker compose up -d
+```
+
+The app is then on <http://127.0.0.1:8080> — API under `/editor` and
+`/gameplay`, uploaded images under `/images`, and everything else served from
+the build, falling back to `index.html` so a deep link like `/game/abc` works on
+a cold load.
+
+`docker-compose.yml` mounts `client/build` read-only at `/go/src/client` and
+points `CLIENT_DIR` at it. The mount is deliberate rather than baked into the
+image: the build context is `server/go/src`, so the Dockerfile cannot reach
+`client/` to build it. Rebuilding the client is enough to pick up changes; the
+container does not need a restart.
+
+`CLIENT_DIR` defaults to `client` relative to the working directory and is
+optional. If it holds no `index.html` — an unbuilt client, or a deployment that
+does not want one — the server logs that it is skipping the client and serves
+the API alone.
 
 ## Checks
 

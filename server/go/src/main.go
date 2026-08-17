@@ -111,6 +111,16 @@ func main() {
 	router.POST("/editor/scoring_notes", auth.AsUser, q.CreateScoringNote)
 	router.DELETE("/editor/scoring_notes/:id", auth.AsUser, q.DeleteScoringNote)
 
+	// Registered last because it claims everything the routes above did not.
+	// CLIENT_DIR is relative to the working directory, which is /go/src in the
+	// image, and docker-compose mounts the client build there.
+	clientDir := os.Getenv("CLIENT_DIR")
+	if len(clientDir) == 0 {
+		clientDir = "client"
+	}
+	fmt.Println()
+	serveClient(router, clientDir)
+
 	fmt.Println()
 	router.Run()
 }
