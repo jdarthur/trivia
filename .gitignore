@@ -1,20 +1,32 @@
+# Node
 client/node_modules/
-client/cert/
-server/__pycache__
-server/test/__pycache__
-server/src/__pycache__
-.idea/
-client/.env
 client/build
+
+# Local config and certs
+client/.env
+client/cert/
+server/go/src/.env
+
+# Go build output
 server/go/bin/
 server/go/pkg/
+
+# Dependencies vendored into the pre-modules GOPATH layout
 server/go/src/github.com
 server/go/src/go.mongodb.org
 server/go/src/golang.org
 server/go/src/gopkg.in
 server/go/src/google.golang.org
-server/go/src/.env
-server/__init__.pyc
-server/test/__init__.pyc
+
+# Uploaded question images. IMAGE_DIR defaults to "images" relative to the
+# working directory, so it lands at the repo root when the server is started
+# from there, and under server/go/src when started from the module directory.
+/images/
 server/go/src/images
-venv/
+
+# Editors
+.idea/
+
+# Stray package downloads -- a 39M containerd RPM was committed by accident once
+*.rpm
+*.deb
