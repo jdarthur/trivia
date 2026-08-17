@@ -72,10 +72,9 @@ jobs:
       - name: Build
         run: npm run build
 
-      # Reported, not enforced. npm audit currently finds 67 advisories, nearly
-      # all of them transitive through react-scripts, which pins the vulnerable
-      # versions and is unmaintained. Make this a blocking step once the Vite
-      # migration lands and the count is something we can hold at zero.
+      # Deliberately strict: no --audit-level, so a low in a dev-only transitive
+      # dependency blocks the merge too. Dropping react-scripts took the count to
+      # zero, and holding it there is cheaper than arguing about a threshold every
+      # time one appears. Loosen to --audit-level=high if that stops being true.
       - name: Audit
-        continue-on-error: true
         run: npm audit
