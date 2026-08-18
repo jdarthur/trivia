@@ -24,6 +24,11 @@ server/go/src/google.golang.org
 /images/
 server/go/src/images
 
+# SQLite database. DB_PATH defaults to "data/trivia.db" relative to the working
+# directory, so it can land at either of the same two spots.
+/data/
+server/go/src/data
+
 # Editors
 .idea/
 
