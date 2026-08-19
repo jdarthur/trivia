@@ -15,7 +15,6 @@ type Player struct {
 	TeamName   string    `json:"team_name"`
 	RealName   string    `json:"real_name"`
 	Icon       string    `json:"icon"`
-	SessionId  string    `json:"session_id"`
 }
 
 func (p Player) SetCreateDate(createDate time.Time) Object {

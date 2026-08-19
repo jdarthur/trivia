@@ -288,7 +288,7 @@ func (e *Env) GetPlayersInSession(c *gin.Context) {
 // getPlayersInSession returns the session's players, in join order, from the
 // session_player membership join — the canonical membership list.
 func getPlayersInSession(e *Env, sessionId string) ([]models.Player, error) {
-	rows, err := e.Db.Query(`SELECT p.id, p.create_date, p.team_name, p.real_name, p.icon, p.session_id
+	rows, err := e.Db.Query(`SELECT p.id, p.create_date, p.team_name, p.real_name, p.icon
 		FROM session_player sp
 		JOIN player p ON p.id = sp.player_id
 		WHERE sp.session_id = ?
@@ -302,7 +302,7 @@ func getPlayersInSession(e *Env, sessionId string) ([]models.Player, error) {
 	for rows.Next() {
 		var player models.Player
 		var createDate string
-		if err := rows.Scan(&player.ID, &createDate, &player.TeamName, &player.RealName, &player.Icon, &player.SessionId); err != nil {
+		if err := rows.Scan(&player.ID, &createDate, &player.TeamName, &player.RealName, &player.Icon); err != nil {
 			return nil, err
 		}
 		player.CreateDate = common.ParseTime(createDate)

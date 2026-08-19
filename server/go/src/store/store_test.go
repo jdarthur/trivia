@@ -36,8 +36,8 @@ func TestMigrateCreatesBaselineSchema(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Version: %v", err)
 	}
-	if v != 4 {
-		t.Fatalf("user_version = %d, want 4", v)
+	if v != 5 {
+		t.Fatalf("user_version = %d, want 5", v)
 	}
 
 	tables := []string{
@@ -87,6 +87,33 @@ func TestMigrateDropsQuestionRoundsUsed(t *testing.T) {
 	}
 }
 
+func TestMigrateDropsPlayerSessionId(t *testing.T) {
+	db := openTestDB(t)
+
+	// Migration 5 (ticket #84) drops the player.session_id mirror;
+	// membership now lives only in session_player.
+	rows, err := db.Query("PRAGMA table_info(player)")
+	if err != nil {
+		t.Fatalf("query table_info: %v", err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var cid int
+		var name, typ string
+		var notnull, pk int
+		var dflt interface{}
+		if err := rows.Scan(&cid, &name, &typ, &notnull, &dflt, &pk); err != nil {
+			t.Fatalf("scan table_info row: %v", err)
+		}
+		if name == "session_id" {
+			t.Error("player.session_id column still present after migration")
+		}
+	}
+	if err := rows.Err(); err != nil {
+		t.Fatalf("iterate table_info: %v", err)
+	}
+}
+
 func TestMigrateIsIdempotent(t *testing.T) {
 	db := openTestDB(t)
 
@@ -97,8 +124,8 @@ func TestMigrateIsIdempotent(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Version: %v", err)
 	}
-	if v != 4 {
-		t.Fatalf("user_version = %d after re-migrate, want 4", v)
+	if v != 5 {
+		t.Fatalf("user_version = %d after re-migrate, want 5", v)
 	}
 }
 

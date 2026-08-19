@@ -528,9 +528,9 @@ func getSession(db *sql.DB, id string, m *models.Session) error {
 
 func getPlayer(db *sql.DB, id string, m *models.Player) error {
 	var createDate string
-	err := db.QueryRow(`SELECT id, create_date, team_name, real_name, icon, session_id
+	err := db.QueryRow(`SELECT id, create_date, team_name, real_name, icon
 		FROM player WHERE id = ?`, id).
-		Scan(&m.ID, &createDate, &m.TeamName, &m.RealName, &m.Icon, &m.SessionId)
+		Scan(&m.ID, &createDate, &m.TeamName, &m.RealName, &m.Icon)
 	if errors.Is(err, sql.ErrNoRows) {
 		return NonexistentIdError{RecordType: PlayerTable, ID: id}
 	}
@@ -721,9 +721,9 @@ func insertSession(db *sql.DB, m models.Session) error {
 }
 
 func insertPlayer(db *sql.DB, m models.Player) error {
-	_, err := db.Exec(`INSERT INTO player (id, create_date, team_name, real_name, icon, session_id)
-		VALUES (?, ?, ?, ?, ?, ?)`,
-		m.ID, formatTime(m.CreateDate), m.TeamName, m.RealName, m.Icon, m.SessionId)
+	_, err := db.Exec(`INSERT INTO player (id, create_date, team_name, real_name, icon)
+		VALUES (?, ?, ?, ?, ?)`,
+		m.ID, formatTime(m.CreateDate), m.TeamName, m.RealName, m.Icon)
 	return err
 }
 
@@ -898,8 +898,8 @@ func updateSession(db *sql.DB, id string, m models.Session) error {
 }
 
 func updatePlayer(db *sql.DB, id string, m models.Player) error {
-	res, err := db.Exec(`UPDATE player SET team_name = ?, real_name = ?, icon = ?, session_id = ? WHERE id = ?`,
-		m.TeamName, m.RealName, m.Icon, m.SessionId, id)
+	res, err := db.Exec(`UPDATE player SET team_name = ?, real_name = ?, icon = ? WHERE id = ?`,
+		m.TeamName, m.RealName, m.Icon, id)
 	return rowsAffected(res, err, PlayerTable, id)
 }
 
