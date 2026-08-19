@@ -10,10 +10,11 @@ import (
 // without conversion. Booleans are stored as INTEGER 0/1.
 //
 // The baseline schema maps the current Mongo document model onto relations.
-// Where a column deliberately has no REFERENCES clause (player.session_id,
-// session.game_id, session.moderator_id), it is a denormalized mirror whose
-// canonical form lives in a join table, or gameplay data that must not be
-// cascade-deleted by editor changes.
+// Where a column deliberately has no REFERENCES clause (session.game_id,
+// session.moderator_id), it is gameplay data that must not be cascade-deleted
+// by editor changes. Denormalized mirrors (question.rounds_used,
+// player.session_id) were dropped once membership reads moved to the join
+// tables.
 
 // migration is one versioned step of the schema. Its statements are applied
 // atomically inside a single transaction.
@@ -226,6 +227,19 @@ var migrations = []migration{
 			// round_question, exactly as loadRound derives Round.Games from
 			// game_round.
 			`ALTER TABLE question DROP COLUMN rounds_used`,
+		},
+	},
+	{
+		version: 5,
+		name:    "drop player session_id mirror",
+		statements: []string{
+			// player.session_id was a denormalized mirror of the
+			// session_player membership join, written on join but never
+			// cleared on leave and un-FK'd. Membership is canonical in
+			// session_player, so the mirror is dropped (ticket #84); reads
+			// derive a player's session from session_player, and updates bump
+			// the state token of the sessions the player actually belongs to.
+			`ALTER TABLE player DROP COLUMN session_id`,
 		},
 	},
 }

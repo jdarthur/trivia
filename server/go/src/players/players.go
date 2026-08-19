@@ -84,11 +84,6 @@ func (e *Env) AddPlayerToSession(c *gin.Context) {
 		err = common.IncrementState((*common.Env)(e), sessionId)
 	}
 
-	if err == nil {
-		player.SessionId = sessionId
-		err = common.Set((*common.Env)(e), common.PlayerTable, string(requestBody.PlayerId), player)
-	}
-
 	common.Respond(c, requestBody, err)
 }
 
@@ -156,10 +151,33 @@ func (e *Env) UpdatePlayer(c *gin.Context) {
 	original.RealName = requestBody.RealName
 	err = common.Set((*common.Env)(e), common.PlayerTable, playerId, original)
 	if err == nil {
-		err = common.IncrementState((*common.Env)(e), original.SessionId)
+		err = bumpPlayerSessions((*common.Env)(e), playerId)
 	}
 
 	common.Respond(c, requestBody, err)
+}
+
+// bumpPlayerSessions bumps the state token of every session the player is
+// currently a member of. Membership is canonical in session_player (there is
+// no player.session_id mirror), so the sessions are derived from the join —
+// a player removed from one session and re-added elsewhere only bumps the
+// sessions they actually belong to.
+func bumpPlayerSessions(e *common.Env, playerId string) error {
+	rows, err := e.Db.Query(`SELECT session_id FROM session_player WHERE player_id = ?`, playerId)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var sessionId string
+		if err := rows.Scan(&sessionId); err != nil {
+			return err
+		}
+		if err := common.IncrementState(e, sessionId); err != nil {
+			return err
+		}
+	}
+	return rows.Err()
 }
 
 func (e *Env) DeletePlayer(c *gin.Context) {
