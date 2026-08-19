@@ -101,16 +101,6 @@ func (e *Env) CreateRound(c *gin.Context) {
 
 	fmt.Println(data)
 
-	//add this new roundId to each question's rounds_used list
-	for _, questionId := range data.Questions {
-		//append roundId to question's rounds_used
-		err = common.Push((*common.Env)(e), common.QuestionTable, questionId, models.RoundsUsed, data.ID)
-		if err != nil {
-			common.Respond(c, data, err)
-			return
-		}
-	}
-
 	common.Respond(c, data, err)
 }
 
@@ -150,12 +140,8 @@ func (e *Env) UpdateRound(c *gin.Context) {
 		return
 	}
 
-	//compose update body and update rounds_used on questions
-	err = e.merge(&updateBody, &existingRound)
-	if err != nil {
-		common.Respond(c, existingRound, err)
-		return
-	}
+	//compose update body into existing round
+	e.merge(&updateBody, &existingRound)
 
 	err = common.Set((*common.Env)(e), common.RoundTable, roundId, existingRound)
 
@@ -182,15 +168,6 @@ func (e *Env) DeleteRound(c *gin.Context) {
 	if err != nil {
 		common.Respond(c, existingRound, err)
 		return
-	}
-
-	for _, questionId := range existingRound.Questions {
-		fmt.Println("remove round ID " + roundId + " from question " + questionId)
-		err = common.Pull((*common.Env)(e), common.QuestionTable, questionId, models.RoundsUsed, roundId)
-		if err != nil {
-			common.Respond(c, existingRound, err)
-			return
-		}
 	}
 
 	for _, gameId := range existingRound.Games {
@@ -264,52 +241,32 @@ func questionInRound(questionId string, existingQuestionIds []string) bool {
 	return false
 }
 
-//Merge update body into existing round
-func (e *Env) merge(update *models.Round, original *models.Round) error {
-
+//Merge update body into existing round. The question list is merged in
+//place; common.Set then rewrites the round_question join wholesale, so no
+//rounds_used mirror bookkeeping is needed (ticket #83).
+func (e *Env) merge(update *models.Round, original *models.Round) {
 	if update.Name != "" {
 		original.Name = update.Name
 	}
-
 	if len(update.Wagers) != 0 {
 		original.Wagers = update.Wagers
 	}
-
-	return e.updateRoundsUsedInQuestions(update.Questions, original)
+	mergeQuestions(update.Questions, original)
 }
 
-//for each questionId in update,
-// if not in existing questions list, add it to question's rounds_used
-//for each questionId in existing,
-// if not in update body, remove it from question's rounds_used
-func (e *Env) updateRoundsUsedInQuestions(newQuestionIds []string, original *models.Round) error {
-	roundId := original.ID
-
-	//add this round_id to newly-added question's rounds_used
+//mergeQuestions reconciles original.Questions with newQuestionIds: add any
+//id missing from the round, drop any id no longer present in the update.
+func mergeQuestions(newQuestionIds []string, original *models.Round) {
 	for _, updateId := range newQuestionIds {
 		if !questionInRound(updateId, original.Questions) {
 			original.Questions = append(original.Questions, updateId)
-			//append roundId to question's rounds_used
-			err := common.Push((*common.Env)(e), common.QuestionTable, updateId, models.RoundsUsed, roundId)
-			if err != nil {
-				return err
-			}
 		}
 	}
-
-	//remove this round from rounds_used on deleted questions
 	for _, existingId := range original.Questions {
 		if !questionInRound(existingId, newQuestionIds) {
 			original.Questions = remove(original.Questions, existingId)
-			//remove roundId from question's rounds_used
-			err := common.Pull((*common.Env)(e), common.QuestionTable, existingId, models.RoundsUsed, roundId)
-			if err != nil {
-				return err
-			}
 		}
 	}
-
-	return nil
 }
 
 //remove something from slice by value

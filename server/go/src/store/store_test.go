@@ -36,8 +36,8 @@ func TestMigrateCreatesBaselineSchema(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Version: %v", err)
 	}
-	if v != 3 {
-		t.Fatalf("user_version = %d, want 3", v)
+	if v != 4 {
+		t.Fatalf("user_version = %d, want 4", v)
 	}
 
 	tables := []string{
@@ -60,6 +60,33 @@ func TestMigrateCreatesBaselineSchema(t *testing.T) {
 	}
 }
 
+func TestMigrateDropsQuestionRoundsUsed(t *testing.T) {
+	db := openTestDB(t)
+
+	// Migration 4 (ticket #83) drops the rounds_used JSON mirror; membership
+	// now lives only in round_question.
+	rows, err := db.Query("PRAGMA table_info(question)")
+	if err != nil {
+		t.Fatalf("query table_info: %v", err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var cid int
+		var name, typ string
+		var notnull, pk int
+		var dflt interface{}
+		if err := rows.Scan(&cid, &name, &typ, &notnull, &dflt, &pk); err != nil {
+			t.Fatalf("scan table_info row: %v", err)
+		}
+		if name == "rounds_used" {
+			t.Error("question.rounds_used column still present after migration")
+		}
+	}
+	if err := rows.Err(); err != nil {
+		t.Fatalf("iterate table_info: %v", err)
+	}
+}
+
 func TestMigrateIsIdempotent(t *testing.T) {
 	db := openTestDB(t)
 
@@ -70,8 +97,8 @@ func TestMigrateIsIdempotent(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Version: %v", err)
 	}
-	if v != 3 {
-		t.Fatalf("user_version = %d after re-migrate, want 3", v)
+	if v != 4 {
+		t.Fatalf("user_version = %d after re-migrate, want 4", v)
 	}
 }
 

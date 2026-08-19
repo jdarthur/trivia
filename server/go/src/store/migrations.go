@@ -215,6 +215,19 @@ var migrations = []migration{
 			`ALTER TABLE session_question ADD COLUMN scoring_note TEXT NOT NULL DEFAULT ''`,
 		},
 	},
+	{
+		version: 4,
+		name:    "drop question rounds_used mirror",
+		statements: []string{
+			// The rounds_used JSON column was a denormalized mirror of
+			// round_question, kept in sync by the editor write path. The editor
+			// logic is ported and the client never reads it, so the mirror is
+			// dropped (ticket #83): reads derive a question's rounds_used from
+			// round_question, exactly as loadRound derives Round.Games from
+			// game_round.
+			`ALTER TABLE question DROP COLUMN rounds_used`,
+		},
+	},
 }
 
 // Migrate brings db up to the latest schema version, applying each pending

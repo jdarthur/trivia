@@ -14,8 +14,8 @@ import (
 )
 
 // These tests exercise the SQLite data-access layer directly (the engine swap
-// in #75): CRUD per table, join-table maintenance, the question rounds_used
-// JSON mirror, session relational state, and the session_state upsert.
+// in #75): CRUD per table, join-table maintenance, session relational state,
+// and the session_state upsert.
 
 func newEnv(t *testing.T) *common.Env {
 	t.Helper()
@@ -96,16 +96,12 @@ func TestRoundQuestionJoinAndRoundsUsed(t *testing.T) {
 	q2 := createQuestion("q2")
 	q3 := createQuestion("q3")
 
-	// create round with questions and wagers (mimics rounds.CreateRound)
+	// create round with questions and wagers (mimics rounds.CreateRound);
+	// membership lives in round_question, no rounds_used mirror to update
 	round := models.Round{Name: "R", UserId: userId, Questions: []string{q1, q2}, Wagers: []int{100, 200}}
 	roundId, _, err := common.Create(env, common.RoundTable, &round)
 	if err != nil {
 		t.Fatal(err)
-	}
-	for _, questionId := range round.Questions {
-		if err := common.Push(env, common.QuestionTable, questionId, models.RoundsUsed, roundId); err != nil {
-			t.Fatal(err)
-		}
 	}
 
 	var got models.Round
@@ -119,6 +115,7 @@ func TestRoundQuestionJoinAndRoundsUsed(t *testing.T) {
 		t.Fatalf("round wagers = %v", got.Wagers)
 	}
 
+	// rounds_used is derived from round_question on read
 	var q models.Question
 	if err := common.GetOne(env, common.QuestionTable, q1, &q); err != nil {
 		t.Fatal(err)
@@ -127,16 +124,10 @@ func TestRoundQuestionJoinAndRoundsUsed(t *testing.T) {
 		t.Fatalf("question rounds_used = %v", q.RoundsUsed)
 	}
 
-	// update the round to [q2, q3] with new wagers (mimics rounds.UpdateRound)
+	// update the round to [q2, q3] with new wagers (mimics rounds.UpdateRound);
+	// Set rewrites round_question wholesale
 	updated := models.Round{Name: "R2", UserId: userId, Questions: []string{q2, q3}, Wagers: []int{300}}
 	if err := common.Set(env, common.RoundTable, roundId, updated); err != nil {
-		t.Fatal(err)
-	}
-	// mirror the handler's rounds_used bookkeeping on the questions
-	if err := common.Push(env, common.QuestionTable, q3, models.RoundsUsed, roundId); err != nil {
-		t.Fatal(err)
-	}
-	if err := common.Pull(env, common.QuestionTable, q1, models.RoundsUsed, roundId); err != nil {
 		t.Fatal(err)
 	}
 
@@ -150,11 +141,23 @@ func TestRoundQuestionJoinAndRoundsUsed(t *testing.T) {
 		t.Fatalf("round wagers after update = %v", got.Wagers)
 	}
 
-	// delete the round (mimics rounds.DeleteRound) and check the mirror is cleaned
-	if err := common.Delete(env, common.RoundTable, roundId); err != nil {
+	// derived rounds_used follows the membership change: q3 adopted, q1 released
+	if err := common.GetOne(env, common.QuestionTable, q1, &q); err != nil {
 		t.Fatal(err)
 	}
-	if err := common.Pull(env, common.QuestionTable, q2, models.RoundsUsed, roundId); err != nil {
+	if len(q.RoundsUsed) != 0 {
+		t.Fatalf("question rounds_used after update = %v", q.RoundsUsed)
+	}
+	if err := common.GetOne(env, common.QuestionTable, q3, &q); err != nil {
+		t.Fatal(err)
+	}
+	if len(q.RoundsUsed) != 1 || q.RoundsUsed[0] != roundId {
+		t.Fatalf("question rounds_used after update = %v", q.RoundsUsed)
+	}
+
+	// delete the round (mimics rounds.DeleteRound); the FK cascade removes
+	// the round_question rows, so the derived rounds_used empties
+	if err := common.Delete(env, common.RoundTable, roundId); err != nil {
 		t.Fatal(err)
 	}
 	if err := common.GetOne(env, common.QuestionTable, q2, &q); err != nil {
@@ -426,13 +429,10 @@ func TestGetAllFilters(t *testing.T) {
 		t.Fatalf("expected 3 unused questions, got %d", len(all.([]*models.Question)))
 	}
 
-	// mark q1 as used, then it should drop out of unused_only
+	// mark q1 as used (round_question row), then it should drop out of unused_only
 	round := models.Round{Name: "R", UserId: userId, Questions: []string{q1}, Wagers: []int{100}}
 	roundId, _, err := common.Create(env, common.RoundTable, &round)
 	if err != nil {
-		t.Fatal(err)
-	}
-	if err := common.Push(env, common.QuestionTable, q1, models.RoundsUsed, roundId); err != nil {
 		t.Fatal(err)
 	}
 	all, err = common.GetAll(env, common.QuestionTable, unusedFilter)
@@ -517,10 +517,10 @@ func TestNonexistentIdAndCollectionCrud(t *testing.T) {
 	}
 }
 
-// The session_player membership join and the question rounds_used mirror are
-// maintained by read-modify-write transactions. Concurrent writers must not
-// lose updates: each push runs in a BEGIN IMMEDIATE transaction, so the
-// second writer waits for the first instead of overwriting it.
+// The session_player membership join is maintained by a read-modify-write
+// transaction. Concurrent writers must not lose updates: each push runs in a
+// BEGIN IMMEDIATE transaction, so the second writer waits for the first
+// instead of overwriting it.
 func TestConcurrentSessionPlayersPush(t *testing.T) {
 	db := GetDb()
 	env := &common.Env{Db: db}
@@ -555,39 +555,6 @@ func TestConcurrentSessionPlayersPush(t *testing.T) {
 	}
 	if len(got.Players) != n {
 		t.Fatalf("expected %d players, got %d: %v", n, len(got.Players), got.Players)
-	}
-}
-
-func TestConcurrentRoundsUsedPushes(t *testing.T) {
-	db := GetDb()
-	env := &common.Env{Db: db}
-	q, err := questions.CreateOneQuestion(&questions.Env{Db: db}, "user-1", models.Question{Question: "q", Answer: "a"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	const n = 16
-	var wg sync.WaitGroup
-	errCh := make(chan error, n)
-	for i := 0; i < n; i++ {
-		wg.Add(1)
-		go func(i int) {
-			defer wg.Done()
-			if err := common.Push(env, common.QuestionTable, q.ID, models.RoundsUsed, fmt.Sprintf("round-%d", i)); err != nil {
-				errCh <- err
-			}
-		}(i)
-	}
-	wg.Wait()
-	close(errCh)
-	for err := range errCh {
-		t.Fatal(err)
-	}
-	var got models.Question
-	if err := common.GetOne(env, common.QuestionTable, q.ID, &got); err != nil {
-		t.Fatal(err)
-	}
-	if len(got.RoundsUsed) != n {
-		t.Fatalf("expected %d rounds_used, got %d: %v", n, len(got.RoundsUsed), got.RoundsUsed)
 	}
 }
 
