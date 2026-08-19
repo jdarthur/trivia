@@ -2,7 +2,6 @@ package models
 
 import (
 	"encoding/json"
-	"github.com/globalsign/mgo/bson"
 	"time"
 )
 
@@ -18,17 +17,17 @@ var QuestionIndex = "question_id"
 var RoundIndex = "round_id"
 
 type Session struct {
-	ID              bson.Binary            `bson:"_id" json:"id"`
-	CreateDate      time.Time              `bson:"create_date" json:"create_date"`
+	ID              string                 `json:"id"`
+	CreateDate      time.Time              `json:"create_date"`
 	Name            string                 `json:"name"`
-	GameId          string                 `bson:"game_id" json:"game_id,omitempty"`
-	Moderator       PlayerId               `bson:"mod" json:"mod,omitempty"`
+	GameId          string                 `json:"game_id,omitempty"`
+	Moderator       PlayerId               `json:"mod,omitempty"`
 	Started         bool                   `json:"started"`
 	Rounds          []RoundInGame          `json:"rounds,omitempty"`
-	CurrentRound    *int                   `bson:"current_round" json:"current_round,omitempty"`
-	CurrentQuestion *int                   `bson:"current_question" json:"current_question,omitempty"`
-	Scoreboard      map[PlayerId][]float64 `bson:"scoreboard" json:"scoreboard,omitempty"`
-	Players         []PlayerId             `bson:"players" json:"players,omitempty"`
+	CurrentRound    *int                   `json:"current_round,omitempty"`
+	CurrentQuestion *int                   `json:"current_question,omitempty"`
+	Scoreboard      map[PlayerId][]float64 `json:"scoreboard,omitempty"`
+	Players         []PlayerId             `json:"players,omitempty"`
 }
 
 func (s Session) SetCreateDate(createDate time.Time) Object {
@@ -36,7 +35,7 @@ func (s Session) SetCreateDate(createDate time.Time) Object {
 	return s
 }
 
-func (s Session) SetId(objectId bson.Binary) Object {
+func (s Session) SetId(objectId string) Object {
 	s.ID = objectId
 	return s
 }
@@ -44,18 +43,16 @@ func (s Session) SetId(objectId bson.Binary) Object {
 func (s Session) MarshalJSON() ([]byte, error) {
 	type Alias Session
 	return json.Marshal(&struct {
-		ID         string `json:"id"`
 		CreateDate string `json:"create_date"`
 		Alias
 	}{
-		ID:         IdAsString(s.ID),
 		CreateDate: dateFormat(s.CreateDate),
-		Alias:      (Alias)(s),
+		Alias:      Alias(s),
 	})
 }
 
 type RoundInGame struct {
-	RoundId   string            `bson:"round_id" json:"round_id,omitempty"`
+	RoundId   string            `json:"round_id,omitempty"`
 	Wagers    []int             `json:"wagers,omitempty"`
 	Questions []QuestionInRound `json:"questions,omitempty"`
 }
@@ -71,12 +68,12 @@ type QuestionInRound struct {
 	Category      string                  `json:"category,omitempty"`
 	Question      string                  `json:"question,omitempty"`
 	Answer        string                  `json:"answer,omitempty"`
-	PlayerAnswers map[PlayerId][]AnswerId `bson:"answers" json:"answers,omitempty"`
+	PlayerAnswers map[PlayerId][]AnswerId `json:"answers,omitempty"`
 	Scored        bool                    `json:"scored,omitempty"`
-	Index         int                     `bson:"-" json:"id"`
-	QuestionId    string                  `bson:"question_id" json:"-"`
-	ScoringNote   string                  `bson:"scoring_note" json:"scoring_note"`
-	ScoringNoteId string                  `bson:"scoring_note_id" json:"scoring_note_id"`
+	Index         int                     `json:"id"`
+	QuestionId    string                  `json:"-"`
+	ScoringNote   string                  `json:"scoring_note"`
+	ScoringNoteId string                  `json:"scoring_note_id"`
 }
 
 type ScoreRequest struct {

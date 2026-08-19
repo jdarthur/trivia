@@ -102,7 +102,7 @@ func DeleteScoringNote(e *Env, userId, noteId string) (models.ScoringNote, error
 		if question.ScoringNote == noteId {
 
 			question.ScoringNote = ""
-			_, err = UpdateOneQuestion(e, userId, models.IdAsString(question.ID), *question)
+			_, err = UpdateOneQuestion(e, userId, question.ID, *question)
 			if err != nil {
 				return models.ScoringNote{}, err
 			}

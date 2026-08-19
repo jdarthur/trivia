@@ -10,13 +10,28 @@ import (
 	"github.com/jdarthur/trivia/questions"
 	"github.com/jdarthur/trivia/rounds"
 	"github.com/jdarthur/trivia/sessions"
+	"github.com/jdarthur/trivia/store"
+	"github.com/joho/godotenv"
 	"log"
 	"os"
 )
 
 func main() {
 
-	client, err := common.GetDatabaseConnection()
+	err := godotenv.Load()
+	if err != nil {
+		fmt.Println("Unable to load .env")
+	}
+
+	db, err := store.OpenDefault()
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer db.Close()
+
+	if err = store.Migrate(db); err != nil {
+		log.Fatal(err)
+	}
 
 	err = common.LoadCerts()
 	if err != nil {
@@ -34,10 +49,10 @@ func main() {
 	router := gin.Default()
 	router.Static("/images", imageDir)
 
-	auth := common.Env{Db: client}
+	auth := common.Env{Db: db}
 
 	fmt.Println("\nQuestions API:")
-	q := questions.Env{Db: client}
+	q := questions.Env{Db: db}
 	router.GET("/editor/questions", auth.AsUser, q.GetAllQuestions)
 	router.GET("/editor/question/:id", auth.AsUser, q.GetOneQuestion)
 	router.POST("/editor/question", auth.AsUser, q.CreateQuestion)
@@ -46,7 +61,7 @@ func main() {
 	router.POST("/editor/file", q.UploadFile)
 
 	fmt.Println("\nRounds API:")
-	r := rounds.Env{Db: client}
+	r := rounds.Env{Db: db}
 	router.GET("/editor/rounds", auth.AsUser, r.GetAllRounds)
 	router.GET("/editor/round/:id", auth.AsUser, r.GetOneRound)
 	router.POST("/editor/round", auth.AsUser, r.CreateRound)
@@ -54,7 +69,7 @@ func main() {
 	router.DELETE("/editor/round/:id", auth.AsUser, r.DeleteRound)
 
 	fmt.Println("\nGames API:")
-	g := games.Env{Db: client}
+	g := games.Env{Db: db}
 	router.GET("/editor/games", auth.AsUser, g.GetAllGames)
 	router.GET("/editor/game/:id", auth.AsUser, g.GetOneGame)
 	router.POST("/editor/game", auth.AsUser, g.CreateGame)
@@ -62,7 +77,7 @@ func main() {
 	router.DELETE("/editor/game/:id", auth.AsUser, g.DeleteGame)
 
 	fmt.Println("\nSession API:")
-	s := sessions.Env{Db: client}
+	s := sessions.Env{Db: db}
 	//router.GET("/gameplay/sessions",s.GetAllSessions)
 	router.GET("/gameplay/session/:id", s.GetOneSession)
 	router.GET("/gameplay/session/:id/scoreboard", s.GetSessionScoreboard)
@@ -90,7 +105,7 @@ func main() {
 	router.PUT("/gameplay/session/:id/hot-edit-round-name", s.WithValidSession, s.AsMod, s.HotEditRoundName)
 
 	fmt.Println("\nPlayer API:")
-	p := players.Env{Db: client}
+	p := players.Env{Db: db}
 	router.GET("/gameplay/player/:id", p.GetOnePlayer)
 	router.POST("/gameplay/player", p.CreatePlayer)
 	router.PUT("/gameplay/player/:id", p.UpdatePlayer)
@@ -99,7 +114,7 @@ func main() {
 	router.DELETE("/gameplay/player/:id", p.DeletePlayer)
 
 	fmt.Println("\nCollection API:")
-	coll := collections.Env{Db: client}
+	coll := collections.Env{Db: db}
 	router.GET("/editor/collections", auth.AsUser, coll.GetAllCollections)
 	router.GET("/editor/collections/:id", auth.AsUser, coll.GetOneCollection)
 	router.POST("/editor/collections", auth.AsUser, coll.CreateCollection)

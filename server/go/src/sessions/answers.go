@@ -56,6 +56,7 @@ func (e *Env) AnswerQuestion(c *gin.Context) {
 		return
 	}
 
+	answer.SessionId = sessionId
 	answerId, createDate, err := common.Create((*common.Env)(e), common.AnswerTable, &answer)
 	if err != nil {
 		fmt.Println(err)
@@ -68,7 +69,7 @@ func (e *Env) AnswerQuestion(c *gin.Context) {
 
 
 	spot := fmt.Sprintf("%v.%v.%v.%v.%v.%v", models.Rounds, *answer.RoundIndex, models.Questions, *answer.QuestionIndex, models.Answers, answer.PlayerId)
-	err = common.Push((*common.Env)(e), common.SessionTable, sessionId, spot, models.IdAsString(answerId))
+	err = common.Push((*common.Env)(e), common.SessionTable, sessionId, spot, answerId)
 
 	if err == nil {
 		err = common.IncrementState((*common.Env)(e), sessionId)
@@ -187,7 +188,7 @@ func getAnswersUnscored(e *Env, session models.Session, roundIndex int, question
 	playerAnswers := session.Rounds[roundIndex].Questions[questionIndex].PlayerAnswers
 	for _, player := range players {
 
-		thisPlayerId := models.PlayerId(models.IdAsString(player.ID))
+		thisPlayerId := models.PlayerId(player.ID)
 
 		var p models.AnswerUnscored
 		if thisPlayerId == callerPlayerId {
@@ -215,7 +216,7 @@ func getAnswersScored(e *Env, session models.Session, roundIndex int, questionIn
 	response.Scored = true
 	for _, player := range players {
 		var team models.ScoredTeam
-		playerId := models.PlayerId(models.IdAsString(player.ID))
+		playerId := models.PlayerId(player.ID)
 
 		if callerPlayerId == playerId {
 			team.PlayerId = playerId
@@ -268,7 +269,7 @@ func getAnswersAsMod(e *Env, session models.Session, roundIndex int, questionInd
 	}
 
 	for _, player := range players {
-		playerId := models.PlayerId(models.IdAsString(player.ID))
+		playerId := models.PlayerId(player.ID)
 
 		var teamAnswer IndividualAnswerAsMod
 		teamAnswer.PlayerId = playerId

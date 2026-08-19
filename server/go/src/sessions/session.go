@@ -3,7 +3,6 @@ package sessions
 import (
 	"github.com/jdarthur/trivia/common"
 	"github.com/gin-gonic/gin"
-	"github.com/globalsign/mgo/bson"
 	"github.com/jdarthur/trivia/models"
 	"time"
 )
@@ -69,7 +68,7 @@ func (e *Env) CreateSession(c *gin.Context) {
 		return
 	}
 
-	session.Moderator = models.PlayerId(models.IdAsString(moderatorId))
+	session.Moderator = models.PlayerId(moderatorId)
 	sessionId, createDate, err := common.Create((*common.Env)(e), common.SessionTable, &session)
 	if err != nil {
 		common.Respond(c, nil, err)
@@ -79,7 +78,7 @@ func (e *Env) CreateSession(c *gin.Context) {
 	session.ID = sessionId
 	session.CreateDate = createDate
 
-	err = common.IncrementState((*common.Env)(e), models.IdAsString(sessionId))
+	err = common.IncrementState((*common.Env)(e), sessionId)
 	common.Respond(c, session, err)
 }
 
@@ -220,18 +219,18 @@ func gameIsStartable(e *Env, gameId string) (*models.Game, error) {
 	}
 
 	if len(game.Rounds) == 0 {
-		return &game, GameWithoutRoundsError{GameId: models.IdAsString(game.ID)}
+		return &game, GameWithoutRoundsError{GameId: game.ID}
 	}
 
 	for _, roundId := range game.Rounds {
 		var round models.Round
 		err = common.GetOne((*common.Env)(e), common.RoundTable, roundId, &round)
 		if err != nil {
-			return &game, InvalidRoundIdInGameError{RoundId: roundId, GameId: models.IdAsString(game.ID)}
+			return &game, InvalidRoundIdInGameError{RoundId: roundId, GameId: game.ID}
 		}
 
 		if len(round.Questions) == 0 {
-			return &game, RoundWithoutQuestionsError{GameId: models.IdAsString(game.ID), RoundId: roundId}
+			return &game, RoundWithoutQuestionsError{GameId: game.ID, RoundId: roundId}
 		}
 	}
 
@@ -282,8 +281,8 @@ func (e *Env) GetPlayersInSession(c *gin.Context) {
 	//strip playerIds if called by non-mod
 	if models.PlayerId(callerPlayerId) != session.Moderator {
 		for i := range players {
-			if callerPlayerId != models.IdAsString(players[i].ID) {
-				players[i].ID = bson.Binary{}
+			if callerPlayerId != players[i].ID {
+				players[i].ID = ""
 			}
 		}
 	}

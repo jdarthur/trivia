@@ -3,7 +3,6 @@ package rounds
 import (
 	"fmt"
 	"github.com/gin-gonic/gin"
-	"github.com/globalsign/mgo/bson"
 	"github.com/jdarthur/trivia/common"
 	"github.com/jdarthur/trivia/models"
 	"strings"
@@ -31,13 +30,13 @@ func createFilters(c *gin.Context) map[string]interface{} {
 	//unused_only means that games = []
 	unusedOnly := c.DefaultQuery("unused_only", "false")
 	if strings.ToLower(unusedOnly) == "true" {
-		filter[models.Games+".0"] = bson.M{"$exists": false}
+		filter[models.Games+".0"] = common.M{"$exists": false}
 	}
 
 	//text_filter means that the search string appears in name (case-insensitive)
 	textFilter := c.Query("text_filter")
 	if textFilter != "" {
-		search := bson.M{"$regex": bson.RegEx{Pattern: ".*" + textFilter + ".*", Options: "i"}}
+		search := common.M{"$regex": common.RegEx{Pattern: ".*" + textFilter + ".*", Options: "i"}}
 		filter["name"] = search
 	}
 	return filter
@@ -105,7 +104,7 @@ func (e *Env) CreateRound(c *gin.Context) {
 	//add this new roundId to each question's rounds_used list
 	for _, questionId := range data.Questions {
 		//append roundId to question's rounds_used
-		err = common.Push((*common.Env)(e), common.QuestionTable, questionId, models.RoundsUsed, models.IdAsString(data.ID))
+		err = common.Push((*common.Env)(e), common.QuestionTable, questionId, models.RoundsUsed, data.ID)
 		if err != nil {
 			common.Respond(c, data, err)
 			return
@@ -284,7 +283,7 @@ func (e *Env) merge(update *models.Round, original *models.Round) error {
 //for each questionId in existing,
 // if not in update body, remove it from question's rounds_used
 func (e *Env) updateRoundsUsedInQuestions(newQuestionIds []string, original *models.Round) error {
-	roundId := models.IdAsString(original.ID)
+	roundId := original.ID
 
 	//add this round_id to newly-added question's rounds_used
 	for _, updateId := range newQuestionIds {

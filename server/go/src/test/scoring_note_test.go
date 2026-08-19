@@ -25,7 +25,7 @@ func TestScoringNoteCrud(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	noteId := models.IdAsString(note.ID)
+	noteId := note.ID
 
 	_, err = questions.GetOneScoringNote(env, userId, noteId)
 	if err != nil {
@@ -83,7 +83,7 @@ func TestOrderByCreateDate(t *testing.T) {
 			t.Errorf("Expected name %s at index %d, got name %s", expectedName, i, note.Name)
 		}
 
-		_, err = questions.DeleteScoringNote(env, userId, models.IdAsString(note.ID))
+		_, err = questions.DeleteScoringNote(env, userId, note.ID)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -168,7 +168,7 @@ func TestUpdateLastUsed(t *testing.T) {
 		Question:    "test question",
 		Answer:      "answer111",
 		UserId:      userId,
-		ScoringNote: models.IdAsString(note.ID),
+		ScoringNote: note.ID,
 	}
 
 	question, err = questions.CreateOneQuestion(env, userId, question)
@@ -176,7 +176,7 @@ func TestUpdateLastUsed(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	noteAfter, err := questions.GetOneScoringNote(env, userId, models.IdAsString(note.ID))
+	noteAfter, err := questions.GetOneScoringNote(env, userId, note.ID)
 	if err != nil {
 		t.Error(err)
 	}
@@ -185,7 +185,7 @@ func TestUpdateLastUsed(t *testing.T) {
 		t.Error("Expected 'Last used' field to be updated after setting on question")
 	}
 
-	_, err = questions.DeleteOneQuestion(env, userId, models.IdAsString(question.ID))
+	_, err = questions.DeleteOneQuestion(env, userId, question.ID)
 	if err != nil {
 		t.Error(err)
 	}
@@ -221,15 +221,15 @@ func TestUpdateLastUsedOnUpdate(t *testing.T) {
 	}
 
 	questionUpdate := models.Question{
-		ScoringNote: models.IdAsString(note.ID),
+		ScoringNote: note.ID,
 	}
 
-	_, err = questions.UpdateOneQuestion(env, userId, models.IdAsString(question.ID), questionUpdate)
+	_, err = questions.UpdateOneQuestion(env, userId, question.ID, questionUpdate)
 	if err != nil {
 		t.Error(err)
 	}
 
-	noteAfter, err := questions.GetOneScoringNote(env, userId, models.IdAsString(note.ID))
+	noteAfter, err := questions.GetOneScoringNote(env, userId, note.ID)
 	if err != nil {
 		t.Error(err)
 	}
@@ -238,7 +238,7 @@ func TestUpdateLastUsedOnUpdate(t *testing.T) {
 		t.Error("Expected 'Last used' field to be updated after setting on question")
 	}
 
-	_, err = questions.DeleteOneQuestion(env, userId, models.IdAsString(question.ID))
+	_, err = questions.DeleteOneQuestion(env, userId, question.ID)
 	if err != nil {
 		t.Error(err)
 	}
@@ -266,7 +266,7 @@ func TestClearScoringNoteOnDelete(t *testing.T) {
 		Question:    "test question",
 		Answer:      "answer111",
 		UserId:      userId,
-		ScoringNote: models.IdAsString(note.ID),
+		ScoringNote: note.ID,
 	}
 
 	question, err = questions.CreateOneQuestion(env, userId, question)
@@ -274,12 +274,12 @@ func TestClearScoringNoteOnDelete(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, err = questions.DeleteScoringNote(env, userId, models.IdAsString(note.ID))
+	_, err = questions.DeleteScoringNote(env, userId, note.ID)
 	if err != nil {
 		t.Error(err)
 	}
 
-	question, err = questions.GetOneQuestion(env, userId, models.IdAsString(question.ID))
+	question, err = questions.GetOneQuestion(env, userId, question.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -288,7 +288,7 @@ func TestClearScoringNoteOnDelete(t *testing.T) {
 		t.Error("Expected scoring note field to be cleared out on question after deleting scoring note")
 	}
 
-	_, err = questions.DeleteOneQuestion(env, userId, models.IdAsString(question.ID))
+	_, err = questions.DeleteOneQuestion(env, userId, question.ID)
 	if err != nil {
 		t.Error(err)
 	}
@@ -301,7 +301,7 @@ func deleteAllNotes(e *questions.Env, userId string) error {
 	}
 
 	for _, note := range notes {
-		_, err = questions.DeleteScoringNote(e, userId, models.IdAsString(note.ID))
+		_, err = questions.DeleteScoringNote(e, userId, note.ID)
 		if err != nil {
 			return err
 		}

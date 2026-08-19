@@ -28,7 +28,7 @@ func (e *Env) AsMod(c *gin.Context) {
 
 		playerId := models.PlayerId(c.Query("player_id"))
 		if playerId != session.Moderator {
-			common.Respond(c, session, UnauthorizedSessionActionError{SessionId: models.IdAsString(session.ID), ModeratorId: playerId})
+			common.Respond(c, session, UnauthorizedSessionActionError{SessionId: session.ID, ModeratorId: playerId})
 			c.Abort()
 		}
 		c.Next()
