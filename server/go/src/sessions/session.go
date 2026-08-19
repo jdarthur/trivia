@@ -173,19 +173,15 @@ func (e *Env) StartSession(c *gin.Context) {
 		return
 	}
 
-	game, err := gameIsStartable(e, existingSession.GameId)
+	_, err = gameIsStartable(e, existingSession.GameId)
 	if err != nil {
 		common.Respond(c, existingSession, err)
 		return
 	}
 
-	//set roundId in this sessions Rounds arr
+	//session reads derive the rounds from the game + session_question tables,
+	//so starting just flips the flag and snapshots the first question
 	existingSession.Started = true
-	for _, roundId := range game.Rounds {
-		var roundInGame models.RoundInGame
-		roundInGame.RoundId = roundId
-		existingSession.Rounds = append(existingSession.Rounds, roundInGame)
-	}
 
 	err = common.Set((*common.Env)(e), common.SessionTable, sessionId, &existingSession)
 	if err != nil {
@@ -276,7 +272,7 @@ func (e *Env) GetPlayersInSession(c *gin.Context) {
 		return
 	}
 
-	players, err := getPlayersInSession(e, session)
+	players, err := getPlayersInSession(e, sessionId)
 
 	//strip playerIds if called by non-mod
 	if models.PlayerId(callerPlayerId) != session.Moderator {
@@ -289,17 +285,30 @@ func (e *Env) GetPlayersInSession(c *gin.Context) {
 	common.Respond(c, gin.H{"players": players}, err)
 }
 
-func getPlayersInSession(e *Env, session models.Session) ([]models.Player, error) {
+// getPlayersInSession returns the session's players, in join order, from the
+// session_player membership join — the canonical membership list.
+func getPlayersInSession(e *Env, sessionId string) ([]models.Player, error) {
+	rows, err := e.Db.Query(`SELECT p.id, p.create_date, p.team_name, p.real_name, p.icon, p.session_id
+		FROM session_player sp
+		JOIN player p ON p.id = sp.player_id
+		WHERE sp.session_id = ?
+		ORDER BY sp.position`, sessionId)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
 	sessionPlayers := make([]models.Player, 0)
-	for _, playerId := range session.Players {
+	for rows.Next() {
 		var player models.Player
-		err := common.GetOne((*common.Env)(e), common.PlayerTable, string(playerId), &player)
-		if err != nil {
+		var createDate string
+		if err := rows.Scan(&player.ID, &createDate, &player.TeamName, &player.RealName, &player.Icon, &player.SessionId); err != nil {
 			return nil, err
 		}
+		player.CreateDate = common.ParseTime(createDate)
 		sessionPlayers = append(sessionPlayers, player)
 	}
-	return sessionPlayers, nil
+	return sessionPlayers, rows.Err()
 }
 
 func (e *Env) GetSessionState(c *gin.Context) {

@@ -6,7 +6,6 @@ import (
 )
 
 var Players = "players"
-var Answers = "answers"
 var GameId = "game_id"
 var ModeratorId = "mod"
 var Started = "started"
@@ -58,22 +57,20 @@ type RoundInGame struct {
 }
 
 type PlayerId string
-type AnswerId string
 
 func (p PlayerId) String() string {
 	return string(p)
 }
 
 type QuestionInRound struct {
-	Category      string                  `json:"category,omitempty"`
-	Question      string                  `json:"question,omitempty"`
-	Answer        string                  `json:"answer,omitempty"`
-	PlayerAnswers map[PlayerId][]AnswerId `json:"answers,omitempty"`
-	Scored        bool                    `json:"scored,omitempty"`
-	Index         int                     `json:"id"`
-	QuestionId    string                  `json:"-"`
-	ScoringNote   string                  `json:"scoring_note"`
-	ScoringNoteId string                  `json:"scoring_note_id"`
+	Category      string `json:"category,omitempty"`
+	Question      string `json:"question,omitempty"`
+	Answer        string `json:"answer,omitempty"`
+	Scored        bool   `json:"scored,omitempty"`
+	Index         int    `json:"id"`
+	QuestionId    string `json:"-"`
+	ScoringNote   string `json:"scoring_note"`
+	ScoringNoteId string `json:"scoring_note_id"`
 }
 
 type ScoreRequest struct {

@@ -1,7 +1,10 @@
 package sessions
 
 import (
-	"fmt"
+	"context"
+	"database/sql"
+	"errors"
+
 	"github.com/gin-gonic/gin"
 	"github.com/jdarthur/trivia/common"
 	"github.com/jdarthur/trivia/models"
@@ -50,59 +53,69 @@ func (e *Env) SetCurrentQuestion(c *gin.Context) {
 		return
 	}
 
-	err = _setCurrentQuestion(e, &existingSession, requestBody.QuestionIndex, roundObject, &roundInSession)
+	err = _setCurrentQuestion(e, &existingSession, requestBody.RoundIndex, requestBody.QuestionIndex, roundObject)
 	if err == nil {
 		err = common.IncrementState((*common.Env)(e), sessionId)
 	}
 	common.Respond(c, existingSession, err)
 }
 
-func _setCurrentQuestion(e *Env, session *models.Session, questionIndex int, round models.Round, roundInSession *models.RoundInGame) error {
+// _setCurrentQuestion snapshots the question into the session_question row for
+// (round, question) — the text, answer, category, and scoring note as of when
+// the question was set — and advances session.CurrentQuestion. Re-setting a
+// question preserves its scored flag, matching the old document behavior.
+func _setCurrentQuestion(e *Env, session *models.Session, roundIndex int, questionIndex int, round models.Round) error {
 
 	//error if question index is out of range for this round
-	if questionIndex >= len(roundInSession.Questions) {
-		fmt.Println("qIndex > Questions.length")
+	if questionIndex >= len(round.Questions) {
 		return InvalidQuestionIndexError{QuestionIndex: questionIndex}
 	}
 
 	//retrieve question from DB to get the question text
-	var questionObject models.Question
 	questionId := round.Questions[questionIndex]
+	var questionObject models.Question
 	err := common.GetOne((*common.Env)(e), common.QuestionTable, questionId, &questionObject)
 	if err != nil {
-		fmt.Println("failed to retrieve question by ID inside of SetCurrentQuestion")
 		return InvalidQuestionIndexError{QuestionIndex: questionIndex}
 	}
 
-	//get question object inside this round
-	questionInRound := roundInSession.Questions[questionIndex]
-
-	//if playerAnswers is already there, don't overwrite it
-	if len(questionInRound.PlayerAnswers) == 0 {
-		questionInRound.PlayerAnswers = make(map[models.PlayerId][]models.AnswerId)
-	}
-
-	//set current question field & question text inside this session
-	session.CurrentQuestion = &questionIndex
-	questionInRound.Question = questionObject.Question
-	questionInRound.Answer = questionObject.Answer
-	questionInRound.QuestionId = questionId
-	questionInRound.ScoringNoteId = questionObject.ScoringNote
-
+	scoringNote := ""
 	if questionObject.ScoringNote != "" {
 		var note models.ScoringNote
 		err := common.GetOne((*common.Env)(e), common.ScoringNoteTable, questionObject.ScoringNote, &note)
 		if err != nil {
-			fmt.Println("failed to retrieve scoring note by ID inside of SetCurrentQuestion")
 			return InvalidQuestionIndexError{QuestionIndex: questionIndex}
 		}
-
-		questionInRound.ScoringNote = note.Description
+		scoringNote = note.Description
 	}
 
-	roundInSession.Questions[questionIndex] = questionInRound
+	err = upsertSessionQuestion(e, session.ID, roundIndex, questionIndex, questionId,
+		questionObject.Category, questionObject.Question, questionObject.Answer,
+		questionObject.ScoringNote, scoringNote)
+	if err != nil {
+		return err
+	}
 
-	return common.Set((*common.Env)(e), common.SessionTable, session.ID, &session)
+	session.CurrentQuestion = &questionIndex
+	return nil
+}
+
+// upsertSessionQuestion writes (or refreshes) one session_question snapshot
+// row. scored is deliberately not updated on conflict — re-navigating to a
+// scored question keeps it scored.
+func upsertSessionQuestion(e *Env, sessionId string, roundIndex int, questionIndex int, questionId string, category string, question string, answer string, scoringNoteId string, scoringNote string) error {
+	_, err := e.Db.Exec(`INSERT INTO session_question
+		(session_id, round_index, question_index, question_id, category, question, answer, scoring_note_id, scoring_note, scored)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0)
+		ON CONFLICT(session_id, round_index, question_index) DO UPDATE SET
+			question_id = excluded.question_id,
+			category = excluded.category,
+			question = excluded.question,
+			answer = excluded.answer,
+			scoring_note_id = excluded.scoring_note_id,
+			scoring_note = excluded.scoring_note`,
+		sessionId, roundIndex, questionIndex, questionId, category, question, answer, scoringNoteId, scoringNote)
+	return err
 }
 
 type CurrentRoundRequest struct {
@@ -156,26 +169,8 @@ func _setCurrentRound(e *Env, session *models.Session, roundIndex int, questionI
 		return err
 	}
 
-	roundInSession.Wagers = round.Wagers
 	session.CurrentRound = &roundIndex
-	if len(roundInSession.Questions) == 0 {
-		fmt.Println("setting question categories in round")
-		//for each question, set the category in this session.Rounds.Questions array
-		for _, questionId := range round.Questions {
-			var question models.Question
-			err = common.GetOne((*common.Env)(e), common.QuestionTable, questionId, &question)
-			if err != nil {
-				return err
-			}
-
-			var questionInRound models.QuestionInRound
-			questionInRound.Category = question.Category
-			roundInSession.Questions = append(roundInSession.Questions, questionInRound)
-		}
-	}
-
-	session.Rounds[roundIndex] = roundInSession
-	return _setCurrentQuestion(e, session, questionIndex, round, &roundInSession)
+	return _setCurrentQuestion(e, session, roundIndex, questionIndex, round)
 }
 
 func (e *Env) GetCurrentQuestion(c *gin.Context) {
@@ -290,107 +285,117 @@ func scoreQuestion(e *Env, c *gin.Context) (models.ScoreRequest, error) {
 	roundIndex := requestBody.RoundIndex
 	questionIndex := requestBody.QuestionIndex
 
-	questionIndexOverall, err := getQuestionIndex(session, roundIndex, questionIndex)
-	if err != nil {
-		return models.ScoreRequest{}, err
+	if roundIndex >= len(session.Rounds) {
+		return models.ScoreRequest{}, InvalidRoundIndexError{RoundIndex: roundIndex}
+	}
+	if questionIndex >= len(session.Rounds[roundIndex].Questions) {
+		return models.ScoreRequest{}, InvalidQuestionIndexError{QuestionIndex: questionIndex}
 	}
 
-	questionInRound := session.Rounds[roundIndex].Questions[questionIndex]
-	rescore := questionInRound.Scored
-
-	for playerId, correctOrNot := range requestBody.Players {
-		answerCount := len(session.Rounds[roundIndex].Questions[questionIndex].PlayerAnswers[playerId])
-		if answerCount == 0 {
-			return models.ScoreRequest{}, IllegalScoreError{PlayerId: playerId, RoundIndex: requestBody.RoundIndex, QuestionIndex: requestBody.RoundIndex}
-		}
-
-		lastAnswerId := session.Rounds[roundIndex].Questions[questionIndex].PlayerAnswers[playerId][answerCount-1]
-
-		var answer models.Answer
-		err = common.GetOne((*common.Env)(e), common.AnswerTable, string(lastAnswerId), &answer)
-		if err != nil {
-			return models.ScoreRequest{}, err
-		}
-
-		//override wager if score override is provided.
-		//award 0 points if answer is correct
-		var pointsToAward float64
-		if correctOrNot.Correct {
-			if correctOrNot.ScoreOverride != nil {
-				pointsToAward = *correctOrNot.ScoreOverride
-			} else {
-				pointsToAward = float64(answer.Wager)
-			}
-		} else {
-			pointsToAward = 0
-		}
-
-		answer.PointsAwarded = pointsToAward
-		answer.Correct = correctOrNot.Correct
-
-		err = common.Set((*common.Env)(e), common.AnswerTable, string(lastAnswerId), &answer)
-		if err != nil {
-			return models.ScoreRequest{}, err
-		}
-
-		//award points in scoreboard
-		session.Scoreboard[playerId] = splicePoints(session.Scoreboard[playerId], pointsToAward, questionIndexOverall, rescore)
-		fmt.Println(session.Scoreboard[playerId])
-	}
-
-	questionInRound.Scored = true
-
-	var question models.Question
-	err = common.GetOne((*common.Env)(e), common.QuestionTable, questionInRound.QuestionId, &question)
-	if err != nil {
-		return models.ScoreRequest{}, err
-	}
-
-	questionInRound.Answer = question.Answer
-	session.Rounds[roundIndex].Questions[questionIndex] = questionInRound
-
-	err = common.Set((*common.Env)(e), common.SessionTable, sessionId, &session)
-	if err == nil {
-		err = common.IncrementState((*common.Env)(e), sessionId)
-	}
+	err = scoreQuestionTx(e, session, requestBody, roundIndex, questionIndex)
 	return requestBody, err
-
 }
 
-//get this overall index of this question withing the game
-//e.g. 5x5 game: round 1 question1 is 0, round 2 question 1 is 5, round 5, question  5 is 24
-func getQuestionIndex(session models.Session, roundIndex int, questionIndex int) (int, error) {
+// scoreQuestionTx applies a ScoreRequest inside a single BEGIN IMMEDIATE
+// transaction. Scoring is the one real write race in gameplay (5-6 players
+// answer, the mod scores once), so the write lock serializes scorers, and
+// answer.correct / answer.points_awarded, the session_score round totals, the
+// question's scored flag, and the state-token bump commit (or roll back)
+// together — a reader can never observe a half-scored question.
+func scoreQuestionTx(e *Env, session models.Session, requestBody models.ScoreRequest, roundIndex int, questionIndex int) error {
+	return common.WithWriteTx(e.Db, func(q common.Queryer) error {
+		ctx := context.Background()
 
-	fmt.Println(roundIndex, questionIndex)
-
-	if len(session.Rounds) <= roundIndex {
-		return 0, InvalidRoundIndexError{RoundIndex: roundIndex}
-	}
-
-	r := session.Rounds[roundIndex]
-
-	if len(r.Questions) <= questionIndex {
-		return 0, InvalidQuestionIndexError{QuestionIndex: questionIndex}
-	}
-
-	incr := 0
-	for i := 0; i <= roundIndex; i++ {
-		round := session.Rounds[i]
-		for j := range round.Questions {
-			if roundIndex == i && questionIndex == j {
-				return incr, nil
-			}
-			incr++
+		//read the question snapshot inside the transaction, so the scored
+		//check and the scored write cannot race
+		var questionId, snapshotAnswer string
+		var scored int
+		err := q.QueryRowContext(ctx, `SELECT question_id, answer, scored FROM session_question
+			WHERE session_id = ? AND round_index = ? AND question_index = ?`,
+			session.ID, roundIndex, questionIndex).Scan(&questionId, &snapshotAnswer, &scored)
+		if errors.Is(err, sql.ErrNoRows) {
+			return InvalidQuestionIndexError{QuestionIndex: questionIndex}
 		}
-	}
+		if err != nil {
+			return err
+		}
 
-	return incr, nil
-}
+		for playerId, correctOrNot := range requestBody.Players {
+			//the player's latest answer for this question
+			var answerId string
+			var oldPoints float64
+			var wager int
+			err := q.QueryRowContext(ctx, `SELECT id, points_awarded, wager FROM answer
+				WHERE session_id = ? AND round_index = ? AND question_index = ? AND player_id = ?
+				ORDER BY rowid DESC LIMIT 1`,
+				session.ID, roundIndex, questionIndex, string(playerId)).Scan(&answerId, &oldPoints, &wager)
+			if errors.Is(err, sql.ErrNoRows) {
+				return IllegalScoreError{PlayerId: playerId, RoundIndex: roundIndex, QuestionIndex: questionIndex}
+			}
+			if err != nil {
+				return err
+			}
 
-func splicePoints(pointsArray []float64, pointValue float64, index int, rescore bool) []float64 {
-	if !rescore && index >= (len(pointsArray)-1) {
-		return append(pointsArray, pointValue)
-	}
-	pointsArray[index] = pointValue
-	return pointsArray
+			//override wager if score override is provided.
+			//award 0 points if answer is incorrect
+			var pointsToAward float64
+			if correctOrNot.Correct {
+				if correctOrNot.ScoreOverride != nil {
+					pointsToAward = *correctOrNot.ScoreOverride
+				} else {
+					pointsToAward = float64(wager)
+				}
+			} else {
+				pointsToAward = 0
+			}
+
+			correct := 0
+			if correctOrNot.Correct {
+				correct = 1
+			}
+			if _, err := q.ExecContext(ctx, `UPDATE answer SET correct = ?, points_awarded = ? WHERE id = ?`,
+				correct, pointsToAward, answerId); err != nil {
+				return err
+			}
+
+			//adjust the round total: drop this question's old contribution, add the new
+			var roundTotal float64
+			err = q.QueryRowContext(ctx, `SELECT points FROM session_score
+				WHERE session_id = ? AND player_id = ? AND round_index = ?`,
+				session.ID, string(playerId), roundIndex).Scan(&roundTotal)
+			if err != nil && !errors.Is(err, sql.ErrNoRows) {
+				return err
+			}
+			if errors.Is(err, sql.ErrNoRows) {
+				roundTotal = 0
+			}
+			roundTotal = roundTotal - oldPoints + pointsToAward
+
+			if _, err := q.ExecContext(ctx, `INSERT INTO session_score (session_id, player_id, round_index, points)
+				VALUES (?, ?, ?, ?)
+				ON CONFLICT(session_id, player_id, round_index) DO UPDATE SET points = excluded.points`,
+				session.ID, string(playerId), roundIndex, roundTotal); err != nil {
+				return err
+			}
+		}
+
+		//refresh the snapshot's answer text from the question table, as the
+		//old code did at score time
+		questionAnswer := snapshotAnswer
+		if questionId != "" {
+			err := q.QueryRowContext(ctx, `SELECT answer FROM question WHERE id = ?`, questionId).Scan(&questionAnswer)
+			if err != nil && !errors.Is(err, sql.ErrNoRows) {
+				return err
+			}
+		}
+
+		if _, err := q.ExecContext(ctx, `UPDATE session_question SET scored = 1, answer = ?
+			WHERE session_id = ? AND round_index = ? AND question_index = ?`,
+			questionAnswer, session.ID, roundIndex, questionIndex); err != nil {
+			return err
+		}
+
+		//bump the state token in the same transaction
+		return common.IncrementStateTx(q, session.ID)
+	})
 }

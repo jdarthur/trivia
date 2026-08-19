@@ -15,11 +15,22 @@ import (
 
 // These tests exercise the SQLite data-access layer directly (the engine swap
 // in #75): CRUD per table, join-table maintenance, the question rounds_used
-// JSON mirror, session JSON columns, and the session_state upsert.
+// JSON mirror, session relational state, and the session_state upsert.
 
 func newEnv(t *testing.T) *common.Env {
 	t.Helper()
 	return &common.Env{Db: GetDb()}
+}
+
+// createPlayer inserts a player record and returns its ID. session_player
+// rows carry a foreign key to player, so membership tests need real players.
+func createPlayer(t *testing.T, env *common.Env, teamName string) string {
+	t.Helper()
+	playerId, _, err := common.Create(env, common.PlayerTable, &models.Player{TeamName: teamName})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return playerId
 }
 
 func TestQuestionCrud(t *testing.T) {
@@ -219,12 +230,12 @@ func TestGameRoundJoinAndRoundNames(t *testing.T) {
 	}
 }
 
-func TestSessionJSONColumnsAndState(t *testing.T) {
+func TestSessionRelationalState(t *testing.T) {
 	db := GetDb()
 	env := &common.Env{Db: db}
 	userId := "user-1"
 
-	question, err := questions.CreateOneQuestion(&questions.Env{Db: db}, userId, models.Question{Question: "q", Answer: "a"})
+	question, err := questions.CreateOneQuestion(&questions.Env{Db: db}, userId, models.Question{Question: "q", Answer: "a", Category: "cat"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -267,68 +278,100 @@ func TestSessionJSONColumnsAndState(t *testing.T) {
 		t.Error("expected state to change on increment")
 	}
 
-	// players push/pull
-	if err := common.Push(env, common.SessionTable, sessionId, models.Players, models.PlayerId("p1")); err != nil {
+	// players push/pull maintain the session_player join
+	p1 := createPlayer(t, env, "team-1")
+	p2 := createPlayer(t, env, "team-2")
+	if err := common.Push(env, common.SessionTable, sessionId, models.Players, models.PlayerId(p1)); err != nil {
 		t.Fatal(err)
 	}
-	if err := common.Push(env, common.SessionTable, sessionId, models.Players, "p2"); err != nil {
+	if err := common.Push(env, common.SessionTable, sessionId, models.Players, p2); err != nil {
 		t.Fatal(err)
 	}
 	var got models.Session
 	if err := common.GetOne(env, common.SessionTable, sessionId, &got); err != nil {
 		t.Fatal(err)
 	}
-	if len(got.Players) != 2 || got.Players[0] != "p1" || got.Players[1] != "p2" {
+	if len(got.Players) != 2 || got.Players[0] != models.PlayerId(p1) || got.Players[1] != models.PlayerId(p2) {
 		t.Fatalf("session players = %v", got.Players)
 	}
-	if err := common.Pull(env, common.SessionTable, sessionId, models.Players, "p1"); err != nil {
+	if err := common.Pull(env, common.SessionTable, sessionId, models.Players, p1); err != nil {
 		t.Fatal(err)
 	}
 	if err := common.GetOne(env, common.SessionTable, sessionId, &got); err != nil {
 		t.Fatal(err)
 	}
-	if len(got.Players) != 1 || got.Players[0] != "p2" {
+	if len(got.Players) != 1 || got.Players[0] != models.PlayerId(p2) {
 		t.Fatalf("session players after pull = %v", got.Players)
 	}
 
-	// answers push into the nested rounds path (mimics sessions.AnswerQuestion)
-	started := models.Session{
-		ID:     sessionId,
-		Name:   "S",
-		GameId: gameId,
-		Rounds: []models.RoundInGame{{
-			RoundId:   roundId,
-			Wagers:    []int{100},
-			Questions: []models.QuestionInRound{{QuestionId: question.ID}},
-		}},
+	// session reads reconstruct rounds from the game structure
+	if len(got.Rounds) != 1 || got.Rounds[0].RoundId != roundId {
+		t.Fatalf("session rounds = %+v", got.Rounds)
 	}
-	if err := common.Set(env, common.SessionTable, sessionId, &started); err != nil {
-		t.Fatal(err)
+	if len(got.Rounds[0].Wagers) != 1 || got.Rounds[0].Wagers[0] != 100 {
+		t.Fatalf("session round wagers = %v", got.Rounds[0].Wagers)
 	}
-
-	spot := fmt.Sprintf("%v.%v.%v.%v.%v.%v", models.Rounds, 0, models.Questions, 0, models.Answers, "p2")
-	if err := common.Push(env, common.SessionTable, sessionId, spot, "answer-1"); err != nil {
-		t.Fatal(err)
+	if len(got.Rounds[0].Questions) != 1 || got.Rounds[0].Questions[0].Category != "cat" {
+		t.Fatalf("session round questions = %+v", got.Rounds[0].Questions)
+	}
+	// the question id must survive the relational round-trip
+	if got.Rounds[0].Questions[0].QuestionId != question.ID {
+		t.Fatalf("question id lost in session read: %q", got.Rounds[0].Questions[0].QuestionId)
 	}
 
+	// a session_question snapshot overlays the question text and scored flag
+	// (this is what _setCurrentQuestion / scoring write)
+	if _, err := db.Exec(`INSERT INTO session_question
+		(session_id, round_index, question_index, question_id, category, question, answer, scoring_note_id, scoring_note, scored)
+		VALUES (?, 0, 0, ?, 'cat', 'q', 'a', '', '', 1)`, sessionId, question.ID); err != nil {
+		t.Fatal(err)
+	}
 	if err := common.GetOne(env, common.SessionTable, sessionId, &got); err != nil {
 		t.Fatal(err)
 	}
-	answers := got.Rounds[0].Questions[0].PlayerAnswers[models.PlayerId("p2")]
-	if len(answers) != 1 || string(answers[0]) != "answer-1" {
-		t.Fatalf("session answers = %v", answers)
-	}
-	// the question id must survive the JSON column round-trip
-	if got.Rounds[0].Questions[0].QuestionId != question.ID {
-		t.Fatalf("question id lost in JSON round-trip: %q", got.Rounds[0].Questions[0].QuestionId)
+	q := got.Rounds[0].Questions[0]
+	if q.Question != "q" || q.Answer != "a" || !q.Scored {
+		t.Fatalf("session_question overlay not applied: %+v", q)
 	}
 
-	// delete the session cascades its state row
+	// scoreboard reads come from session_score
+	if _, err := db.Exec(`INSERT INTO session_score (session_id, player_id, round_index, points)
+		VALUES (?, ?, 0, 100)`, sessionId, p2); err != nil {
+		t.Fatal(err)
+	}
+	if err := common.GetOne(env, common.SessionTable, sessionId, &got); err != nil {
+		t.Fatal(err)
+	}
+	scores := got.Scoreboard[models.PlayerId(p2)]
+	if len(scores) != 1 || scores[0] != 100 {
+		t.Fatalf("session scoreboard = %v", got.Scoreboard)
+	}
+
+	// delete the session cascades its state, membership, snapshot, and score rows
 	if err := common.Delete(env, common.SessionTable, sessionId); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := common.GetState(env, sessionId); err == nil {
 		t.Error("expected state row to be cascade-deleted with session")
+	}
+	var n int
+	if err := db.QueryRow(`SELECT count(*) FROM session_player WHERE session_id = ?`, sessionId).Scan(&n); err != nil {
+		t.Fatal(err)
+	}
+	if n != 0 {
+		t.Errorf("session_player rows survived session delete: %d", n)
+	}
+	if err := db.QueryRow(`SELECT count(*) FROM session_question WHERE session_id = ?`, sessionId).Scan(&n); err != nil {
+		t.Fatal(err)
+	}
+	if n != 0 {
+		t.Errorf("session_question rows survived session delete: %d", n)
+	}
+	if err := db.QueryRow(`SELECT count(*) FROM session_score WHERE session_id = ?`, sessionId).Scan(&n); err != nil {
+		t.Fatal(err)
+	}
+	if n != 0 {
+		t.Errorf("session_score rows survived session delete: %d", n)
 	}
 }
 
@@ -474,16 +517,20 @@ func TestNonexistentIdAndCollectionCrud(t *testing.T) {
 	}
 }
 
-// The session players / session rounds / question rounds_used columns are
-// read-modify-write JSON documents. Concurrent writers must not lose updates:
-// each push runs in a BEGIN IMMEDIATE transaction, so the second writer waits
-// for the first instead of overwriting it.
+// The session_player membership join and the question rounds_used mirror are
+// maintained by read-modify-write transactions. Concurrent writers must not
+// lose updates: each push runs in a BEGIN IMMEDIATE transaction, so the
+// second writer waits for the first instead of overwriting it.
 func TestConcurrentSessionPlayersPush(t *testing.T) {
 	db := GetDb()
 	env := &common.Env{Db: db}
 	sessionId, _, err := common.Create(env, common.SessionTable, &models.Session{Name: "S"})
 	if err != nil {
 		t.Fatal(err)
+	}
+	playerIds := make([]string, 0, 16)
+	for i := 0; i < 16; i++ {
+		playerIds = append(playerIds, createPlayer(t, env, fmt.Sprintf("team-%d", i)))
 	}
 	const n = 16
 	var wg sync.WaitGroup
@@ -492,7 +539,7 @@ func TestConcurrentSessionPlayersPush(t *testing.T) {
 		wg.Add(1)
 		go func(i int) {
 			defer wg.Done()
-			if err := common.Push(env, common.SessionTable, sessionId, models.Players, models.PlayerId(fmt.Sprintf("p%d", i))); err != nil {
+			if err := common.Push(env, common.SessionTable, sessionId, models.Players, models.PlayerId(playerIds[i])); err != nil {
 				errCh <- err
 			}
 		}(i)
@@ -508,52 +555,6 @@ func TestConcurrentSessionPlayersPush(t *testing.T) {
 	}
 	if len(got.Players) != n {
 		t.Fatalf("expected %d players, got %d: %v", n, len(got.Players), got.Players)
-	}
-}
-
-func TestConcurrentSessionAnswerPushes(t *testing.T) {
-	db := GetDb()
-	env := &common.Env{Db: db}
-	sessionId, _, err := common.Create(env, common.SessionTable, &models.Session{Name: "S"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	started := models.Session{
-		ID:     sessionId,
-		Name:   "S",
-		Rounds: []models.RoundInGame{{Questions: []models.QuestionInRound{{}}}},
-	}
-	if err := common.Set(env, common.SessionTable, sessionId, &started); err != nil {
-		t.Fatal(err)
-	}
-	const n = 16
-	var wg sync.WaitGroup
-	errCh := make(chan error, n)
-	for i := 0; i < n; i++ {
-		wg.Add(1)
-		go func(i int) {
-			defer wg.Done()
-			spot := fmt.Sprintf("%v.%v.%v.%v.%v.%v", models.Rounds, 0, models.Questions, 0, models.Answers, fmt.Sprintf("p%d", i))
-			if err := common.Push(env, common.SessionTable, sessionId, spot, fmt.Sprintf("answer-%d", i)); err != nil {
-				errCh <- err
-			}
-		}(i)
-	}
-	wg.Wait()
-	close(errCh)
-	for err := range errCh {
-		t.Fatal(err)
-	}
-	var got models.Session
-	if err := common.GetOne(env, common.SessionTable, sessionId, &got); err != nil {
-		t.Fatal(err)
-	}
-	total := 0
-	for _, answers := range got.Rounds[0].Questions[0].PlayerAnswers {
-		total += len(answers)
-	}
-	if total != n {
-		t.Fatalf("expected %d answers, got %d: %v", n, total, got.Rounds[0].Questions[0].PlayerAnswers)
 	}
 }
 

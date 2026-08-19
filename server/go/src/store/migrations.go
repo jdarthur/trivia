@@ -199,6 +199,22 @@ var migrations = []migration{
 			`ALTER TABLE session ADD COLUMN players TEXT NOT NULL DEFAULT '[]'`,
 		},
 	},
+	{
+		version: 3,
+		name:    "session relational port",
+		statements: []string{
+			// The session-port ticket (#76) moves session's document-shaped
+			// fields into the session_question / session_score / session_player
+			// tables. The JSON columns added by migration 2 are dropped; the
+			// session_question table gains a scoring-note description snapshot
+			// (the API returns the description text, and the old code snapshotted
+			// it into the session document at set time).
+			`ALTER TABLE session DROP COLUMN rounds`,
+			`ALTER TABLE session DROP COLUMN scoreboard`,
+			`ALTER TABLE session DROP COLUMN players`,
+			`ALTER TABLE session_question ADD COLUMN scoring_note TEXT NOT NULL DEFAULT ''`,
+		},
+	},
 }
 
 // Migrate brings db up to the latest schema version, applying each pending
