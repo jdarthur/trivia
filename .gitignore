@@ -32,6 +32,10 @@ server/go/src/data
 # Editors
 .idea/
 
+# Reasonix agent workspace and config
+.reasonix/
+reasonix.toml
+
 # Stray package downloads -- a 39M containerd RPM was committed by accident once
 *.rpm
 *.deb
