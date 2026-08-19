@@ -15,7 +15,6 @@ import (
 	"reflect"
 	"regexp"
 	"sort"
-	"strconv"
 	"strings"
 	"time"
 
@@ -105,7 +104,11 @@ func formatTime(t time.Time) string {
 	return t.Format(timeFormat)
 }
 
-func parseTime(s string) time.Time {
+// ParseTime converts a stored timestamp string (the API's historical
+// UTC-naive "2006-01-02T15:04:05.000000" format) back into a time.Time. It
+// tolerates RFC3339 timestamps in case a column ever holds one, otherwise
+// falls back to the zero time.
+func ParseTime(s string) time.Time {
 	if s == "" {
 		return time.Time{}
 	}
@@ -209,7 +212,7 @@ func scanQuestion(s rowScanner) (models.Question, error) {
 	if err != nil {
 		return m, err
 	}
-	m.CreateDate = parseTime(createDate)
+	m.CreateDate = ParseTime(createDate)
 	m.RoundsUsed = make([]string, 0)
 	_ = json.Unmarshal([]byte(roundsUsed), &m.RoundsUsed)
 	return m, nil
@@ -292,7 +295,7 @@ func getRound(db *sql.DB, id string, m *models.Round) error {
 	if err != nil {
 		return err
 	}
-	m.CreateDate = parseTime(createDate)
+	m.CreateDate = ParseTime(createDate)
 	return loadRound(db, m)
 }
 
@@ -340,7 +343,7 @@ func getGame(db *sql.DB, id string, m *models.Game) error {
 	if err != nil {
 		return err
 	}
-	m.CreateDate = parseTime(createDate)
+	m.CreateDate = ParseTime(createDate)
 	return loadGame(db, m)
 }
 
@@ -349,32 +352,159 @@ func scanSession(s rowScanner) (models.Session, error) {
 	var createDate, moderatorId string
 	var started int
 	var curRound, curQuestion sql.NullInt64
-	var roundsJSON, scoreboardJSON, playersJSON string
 	err := s.Scan(&m.ID, &createDate, &m.Name, &m.GameId, &moderatorId, &started,
-		&curRound, &curQuestion, &roundsJSON, &scoreboardJSON, &playersJSON)
+		&curRound, &curQuestion)
 	if err != nil {
 		return m, err
 	}
-	m.CreateDate = parseTime(createDate)
+	m.CreateDate = ParseTime(createDate)
 	m.Moderator = models.PlayerId(moderatorId)
 	m.Started = started == 1
 	m.CurrentRound = intPtr(curRound)
 	m.CurrentQuestion = intPtr(curQuestion)
-	if err := unmarshalSessionJSON(roundsJSON, scoreboardJSON, playersJSON, &m); err != nil {
-		return m, err
-	}
 	return m, nil
+}
+
+// loadSessionRelations fills a session's derived lists from the relational
+// tables (the session-port ticket #76):
+//
+//   - Rounds: the game's round/question structure (round ids, wagers,
+//     categories) with the session_question snapshot rows overlaid, so a
+//     session read returns the same shape the old JSON document held.
+//   - Players: the session_player membership join, ordered by position.
+//   - Scoreboard: the session_score rows, grouped per player by round index.
+//
+// A missing game, round, or question does not fail the session read — the
+// session is returned with whatever structure can still be derived (the old
+// document stored this structure denormalized, so it survived editor
+// deletions; the relational view degrades gracefully instead of 404ing).
+func loadSessionRelations(db *sql.DB, m *models.Session) error {
+	if err := loadSessionRounds(db, m); err != nil {
+		return err
+	}
+	if err := loadSessionPlayers(db, m); err != nil {
+		return err
+	}
+	return loadSessionScoreboard(db, m)
+}
+
+func loadSessionRounds(db *sql.DB, m *models.Session) error {
+	m.Rounds = make([]models.RoundInGame, 0)
+	if m.GameId == "" {
+		return nil
+	}
+
+	var game models.Game
+	if err := getGame(db, m.GameId, &game); err != nil {
+		// No game (deleted or dangling game_id): nothing to derive.
+		return nil
+	}
+
+	for _, roundId := range game.Rounds {
+		var round models.Round
+		if err := getRound(db, roundId, &round); err != nil {
+			continue
+		}
+
+		roundInGame := models.RoundInGame{
+			RoundId:   roundId,
+			Wagers:    round.Wagers,
+			Questions: make([]models.QuestionInRound, 0, len(round.Questions)),
+		}
+		for i, questionId := range round.Questions {
+			var q models.Question
+			if err := getQuestion(db, questionId, &q); err != nil {
+				continue
+			}
+			roundInGame.Questions = append(roundInGame.Questions, models.QuestionInRound{
+				Category:   q.Category,
+				QuestionId: questionId,
+				Index:      i,
+			})
+		}
+		m.Rounds = append(m.Rounds, roundInGame)
+	}
+
+	// Overlay the per-question snapshots taken at set/score/hot-edit time.
+	rows, err := db.Query(`SELECT round_index, question_index, question_id, category,
+		question, answer, scoring_note_id, scoring_note, scored
+		FROM session_question WHERE session_id = ?`, m.ID)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var roundIndex, questionIndex int
+		var questionId, category, question, answer, scoringNoteId, scoringNote string
+		var scored int
+		if err := rows.Scan(&roundIndex, &questionIndex, &questionId, &category,
+			&question, &answer, &scoringNoteId, &scoringNote, &scored); err != nil {
+			return err
+		}
+		if roundIndex >= len(m.Rounds) || questionIndex >= len(m.Rounds[roundIndex].Questions) {
+			continue
+		}
+		q := &m.Rounds[roundIndex].Questions[questionIndex]
+		q.QuestionId = questionId
+		q.Category = category
+		q.Question = question
+		q.Answer = answer
+		q.ScoringNoteId = scoringNoteId
+		q.ScoringNote = scoringNote
+		q.Scored = scored == 1
+	}
+	return rows.Err()
+}
+
+func loadSessionPlayers(db *sql.DB, m *models.Session) error {
+	m.Players = make([]models.PlayerId, 0)
+	rows, err := db.Query(`SELECT player_id FROM session_player
+		WHERE session_id = ? ORDER BY position`, m.ID)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var playerId string
+		if err := rows.Scan(&playerId); err != nil {
+			return err
+		}
+		m.Players = append(m.Players, models.PlayerId(playerId))
+	}
+	return rows.Err()
+}
+
+func loadSessionScoreboard(db *sql.DB, m *models.Session) error {
+	m.Scoreboard = make(map[models.PlayerId][]float64)
+	rows, err := db.Query(`SELECT player_id, points FROM session_score
+		WHERE session_id = ? ORDER BY player_id, round_index`, m.ID)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var playerId string
+		var points float64
+		if err := rows.Scan(&playerId, &points); err != nil {
+			return err
+		}
+		m.Scoreboard[models.PlayerId(playerId)] = append(m.Scoreboard[models.PlayerId(playerId)], points)
+	}
+	return rows.Err()
 }
 
 func getSession(db *sql.DB, id string, m *models.Session) error {
 	row := db.QueryRow(`SELECT id, create_date, name, game_id, moderator_id, started,
-		current_round, current_question, rounds, scoreboard, players
+		current_round, current_question
 		FROM session WHERE id = ?`, id)
 	got, err := scanSession(row)
 	if errors.Is(err, sql.ErrNoRows) {
 		return NonexistentIdError{RecordType: SessionTable, ID: id}
 	}
 	if err != nil {
+		return err
+	}
+	if err := loadSessionRelations(db, &got); err != nil {
 		return err
 	}
 	*m = got
@@ -392,7 +522,7 @@ func getPlayer(db *sql.DB, id string, m *models.Player) error {
 	if err != nil {
 		return err
 	}
-	m.CreateDate = parseTime(createDate)
+	m.CreateDate = ParseTime(createDate)
 	return nil
 }
 
@@ -411,7 +541,7 @@ func getAnswer(db *sql.DB, id string, m *models.Answer) error {
 	if err != nil {
 		return err
 	}
-	m.CreateDate = parseTime(createDate)
+	m.CreateDate = ParseTime(createDate)
 	m.RoundIndex = intPtr(roundIndex)
 	m.QuestionIndex = intPtr(questionIndex)
 	m.PlayerId = models.PlayerId(playerId)
@@ -446,7 +576,7 @@ func getCollection(db *sql.DB, id string, m *models.Collection) error {
 	if err != nil {
 		return err
 	}
-	m.CreateDate = parseTime(createDate)
+	m.CreateDate = ParseTime(createDate)
 	return loadCollection(db, m)
 }
 
@@ -461,8 +591,8 @@ func getScoringNote(db *sql.DB, id string, m *models.ScoringNote) error {
 	if err != nil {
 		return err
 	}
-	m.CreateDate = parseTime(createDate)
-	m.LastUsed = parseTime(lastUsed)
+	m.CreateDate = ParseTime(createDate)
+	m.LastUsed = ParseTime(lastUsed)
 	return nil
 }
 
@@ -564,10 +694,6 @@ func insertGame(db *sql.DB, m models.Game) error {
 }
 
 func insertSession(db *sql.DB, m models.Session) error {
-	roundsJSON, scoreboardJSON, playersJSON, err := marshalSessionJSON(m)
-	if err != nil {
-		return err
-	}
 	var currentRound, currentQuestion interface{}
 	if m.CurrentRound != nil {
 		currentRound = *m.CurrentRound
@@ -575,11 +701,11 @@ func insertSession(db *sql.DB, m models.Session) error {
 	if m.CurrentQuestion != nil {
 		currentQuestion = *m.CurrentQuestion
 	}
-	_, err = db.Exec(`INSERT INTO session (id, create_date, name, game_id, moderator_id, started,
-		current_round, current_question, rounds, scoreboard, players)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+	_, err := db.Exec(`INSERT INTO session (id, create_date, name, game_id, moderator_id, started,
+		current_round, current_question)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
 		m.ID, formatTime(m.CreateDate), m.Name, m.GameId, string(m.Moderator), boolToInt(m.Started),
-		currentRound, currentQuestion, roundsJSON, scoreboardJSON, playersJSON)
+		currentRound, currentQuestion)
 	return err
 }
 
@@ -750,10 +876,6 @@ func updateGame(db *sql.DB, id string, m models.Game) error {
 }
 
 func updateSession(db *sql.DB, id string, m models.Session) error {
-	roundsJSON, scoreboardJSON, playersJSON, err := marshalSessionJSON(m)
-	if err != nil {
-		return err
-	}
 	var currentRound, currentQuestion interface{}
 	if m.CurrentRound != nil {
 		currentRound = *m.CurrentRound
@@ -762,9 +884,9 @@ func updateSession(db *sql.DB, id string, m models.Session) error {
 		currentQuestion = *m.CurrentQuestion
 	}
 	res, err := db.Exec(`UPDATE session SET name = ?, game_id = ?, moderator_id = ?, started = ?,
-		current_round = ?, current_question = ?, rounds = ?, scoreboard = ?, players = ? WHERE id = ?`,
+		current_round = ?, current_question = ? WHERE id = ?`,
 		m.Name, m.GameId, string(m.Moderator), boolToInt(m.Started),
-		currentRound, currentQuestion, roundsJSON, scoreboardJSON, playersJSON, id)
+		currentRound, currentQuestion, id)
 	return rowsAffected(res, err, SessionTable, id)
 }
 
@@ -823,7 +945,7 @@ func updateScoringNote(db *sql.DB, id string, m models.ScoringNote) error {
 // The position read and insert run in one write transaction, so concurrent
 // pushes to the same parent cannot compute the same position.
 func insertJoin(db *sql.DB, table, parentCol, childCol, parentId, childId string) error {
-	return withWriteTx(db, func(q queryExecer) error {
+	return WithWriteTx(db, func(q Queryer) error {
 		ctx := context.Background()
 		var pos int
 		err := q.QueryRowContext(ctx, fmt.Sprintf("SELECT COALESCE(MAX(position)+1, 0) FROM %s WHERE %s = ?", table, parentCol), parentId).Scan(&pos)
@@ -872,10 +994,7 @@ func Push(e *Env, objectType string, objectId string, array string, value interf
 		return insertJoin(e.Db, "collection_question", "collection_id", "question_id", objectId, valueString)
 
 	case objectType == SessionTable && array == models.Players:
-		return pushSessionPlayers(e.Db, objectId, valueString)
-
-	case objectType == SessionTable:
-		return pushSessionAnswerPath(e.Db, objectId, array, valueString)
+		return insertJoin(e.Db, "session_player", "session_id", "player_id", objectId, valueString)
 
 	default:
 		return errors.New("invalid push: " + objectType + "." + array)
@@ -905,7 +1024,7 @@ func Pull(e *Env, objectType string, objectId string, array string, value interf
 		return deleteJoin(e.Db, "collection_question", "collection_id", "question_id", objectId, valueString)
 
 	case objectType == SessionTable && array == models.Players:
-		return pullSessionPlayers(e.Db, objectId, valueString)
+		return deleteJoin(e.Db, "session_player", "session_id", "player_id", objectId, valueString)
 
 	default:
 		return errors.New("invalid pull: " + objectType + "." + array)
@@ -922,20 +1041,21 @@ func removeString(s []string, target string) []string {
 	return out
 }
 
-// queryExecer is the subset of *sql.DB / *sql.Tx / *sql.Conn used by the
-// transaction helper and the JSON read-modify-write paths.
-type queryExecer interface {
+// Queryer is the subset of *sql.DB / *sql.Tx / *sql.Conn used by the
+// transaction helper and by handlers running their own write transactions.
+type Queryer interface {
 	ExecContext(ctx context.Context, query string, args ...interface{}) (sql.Result, error)
 	QueryRowContext(ctx context.Context, query string, args ...interface{}) *sql.Row
+	QueryContext(ctx context.Context, query string, args ...interface{}) (*sql.Rows, error)
 }
 
-// withWriteTx runs fn inside a BEGIN IMMEDIATE transaction on one pinned
+// WithWriteTx runs fn inside a BEGIN IMMEDIATE transaction on one pinned
 // connection. Taking SQLite's write lock at BEGIN — rather than at the first
 // write, as a deferred transaction would — serializes read-modify-write
 // sequences: a concurrent writer blocks on the busy timeout until the first
 // commits, instead of both reading the same value and the last writer
 // silently dropping the other's update.
-func withWriteTx(db *sql.DB, fn func(q queryExecer) error) error {
+func WithWriteTx(db *sql.DB, fn func(q Queryer) error) error {
 	ctx := context.Background()
 	conn, err := db.Conn(ctx)
 	if err != nil {
@@ -967,7 +1087,7 @@ func withWriteTx(db *sql.DB, fn func(q queryExecer) error) error {
 // mutate, and writes it back — atomically, so concurrent pushes/pulls (e.g.
 // two rounds adopting the same question) cannot lose an update.
 func mutateQuestionRoundsUsed(db *sql.DB, id string, mutate func([]string) []string) error {
-	return withWriteTx(db, func(q queryExecer) error {
+	return WithWriteTx(db, func(q Queryer) error {
 		ctx := context.Background()
 		var roundsUsed string
 		err := q.QueryRowContext(ctx, `SELECT rounds_used FROM question WHERE id = ?`, id).Scan(&roundsUsed)
@@ -1032,7 +1152,7 @@ func GetAll(e *Env, objectType string, filters interface{}) (interface{}, error)
 			if err := rows.Scan(&m.ID, &createDate, &m.Name, &m.UserId); err != nil {
 				return nil, err
 			}
-			m.CreateDate = parseTime(createDate)
+			m.CreateDate = ParseTime(createDate)
 			if err := loadRound(e.Db, &m); err != nil {
 				return nil, err
 			}
@@ -1053,7 +1173,7 @@ func GetAll(e *Env, objectType string, filters interface{}) (interface{}, error)
 			if err := rows.Scan(&m.ID, &createDate, &m.Name, &m.UserId); err != nil {
 				return nil, err
 			}
-			m.CreateDate = parseTime(createDate)
+			m.CreateDate = ParseTime(createDate)
 			if err := loadGame(e.Db, &m); err != nil {
 				return nil, err
 			}
@@ -1063,7 +1183,7 @@ func GetAll(e *Env, objectType string, filters interface{}) (interface{}, error)
 
 	case SessionTable:
 		rows, err := e.Db.Query(`SELECT id, create_date, name, game_id, moderator_id, started,
-			current_round, current_question, rounds, scoreboard, players
+			current_round, current_question
 			FROM session`+where+` ORDER BY create_date`, args...)
 		if err != nil {
 			return nil, err
@@ -1073,6 +1193,9 @@ func GetAll(e *Env, objectType string, filters interface{}) (interface{}, error)
 		for rows.Next() {
 			m, err := scanSession(rows)
 			if err != nil {
+				return nil, err
+			}
+			if err := loadSessionRelations(e.Db, &m); err != nil {
 				return nil, err
 			}
 			slice = append(slice, &m)
@@ -1092,7 +1215,7 @@ func GetAll(e *Env, objectType string, filters interface{}) (interface{}, error)
 			if err := rows.Scan(&m.ID, &createDate, &m.Name, &m.UserId); err != nil {
 				return nil, err
 			}
-			m.CreateDate = parseTime(createDate)
+			m.CreateDate = ParseTime(createDate)
 			if err := loadCollection(e.Db, &m); err != nil {
 				return nil, err
 			}
@@ -1114,8 +1237,8 @@ func GetAll(e *Env, objectType string, filters interface{}) (interface{}, error)
 			if err := rows.Scan(&m.ID, &m.UserId, &createDate, &lastUsed, &m.Name, &m.Description); err != nil {
 				return nil, err
 			}
-			m.CreateDate = parseTime(createDate)
-			m.LastUsed = parseTime(lastUsed)
+			m.CreateDate = ParseTime(createDate)
+			m.LastUsed = ParseTime(lastUsed)
 			slice = append(slice, &m)
 		}
 		return slice, rows.Err()
@@ -1274,235 +1397,6 @@ func Delete(e *Env, objectType string, objectId string) error {
 
 //=====================================
 //=====================================
-//           Session JSON columns
-//=====================================
-//=====================================
-
-// sessionRound / sessionQuestion are the storage shape of session's
-// document-style fields. They mirror the API models but keep QuestionId
-// (json:"-" on models.QuestionInRound) inside the JSON blob.
-type sessionRound struct {
-	RoundId   string            `json:"round_id"`
-	Wagers    []int             `json:"wagers"`
-	Questions []sessionQuestion `json:"questions"`
-}
-
-type sessionQuestion struct {
-	Category      string                   `json:"category"`
-	Question      string                   `json:"question"`
-	Answer        string                   `json:"answer"`
-	PlayerAnswers map[models.PlayerId][]models.AnswerId `json:"answers"`
-	Scored        bool                     `json:"scored"`
-	Index         int                      `json:"id"`
-	QuestionId    string                   `json:"question_id"`
-	ScoringNote   string                   `json:"scoring_note"`
-	ScoringNoteId string                   `json:"scoring_note_id"`
-}
-
-func sessionRoundsToJSON(rounds []models.RoundInGame) []sessionRound {
-	out := make([]sessionRound, 0, len(rounds))
-	for _, r := range rounds {
-		sr := sessionRound{RoundId: r.RoundId, Wagers: r.Wagers}
-		for _, q := range r.Questions {
-			sr.Questions = append(sr.Questions, sessionQuestion{
-				Category:      q.Category,
-				Question:      q.Question,
-				Answer:        q.Answer,
-				PlayerAnswers: q.PlayerAnswers,
-				Scored:        q.Scored,
-				Index:         q.Index,
-				QuestionId:    q.QuestionId,
-				ScoringNote:   q.ScoringNote,
-				ScoringNoteId: q.ScoringNoteId,
-			})
-		}
-		out = append(out, sr)
-	}
-	return out
-}
-
-func sessionRoundsFromJSON(rounds []sessionRound) []models.RoundInGame {
-	out := make([]models.RoundInGame, 0, len(rounds))
-	for _, r := range rounds {
-		mr := models.RoundInGame{RoundId: r.RoundId, Wagers: r.Wagers}
-		for _, q := range r.Questions {
-			mr.Questions = append(mr.Questions, models.QuestionInRound{
-				Category:      q.Category,
-				Question:      q.Question,
-				Answer:        q.Answer,
-				PlayerAnswers: q.PlayerAnswers,
-				Scored:        q.Scored,
-				Index:         q.Index,
-				QuestionId:    q.QuestionId,
-				ScoringNote:   q.ScoringNote,
-				ScoringNoteId: q.ScoringNoteId,
-			})
-		}
-		out = append(out, mr)
-	}
-	return out
-}
-
-func marshalSessionJSON(s models.Session) (rounds string, scoreboard string, players string, err error) {
-	roundsJSON, err := json.Marshal(sessionRoundsToJSON(s.Rounds))
-	if err != nil {
-		return "", "", "", err
-	}
-	if s.Scoreboard == nil {
-		s.Scoreboard = make(map[models.PlayerId][]float64)
-	}
-	scoreboardJSON, err := json.Marshal(s.Scoreboard)
-	if err != nil {
-		return "", "", "", err
-	}
-	if s.Players == nil {
-		s.Players = make([]models.PlayerId, 0)
-	}
-	playersJSON, err := json.Marshal(s.Players)
-	if err != nil {
-		return "", "", "", err
-	}
-	return string(roundsJSON), string(scoreboardJSON), string(playersJSON), nil
-}
-
-func unmarshalSessionJSON(rounds string, scoreboard string, players string, s *models.Session) error {
-	var sr []sessionRound
-	if err := json.Unmarshal([]byte(rounds), &sr); err != nil {
-		return err
-	}
-	s.Rounds = sessionRoundsFromJSON(sr)
-
-	s.Scoreboard = make(map[models.PlayerId][]float64)
-	if err := json.Unmarshal([]byte(scoreboard), &s.Scoreboard); err != nil {
-		return err
-	}
-
-	s.Players = make([]models.PlayerId, 0)
-	if err := json.Unmarshal([]byte(players), &s.Players); err != nil {
-		return err
-	}
-	return nil
-}
-
-// pushSessionPlayers appends a player ID to the session's players JSON column.
-// Runs in a write transaction: joining players concurrently must not lose one.
-func pushSessionPlayers(db *sql.DB, sessionId string, playerId string) error {
-	return withWriteTx(db, func(q queryExecer) error {
-		ctx := context.Background()
-		var playersJSON string
-		err := q.QueryRowContext(ctx, `SELECT players FROM session WHERE id = ?`, sessionId).Scan(&playersJSON)
-		if err != nil {
-			if errors.Is(err, sql.ErrNoRows) {
-				return NonexistentIdError{RecordType: SessionTable, ID: sessionId}
-			}
-			return err
-		}
-		players := make([]models.PlayerId, 0)
-		_ = json.Unmarshal([]byte(playersJSON), &players)
-		players = append(players, models.PlayerId(playerId))
-		updated, err := json.Marshal(players)
-		if err != nil {
-			return err
-		}
-		res, err := q.ExecContext(ctx, `UPDATE session SET players = ? WHERE id = ?`, string(updated), sessionId)
-		if err != nil {
-			return err
-		}
-		return rowsAffected(res, nil, SessionTable, sessionId)
-	})
-}
-
-func pullSessionPlayers(db *sql.DB, sessionId string, playerId string) error {
-	return withWriteTx(db, func(q queryExecer) error {
-		ctx := context.Background()
-		var playersJSON string
-		err := q.QueryRowContext(ctx, `SELECT players FROM session WHERE id = ?`, sessionId).Scan(&playersJSON)
-		if err != nil {
-			if errors.Is(err, sql.ErrNoRows) {
-				return NonexistentIdError{RecordType: SessionTable, ID: sessionId}
-			}
-			return err
-		}
-		players := make([]models.PlayerId, 0)
-		_ = json.Unmarshal([]byte(playersJSON), &players)
-		filtered := make([]models.PlayerId, 0, len(players))
-		for _, p := range players {
-			if string(p) != playerId {
-				filtered = append(filtered, p)
-			}
-		}
-		updated, err := json.Marshal(filtered)
-		if err != nil {
-			return err
-		}
-		res, err := q.ExecContext(ctx, `UPDATE session SET players = ? WHERE id = ?`, string(updated), sessionId)
-		if err != nil {
-			return err
-		}
-		return rowsAffected(res, nil, SessionTable, sessionId)
-	})
-}
-
-// pushSessionAnswerPath appends an answer ID into
-// session.rounds[roundIndex].questions[questionIndex].answers[playerId].
-// The path is built by sessions/answers.go as
-// "rounds.<roundIndex>.questions.<questionIndex>.answers.<playerId>".
-// Runs in a write transaction: two players answering the same question
-// concurrently must not drop each other's answers.
-func pushSessionAnswerPath(db *sql.DB, sessionId string, path string, answerId string) error {
-	parts := strings.Split(path, ".")
-	if len(parts) != 6 || parts[0] != models.Rounds || parts[2] != models.Questions || parts[4] != models.Answers {
-		return errors.New("invalid session push path: " + path)
-	}
-	roundIndex, err := strconv.Atoi(parts[1])
-	if err != nil {
-		return errors.New("invalid session push path: " + path)
-	}
-	questionIndex, err := strconv.Atoi(parts[3])
-	if err != nil {
-		return errors.New("invalid session push path: " + path)
-	}
-	playerId := models.PlayerId(parts[5])
-
-	return withWriteTx(db, func(q queryExecer) error {
-		ctx := context.Background()
-		var roundsJSON string
-		err := q.QueryRowContext(ctx, `SELECT rounds FROM session WHERE id = ?`, sessionId).Scan(&roundsJSON)
-		if err != nil {
-			if errors.Is(err, sql.ErrNoRows) {
-				return NonexistentIdError{RecordType: SessionTable, ID: sessionId}
-			}
-			return err
-		}
-		rounds := make([]sessionRound, 0)
-		_ = json.Unmarshal([]byte(roundsJSON), &rounds)
-
-		for len(rounds) <= roundIndex {
-			rounds = append(rounds, sessionRound{})
-		}
-		for len(rounds[roundIndex].Questions) <= questionIndex {
-			rounds[roundIndex].Questions = append(rounds[roundIndex].Questions, sessionQuestion{})
-		}
-		sq := &rounds[roundIndex].Questions[questionIndex]
-		if sq.PlayerAnswers == nil {
-			sq.PlayerAnswers = make(map[models.PlayerId][]models.AnswerId)
-		}
-		sq.PlayerAnswers[playerId] = append(sq.PlayerAnswers[playerId], models.AnswerId(answerId))
-
-		updated, err := json.Marshal(rounds)
-		if err != nil {
-			return err
-		}
-		res, err := q.ExecContext(ctx, `UPDATE session SET rounds = ? WHERE id = ?`, string(updated), sessionId)
-		if err != nil {
-			return err
-		}
-		return rowsAffected(res, nil, SessionTable, sessionId)
-	})
-}
-
-//=====================================
-//=====================================
 //           Session state
 //=====================================
 //=====================================
@@ -1519,11 +1413,19 @@ func GetState(e *Env, sessionId string) (sessionState string, err error) {
 	return state, nil
 }
 
-func IncrementState(e *Env, sessionId string) (err error) {
+// IncrementStateTx is IncrementState's upsert, runnable inside a caller's
+// transaction — the scoring path bumps the token atomically with the score
+// writes so readers never observe a half-scored question.
+func IncrementStateTx(q Queryer, sessionId string) error {
 	state := uuid.New().String()
-	_, err = e.Db.Exec(`INSERT INTO session_state (session_id, state) VALUES (?, ?)
+	_, err := q.ExecContext(context.Background(),
+		`INSERT INTO session_state (session_id, state) VALUES (?, ?)
 		ON CONFLICT(session_id) DO UPDATE SET state = excluded.state`, sessionId, state)
 	return err
+}
+
+func IncrementState(e *Env, sessionId string) error {
+	return IncrementStateTx(e.Db, sessionId)
 }
 
 //=====================================

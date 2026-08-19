@@ -2,7 +2,7 @@ package sessions
 
 import (
 	"errors"
-	"fmt"
+
 	"github.com/gin-gonic/gin"
 	"github.com/jdarthur/trivia/common"
 	"github.com/jdarthur/trivia/models"
@@ -27,20 +27,18 @@ func (e *Env) HotEditQuestion(c *gin.Context) {
 			return
 		}
 
-		fmt.Println(request)
-
 		err = checkValidRoundAndQuestionIndex(session, request.RoundIndex, request.QuestionIndex)
 		if err != nil {
 			common.Respond(c, request, err)
 			return
 		}
 
-		//update question in session
+		//update the snapshot in session_question
 		questionInRound := session.Rounds[request.RoundIndex].Questions[request.QuestionIndex]
-		questionInRound.Question = request.Question.Question
-		questionInRound.Answer = request.Question.Answer
-		questionInRound.Category = request.Question.Category
+		questionId := questionInRound.QuestionId
 
+		scoringNoteId := ""
+		scoringNote := ""
 		if request.Question.ScoringNote != "" {
 			var note models.ScoringNote
 			err := common.GetOne((*common.Env)(e), common.ScoringNoteTable, request.Question.ScoringNote, &note)
@@ -49,23 +47,19 @@ func (e *Env) HotEditQuestion(c *gin.Context) {
 				return
 			}
 
-			questionInRound.ScoringNote = note.Description
-			questionInRound.ScoringNoteId = request.Question.ScoringNote
-		} else {
-			questionInRound.ScoringNote = ""
-			questionInRound.ScoringNoteId = ""
+			scoringNoteId = request.Question.ScoringNote
+			scoringNote = note.Description
 		}
 
-		session.Rounds[request.RoundIndex].Questions[request.QuestionIndex] = questionInRound
-		err = common.Set((*common.Env)(e), common.SessionTable, sessionId, &session)
+		err = updateSessionQuestionSnapshot(e, sessionId, request.RoundIndex, request.QuestionIndex,
+			questionId, request.Question.Category, request.Question.Question, request.Question.Answer,
+			scoringNoteId, scoringNote)
 		if err != nil {
 			common.Respond(c, request, err)
 			return
 		}
 
 		//update question in question table
-		questionId := questionInRound.QuestionId
-
 		var question models.Question
 		err = common.GetOne((*common.Env)(e), common.QuestionTable, questionId, &question)
 		if err != nil {
@@ -87,6 +81,32 @@ func (e *Env) HotEditQuestion(c *gin.Context) {
 		err = common.IncrementState((*common.Env)(e), sessionId)
 		common.Respond(c, request, err)
 	}
+}
+
+// updateSessionQuestionSnapshot rewrites the session_question snapshot row for
+// (round, question) with the hot-edited text. A missing row (question never
+// set) is created as a safety net. The scored flag is preserved.
+func updateSessionQuestionSnapshot(e *Env, sessionId string, roundIndex int, questionIndex int, questionId string, category string, question string, answer string, scoringNoteId string, scoringNote string) error {
+	res, err := e.Db.Exec(`UPDATE session_question SET question = ?, answer = ?, category = ?,
+		scoring_note_id = ?, scoring_note = ?
+		WHERE session_id = ? AND round_index = ? AND question_index = ?`,
+		question, answer, category, scoringNoteId, scoringNote, sessionId, roundIndex, questionIndex)
+	if err != nil {
+		return err
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if n > 0 {
+		return nil
+	}
+
+	_, err = e.Db.Exec(`INSERT INTO session_question
+		(session_id, round_index, question_index, question_id, category, question, answer, scoring_note_id, scoring_note, scored)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0)`,
+		sessionId, roundIndex, questionIndex, questionId, category, question, answer, scoringNoteId, scoringNote)
+	return err
 }
 
 type EditRoundNameRequest struct {
