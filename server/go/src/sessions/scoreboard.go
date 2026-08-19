@@ -37,8 +37,8 @@ func getSessionScoreboard(e *Env, c *gin.Context) (models.PlayerScoreboard, erro
 			playerScore.Score = make([]float64, 0)
 
 			//add playerId for the caller (or everyone if called as mod)
-			if callerPlayerId == models.IdAsString(player.ID) || models.PlayerId(callerPlayerId) == session.Moderator {
-				playerScore.PlayerId = models.PlayerId(models.IdAsString(player.ID))
+			if callerPlayerId == player.ID || models.PlayerId(callerPlayerId) == session.Moderator {
+				playerScore.PlayerId = models.PlayerId(player.ID)
 			}
 			scoreboard.Scores = append(scoreboard.Scores, playerScore)
 		}
@@ -58,8 +58,8 @@ func getSessionScoreboard(e *Env, c *gin.Context) (models.PlayerScoreboard, erro
 		playerScore.Score = scores
 
 		//add playerId for the caller (or everyone if called as mod)
-		if callerPlayerId == models.IdAsString(player.ID) || models.PlayerId(callerPlayerId) == session.Moderator {
-			playerScore.PlayerId = models.PlayerId(models.IdAsString(player.ID))
+		if callerPlayerId == player.ID || models.PlayerId(callerPlayerId) == session.Moderator {
+			playerScore.PlayerId = models.PlayerId(player.ID)
 		}
 
 		scoreboard.Scores = append(scoreboard.Scores, playerScore)

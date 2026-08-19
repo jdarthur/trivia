@@ -3,7 +3,6 @@ package questions
 import (
 	"fmt"
 	"github.com/gin-gonic/gin"
-	"github.com/globalsign/mgo/bson"
 	"github.com/jdarthur/trivia/common"
 	"github.com/jdarthur/trivia/models"
 	"strings"
@@ -80,7 +79,7 @@ func (e *Env) deleteFromCollections(userId, targetQuestionId string) error {
 		for _, questionId := range collection.Questions {
 			if questionId == targetQuestionId {
 
-				collectionId := models.IdAsString(collection.ID)
+				collectionId := collection.ID
 
 				if len(collection.Questions) == 1 {
 					fmt.Println("no remaining questions... delete collection " + collectionId)
@@ -154,14 +153,14 @@ func createFilters(c *gin.Context) map[string]interface{} {
 	//unused_only means that rounds_used = []
 	unusedOnly := c.DefaultQuery("unused_only", "false")
 	if strings.ToLower(unusedOnly) == "true" {
-		filter[models.RoundsUsed+".0"] = bson.M{"$exists": false}
+		filter[models.RoundsUsed+".0"] = common.M{"$exists": false}
 	}
 
 	//text_filter means that the search string appears in category/question/answer (case-insensitive)
 	textFilter := c.Query("text_filter")
 	if textFilter != "" {
-		search := bson.M{"$regex": bson.RegEx{Pattern: ".*" + textFilter + ".*", Options: "i"}}
-		filter["$or"] = []bson.M{{"question": search}, {"answer": search}, {"category": search}}
+		search := common.M{"$regex": common.RegEx{Pattern: ".*" + textFilter + ".*", Options: "i"}}
+		filter["$or"] = []common.M{{"question": search}, {"answer": search}, {"category": search}}
 	}
 	return filter
 }
@@ -198,8 +197,8 @@ func DeleteOneQuestion(e *Env, userId, questionId string) (models.Question, erro
 	}
 
 	for _, roundId := range question.RoundsUsed {
-		fmt.Println("remove question ID " + models.IdAsString(question.ID) + " from round " + roundId)
-		err = common.Pull((*common.Env)(e), common.RoundTable, roundId, models.Questions, models.IdAsString(question.ID))
+		fmt.Println("remove question ID " + question.ID + " from round " + roundId)
+		err = common.Pull((*common.Env)(e), common.RoundTable, roundId, models.Questions, question.ID)
 		if err != nil {
 			return models.Question{}, err
 		}

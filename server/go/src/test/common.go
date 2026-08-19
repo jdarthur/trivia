@@ -1,16 +1,28 @@
 package test
 
 import (
-	"github.com/globalsign/mgo"
-	"github.com/jdarthur/trivia/common"
+	"database/sql"
+	"fmt"
+	"os"
+	"path/filepath"
+	"time"
+
+	"github.com/jdarthur/trivia/store"
 )
 
-func GetDb() *mgo.Session {
+// GetDb opens a fresh, migrated SQLite database in a temp dir. No external
+// service is needed — each call returns an isolated database.
+func GetDb() *sql.DB {
+	path := filepath.Join(os.TempDir(), fmt.Sprintf("trivia-test-%d.db", time.Now().UnixNano()))
 
-	dbClient, err := common.GetDatabaseConnection()
+	db, err := store.Open(path)
 	if err != nil {
 		panic(err)
 	}
 
-	return dbClient
+	if err := store.Migrate(db); err != nil {
+		panic(err)
+	}
+
+	return db
 }

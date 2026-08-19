@@ -102,7 +102,7 @@ func _setCurrentQuestion(e *Env, session *models.Session, questionIndex int, rou
 
 	roundInSession.Questions[questionIndex] = questionInRound
 
-	return common.Set((*common.Env)(e), common.SessionTable, models.IdAsString(session.ID), &session)
+	return common.Set((*common.Env)(e), common.SessionTable, session.ID, &session)
 }
 
 type CurrentRoundRequest struct {

@@ -12,7 +12,7 @@ players answer from their own devices.
 |---|---|
 | Client | React, Ant Design, Redux Toolkit, React Router |
 | Server | Go, Gin |
-| Database | MongoDB |
+| Database | SQLite (via `modernc.org/sqlite`, pure Go) |
 | Auth | Auth0 (editor endpoints only — gameplay is anonymous) |
 
 ## Layout
@@ -29,17 +29,9 @@ archive/         past games, kept for reference
 
 ## Running it
 
-The server needs a MongoDB to talk to. `server/go/src/docker-compose.yml` will
-start one:
-
-```sh
-cd server/go/src
-docker compose up -d mongo
-```
-
-> **Note:** the database driver is `globalsign/mgo`, a 2018 fork that cannot
-> complete server selection against MongoDB 6.0 or newer. Pin the image to
-> `mongo:5.0` until the driver is replaced.
+The server needs no external service — it stores everything in a SQLite
+database. `server/go/src/store/` owns the connection (`DB_PATH`, default
+`data/trivia.db`) and applies schema migrations on startup.
 
 Then the API, which listens on `:8080`:
 
@@ -48,9 +40,9 @@ cd server/go/src
 go run .
 ```
 
-It reads `MONGO_HOST` and `MONGO_PORT` from `server/go/src/.env` (both default
-to `localhost:27017`) and `IMAGE_DIR` for uploaded question images, which
-defaults to `images` relative to the working directory.
+It reads `DB_PATH` from `server/go/src/.env` (default `data/trivia.db`) and
+`IMAGE_DIR` for uploaded question images, which defaults to `images` relative
+to the working directory.
 
 ### Development: two servers
 

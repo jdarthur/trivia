@@ -187,6 +187,18 @@ var migrations = []migration{
 			`CREATE INDEX idx_answer_session ON answer(session_id, round_index, question_index)`,
 		},
 	},
+	{
+		version: 2,
+		name:    "session json columns",
+		statements: []string{
+			// The engine swap (#75) keeps session's document-shaped fields as
+			// JSON columns; the session-port ticket (#76) replaces these with
+			// the session_question / session_score / session_player tables.
+			`ALTER TABLE session ADD COLUMN rounds TEXT NOT NULL DEFAULT '[]'`,
+			`ALTER TABLE session ADD COLUMN scoreboard TEXT NOT NULL DEFAULT '{}'`,
+			`ALTER TABLE session ADD COLUMN players TEXT NOT NULL DEFAULT '[]'`,
+		},
+	},
 }
 
 // Migrate brings db up to the latest schema version, applying each pending

@@ -2,7 +2,6 @@ package models
 
 import (
 	"encoding/json"
-	"github.com/globalsign/mgo/bson"
 	"time"
 )
 
@@ -11,15 +10,17 @@ var PlayerIdParam = "player_id"
 var Wager = "wager"
 
 type Answer struct {
-	ID            bson.Binary `bson:"_id" json:"id"`
-	CreateDate    time.Time   `bson:"create_date" json:"create_date"`
-	QuestionIndex *int        `bson:"-" json:"question_id,omitempty" binding:"required"`
-	RoundIndex    *int        `bson:"-" json:"round_id,omitempty" binding:"required"`
-	PlayerId      PlayerId    `bson:"player_id" json:"player_id" binding:"required"`
-	Answer        string      `bson:"answer" json:"answer" binding:"required"`
-	Wager         int         `bson:"wager" json:"wager" binding:"required"`
-	Correct       bool        `bson:"correct" json:"correct,omitempty"`
-	PointsAwarded float64     `bson:"points_awarded" json:"points_awarded,omitempty"`
+	ID            string    `json:"id"`
+	CreateDate    time.Time `json:"create_date"`
+	QuestionIndex *int      `json:"question_id,omitempty" binding:"required"`
+	RoundIndex    *int      `json:"round_id,omitempty" binding:"required"`
+	PlayerId      PlayerId  `json:"player_id" binding:"required"`
+	Answer        string    `json:"answer" binding:"required"`
+	Wager         int       `json:"wager" binding:"required"`
+	Correct       bool      `json:"correct,omitempty"`
+	PointsAwarded float64   `json:"points_awarded,omitempty"`
+	// SessionId is set server-side on create; it is not part of the API.
+	SessionId string `json:"-"`
 }
 
 func (a Answer) SetCreateDate(createDate time.Time) Object {
@@ -27,7 +28,7 @@ func (a Answer) SetCreateDate(createDate time.Time) Object {
 	return a
 }
 
-func (a Answer) SetId(objectId bson.Binary) Object {
+func (a Answer) SetId(objectId string) Object {
 	a.ID = objectId
 	return a
 }
@@ -35,13 +36,11 @@ func (a Answer) SetId(objectId bson.Binary) Object {
 func (a Answer) MarshalJSON() ([]byte, error) {
 	type Alias Answer
 	return json.Marshal(&struct {
-		ID         string `json:"id"`
 		CreateDate string `json:"create_date"`
 		Alias
 	}{
-		ID:         IdAsString(a.ID),
 		CreateDate: dateFormat(a.CreateDate),
-		Alias:      (Alias)(a),
+		Alias:      Alias(a),
 	})
 }
 
