@@ -46,8 +46,8 @@ type Env struct {
 //
 // For example, indirectly-set fields (such as models.Question's
 // RoundsUsed) are not able to be set in the create/update endpoints
-// for that data type (instead, that RoundsUsed field is updated when
-// that particular question is added to a models.Round)
+// for that data type (instead, that RoundsUsed field is derived from
+// the question's round_question membership rows)
 type InvalidDataError interface {
 	Field() string
 	Data() interface{}
@@ -138,14 +138,6 @@ func boolToInt(b bool) int {
 	return 0
 }
 
-// emptyStrings returns a non-nil slice so it marshals as '[]', not 'null'.
-func emptyStrings(s []string) []string {
-	if s == nil {
-		return make([]string, 0)
-	}
-	return s
-}
-
 // stringValue converts a Push/Pull value (a plain string or a defined
 // string type such as models.PlayerId) to a string.
 func stringValue(v interface{}) string {
@@ -207,25 +199,48 @@ func GetOne(e *Env, objectType string, objectId string, model models.Object) err
 
 func scanQuestion(s rowScanner) (models.Question, error) {
 	var m models.Question
-	var createDate, roundsUsed string
-	err := s.Scan(&m.ID, &createDate, &m.Category, &m.Question, &m.Answer, &m.UserId, &m.ScoringNote, &roundsUsed)
+	var createDate string
+	err := s.Scan(&m.ID, &createDate, &m.Category, &m.Question, &m.Answer, &m.UserId, &m.ScoringNote)
 	if err != nil {
 		return m, err
 	}
 	m.CreateDate = ParseTime(createDate)
 	m.RoundsUsed = make([]string, 0)
-	_ = json.Unmarshal([]byte(roundsUsed), &m.RoundsUsed)
 	return m, nil
 }
 
+// loadQuestionRoundsUsed fills a question's derived RoundsUsed from the
+// round_question join table — the rounds_used JSON mirror is gone (migration
+// 4, ticket #83). Same pattern as loadRound deriving Round.Games from
+// game_round.
+func loadQuestionRoundsUsed(db *sql.DB, m *models.Question) error {
+	m.RoundsUsed = make([]string, 0)
+	rows, err := db.Query(`SELECT round_id FROM round_question WHERE question_id = ? ORDER BY position`, m.ID)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var roundId string
+		if err := rows.Scan(&roundId); err != nil {
+			return err
+		}
+		m.RoundsUsed = append(m.RoundsUsed, roundId)
+	}
+	return rows.Err()
+}
+
 func getQuestion(db *sql.DB, id string, m *models.Question) error {
-	row := db.QueryRow(`SELECT id, create_date, category, question, answer, user_id, scoring_note, rounds_used
+	row := db.QueryRow(`SELECT id, create_date, category, question, answer, user_id, scoring_note
 		FROM question WHERE id = ?`, id)
 	got, err := scanQuestion(row)
 	if errors.Is(err, sql.ErrNoRows) {
 		return NonexistentIdError{RecordType: QuestionTable, ID: id}
 	}
 	if err != nil {
+		return err
+	}
+	if err := loadQuestionRoundsUsed(db, &got); err != nil {
 		return err
 	}
 	*m = got
@@ -643,13 +658,9 @@ func Create(e *Env, objectType string, data models.Object) (string, time.Time, e
 }
 
 func insertQuestion(db *sql.DB, m models.Question) error {
-	roundsUsed, err := json.Marshal(emptyStrings(m.RoundsUsed))
-	if err != nil {
-		return err
-	}
-	_, err = db.Exec(`INSERT INTO question (id, create_date, category, question, answer, user_id, scoring_note, rounds_used)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-		m.ID, formatTime(m.CreateDate), m.Category, m.Question, m.Answer, m.UserId, m.ScoringNote, string(roundsUsed))
+	_, err := db.Exec(`INSERT INTO question (id, create_date, category, question, answer, user_id, scoring_note)
+		VALUES (?, ?, ?, ?, ?, ?, ?)`,
+		m.ID, formatTime(m.CreateDate), m.Category, m.Question, m.Answer, m.UserId, m.ScoringNote)
 	return err
 }
 
@@ -804,13 +815,9 @@ func rowsAffected(res sql.Result, err error, objectType string, objectId string)
 }
 
 func updateQuestion(db *sql.DB, id string, m models.Question) error {
-	roundsUsed, err := json.Marshal(emptyStrings(m.RoundsUsed))
-	if err != nil {
-		return err
-	}
 	res, err := db.Exec(`UPDATE question SET category = ?, question = ?, answer = ?, user_id = ?,
-		scoring_note = ?, rounds_used = ? WHERE id = ?`,
-		m.Category, m.Question, m.Answer, m.UserId, m.ScoringNote, string(roundsUsed), id)
+		scoring_note = ? WHERE id = ?`,
+		m.Category, m.Question, m.Answer, m.UserId, m.ScoringNote, id)
 	return rowsAffected(res, err, QuestionTable, id)
 }
 
@@ -976,11 +983,6 @@ func Push(e *Env, objectType string, objectId string, array string, value interf
 	valueString := stringValue(value)
 
 	switch {
-	case objectType == QuestionTable && array == models.RoundsUsed:
-		return mutateQuestionRoundsUsed(e.Db, objectId, func(rounds []string) []string {
-			return append(rounds, valueString)
-		})
-
 	case objectType == RoundTable && array == models.Questions:
 		return insertJoin(e.Db, "round_question", "round_id", "question_id", objectId, valueString)
 
@@ -1006,11 +1008,6 @@ func Pull(e *Env, objectType string, objectId string, array string, value interf
 	valueString := stringValue(value)
 
 	switch {
-	case objectType == QuestionTable && array == models.RoundsUsed:
-		return mutateQuestionRoundsUsed(e.Db, objectId, func(rounds []string) []string {
-			return removeString(rounds, valueString)
-		})
-
 	case objectType == RoundTable && array == models.Questions:
 		return deleteJoin(e.Db, "round_question", "round_id", "question_id", objectId, valueString)
 
@@ -1029,16 +1026,6 @@ func Pull(e *Env, objectType string, objectId string, array string, value interf
 	default:
 		return errors.New("invalid pull: " + objectType + "." + array)
 	}
-}
-
-func removeString(s []string, target string) []string {
-	out := make([]string, 0, len(s))
-	for _, v := range s {
-		if v != target {
-			out = append(out, v)
-		}
-	}
-	return out
 }
 
 // Queryer is the subset of *sql.DB / *sql.Tx / *sql.Conn used by the
@@ -1083,34 +1070,6 @@ func WithWriteTx(db *sql.DB, fn func(q Queryer) error) error {
 	return nil
 }
 
-// mutateQuestionRoundsUsed reads a question's rounds_used JSON array, applies
-// mutate, and writes it back — atomically, so concurrent pushes/pulls (e.g.
-// two rounds adopting the same question) cannot lose an update.
-func mutateQuestionRoundsUsed(db *sql.DB, id string, mutate func([]string) []string) error {
-	return WithWriteTx(db, func(q Queryer) error {
-		ctx := context.Background()
-		var roundsUsed string
-		err := q.QueryRowContext(ctx, `SELECT rounds_used FROM question WHERE id = ?`, id).Scan(&roundsUsed)
-		if err != nil {
-			if errors.Is(err, sql.ErrNoRows) {
-				return NonexistentIdError{RecordType: QuestionTable, ID: id}
-			}
-			return err
-		}
-		rounds := make([]string, 0)
-		_ = json.Unmarshal([]byte(roundsUsed), &rounds)
-		updated, err := json.Marshal(mutate(rounds))
-		if err != nil {
-			return err
-		}
-		res, err := q.ExecContext(ctx, `UPDATE question SET rounds_used = ? WHERE id = ?`, string(updated), id)
-		if err != nil {
-			return err
-		}
-		return rowsAffected(res, nil, QuestionTable, id)
-	})
-}
-
 // GetAll records of a certain type
 //
 // args:
@@ -1123,7 +1082,7 @@ func GetAll(e *Env, objectType string, filters interface{}) (interface{}, error)
 
 	switch objectType {
 	case QuestionTable:
-		rows, err := e.Db.Query(`SELECT id, create_date, category, question, answer, user_id, scoring_note, rounds_used
+		rows, err := e.Db.Query(`SELECT id, create_date, category, question, answer, user_id, scoring_note
 			FROM question`+where+` ORDER BY create_date`, args...)
 		if err != nil {
 			return nil, err
@@ -1133,6 +1092,9 @@ func GetAll(e *Env, objectType string, filters interface{}) (interface{}, error)
 		for rows.Next() {
 			m, err := scanQuestion(rows)
 			if err != nil {
+				return nil, err
+			}
+			if err := loadQuestionRoundsUsed(e.Db, &m); err != nil {
 				return nil, err
 			}
 			slice = append(slice, &m)
@@ -1371,10 +1333,11 @@ func buildWhere(table string, filters interface{}) (string, []interface{}) {
 					continue
 				}
 				if exists, ok := m["$exists"].(bool); ok && !exists {
-					// unused_only: rounds_used is a JSON column; games lives in
-					// the game_round join table.
+					// unused_only: membership lives in the join tables, so a
+					// question (or round) is unused when it has no rows there.
 					if k == models.RoundsUsed+".0" {
-						add("rounds_used = ?", "[]")
+						clauses = append(clauses,
+							"NOT EXISTS (SELECT 1 FROM round_question WHERE round_question.question_id = question.id)")
 					} else if k == models.Games+".0" {
 						clauses = append(clauses,
 							"NOT EXISTS (SELECT 1 FROM game_round WHERE game_round.round_id = round.id)")

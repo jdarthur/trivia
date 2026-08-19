@@ -165,7 +165,7 @@ func (e *Env) DeleteGame(c *gin.Context) {
 	}
 
 	for _, roundId := range existingGame.Rounds {
-		//append roundId to question's rounds_used
+		//append gameId to round's games
 		fmt.Println("remove game ID " + gameId + " from round " + roundId)
 		err = common.Pull((*common.Env)(e), common.RoundTable, roundId, models.Games, gameId)
 		if err != nil {
@@ -267,7 +267,7 @@ func (e *Env) merge(update *models.Game, original *models.Game) error {
 func (e *Env) updateGamesInRounds(newRoundIds []string, original *models.Game) error {
 	gameId := original.ID
 
-	//add this round_id to newly-added question's rounds_used
+	//add this game_id to newly-added round's games
 	for _, updateId := range newRoundIds {
 		if !roundInGame(updateId, original.Rounds) {
 			original.Rounds = append(original.Rounds, updateId)
