@@ -216,6 +216,16 @@ func CreateOneQuestion(e *Env, userId string, data models.Question) (models.Ques
 		return models.Question{}, AttemptedToSetRoundsUsedError{RoundsUsed: data.RoundsUsed}
 	}
 
+	// scoring_note must reference a note this user owns; the FK on
+	// question.scoring_note_id enforces existence, this check keeps the
+	// ownership rule and surfaces a clean NonexistentIdError (same as update).
+	if data.ScoringNote != "" {
+		_, err := GetOneScoringNote(e, userId, data.ScoringNote)
+		if err != nil {
+			return models.Question{}, err
+		}
+	}
+
 	id, createDate, err := common.Create((*common.Env)(e), common.QuestionTable, &data)
 	if err != nil {
 		return models.Question{}, err

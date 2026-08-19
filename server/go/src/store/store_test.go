@@ -36,8 +36,8 @@ func TestMigrateCreatesBaselineSchema(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Version: %v", err)
 	}
-	if v != 5 {
-		t.Fatalf("user_version = %d, want 5", v)
+	if v != 6 {
+		t.Fatalf("user_version = %d, want 6", v)
 	}
 
 	tables := []string{
@@ -114,6 +114,89 @@ func TestMigrateDropsPlayerSessionId(t *testing.T) {
 	}
 }
 
+func TestMigrateScoringNoteForeignKey(t *testing.T) {
+	db, err := Open(filepath.Join(t.TempDir(), "trivia.db"))
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+	t.Cleanup(func() { db.Close() })
+
+	// Migration 6 (ticket #85) turns question.scoring_note into the enforced
+	// scoring_note_id FK. Migrate to version 5 first and seed both a valid
+	// reference and a dangling one (possible only because the old column had
+	// no REFERENCES clause).
+	var m6 migration
+	for _, m := range migrations {
+		if m.version == 6 {
+			m6 = m
+			break
+		}
+		if err := apply(db, m); err != nil {
+			t.Fatalf("apply migration %d: %v", m.version, err)
+		}
+	}
+
+	mustExec(t, db, "INSERT INTO scoring_note (id, user_id, create_date, last_used, name, description) VALUES ('n1', '', '2026-01-01T00:00:00.000000', '', 'name', 'desc')")
+	mustExec(t, db, "INSERT INTO question (id, create_date, category, question, answer, user_id, scoring_note) VALUES ('q1', '2026-01-01T00:00:00.000000', '', 'q1', '', '', 'n1')")
+	mustExec(t, db, "INSERT INTO question (id, create_date, category, question, answer, user_id, scoring_note) VALUES ('q2', '2026-01-01T00:00:00.000000', '', 'q2', '', '', 'missing')")
+
+	if err := apply(db, m6); err != nil {
+		t.Fatalf("apply migration 6: %v", err)
+	}
+
+	// valid reference copied across, dangling reference nulled rather than
+	// failing the migration
+	var got sql.NullString
+	if err := db.QueryRow("SELECT scoring_note_id FROM question WHERE id = 'q1'").Scan(&got); err != nil {
+		t.Fatalf("read q1 scoring_note_id: %v", err)
+	}
+	if !got.Valid || got.String != "n1" {
+		t.Errorf("q1 scoring_note_id = %+v, want 'n1'", got)
+	}
+	if err := db.QueryRow("SELECT scoring_note_id FROM question WHERE id = 'q2'").Scan(&got); err != nil {
+		t.Fatalf("read q2 scoring_note_id: %v", err)
+	}
+	if got.Valid {
+		t.Errorf("q2 scoring_note_id = %q, want NULL (dangling reference nulled)", got.String)
+	}
+
+	// the old column is gone
+	rows, err := db.Query("PRAGMA table_info(question)")
+	if err != nil {
+		t.Fatalf("query table_info: %v", err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var cid int
+		var name, typ string
+		var notnull, pk int
+		var dflt interface{}
+		if err := rows.Scan(&cid, &name, &typ, &notnull, &dflt, &pk); err != nil {
+			t.Fatalf("scan table_info row: %v", err)
+		}
+		if name == "scoring_note" {
+			t.Error("question.scoring_note column still present after migration")
+		}
+	}
+	if err := rows.Err(); err != nil {
+		t.Fatalf("iterate table_info: %v", err)
+	}
+
+	// FK enforced: a question referencing an unknown note is rejected
+	if _, err := db.Exec("INSERT INTO question (id, create_date, scoring_note_id) VALUES ('q3', '2026-01-01T00:00:00.000000', 'nope')"); err == nil {
+		t.Error("expected FK violation inserting question with unknown scoring_note_id")
+	}
+
+	// ON DELETE SET NULL: deleting the note clears referencing questions
+	mustExec(t, db, "DELETE FROM scoring_note WHERE id = 'n1'")
+	if err := db.QueryRow("SELECT scoring_note_id FROM question WHERE id = 'q1'").Scan(&got); err != nil {
+		t.Fatalf("read q1 scoring_note_id after note delete: %v", err)
+	}
+	if got.Valid {
+		t.Errorf("q1 scoring_note_id = %q after note delete, want NULL", got.String)
+	}
+}
+
 func TestMigrateIsIdempotent(t *testing.T) {
 	db := openTestDB(t)
 
@@ -124,8 +207,8 @@ func TestMigrateIsIdempotent(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Version: %v", err)
 	}
-	if v != 5 {
-		t.Fatalf("user_version = %d after re-migrate, want 5", v)
+	if v != 6 {
+		t.Fatalf("user_version = %d after re-migrate, want 6", v)
 	}
 }
 
