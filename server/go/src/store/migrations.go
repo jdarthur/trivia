@@ -266,6 +266,22 @@ var migrations = []migration{
 			`ALTER TABLE question DROP COLUMN scoring_note`,
 		},
 	},
+	{
+		version: 7,
+		name:    "user table",
+		statements: []string{
+			// ticket #102: the editor's auth is Auth0 (sub from the token),
+			// but dev mode authenticates mock users whose identity lives here.
+			// sub is the Auth0 subject / dev-mode "dev|<username>" identifier.
+			`CREATE TABLE user (
+				sub          TEXT PRIMARY KEY,
+				username     TEXT NOT NULL DEFAULT '',
+				display_name TEXT NOT NULL DEFAULT '',
+				create_date  TEXT NOT NULL,
+				avatar_url   TEXT NOT NULL DEFAULT ''
+			)`,
+		},
+	},
 }
 
 // Migrate brings db up to the latest schema version, applying each pending
