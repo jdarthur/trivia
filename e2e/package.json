@@ -1,0 +1,13 @@
+{
+  "name": "e2e",
+  "version": "1.0.0",
+  "description": "End-to-end tests for the trivia app (Playwright). Kept separate from client/ so the client dependency and blocking-`npm audit` surface is untouched.",
+  "private": true,
+  "scripts": {
+    "test": "playwright test"
+  },
+  "license": "ISC",
+  "devDependencies": {
+    "@playwright/test": "^1.62.1"
+  }
+}

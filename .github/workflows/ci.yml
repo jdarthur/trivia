@@ -78,3 +78,52 @@ jobs:
       # time one appears. Loosen to --audit-level=high if that stops being true.
       - name: Audit
         run: npm audit
+
+  e2e:
+    name: E2E (Playwright)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: e2e
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: e2e/package-lock.json
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: stable
+          cache-dependency-path: server/go/src/go.sum
+
+      - name: Install e2e deps
+        run: npm ci
+
+      # Deliberately strict, matching the client: any npm audit finding (even a
+      # low in a dev-only transitive dependency) blocks the merge. The e2e
+      # package is kept separate from client/ precisely so its surface is
+      # isolated; the same stance applies here.
+      - name: Audit
+        run: npm audit
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      # The webServer config builds the client and boots the Go API against a
+      # temp SQLite DB, so the test command alone drives the whole harness.
+      - name: Run e2e tests
+        run: npx playwright test
+
+      - name: Upload results on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-test-results
+          path: |
+            test-results/
+            playwright-report/
+          retention-days: 7

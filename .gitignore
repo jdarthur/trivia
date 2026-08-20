@@ -1,6 +1,9 @@
 # Node
 client/node_modules/
 client/build
+e2e/node_modules/
+e2e/test-results/
+e2e/playwright-report/
 
 # Local config and certs
 client/.env
