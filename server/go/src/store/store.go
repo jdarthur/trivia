@@ -18,6 +18,11 @@ import (
 // IMAGE_DIR it is relative to the working directory.
 const DefaultDBPath = "./data/trivia.db"
 
+// DefaultDevDBPath is the database file used when the API runs with --dev-mode
+// and DB_PATH is not set. It is a scratch database — safe to delete, and never
+// the standard trivia.db.
+const DefaultDevDBPath = "./data/trivia-dev.db"
+
 // DBPath returns the SQLite database path from the DB_PATH environment
 // variable, falling back to DefaultDBPath when unset.
 func DBPath() string {

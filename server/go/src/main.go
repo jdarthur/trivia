@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/jdarthur/trivia/collections"
@@ -18,12 +19,24 @@ import (
 
 func main() {
 
+	// Dev mode must be enabled explicitly with --dev-mode. It runs against a
+	// transient SQLite database, seeds mock users, skips the Auth0 JWKS fetch
+	// (which hard-fails offline), and accepts unsigned mock JWTs. It is never
+	// turned on silently via the environment.
+	devMode := flag.Bool("dev-mode", false, "run against a transient SQLite DB with seeded mock users and no Auth0 verification")
+	flag.Parse()
+
 	err := godotenv.Load()
 	if err != nil {
 		fmt.Println("Unable to load .env")
 	}
 
-	db, err := store.OpenDefault()
+	// Dev mode uses a scratch database file, distinct from the standard one.
+	var dbPath = store.DBPath()
+	if *devMode {
+		dbPath = store.DefaultDevDBPath
+	}
+	db, err := store.Open(dbPath)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -33,12 +46,21 @@ func main() {
 		log.Fatal(err)
 	}
 
-	err = common.LoadCerts()
-	if err != nil {
-		log.Fatal(err)
+	if *devMode {
+		common.DevMode = true
+		fmt.Println("\nWARNING: running in dev mode, Auth0 verification disabled")
+		fmt.Printf("dev database: %s (scratch file, safe to delete)\n", dbPath)
+		if err = store.SeedUsers(db); err != nil {
+			log.Fatal(err)
+		}
+		fmt.Printf("seeded %d mock user(s)\n", len(store.MockUsers))
+	} else {
+		err = common.LoadCerts()
+		if err != nil {
+			log.Fatal(err)
+		}
+		fmt.Printf("loaded %d Auth0 signing key(s)\n", len(common.JwtKeys.Keys))
 	}
-
-	fmt.Printf("loaded %d Auth0 signing key(s)\n", len(common.JwtKeys.Keys))
 
 	imageDir := os.Getenv("IMAGE_DIR")
 	if len(imageDir) == 0 {

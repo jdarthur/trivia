@@ -1,6 +1,7 @@
 package common
 
 import (
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -35,6 +36,12 @@ func (e MissingTokenError) Error() string {
 }
 
 var USER_ID = "userId"
+
+// DevMode gates acceptance of unsigned mock JWTs. It is set only by the API's
+// --dev-mode flag (main.go); default builds leave it false and behave exactly
+// as before. When true, AsUser additionally accepts an unsigned token whose
+// `sub` names a seeded dev-mode user.
+var DevMode = false
 
 var auth0Domain = "https://borttrivia.us.auth0.com/"
 var audience = "https://borttrivia.com/editor"
@@ -193,10 +200,64 @@ func DecodeToken(jwtToken string) (jwt.MapClaims, error) {
 	return claims, nil
 }
 
+// decodeDevToken accepts an unsigned mock JWT in dev mode. It is deliberately
+// separate from DecodeToken: the normal RS256/aud/iss verification path is left
+// completely untouched, and this unsigned path is reachable only when DevMode
+// is true. The token's `sub` must name a user present in the user table.
+func decodeDevToken(jwtToken string, db *sql.DB) (jwt.MapClaims, error) {
+	// alg "none" means the token carries no signature. golang-jwt requires the
+	// keyfunc to return jwt.UnsafeAllowNoneSignatureType as the key to authorize
+	// the none algorithm (passing it as a ParserOption is a compile error).
+	token, err := jwt.Parse(jwtToken, func(t *jwt.Token) (interface{}, error) {
+		return jwt.UnsafeAllowNoneSignatureType, nil
+	},
+		jwt.WithValidMethods([]string{"none"}),
+		// WithoutClaimsValidation skips the time-based checks (exp/iat) so we
+		// can enforce exp ourselves below.
+		jwt.WithoutClaimsValidation(),
+	)
+	if err != nil {
+		return nil, InvalidTokenError{Token: jwtToken}
+	}
+
+	claims, ok := token.Claims.(jwt.MapClaims)
+	if !ok {
+		return nil, InvalidTokenError{Token: jwtToken}
+	}
+
+	sub, ok := claims["sub"].(string)
+	if !ok || sub == "" {
+		return nil, InvalidUserError{UserId: ""}
+	}
+
+	// Require a future exp so a mock token doesn't live forever. The client
+	// embeds one; a missing or already-expired token is rejected.
+	exp, ok := claims["exp"].(float64)
+	if !ok || time.Now().Add(-maxClockSkew).After(time.Unix(int64(exp), 0)) {
+		return nil, InvalidTokenError{Token: jwtToken}
+	}
+
+	var n int
+	if err := db.QueryRow("SELECT count(*) FROM user WHERE sub = ?", sub).Scan(&n); err != nil {
+		return nil, InvalidTokenError{Token: jwtToken}
+	}
+	if n == 0 {
+		return nil, InvalidUserError{UserId: sub}
+	}
+
+	return claims, nil
+}
+
 func (e *Env) AsUser(c *gin.Context) {
 	tokenValue := c.GetHeader("borttrivia-token")
 	if tokenValue != "" {
-		token, err := DecodeToken(tokenValue)
+		var token jwt.MapClaims
+		var err error
+		if DevMode {
+			token, err = decodeDevToken(tokenValue, e.Db)
+		} else {
+			token, err = DecodeToken(tokenValue)
+		}
 		if err != nil {
 			Respond(c, nil, err)
 			c.Abort()
