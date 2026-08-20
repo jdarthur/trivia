@@ -151,6 +151,16 @@ func stringValue(v interface{}) string {
 	return fmt.Sprintf("%v", v)
 }
 
+// nilIfEmpty maps an empty string to NULL. question.scoring_note_id is a
+// nullable FK column (ticket #85) where NULL — not '' — is the "no note"
+// sentinel; the API wire format keeps the historical empty string.
+func nilIfEmpty(s string) interface{} {
+	if s == "" {
+		return nil
+	}
+	return s
+}
+
 // deref returns the value behind any pointer chain.
 func deref(data interface{}) interface{} {
 	v := reflect.ValueOf(data)
@@ -200,12 +210,18 @@ func GetOne(e *Env, objectType string, objectId string, model models.Object) err
 func scanQuestion(s rowScanner) (models.Question, error) {
 	var m models.Question
 	var createDate string
-	err := s.Scan(&m.ID, &createDate, &m.Category, &m.Question, &m.Answer, &m.UserId, &m.ScoringNote)
+	var scoringNoteId sql.NullString
+	err := s.Scan(&m.ID, &createDate, &m.Category, &m.Question, &m.Answer, &m.UserId, &scoringNoteId)
 	if err != nil {
 		return m, err
 	}
 	m.CreateDate = ParseTime(createDate)
 	m.RoundsUsed = make([]string, 0)
+	// scoring_note_id is a nullable FK column; NULL surfaces as the
+	// wire-format empty string.
+	if scoringNoteId.Valid {
+		m.ScoringNote = scoringNoteId.String
+	}
 	return m, nil
 }
 
@@ -231,7 +247,7 @@ func loadQuestionRoundsUsed(db *sql.DB, m *models.Question) error {
 }
 
 func getQuestion(db *sql.DB, id string, m *models.Question) error {
-	row := db.QueryRow(`SELECT id, create_date, category, question, answer, user_id, scoring_note
+	row := db.QueryRow(`SELECT id, create_date, category, question, answer, user_id, scoring_note_id
 		FROM question WHERE id = ?`, id)
 	got, err := scanQuestion(row)
 	if errors.Is(err, sql.ErrNoRows) {
@@ -658,9 +674,9 @@ func Create(e *Env, objectType string, data models.Object) (string, time.Time, e
 }
 
 func insertQuestion(db *sql.DB, m models.Question) error {
-	_, err := db.Exec(`INSERT INTO question (id, create_date, category, question, answer, user_id, scoring_note)
+	_, err := db.Exec(`INSERT INTO question (id, create_date, category, question, answer, user_id, scoring_note_id)
 		VALUES (?, ?, ?, ?, ?, ?, ?)`,
-		m.ID, formatTime(m.CreateDate), m.Category, m.Question, m.Answer, m.UserId, m.ScoringNote)
+		m.ID, formatTime(m.CreateDate), m.Category, m.Question, m.Answer, m.UserId, nilIfEmpty(m.ScoringNote))
 	return err
 }
 
@@ -816,8 +832,8 @@ func rowsAffected(res sql.Result, err error, objectType string, objectId string)
 
 func updateQuestion(db *sql.DB, id string, m models.Question) error {
 	res, err := db.Exec(`UPDATE question SET category = ?, question = ?, answer = ?, user_id = ?,
-		scoring_note = ? WHERE id = ?`,
-		m.Category, m.Question, m.Answer, m.UserId, m.ScoringNote, id)
+		scoring_note_id = ? WHERE id = ?`,
+		m.Category, m.Question, m.Answer, m.UserId, nilIfEmpty(m.ScoringNote), id)
 	return rowsAffected(res, err, QuestionTable, id)
 }
 
@@ -1082,7 +1098,7 @@ func GetAll(e *Env, objectType string, filters interface{}) (interface{}, error)
 
 	switch objectType {
 	case QuestionTable:
-		rows, err := e.Db.Query(`SELECT id, create_date, category, question, answer, user_id, scoring_note
+		rows, err := e.Db.Query(`SELECT id, create_date, category, question, answer, user_id, scoring_note_id
 			FROM question`+where+` ORDER BY create_date`, args...)
 		if err != nil {
 			return nil, err

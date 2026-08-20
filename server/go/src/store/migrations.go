@@ -242,6 +242,30 @@ var migrations = []migration{
 			`ALTER TABLE player DROP COLUMN session_id`,
 		},
 	},
+	{
+		version: 6,
+		name:    "question scoring_note foreign key",
+		statements: []string{
+			// ticket #85: question.scoring_note held a scoring_note UUID with
+			// no REFERENCES clause, so a question could point at a missing or
+			// deleted note and cleanup depended on an app-side scan in
+			// DeleteScoringNote. Rename the column to scoring_note_id and
+			// enforce the reference.
+			//
+			// The column stays nullable: NULL (not '') is the "no note"
+			// sentinel, and ON DELETE SET NULL clears the reference when a
+			// note is deleted — matching the old app-side clearing, atomically.
+			// Dangling references that predate the constraint are nulled
+			// rather than failing the migration.
+			//
+			// The API wire format keeps the historical field name
+			// "scoring_note"; only the column is renamed.
+			`ALTER TABLE question ADD COLUMN scoring_note_id TEXT REFERENCES scoring_note(id) ON DELETE SET NULL`,
+			`UPDATE question SET scoring_note_id = scoring_note
+				WHERE scoring_note != '' AND scoring_note IN (SELECT id FROM scoring_note)`,
+			`ALTER TABLE question DROP COLUMN scoring_note`,
+		},
+	},
 }
 
 // Migrate brings db up to the latest schema version, applying each pending

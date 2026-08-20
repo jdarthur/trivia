@@ -92,21 +92,13 @@ func DeleteScoringNote(e *Env, userId, noteId string) (models.ScoringNote, error
 		return note, err
 	}
 
+	// question.scoring_note_id references scoring_note(id) ON DELETE SET NULL
+	// (ticket #85), so deleting the note atomically clears the reference on
+	// every question that used it — the app-side scan this method used to do
+	// is no longer needed.
 	err = common.Delete((*common.Env)(e), common.ScoringNoteTable, noteId)
 	if err != nil {
 		return models.ScoringNote{}, err
-	}
-
-	questions, err := GetAllQuestions(e, userId)
-	for _, question := range questions {
-		if question.ScoringNote == noteId {
-
-			question.ScoringNote = ""
-			_, err = UpdateOneQuestion(e, userId, question.ID, *question)
-			if err != nil {
-				return models.ScoringNote{}, err
-			}
-		}
 	}
 
 	return note, nil

@@ -294,6 +294,27 @@ func TestClearScoringNoteOnDelete(t *testing.T) {
 	}
 }
 
+func TestCreateQuestionWithUnknownScoringNoteFails(t *testing.T) {
+	conn := GetDb()
+	env := &questions.Env{Db: conn}
+
+	userId := "test"
+
+	// question.scoring_note_id is a real FK (ticket #85): referencing a note
+	// that does not exist must fail on create.
+	question := models.Question{
+		Category:    "test category",
+		Question:    "test question",
+		Answer:      "answer111",
+		UserId:      userId,
+		ScoringNote: "missing-note-id",
+	}
+
+	if _, err := questions.CreateOneQuestion(env, userId, question); err == nil {
+		t.Error("Expected error when creating a question with an unknown scoring note ID")
+	}
+}
+
 func deleteAllNotes(e *questions.Env, userId string) error {
 	notes, err := questions.GetAllScoringNotes(e, userId)
 	if err != nil {
