@@ -1,10 +1,8 @@
 import { defineConfig, devices } from '@playwright/test';
-import * as os from 'os';
 import * as path from 'path';
 
 const repoRoot = path.resolve(__dirname, '..');
 const clientBuildDir = path.join(repoRoot, 'client', 'build');
-const dbPath = path.join(os.tmpdir(), 'trivia-e2e.db');
 
 export default defineConfig({
   testDir: './tests',
@@ -19,18 +17,19 @@ export default defineConfig({
     trace: 'on-first-retry',
   },
   // Same single-server topology as deployment (no proxy): build the client, then
-  // boot the Go API which serves the built client itself via static.go. DB_PATH
-  // points at a temp SQLite file and CLIENT_DIR at the built client.
+  // boot the Go API which serves the built client itself via static.go. We run in
+  // --dev-mode so the server uses a scratch SQLite DB (data/trivia-dev.db) and
+  // skips the Auth0 JWKS fetch — which hard-fails offline and would otherwise make
+  // the harness depend on Auth0 reachability. CLIENT_DIR points at the built client.
   webServer: {
     command:
-      'cd client && npm ci && npm run build && cd ../server/go/src && rm -f "$DB_PATH" && go run .',
+      'cd client && npm ci && npm run build && cd ../server/go/src && rm -f data/trivia-dev.db && go run . --dev-mode',
     cwd: repoRoot,
     url: 'http://localhost:8080/',
     timeout: 180000,
     reuseExistingServer: !process.env.CI,
     env: {
       ...process.env,
-      DB_PATH: dbPath,
       CLIENT_DIR: clientBuildDir,
       PORT: '8080',
     },
