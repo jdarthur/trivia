@@ -21,6 +21,7 @@ import {HistoryRouter} from "redux-first-history/rr6";
 import {history} from "../api/store";
 import AuthRequired from "./AuthRequired";
 import {AUDIENCE, SCOPE} from "./authConfig";
+import {buildMockToken, getMockUserName} from "./mockUser";
 
 const {Content, Header} = Layout;
 const {SubMenu} = Menu;
@@ -46,6 +47,17 @@ export default function App() {
     }, []);
 
     useEffect(() => {
+        // Mock mode: a ?mockUser=<name> URL param logs in as a seeded dev-mode
+        // user without Auth0. Build an unsigned token for the dev backend and
+        // skip the Auth0 token fetch entirely.
+        const mockUser = getMockUserName();
+        if (mockUser) {
+            const authToken = buildMockToken(mockUser);
+            setToken(authToken);
+            dispatch(setAuthToken({authToken}));
+            return
+        }
+
         // Wait for the SDK to finish handling the redirect callback, otherwise
         // we ask for a token before there is a session to get one from.
         if (authIsLoading) {

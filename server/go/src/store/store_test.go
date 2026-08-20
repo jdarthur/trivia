@@ -36,8 +36,8 @@ func TestMigrateCreatesBaselineSchema(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Version: %v", err)
 	}
-	if v != 6 {
-		t.Fatalf("user_version = %d, want 6", v)
+	if v != 7 {
+		t.Fatalf("user_version = %d, want 7", v)
 	}
 
 	tables := []string{
@@ -46,6 +46,7 @@ func TestMigrateCreatesBaselineSchema(t *testing.T) {
 		"collection", "collection_question",
 		"scoring_note", "player", "session", "session_player",
 		"session_question", "answer", "session_score", "session_state",
+		"user",
 	}
 	for _, name := range tables {
 		var n int
@@ -197,6 +198,39 @@ func TestMigrateScoringNoteForeignKey(t *testing.T) {
 	}
 }
 
+func TestSeedUsers(t *testing.T) {
+	db := openTestDB(t)
+
+	if err := SeedUsers(db); err != nil {
+		t.Fatalf("SeedUsers: %v", err)
+	}
+
+	// every mock user is present with its sub and display name
+	for _, u := range MockUsers {
+		var displayName string
+		if err := db.QueryRow(
+			"SELECT display_name FROM user WHERE sub = ?", u.Sub,
+		).Scan(&displayName); err != nil {
+			t.Fatalf("read seeded user %s: %v", u.Sub, err)
+		}
+		if displayName != u.DisplayName {
+			t.Errorf("user %s display_name = %q, want %q", u.Sub, displayName, u.DisplayName)
+		}
+	}
+
+	// idempotent: re-running is a no-op and doesn't duplicate rows
+	if err := SeedUsers(db); err != nil {
+		t.Fatalf("second SeedUsers: %v", err)
+	}
+	var n int
+	if err := db.QueryRow("SELECT count(*) FROM user").Scan(&n); err != nil {
+		t.Fatalf("count user: %v", err)
+	}
+	if n != len(MockUsers) {
+		t.Errorf("user rows = %d after re-seed, want %d", n, len(MockUsers))
+	}
+}
+
 func TestMigrateIsIdempotent(t *testing.T) {
 	db := openTestDB(t)
 
@@ -207,8 +241,8 @@ func TestMigrateIsIdempotent(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Version: %v", err)
 	}
-	if v != 6 {
-		t.Fatalf("user_version = %d after re-migrate, want 6", v)
+	if v != 7 {
+		t.Fatalf("user_version = %d after re-migrate, want 7", v)
 	}
 }
 

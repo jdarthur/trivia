@@ -70,6 +70,41 @@ separately.
 `npm start` serves over HTTPS using the certificate in `client/cert/`, which is
 self-signed — expect a browser warning on first load.
 
+### Dev mode: mock login without Auth0
+
+The editor normally signs in through Auth0. For local work without an Auth0
+tenant, the API has a `--dev-mode` flag that runs against a **transient**
+SQLite database (default `data/trivia-dev.db`, distinct from the real
+`trivia.db`), seeds mock users, skips the Auth0 JWKS fetch, and accepts
+unsigned mock JWTs:
+
+```sh
+cd server/go/src
+go run . --dev-mode
+```
+
+It prints a loud `WARNING: running in dev mode, Auth0 verification disabled`
+banner on boot. The dev database is a scratch file — safe to delete, and it
+never touches the standard `trivia.db`.
+
+The seeded mock users are `alice`, `bob`, `carol`, and `dave` (subs
+`dev|alice`, `dev|bob`, `dev|carol`, `dev|dave`). Log in as one by adding a
+`?mockUser=<name>` query param to the editor URL:
+
+```
+https://localhost:3000/questions?mockUser=alice
+```
+
+The client skips Auth0, embeds `dev|<name>` and a future `exp` in an unsigned
+JWT, and sends it on the normal `borttrivia-token` header. The mock avatar is a
+placeholder; logging out just drops the token and the `?mockUser` param — there
+is no Auth0 redirect.
+
+**Security guardrail:** the server only accepts unsigned tokens when started
+with `--dev-mode` (the `alg:none` path is gated behind the `--dev-mode` flag),
+and only for `sub`s that exist in the seeded `user` table. A production build
+never enables dev mode, so `?mockUser` is inert against a real backend.
+
 ### Deployment: one server
 
 The API can serve the built client itself, so there is no separate node process

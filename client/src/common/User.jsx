@@ -3,15 +3,18 @@ import React from "react";
 import {Popover} from 'antd'
 import LogoutButton from "./Logout2";
 import {useAuth0} from "@auth0/auth0-react";
+import {MOCK_AVATAR, isMockMode} from "./mockUser";
 
 
-const User = () => {
+const User = ({mockName}) => {
 
     const {user} = useAuth0();
-    const {name, picture} = user;
+    const isMock = isMockMode();
+    const name = isMock ? mockName : user?.name;
+    const picture = isMock ? MOCK_AVATAR : user?.picture;
 
     const content = <div style={{display: 'flex', flexDirection: 'row', justifyContent: 'center'}}>
-        <LogoutButton/>
+        <LogoutButton mock={isMock}/>
     </div>
 
     return (
