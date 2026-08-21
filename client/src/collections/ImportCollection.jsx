@@ -74,7 +74,7 @@ export default function ImportCollection(props) {
     return (
         <Modal
             title={title}
-            visible={true}
+            open={true}
             width={success ? "500" : "70vw"}
             onCancel={() => navigate("/collections")}
             footer={success ? null : footer}>

@@ -42,7 +42,7 @@ export default function NewCollection(props) {
     return (
         <Modal
             title="New Collection"
-            visible={props.open}
+            open={props.open}
             width={600}
             onCancel={props.close}
             footer={footer} >
