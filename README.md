@@ -44,7 +44,8 @@ go run .
 
 It reads `DB_PATH` from `server/go/src/.env` (default `data/trivia.db`) and
 `IMAGE_DIR` for uploaded question images, which defaults to `images` relative
-to the working directory.
+to the working directory. There is no `MONGO_HOST` / `MONGO_PORT` — the running
+server is pure SQLite.
 
 ### Development: two servers
 
@@ -122,6 +123,11 @@ The app is then on <http://127.0.0.1:8080> — API under `/editor` and
 the build, falling back to `index.html` so a deep link like `/game/abc` works on
 a cold load.
 
+`docker compose` brings up only the editor-server — there is no database
+container. The SQLite database lives on a `trivia-data` named volume mounted at
+`/data`, with `DB_PATH` set to `/data/trivia.db`, so the data survives container
+rebuilds and restarts.
+
 `docker-compose.yml` mounts `client/build` read-only at `/go/src/client` and
 points `CLIENT_DIR` at it. The mount is deliberate rather than baked into the
 image: the build context is `server/go/src`, so the Dockerfile cannot reach
@@ -132,6 +138,25 @@ container does not need a restart.
 optional. If it holds no `index.html` — an unbuilt client, or a deployment that
 does not want one — the server logs that it is skipping the client and serves
 the API alone.
+
+## Backups
+
+The whole application lives in one SQLite file (`data/trivia.db` by default),
+so a backup is a single-file copy. The server enables WAL journal mode
+(`PRAGMA journal_mode=WAL`), which means a plain file copy of a **running**
+database may miss writes still sitting in the WAL file. For a consistent
+snapshot use SQLite's online backup, which works even while the server is up:
+
+```sh
+cd server/go/src
+sqlite3 data/trivia.db ".backup 'trivia-YYYYMMDD.db'"
+```
+
+Restores are just the inverse: stop the server, copy the backup file back over
+`data/trivia.db` (and delete any leftover `data/trivia.db-wal` /
+`data/trivia.db-shm` files), then start it again. If you prefer a plain `cp`
+instead of `.backup`, do it while the server is stopped so the WAL is fully
+checkpointed.
 
 ## Migrating from MongoDB
 

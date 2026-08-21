@@ -1,6 +1,10 @@
 package sessions
 
 import (
+	"bytes"
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"path/filepath"
 	"sync"
 	"testing"
@@ -8,6 +12,7 @@ import (
 	"github.com/jdarthur/trivia/common"
 	"github.com/jdarthur/trivia/models"
 	"github.com/jdarthur/trivia/store"
+	"github.com/gin-gonic/gin"
 )
 
 // These tests exercise the session-port logic (#76) directly: scoring runs in
@@ -472,6 +477,147 @@ func TestAnswersUnscoredAndScored(t *testing.T) {
 	}
 	if len(byTeam2["team-3"].Answers) != 1 || byTeam2["team-3"].Answers[0].PointsAwarded != 0 {
 		t.Fatalf("team-3 scored answers = %+v", byTeam2["team-3"].Answers)
+	}
+}
+
+// createStartableGame builds a question → round → game chain that passes
+// gameIsStartable, the prerequisite for the CreateSession handler.
+func createStartableGame(t *testing.T, env *Env) string {
+	t.Helper()
+	q := createQuestion(t, env, "q?", "a", "Cat A")
+	round := models.Round{Name: "R", Questions: []string{q}, Wagers: []int{100}}
+	roundId, _, err := common.Create((*common.Env)(env), common.RoundTable, &round)
+	if err != nil {
+		t.Fatal(err)
+	}
+	game := models.Game{Name: "G", Rounds: []string{roundId}, RoundNames: map[string]string{roundId: "R"}}
+	gameId, _, err := common.Create((*common.Env)(env), common.GameTable, &game)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return gameId
+}
+
+// The CreateSession handler is the real entry point for a new game: it
+// validates the game, creates the moderator player, inserts the session, and
+// bumps the state token so session_state exists from the very first moment.
+func TestCreateSessionHandlerBumpsStateToken(t *testing.T) {
+	env := openSessionTestDB(t)
+	gameId := createStartableGame(t, env)
+
+	gin.SetMode(gin.TestMode)
+	recorder := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(recorder)
+	body, err := json.Marshal(map[string]string{"name": "S", "game_id": gameId})
+	if err != nil {
+		t.Fatal(err)
+	}
+	c.Request = httptest.NewRequest(http.MethodPost, "/gameplay/session", bytes.NewReader(body))
+	c.Request.Header.Set("Content-Type", "application/json")
+
+	env.CreateSession(c)
+
+	if c.IsAborted() {
+		t.Fatalf("CreateSession aborted with %d: %s", recorder.Code, recorder.Body.String())
+	}
+	var created struct {
+		ID        string `json:"id"`
+		Moderator string `json:"mod"`
+	}
+	if err := json.Unmarshal(recorder.Body.Bytes(), &created); err != nil {
+		t.Fatalf("bad create response %q: %v", recorder.Body.String(), err)
+	}
+	if created.ID == "" {
+		t.Fatalf("session created without id: %s", recorder.Body.String())
+	}
+	if created.Moderator == "" {
+		t.Fatalf("session created without moderator: %s", recorder.Body.String())
+	}
+	var mod models.Player
+	if err := common.GetOne((*common.Env)(env), common.PlayerTable, created.Moderator, &mod); err != nil {
+		t.Fatalf("moderator player missing: %v", err)
+	}
+
+	// creation must leave a session_state row behind
+	state1, err := common.GetState((*common.Env)(env), created.ID)
+	if err != nil {
+		t.Fatalf("no state token after creation: %v", err)
+	}
+	if state1 == "" {
+		t.Fatal("expected a non-empty state token after creation")
+	}
+
+	// incrementing the token yields a new uuid, not the same one
+	if err := common.IncrementState((*common.Env)(env), created.ID); err != nil {
+		t.Fatal(err)
+	}
+	state2, err := common.GetState((*common.Env)(env), created.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if state1 == state2 {
+		t.Fatalf("state token did not change on increment: %q", state1)
+	}
+}
+
+// GetSessionState long-polls until the stored token differs from the caller's
+// `current`; with a stale `current` it should return the new token at once.
+func TestGetSessionStateHandlerReturnsNewToken(t *testing.T) {
+	env := openSessionTestDB(t)
+	gameId := createStartableGame(t, env)
+
+	// create a real session through the handler
+	gin.SetMode(gin.TestMode)
+	recorder := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(recorder)
+	body, err := json.Marshal(map[string]string{"name": "S", "game_id": gameId})
+	if err != nil {
+		t.Fatal(err)
+	}
+	c.Request = httptest.NewRequest(http.MethodPost, "/gameplay/session", bytes.NewReader(body))
+	c.Request.Header.Set("Content-Type", "application/json")
+	env.CreateSession(c)
+	var created struct {
+		ID string `json:"id"`
+	}
+	if err := json.Unmarshal(recorder.Body.Bytes(), &created); err != nil {
+		t.Fatalf("bad create response %q: %v", recorder.Body.String(), err)
+	}
+
+	old, err := common.GetState((*common.Env)(env), created.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := common.IncrementState((*common.Env)(env), created.ID); err != nil {
+		t.Fatal(err)
+	}
+
+	recorder = httptest.NewRecorder()
+	c, _ = gin.CreateTestContext(recorder)
+	c.Params = gin.Params{{Key: "id", Value: created.ID}}
+	c.Request = httptest.NewRequest(http.MethodGet,
+		"/gameplay/session/"+created.ID+"/state?current="+old, nil)
+
+	env.GetSessionState(c)
+
+	if c.IsAborted() {
+		t.Fatalf("GetSessionState aborted: %s", recorder.Body.String())
+	}
+	var resp struct {
+		State string `json:"state"`
+	}
+	if err := json.Unmarshal(recorder.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("bad state response %q: %v", recorder.Body.String(), err)
+	}
+	got, err := common.GetState((*common.Env)(env), created.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.State != got {
+		t.Fatalf("handler returned state %q, want current %q", resp.State, got)
+	}
+	if resp.State == old {
+		t.Fatalf("handler returned the stale token %q instead of the new one", resp.State)
 	}
 }
 
