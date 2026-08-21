@@ -110,12 +110,15 @@ never enables dev mode, so `?mockUser` is inert against a real backend.
 
 ### Deployment: one server
 
-The API can serve the built client itself, so there is no separate node process
-and no proxy in front of the two. Build the client, then bring the stack up:
+The API serves the built client itself, so there is no separate node process, no
+database container, and no proxy in front of the two — a single Go binary plus a
+SQLite file is the entire deployment. Build the client, build the server binary,
+and run it:
 
 ```sh
 cd client && npm run build
-cd ../server/go/src && docker compose up -d
+cd ../server/go/src && go build -o trivia-server .
+./trivia-server
 ```
 
 The app is then on <http://127.0.0.1:8080> — API under `/editor` and
@@ -123,21 +126,29 @@ The app is then on <http://127.0.0.1:8080> — API under `/editor` and
 the build, falling back to `index.html` so a deep link like `/game/abc` works on
 a cold load.
 
-`docker compose` brings up only the editor-server — there is no database
-container. The SQLite database lives on a `trivia-data` named volume mounted at
-`/data`, with `DB_PATH` set to `/data/trivia.db`, so the data survives container
-rebuilds and restarts.
+The server reads three environment variables (all with defaults, so a plain
+`go run .` works too):
 
-`docker-compose.yml` mounts `client/build` read-only at `/go/src/client` and
-points `CLIENT_DIR` at it. The mount is deliberate rather than baked into the
-image: the build context is `server/go/src`, so the Dockerfile cannot reach
-`client/` to build it. Rebuilding the client is enough to pick up changes; the
-container does not need a restart.
+| Variable    | Default          | Meaning                                     |
+|-------------|------------------|---------------------------------------------|
+| `DB_PATH`   | `data/trivia.db` | SQLite database file (created if missing)   |
+| `CLIENT_DIR`| `client`         | Built client directory to serve             |
+| `IMAGE_DIR` | `images`         | Directory for uploaded question images      |
 
-`CLIENT_DIR` defaults to `client` relative to the working directory and is
-optional. If it holds no `index.html` — an unbuilt client, or a deployment that
-does not want one — the server logs that it is skipping the client and serves
-the API alone.
+`CLIENT_DIR` is optional: if it holds no `index.html` — an unbuilt client, or a
+deployment that does not want one — the server logs that it is skipping the
+client and serves the API alone.
+
+Because the database driver is pure Go (no CGO), the server cross-compiles to
+any platform trivially — e.g. a static Linux/amd64 binary for a remote host:
+
+```sh
+cd server/go/src
+CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o trivia-server .
+```
+
+To move a deployment, copy the binary and the `data/` directory (see Backups)
+to the target host; there is nothing else to install.
 
 ## Backups
 
