@@ -398,3 +398,167 @@ test.describe('gameplay question flow, answering & wagering', () => {
     await cleanup(request, seeded, { sessionId, modId, playerIds: [playerId] });
   });
 });
+
+// --- Ticket #111: scoring, scoreboard & statuses --------------------------
+
+// Drive the player's answer card to submit an answer with a wager.
+async function answerQuestion(page: Page, wager: number, answer: string) {
+  const card = playerAnswerCard(page);
+  await card.locator('textarea[placeholder="Your answer"]').fill(answer);
+  await card.locator('.ant-radio-button-wrapper').filter({ hasText: String(wager) }).click();
+  const button = card.getByRole('button', { name: 'Answer', exact: true });
+  await expect(button).toBeEnabled();
+  await button.click();
+}
+
+// Mark every joined player correct/incorrect in the mod's scorer and submit.
+async function scoreCurrentQuestion(modPage: Page, correct: boolean) {
+  const scorer = modPage.locator('.player-scorer');
+  await scorer.locator(`button:has(.anticon-${correct ? 'check' : 'close'})`).click();
+  const scoreButton = scorer.getByRole('button', { name: 'Score', exact: true });
+  await expect(scoreButton).toBeEnabled();
+  await scoreButton.click();
+}
+
+// Full setup for a scoring test: seed a game, open a session, start it with a
+// joined player, and return every handle plus the unique team name.
+async function setupActiveGame(
+  browser: { newContext: (o?: object) => Promise<BrowserContext> },
+  request: APIRequestContext,
+  prefix: string,
+) {
+  const seeded = await seedStartableGame(request, prefix);
+  const { sessionId, modId } = await createSession(request, `e2e-session-${prefix}`, seeded.gameId);
+  const { context: modContext, page: modPage } = await openModLobby(browser, sessionId, modId);
+  const { context: playerContext, page: playerPage, playerId } = await joinPlayer(
+    browser,
+    sessionId,
+    `Team ${prefix}`,
+    `Player ${prefix}`,
+  );
+  await modPage.locator('.start-button').click();
+  await expect(modPage.locator('.active-game')).toBeVisible({ timeout: 30000 });
+  await expect(playerPage.locator('.active-game')).toBeVisible({ timeout: 30000 });
+  return {
+    seeded,
+    sessionId,
+    modId,
+    modContext,
+    modPage,
+    playerContext,
+    playerPage,
+    playerId,
+    teamName: `Team ${prefix}`,
+  };
+}
+
+test.describe('gameplay scoring, scoreboard & statuses', () => {
+  test('a correct answer pushes to the scoreboard for all actors and the player status turns green', async ({
+    browser,
+    request,
+  }) => {
+    test.setTimeout(90000);
+    const prefix = unique();
+    const g = await setupActiveGame(browser, request, prefix);
+
+    // Player has not answered yet -> grey "not answered" status.
+    await expect(g.playerPage.locator('.player-status-bar .anticon-minus')).toBeVisible({ timeout: 30000 });
+
+    // Player answers the first question (wager 100).
+    await answerQuestion(g.playerPage, 100, 'First answer');
+    // Player status flips to "answered" (yellow/check).
+    await expect(g.playerPage.locator('.player-status-bar .anticon-check')).toBeVisible({ timeout: 30000 });
+
+    // Mod marks the answer correct and scores it.
+    await scoreCurrentQuestion(g.modPage, true);
+
+    // Scoreboard updates for the mod...
+    await expect(
+      g.modPage.locator('.scoreboard .ant-card').filter({ hasText: g.teamName }),
+    ).toContainText('100', { timeout: 30000 });
+    // ...and for the player.
+    await expect(
+      g.playerPage.locator('.scoreboard .ant-card').filter({ hasText: g.teamName }),
+    ).toContainText('100', { timeout: 30000 });
+
+    // Player status turns green (correct) after scoring.
+    await expect(g.playerPage.locator('.player-status-bar .anticon-check-square')).toBeVisible({
+      timeout: 30000,
+    });
+
+    await g.playerContext.close();
+    await g.modContext.close();
+    await cleanup(request, g.seeded, { sessionId: g.sessionId, modId: g.modId, playerIds: [g.playerId] });
+  });
+
+  test('an incorrect answer turns the player status red and awards no points', async ({ browser, request }) => {
+    test.setTimeout(90000);
+    const prefix = unique();
+    const g = await setupActiveGame(browser, request, prefix);
+
+    // Player answers the first question (wager 200).
+    await answerQuestion(g.playerPage, 200, 'Wrong answer');
+    await expect(g.playerPage.locator('.player-status-bar .anticon-check')).toBeVisible({ timeout: 30000 });
+
+    // Mod marks the answer incorrect and scores it.
+    await scoreCurrentQuestion(g.modPage, false);
+
+    // Player status turns red (incorrect) after scoring.
+    await expect(g.playerPage.locator('.player-status-bar .anticon-close-square')).toBeVisible({
+      timeout: 30000,
+    });
+
+    // No points awarded: the scoreboard stays 0 for both actors.
+    await expect(
+      g.modPage.locator('.scoreboard .ant-card').filter({ hasText: g.teamName }),
+    ).toContainText('0', { timeout: 30000 });
+    await expect(
+      g.playerPage.locator('.scoreboard .ant-card').filter({ hasText: g.teamName }),
+    ).toContainText('0', { timeout: 30000 });
+
+    await g.playerContext.close();
+    await g.modContext.close();
+    await cleanup(request, g.seeded, { sessionId: g.sessionId, modId: g.modId, playerIds: [g.playerId] });
+  });
+
+  test('the scorer clears between questions (regression #7/#8) and scores accumulate', async ({
+    browser,
+    request,
+  }) => {
+    test.setTimeout(120000);
+    const prefix = unique();
+    const g = await setupActiveGame(browser, request, prefix);
+
+    // Round 1: correct answer worth 100.
+    await answerQuestion(g.playerPage, 100, 'First answer');
+    await scoreCurrentQuestion(g.modPage, true);
+    await expect(
+      g.modPage.locator('.scoreboard .ant-card').filter({ hasText: g.teamName }),
+    ).toContainText('100', { timeout: 30000 });
+
+    // Mod advances to the second question.
+    await g.modPage.getByRole('button', { name: 'Next Question', exact: true }).click();
+    await expect(g.modPage.locator('.active-question-box')).toContainText(`Second question ${prefix}`, {
+      timeout: 30000,
+    });
+
+    // The player answers the new question (only wager 200 remains available).
+    await answerQuestion(g.playerPage, 200, 'Second answer');
+
+    // Regression guard: the previous question's marks were cleared, so even
+    // though the new answer is loaded, the Score button stays disabled.
+    const scorer = g.modPage.locator('.player-scorer');
+    await expect(scorer.locator('button:has(.anticon-check)')).toBeVisible({ timeout: 30000 });
+    await expect(scorer.getByRole('button', { name: 'Score', exact: true })).toBeDisabled();
+
+    // Score the second question correct for 200 -> total 300.
+    await scoreCurrentQuestion(g.modPage, true);
+    await expect(
+      g.modPage.locator('.scoreboard .ant-card').filter({ hasText: g.teamName }),
+    ).toContainText('300', { timeout: 30000 });
+
+    await g.playerContext.close();
+    await g.modContext.close();
+    await cleanup(request, g.seeded, { sessionId: g.sessionId, modId: g.modId, playerIds: [g.playerId] });
+  });
+});
