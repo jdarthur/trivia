@@ -1,4 +1,4 @@
-import { expect, test, type APIRequestContext, type BrowserContext } from '@playwright/test';
+import { expect, test, type APIRequestContext, type BrowserContext, type Page } from '@playwright/test';
 
 // Gameplay e2e (ticket #109): lobby + session start, first slice of the
 // single-session suite. Unlike the editor suites, gameplay is anonymous and
@@ -239,6 +239,159 @@ test.describe('gameplay lobby & session start', () => {
     await expect(modPage.locator('.active-question-box')).toContainText(`Second question ${prefix}`, {
       timeout: 30000,
     });
+
+    await playerContext.close();
+    await modContext.close();
+    await cleanup(request, seeded, { sessionId, modId, playerIds: [playerId] });
+  });
+});
+
+// --- Ticket #110: question flow, answering & wagering ---------------------
+
+// The player's answer card: the Card wrapping the "Your answer" textarea.
+function playerAnswerCard(page: Page) {
+  return page.locator('.ant-card').filter({ has: page.locator('textarea[placeholder="Your answer"]') });
+}
+
+// Read the mod's view of answers for one question (round/question indices).
+async function getAnswersAsMod(
+  request: APIRequestContext,
+  sessionId: string,
+  modId: string,
+  roundIndex: number,
+  questionIndex: number,
+): Promise<any> {
+  const res = await request.get(
+    `/gameplay/session/${sessionId}/answers?player_id=${modId}&round_id=${roundIndex}&question_id=${questionIndex}`,
+  );
+  expect(res.ok()).toBeTruthy();
+  return await res.json();
+}
+
+// Answers a player has submitted for one question, oldest first.
+async function playerAnswers(
+  request: APIRequestContext,
+  sessionId: string,
+  modId: string,
+  playerId: string,
+  roundIndex: number,
+  questionIndex: number,
+): Promise<any[]> {
+  const data = await getAnswersAsMod(request, sessionId, modId, roundIndex, questionIndex);
+  const team = data.answers.find((a: any) => a.player_id === playerId);
+  return team?.answers ?? [];
+}
+
+test.describe('gameplay question flow, answering & wagering', () => {
+  test('mod advances, player sees question/category, submits and edits/resends an answer', async ({
+    browser,
+    request,
+  }) => {
+    test.setTimeout(90000);
+    const prefix = unique();
+    const seeded = await seedStartableGame(request, prefix);
+    const { sessionId, modId } = await createSession(request, `e2e-session-${prefix}`, seeded.gameId);
+
+    const { context: modContext, page: modPage } = await openModLobby(browser, sessionId, modId);
+    const { context: playerContext, page: playerPage, playerId } = await joinPlayer(
+      browser,
+      sessionId,
+      `Team ${prefix}`,
+      `Player ${prefix}`,
+    );
+
+    // Start the game; both contexts enter the active game.
+    await modPage.locator('.start-button').click();
+    await expect(modPage.locator('.active-game')).toBeVisible({ timeout: 30000 });
+    await expect(playerPage.locator('.active-game')).toBeVisible({ timeout: 30000 });
+
+    // Mod advances to the second question (NextOrPrevious -> SetQuestion).
+    await modPage.getByRole('button', { name: 'Next Question', exact: true }).click();
+    await expect(modPage.locator('.active-question-box')).toContainText(`Second question ${prefix}`, {
+      timeout: 30000,
+    });
+
+    // The player sees the advanced question text and its category.
+    await expect(playerPage.locator('.active-question-box')).toContainText(`Second question ${prefix}`, {
+      timeout: 30000,
+    });
+    await expect(
+      playerPage.locator('.ant-breadcrumb').getByText(`e2e-cat-${prefix}`, { exact: true }),
+    ).toBeVisible({ timeout: 30000 });
+
+    // Player submits an answer (wager 100 + text).
+    const card = playerAnswerCard(playerPage);
+    await card.locator('textarea[placeholder="Your answer"]').fill('First answer');
+    await card.locator('.ant-radio-button-wrapper').filter({ hasText: '100' }).click();
+    const answerButton = card.getByRole('button', { name: 'Answer', exact: true });
+    await expect(answerButton).toBeEnabled();
+    await answerButton.click();
+
+    await expect
+      .poll(async () => (await playerAnswers(request, sessionId, modId, playerId, 0, 1)).length)
+      .toBe(1);
+    expect((await playerAnswers(request, sessionId, modId, playerId, 0, 1))[0].answer).toBe('First answer');
+
+    // Edit & resend: the submit button flips to "Update".
+    await card.locator('textarea[placeholder="Your answer"]').fill('Edited answer');
+    const updateButton = card.getByRole('button', { name: 'Update', exact: true });
+    await expect(updateButton).toBeEnabled();
+    await updateButton.click();
+
+    await expect
+      .poll(async () => (await playerAnswers(request, sessionId, modId, playerId, 0, 1)).length)
+      .toBe(2);
+    const resent = await playerAnswers(request, sessionId, modId, playerId, 0, 1);
+    expect(resent[resent.length - 1].answer).toBe('Edited answer');
+
+    await playerContext.close();
+    await modContext.close();
+    await cleanup(request, seeded, { sessionId, modId, playerIds: [playerId] });
+  });
+
+  test('wagering: a player picks a wager via WagerManager and it is recorded on the answer', async ({
+    browser,
+    request,
+  }) => {
+    test.setTimeout(90000);
+    const prefix = unique();
+    const seeded = await seedStartableGame(request, prefix);
+    const { sessionId, modId } = await createSession(request, `e2e-session-${prefix}`, seeded.gameId);
+
+    const { context: modContext, page: modPage } = await openModLobby(browser, sessionId, modId);
+    const { context: playerContext, page: playerPage, playerId } = await joinPlayer(
+      browser,
+      sessionId,
+      `Team ${prefix}`,
+      `Player ${prefix}`,
+    );
+
+    await modPage.locator('.start-button').click();
+    await expect(playerPage.locator('.active-game')).toBeVisible({ timeout: 30000 });
+
+    const card = playerAnswerCard(playerPage);
+
+    // WagerManager exposes the round's wager options as selectable radio buttons.
+    await expect(card.locator('.ant-radio-button-wrapper').filter({ hasText: '100' })).toBeVisible({
+      timeout: 30000,
+    });
+    await expect(card.locator('.ant-radio-button-wrapper').filter({ hasText: '200' })).toBeVisible();
+
+    // A wager is required: with only an answer typed the submit button stays disabled.
+    await card.locator('textarea[placeholder="Your answer"]').fill('Wagered answer');
+    await expect(card.getByRole('button', { name: 'Answer', exact: true })).toBeDisabled();
+
+    // Select wager 200 and submit.
+    await card.locator('.ant-radio-button-wrapper').filter({ hasText: '200' }).click();
+    const answerButton = card.getByRole('button', { name: 'Answer', exact: true });
+    await expect(answerButton).toBeEnabled();
+    await answerButton.click();
+
+    await expect
+      .poll(async () => (await playerAnswers(request, sessionId, modId, playerId, 0, 0)).length)
+      .toBe(1);
+    const recorded = await playerAnswers(request, sessionId, modId, playerId, 0, 0);
+    expect(recorded[0].wager).toBe(200);
 
     await playerContext.close();
     await modContext.close();
