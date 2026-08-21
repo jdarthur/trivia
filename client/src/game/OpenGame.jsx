@@ -97,7 +97,7 @@ class OpenGame extends React.Component {
         return (
             <Modal
                 title="Edit Game"
-                visible={true}
+                open={true}
                 width="70vw"
                 footer={footer}
                 onCancel={this.save_and_close}>

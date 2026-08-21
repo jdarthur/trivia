@@ -43,14 +43,33 @@ async function createQuestion(
   return json.id;
 }
 
+// Wait for a round to be persisted server-side. The rounds editor optimistically
+// shows the new card before the create POST completes; a full-page reload before
+// that POST settles would abort it and lose the round, so tests that reload after
+// creating must first confirm the round actually exists via the API.
+async function waitForRoundPersisted(request: APIRequestContext, name: string) {
+  await expect
+    .poll(
+      async () => {
+        const res = await request.get('/editor/rounds', { headers: { 'borttrivia-token': token } });
+        const { rounds } = await res.json();
+        return rounds.some((r: { name: string }) => r.name === name);
+      },
+      { timeout: 10000 },
+    )
+    .toBeTruthy();
+}
+
 // Create a round through the UI: click New, type the name into .round-name,
-// click Save, and wait for the round card to appear in the list.
-async function createRoundViaUI(page: Page, name: string) {
+// click Save, wait for the round card to appear in the list, and confirm it is
+// persisted server-side (see waitForRoundPersisted).
+async function createRoundViaUI(page: Page, request: APIRequestContext, name: string) {
   await page.getByRole('button', { name: /New/ }).first().click();
   await expect(page.locator('.round-name')).toBeVisible();
   await page.locator('.round-name').fill(name);
   await page.getByRole('button', { name: 'Save', exact: true }).click();
   await expect(page.locator('.ant-card').filter({ hasText: name })).toBeVisible();
+  await waitForRoundPersisted(request, name);
 }
 
 // Reload the rounds editor for a clean state (the create flow leaves the round
@@ -108,7 +127,7 @@ async function deleteRoundByName(request: APIRequestContext, name: string) {
 roundsTest.describe('rounds CRUD', () => {
   roundsTest('creates a round', async ({ roundsPage, request }) => {
     const name = `e2e-round-create-${unique()}`;
-    await createRoundViaUI(roundsPage, name);
+    await createRoundViaUI(roundsPage, request, name);
     await expect(roundsPage.locator('.ant-card').filter({ hasText: name })).toContainText('Questions');
 
     await deleteRoundByName(request, name);
@@ -123,7 +142,7 @@ roundsTest.describe('rounds CRUD', () => {
     await createQuestion(request, category, q1, 'Answer A');
     await createQuestion(request, category, q2, 'Answer B');
 
-    await createRoundViaUI(roundsPage, name);
+    await createRoundViaUI(roundsPage, request, name);
     await reloadRounds(roundsPage);
     await openRound(roundsPage, name);
 
@@ -154,7 +173,7 @@ roundsTest.describe('rounds CRUD', () => {
     await createQuestion(request, category, q1, 'Answer one');
     await createQuestion(request, category, q2, 'Answer two');
 
-    await createRoundViaUI(roundsPage, name);
+    await createRoundViaUI(roundsPage, request, name);
     await reloadRounds(roundsPage);
     await openRound(roundsPage, name);
     await addQuestions(roundsPage, category, [q1, q2]);
@@ -173,7 +192,7 @@ roundsTest.describe('rounds CRUD', () => {
 
   roundsTest('opens the round view', async ({ roundsPage, request }) => {
     const name = `e2e-round-open-${unique()}`;
-    await createRoundViaUI(roundsPage, name);
+    await createRoundViaUI(roundsPage, request, name);
     await reloadRounds(roundsPage);
     await openRound(roundsPage, name);
     await expect(roundsPage.locator('.round-name')).toHaveValue(name);
@@ -181,9 +200,9 @@ roundsTest.describe('rounds CRUD', () => {
     await deleteRoundByName(request, name);
   });
 
-  roundsTest('deletes a round', async ({ roundsPage }) => {
+  roundsTest('deletes a round', async ({ roundsPage, request }) => {
     const name = `e2e-round-delete-${unique()}`;
-    await createRoundViaUI(roundsPage, name);
+    await createRoundViaUI(roundsPage, request, name);
     await reloadRounds(roundsPage);
     await openRound(roundsPage, name);
 

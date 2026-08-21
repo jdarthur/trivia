@@ -32,3 +32,35 @@ export const roundsTest = base.extend<{ roundsPage: Page }>({
     await use(page);
   },
 });
+
+// loginToGamesEditor lands on the Games editor. Unlike questions/rounds, a
+// direct `goto('/games?mockUser=alice')` mounts GameList before App's mock-token
+// effect has run, so GameList's single /editor/games fetch 401s and the list is
+// never populated (state.games ends up undefined and the "New" button crashes).
+// So we first land on "/" (with mockUser) to let the token get set, then navigate
+// client-side to the games route so GameList mounts with the token already in hand.
+export async function loginToGamesEditor(page: Page) {
+  await page.goto('/?mockUser=alice');
+  // Wait until the mock token is set: the Editor submenu is disabled until
+  // App's token state is populated (showEditor = !!token).
+  await page.waitForFunction(() => {
+    const items = Array.from(document.querySelectorAll('[role="menuitem"]'));
+    const editor = items.find((e) => (e.textContent || '').includes('Editor'));
+    return !!editor && editor.getAttribute('aria-disabled') !== 'true';
+  });
+  await page.evaluate(() => {
+    history.pushState({}, '', '/games?mockUser=alice');
+    window.dispatchEvent(new PopStateEvent('popstate'));
+  });
+  await expect(page.locator('.round_list')).toBeVisible();
+}
+
+// gamesTest / gamesPage land on the Games editor. The games list shares the
+// `round_list` shell class with rounds (GameList.jsx passes class_name="round_list"
+// to LoadingOrView).
+export const gamesTest = base.extend<{ gamesPage: Page }>({
+  gamesPage: async ({ page }, use) => {
+    await loginToGamesEditor(page);
+    await use(page);
+  },
+});
