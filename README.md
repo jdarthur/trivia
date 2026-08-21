@@ -118,8 +118,13 @@ and run it:
 ```sh
 cd client && npm run build
 cd ../server/go/src && go build -o trivia-server .
-./trivia-server
+CLIENT_DIR=../../../client/build ./trivia-server
 ```
+
+For a one-shot full-stack build, the repo's root `Makefile` does it in one step:
+`make build` compiles the server and builds the client, and `make run` does that
+then serves the app on :8080 (see the Makefile header for `make check` / `make
+clean`).
 
 The app is then on <http://127.0.0.1:8080> — API under `/editor` and
 `/gameplay`, uploaded images under `/images`, and everything else served from
