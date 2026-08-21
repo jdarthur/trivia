@@ -18,16 +18,6 @@ jobs:
       run:
         working-directory: server/go/src
 
-    services:
-      # globalsign/mgo is a 2018 fork and cannot complete server selection
-      # against MongoDB 6.0 or newer, so the integration test in test/ only
-      # passes against 5.0 or older. Bump this once the driver moves to
-      # go.mongodb.org/mongo-driver.
-      mongo:
-        image: mongo:5.0
-        ports:
-          - 27017:27017
-
     steps:
       - uses: actions/checkout@v4
 

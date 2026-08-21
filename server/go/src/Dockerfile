@@ -14,6 +14,7 @@ RUN mkdir /go/src/games
 RUN mkdir /go/src/players
 RUN mkdir /go/src/sessions
 RUN mkdir /go/src/collections
+RUN mkdir /go/src/store
 
 ADD go.mod /go/src
 ADD go.sum /go/src
@@ -33,6 +34,7 @@ ADD ./games /go/src/games
 ADD ./players /go/src/players
 ADD ./sessions /go/src/sessions
 ADD ./collections /go/src/collections
+ADD ./store /go/src/store
 
 RUN go build -o main .
 

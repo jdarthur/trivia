@@ -9,6 +9,9 @@ services:
       # entirely if there is no index.html there, so an unbuilt client leaves
       # the API working on its own.
       CLIENT_DIR: /go/src/client
+      # SQLite database lives on a named volume so it survives container
+      # rebuilds and restarts. The server reads DB_PATH (default data/trivia.db).
+      DB_PATH: /data/trivia.db
     volumes:
       - ./.env:/go/src/.env:Z
       # Built on the host by `npm run build`, mounted rather than baked into the
@@ -16,9 +19,7 @@ services:
       # reach client/ to build it itself. Read-only because the server only ever
       # serves these.
       - ../../../client/build:/go/src/client:ro,Z
-  mongo:
-    image: "mongo"
-    ports:
-      - "127.0.0.1:27017:27017"
-    volumes:
-      - ~/trivdata:/data/db:Z
+      - trivia-data:/data:Z
+
+volumes:
+  trivia-data:
