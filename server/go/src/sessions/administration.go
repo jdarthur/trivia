@@ -55,6 +55,9 @@ func (e *Env) SetCurrentQuestion(c *gin.Context) {
 
 	err = _setCurrentQuestion(e, &existingSession, requestBody.RoundIndex, requestBody.QuestionIndex, roundObject)
 	if err == nil {
+		err = common.Set((*common.Env)(e), common.SessionTable, sessionId, &existingSession)
+	}
+	if err == nil {
 		err = common.IncrementState((*common.Env)(e), sessionId)
 	}
 	common.Respond(c, existingSession, err)
@@ -170,7 +173,10 @@ func _setCurrentRound(e *Env, session *models.Session, roundIndex int, questionI
 	}
 
 	session.CurrentRound = &roundIndex
-	return _setCurrentQuestion(e, session, roundIndex, questionIndex, round)
+	if err := _setCurrentQuestion(e, session, roundIndex, questionIndex, round); err != nil {
+		return err
+	}
+	return common.Set((*common.Env)(e), common.SessionTable, session.ID, session)
 }
 
 func (e *Env) GetCurrentQuestion(c *gin.Context) {

@@ -650,3 +650,87 @@ func TestGetWagersDeductsUsedWagers(t *testing.T) {
 		t.Fatalf("available wagers after scoring = %v, want [200]", wagers)
 	}
 }
+
+// StartSession must persist current_round / current_question to the session row
+// (not just the session_question snapshot), otherwise getCurrentQuestion sees
+// nil pointers and returns an empty question. Regression test for ticket #109:
+// the SQLite port advanced the in-memory pointers without a common.Set, leaving
+// the columns NULL so the active game never showed the question.
+func TestStartSessionPersistsCurrentQuestion(t *testing.T) {
+	env := openSessionTestDB(t)
+	gameId := createStartableGame(t, env)
+
+	gin.SetMode(gin.TestMode)
+
+	// create the session through the handler (captures the mod player id)
+	rec := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(rec)
+	body, err := json.Marshal(map[string]string{"name": "S", "game_id": gameId})
+	if err != nil {
+		t.Fatal(err)
+	}
+	c.Request = httptest.NewRequest(http.MethodPost, "/gameplay/session", bytes.NewReader(body))
+	c.Request.Header.Set("Content-Type", "application/json")
+	env.CreateSession(c)
+	if c.IsAborted() {
+		t.Fatalf("CreateSession aborted with %d: %s", rec.Code, rec.Body.String())
+	}
+	var created struct {
+		ID string `json:"id"`
+		Mod string `json:"mod"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &created); err != nil {
+		t.Fatalf("bad create response %q: %v", rec.Body.String(), err)
+	}
+
+	// start the session as the mod
+	rec = httptest.NewRecorder()
+	c, _ = gin.CreateTestContext(rec)
+	c.Params = gin.Params{{Key: "id", Value: created.ID}}
+	startBody, err := json.Marshal(map[string]string{"player_id": created.Mod})
+	if err != nil {
+		t.Fatal(err)
+	}
+	c.Request = httptest.NewRequest(http.MethodPost, "/gameplay/session/"+created.ID+"/start", bytes.NewReader(startBody))
+	c.Request.Header.Set("Content-Type", "application/json")
+	env.StartSession(c)
+	if c.IsAborted() {
+		t.Fatalf("StartSession aborted with %d: %s", rec.Code, rec.Body.String())
+	}
+
+	// current_round / current_question must be persisted on the session row
+	var reloaded models.Session
+	if err := common.GetOne((*common.Env)(env), common.SessionTable, created.ID, &reloaded); err != nil {
+		t.Fatal(err)
+	}
+	if !reloaded.Started {
+		t.Fatal("session not marked started")
+	}
+	if reloaded.CurrentRound == nil || *reloaded.CurrentRound != 0 {
+		t.Fatalf("current_round not persisted, got %v", reloaded.CurrentRound)
+	}
+	if reloaded.CurrentQuestion == nil || *reloaded.CurrentQuestion != 0 {
+		t.Fatalf("current_question not persisted, got %v", reloaded.CurrentQuestion)
+	}
+
+	// getCurrentQuestion returns the question text and, for the mod, the answer
+	rec = httptest.NewRecorder()
+	c, _ = gin.CreateTestContext(rec)
+	c.Params = gin.Params{{Key: "id", Value: created.ID}}
+	c.Request = httptest.NewRequest(http.MethodGet,
+		"/gameplay/session/"+created.ID+"/current-question?player_id="+created.Mod, nil)
+	env.GetCurrentQuestion(c)
+	var q struct {
+		Question string `json:"question"`
+		Answer   string `json:"answer"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &q); err != nil {
+		t.Fatalf("bad current-question response %q: %v", rec.Body.String(), err)
+	}
+	if q.Question == "" {
+		t.Fatalf("current question text is empty: %s", rec.Body.String())
+	}
+	if q.Answer == "" {
+		t.Fatalf("mod should see the answer: %s", rec.Body.String())
+	}
+}
