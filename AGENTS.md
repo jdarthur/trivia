@@ -13,12 +13,11 @@ from their own devices. React client + Go/Gin API. Work in progress — see
   in `client/`; proxies `/editor`, `/gameplay`, `/images` to the API.
 - Auth: Auth0 (editor endpoints only — gameplay is anonymous). JWT signing keys
   loaded from cert files by `common.LoadCerts()`.
-- Storage: MongoDB via `globalsign/mgo` (a 2018 fork that cannot complete server
-  selection against MongoDB 6.0 or newer — **pin `mongo:5.0`**). Connection from
-  `MONGO_HOST`/`MONGO_PORT` (default `localhost:27017`), database `trivia`.
-  **SQLite migration in progress**: `store/` holds the new foundation
-  (`modernc.org/sqlite`, `DB_PATH` env, schema migrations) but no handler uses
-  it yet — data access is still mgo.
+- Storage: SQLite via `store/` (`modernc.org/sqlite`, pure Go, no CGO).
+  Connection from `DB_PATH` (default `data/trivia.db`); schema migrations are
+  applied on startup. All handlers read/write through the `store` connection
+  via the `common` helpers over `*sql.DB`. Old MongoDB data can be imported
+  once with `cmd/migrate` (see README "Migrating from MongoDB").
 - Deployment: the API serves the built client itself (`CLIENT_DIR`, default
   `client`); no proxy in front. Missing `index.html` → API-only mode. Deep links
   fall back to `index.html` (see `static.go`).
@@ -31,7 +30,7 @@ for checks.
 ```sh
 cd server/go/src && go build ./...          # build
 cd server/go/src && go vet ./...            # vet
-cd server/go/src && go test ./...           # tests (test/ needs mongo:5.0)
+cd server/go/src && go test ./...           # tests (temp-file SQLite, no external service)
 cd server/go/src && go install golang.org/x/vuln/cmd/govulncheck@latest && govulncheck ./...   # CI only
 
 cd client && npm ci && npm run build        # client build
@@ -39,7 +38,6 @@ cd client && npm audit                      # strict: any finding blocks CI
 ```
 Local dev (two servers):
 ```sh
-cd server/go/src && docker compose up -d mongo   # MongoDB (mgo needs mongo:5.0)
 cd server/go/src && go run .                      # API on :8080
 cd client && npm install
 cd client && PORT=3000 npm start                  # Vite dev server (default 443 needs privileges)
@@ -56,12 +54,12 @@ Verify: `cd server/go/src && go build ./...` succeeds.
   (no `--audit-level`, so even a low in a dev-only transitive dependency blocks
   the merge; see the CI workflow comment).
 - Server changes must pass `go build ./... && go vet ./... && go test ./...`.
-  The integration test in `test/` talks to a real MongoDB, so it only passes
-  against `mongo:5.0` or older (mgo limitation).
+  The integration tests in `test/` run against a temp-file SQLite DB with no
+  external service.
 
 ## Architecture
 - `server/go/src/` — Go/Gin. `main.go` wires routes per domain.
-  - `common/` — `Env{Db *mgo.Session}` passed into each domain's handlers;
+  - `common/` — `Env{Db *sql.DB}` passed into each domain's handlers;
     DB helpers (`GetOne`/`GetAll`/`Create`/`Set`/`Push`/`Pull`/`Delete`),
     shared error types (`InvalidDataError`, `NonexistentIdError`,
     `InvalidUUIDError`, token errors), `Respond` (error→HTTP mapping), Auth0
@@ -71,9 +69,10 @@ Verify: `cd server/go/src && go build ./...` succeeds.
     scoring notes, scoreboard).
   - `questions/ rounds/ games/ collections/ sessions/ players/` — one package
     per domain: handlers + a `X_errors.go` with domain-specific errors.
-  - `store/` — SQLite foundation (connection, pragmas, migrations); not yet
-    used by handlers.
-  - `static.go` — serves the built client; `test/` — mongo-backed tests.
+  - `store/` — SQLite connection, pragmas, and schema migrations; used by all
+    handlers.
+  - `static.go` — serves the built client; `test/` — SQLite-backed integration
+    tests.
 - `client/src/` — feature folders: `editor/` (questions/rounds/games),
   `game/` (gameplay), `lobby/`, `players/`, `scoreboard/`, `admin-scorer/`,
   `control/`, `answer/`, `question/`, `round/`, `collections/`, `homepage/`,
@@ -83,19 +82,18 @@ Verify: `cd server/go/src && go build ./...` succeeds.
 ## Conventions
 - **One domain per package** on the server (`questions/`, `rounds/`, …), models
   in `models/`, domain errors in `X_errors.go` beside the handlers.
-- **DB access through `common` helpers**, not raw `mgo` calls: handlers hold an
+- **DB access through `common` helpers**, not raw SQL: handlers hold an
   `Env{Db}` and call `common.GetOne`/`common.GetAll`/`common.Create`/
   `common.Set`/`common.Push`/`common.Pull`/`common.Delete`.
 - **Respond via `common.Respond(c, data, err)`** — it maps shared error types
   to HTTP statuses; don't hand-roll error JSON.
-- IDs are UUIDs stored as bson binary (`models.NewId`); `NonexistentIdError`
+- IDs are UUID strings (`models.NewId`); `NonexistentIdError`
   for missing records.
 - Authz split: editor endpoints behind `auth.AsUser` (Auth0); gameplay/session
   endpoints are anonymous.
-- **Migration**: code destined for the SQLite port should not grow new mgo-only
-  patterns; keep the mgo driver pinned to `mongo:5.0` until the port to `store/`
-  lands.
-- Tests: `_test.go` beside the code; mongo-backed integration tests in `test/`.
+- The SQLite port is complete — new code uses `store` + the `common` helpers
+  over `*sql.DB`; there is no mgo/Mongo dependency anymore.
+- Tests: `_test.go` beside the code; SQLite-backed integration tests in `test/`.
 - Don't commit secrets; `client/cert/` is the self-signed local HTTPS keypair.
 
 ## Notes
