@@ -102,7 +102,8 @@ async function cleanup(
     if (pid) await request.delete(`/gameplay/player/${pid}`);
   }
   await request.delete(`/editor/game/${seeded.gameId}`);
-  await request.delete(`/editor/round/${seeded.roundId}`);
+  const roundIds = seeded.roundIds ?? [seeded.roundId];
+  for (const rid of roundIds) await request.delete(`/editor/round/${rid}`);
   for (const qid of seeded.qids) await request.delete(`/editor/question/${qid}`);
 }
 
@@ -452,6 +453,28 @@ async function setupActiveGame(
   };
 }
 
+// Seed a two-round game where every question has a distinct category, so the
+// category grid can visibly track the active question across navigation.
+async function seedNavGame(request: APIRequestContext, prefix: string) {
+  const q1 = await createQuestion(request, `cat-a-${prefix}`, `R1Q1 ${prefix}`, 'A1');
+  const q2 = await createQuestion(request, `cat-b-${prefix}`, `R1Q2 ${prefix}`, 'A2');
+  const q3 = await createQuestion(request, `cat-c-${prefix}`, `R2Q1 ${prefix}`, 'A3');
+  const q4 = await createQuestion(request, `cat-d-${prefix}`, `R2Q2 ${prefix}`, 'A4');
+  const r1 = await createRound(request, `round-one-${prefix}`, [q1, q2], [100, 200]);
+  const r2 = await createRound(request, `round-two-${prefix}`, [q3, q4], [100, 200]);
+  const res = await request.post('/editor/game', {
+    headers: { 'borttrivia-token': token },
+    data: {
+      name: `e2e-game-${prefix}`,
+      rounds: [r1, r2],
+      round_names: { [r1]: `round-one-${prefix}`, [r2]: `round-two-${prefix}` },
+    },
+  });
+  expect(res.ok()).toBeTruthy();
+  const gameId = (await res.json()).id;
+  return { gameId, roundIds: [r1, r2], qids: [q1, q2, q3, q4] };
+}
+
 test.describe('gameplay scoring, scoreboard & statuses', () => {
   test('a correct answer pushes to the scoreboard for all actors and the player status turns green', async ({
     browser,
@@ -556,6 +579,158 @@ test.describe('gameplay scoring, scoreboard & statuses', () => {
     await expect(
       g.modPage.locator('.scoreboard .ant-card').filter({ hasText: g.teamName }),
     ).toContainText('300', { timeout: 30000 });
+
+    await g.playerContext.close();
+    await g.modContext.close();
+    await cleanup(request, g.seeded, { sessionId: g.sessionId, modId: g.modId, playerIds: [g.playerId] });
+  });
+});
+
+// --- Ticket #112: navigation, hot-edit, spectator & edge cases ------------
+
+test.describe('gameplay navigation, hot-edit, spectator & edge cases', () => {
+  test('mod navigates next/previous question and next round; the category grid tracks the active question', async ({
+    browser,
+    request,
+  }) => {
+    test.setTimeout(120000);
+    const prefix = unique();
+    const seeded = await seedNavGame(request, prefix);
+    const { sessionId, modId } = await createSession(request, `e2e-session-${prefix}`, seeded.gameId);
+
+    const { context: modContext, page: modPage } = await openModLobby(browser, sessionId, modId);
+    await modPage.locator('.start-button').click();
+    await expect(modPage.locator('.active-game')).toBeVisible({ timeout: 30000 });
+
+    // Round 1, question 1: grid shows two categories with cat-a active.
+    await expect(modPage.locator('.active-question-box')).toContainText(`R1Q1 ${prefix}`, { timeout: 30000 });
+    await expect(modPage.locator('.round-category')).toHaveCount(2);
+    await expect(modPage.locator('.round-category.active')).toHaveText(`cat-a-${prefix}`);
+
+    // Next question -> R1Q2, and the grid tracks cat-b.
+    await modPage.getByRole('button', { name: 'Next Question', exact: true }).click();
+    await expect(modPage.locator('.active-question-box')).toContainText(`R1Q2 ${prefix}`, { timeout: 30000 });
+    await expect(modPage.locator('.round-category.active')).toHaveText(`cat-b-${prefix}`);
+
+    // Previous question -> back to R1Q1.
+    await modPage.getByRole('button', { name: 'Previous Question', exact: true }).click();
+    await expect(modPage.locator('.active-question-box')).toContainText(`R1Q1 ${prefix}`, { timeout: 30000 });
+    await expect(modPage.locator('.round-category.active')).toHaveText(`cat-a-${prefix}`);
+
+    // On R1Q2 (last of round 1) "Next Round" appears; it moves to R2Q1.
+    await modPage.getByRole('button', { name: 'Next Question', exact: true }).click();
+    await expect(modPage.locator('.active-question-box')).toContainText(`R1Q2 ${prefix}`, { timeout: 30000 });
+    await modPage.getByRole('button', { name: 'Next Round', exact: true }).click();
+    await expect(modPage.locator('.active-question-box')).toContainText(`R2Q1 ${prefix}`, { timeout: 30000 });
+    await expect(modPage.locator('.round-category')).toHaveCount(2);
+    await expect(modPage.locator('.round-category.active')).toHaveText(`cat-c-${prefix}`);
+    // Round name reflects round two.
+    await expect(modPage.locator('.ant-breadcrumb')).toContainText(`round-two-${prefix}`);
+
+    await modContext.close();
+    await cleanup(request, seeded, { sessionId, modId });
+  });
+
+  test('mod hot-edits the question text and round name mid-session and players see the change', async ({
+    browser,
+    request,
+  }) => {
+    test.setTimeout(120000);
+    const prefix = unique();
+    const g = await setupActiveGame(browser, request, prefix);
+
+    // Mod opens the question editor and rewrites the question text.
+    const questionEdit = g.modPage.locator('.active-game .ant-card .anticon-edit').last();
+    await questionEdit.click();
+    const qModal = g.modPage.locator('.ant-modal');
+    const newQuestion = `Hot-edited question ${prefix}`;
+    await qModal.locator('textarea[placeholder="Question"]').fill(newQuestion);
+    await qModal.getByRole('button', { name: 'Update', exact: true }).click();
+
+    // The player sees the edited question text.
+    await expect(g.playerPage.locator('.active-question-box')).toContainText(newQuestion, { timeout: 30000 });
+
+    // Mod renames the round via the inline round-name editor.
+    await g.modPage.locator('.ant-breadcrumb .anticon-edit').click();
+    const newRoundName = `Renamed round ${prefix}`;
+    const roundInput = g.modPage.locator('input[placeholder="Round name"]');
+    await expect(roundInput).toBeVisible();
+    await roundInput.fill(newRoundName);
+    await roundInput.press('Enter');
+
+    // The player sees the new round name in the breadcrumb.
+    await expect(g.playerPage.locator('.ant-breadcrumb')).toContainText(newRoundName, { timeout: 30000 });
+
+    await g.playerContext.close();
+    await g.modContext.close();
+    await cleanup(request, g.seeded, { sessionId: g.sessionId, modId: g.modId, playerIds: [g.playerId] });
+  });
+
+  test('a spectator context (no player_id) sees the game without the answer/wager UI', async ({
+    browser,
+    request,
+  }) => {
+    test.setTimeout(90000);
+    const prefix = unique();
+    const seeded = await seedStartableGame(request, prefix);
+    const { sessionId, modId } = await createSession(request, `e2e-session-${prefix}`, seeded.gameId);
+
+    const { context: modContext, page: modPage } = await openModLobby(browser, sessionId, modId);
+    await modPage.locator('.start-button').click();
+    await expect(modPage.locator('.active-game')).toBeVisible({ timeout: 30000 });
+
+    // A spectator opens the session URL with NO player_id.
+    const specContext = await browser.newContext({ baseURL: BASE_URL });
+    const specPage = await specContext.newPage();
+    await specPage.goto(`/?session_id=${sessionId}`);
+
+    // The spectator sees the active game and the current question text...
+    await expect(specPage.locator('.active-game')).toBeVisible({ timeout: 30000 });
+    await expect(specPage.locator('.active-question-box')).toContainText(`First question ${prefix}`, {
+      timeout: 30000,
+    });
+
+    // ...but no answer input and no wager UI.
+    await expect(specPage.locator('textarea[placeholder="Your answer"]')).toHaveCount(0);
+    await expect(specPage.locator('.ant-radio-button-wrapper')).toHaveCount(0);
+
+    await specContext.close();
+    await modContext.close();
+    await cleanup(request, seeded, { sessionId, modId });
+  });
+
+  test('a player answers the current question after the mod advanced, and cannot submit after scoring', async ({
+    browser,
+    request,
+  }) => {
+    test.setTimeout(120000);
+    const prefix = unique();
+    const g = await setupActiveGame(browser, request, prefix);
+
+    // The mod advances past the first question; the already-joined player can
+    // still answer the current (second) question mid-session. (The server
+    // rejects brand-new joins after start, so this is the supported form.)
+    await g.modPage.getByRole('button', { name: 'Next Question', exact: true }).click();
+    await expect(g.playerPage.locator('.active-question-box')).toContainText(`Second question ${prefix}`, {
+      timeout: 30000,
+    });
+
+    await answerQuestion(g.playerPage, 200, 'Late answer');
+    await expect
+      .poll(async () => (await playerAnswers(request, g.sessionId, g.modId, g.playerId, 0, 1)).length)
+      .toBe(1);
+
+    // Score the question; wait for the player to observe it scored (green).
+    await scoreCurrentQuestion(g.modPage, true);
+    await expect(g.playerPage.locator('.player-status-bar .anticon-check-square')).toBeVisible({
+      timeout: 30000,
+    });
+
+    // After scoring, the answer card ignores further input: even after typing
+    // new text, the submit ("Update") button stays disabled.
+    const card = playerAnswerCard(g.playerPage);
+    await card.locator('textarea[placeholder="Your answer"]').fill('Ignored after scoring');
+    await expect(card.getByRole('button', { name: 'Update', exact: true })).toBeDisabled();
 
     await g.playerContext.close();
     await g.modContext.close();
