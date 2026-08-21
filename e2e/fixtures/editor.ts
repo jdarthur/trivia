@@ -64,3 +64,14 @@ export const gamesTest = base.extend<{ gamesPage: Page }>({
     await use(page);
   },
 });
+
+// collectionsTest / collectionsPage land on the Collections editor. Like rounds,
+// a direct goto with `?mockUser` works (CollectionList.jsx renders the same
+// `round_list` shell class); it is NOT the games special-case that needs the
+// client-side navigation.
+export const collectionsTest = base.extend<{ collectionsPage: Page }>({
+  collectionsPage: async ({ page }, use) => {
+    await loginToEditor(page, 'collections', '.round_list');
+    await use(page);
+  },
+});
