@@ -4,8 +4,19 @@ import './Lobby.css';
 import OtherPlayer from "./OtherPlayer"
 import { Empty } from "antd"
 
-class OtherPlayers extends React.Component {
-  state = {
+interface Props {
+  player_id: string
+  session_id: string
+  session_state: any
+  set_excluded_icons: (excluded_icons: string[]) => void
+}
+
+interface State {
+  players: any[]
+}
+
+class OtherPlayers extends React.Component<Props, State> {
+  state: State = {
     players: []
   }
 
@@ -13,11 +24,11 @@ class OtherPlayers extends React.Component {
     this.get_players()
   }
 
-  set_excluded_icons = (excluded_icons) => {
+  set_excluded_icons = (excluded_icons: string[]) => {
     this.props.set_excluded_icons(excluded_icons)
   }
 
-  componentDidUpdate(prevProps) {
+  componentDidUpdate(prevProps: Props) {
     if (this.props.session_state !== prevProps.session_state) {
       this.get_players()
     }
@@ -29,7 +40,7 @@ class OtherPlayers extends React.Component {
       .then(response => response.json())
       .then(state => {
         console.log(state)
-        const excluded_icons = []
+        const excluded_icons: string[] = []
         for (let i = 0; i < state.length; i++) {
           if (state[i].icon) {
             excluded_icons.push(state[i].icon)

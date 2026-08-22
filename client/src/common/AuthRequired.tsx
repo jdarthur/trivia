@@ -2,7 +2,12 @@ import React from "react";
 import {Spin} from "antd";
 import {useAuth0} from "@auth0/auth0-react";
 
-export default function AuthRequired(props) {
+interface Props {
+    token: string
+    component: React.ReactNode
+}
+
+export default function AuthRequired(props: Props) {
     const {isLoading} = useAuth0()
 
     if (isLoading) {
@@ -21,4 +26,3 @@ export default function AuthRequired(props) {
         </div>
     );
 };
-

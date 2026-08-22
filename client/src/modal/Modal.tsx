@@ -1,7 +1,15 @@
 import React from 'react';
 import './Modal.css';
 
-class Modal extends React.Component {
+interface Props {
+    title: React.ReactNode
+    close: () => void
+    save: () => void
+    save_label: React.ReactNode
+    children?: React.ReactNode
+}
+
+class Modal extends React.Component<Props> {
 
     render() {
         return (

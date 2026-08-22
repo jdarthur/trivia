@@ -2,9 +2,20 @@ import React from 'react';
 import './Homepage.css';
 
 import GameName from "./GameName"
+import type {Game} from "../types/models"
 
-class GameNames extends React.Component {
-  constructor(props) {
+interface Props {
+    select: (game_id: string) => void
+    selected: string
+    token: string
+}
+
+interface State {
+    games: Game[]
+}
+
+class GameNames extends React.Component<Props, State> {
+  constructor(props: Props) {
     super(props)
     this.state = {
       games: []
@@ -15,7 +26,7 @@ class GameNames extends React.Component {
     this.get_games()
   }
 
-  select_game = (game_id) => {
+  select_game = (game_id: string) => {
     this.props.select(game_id)
   }
 

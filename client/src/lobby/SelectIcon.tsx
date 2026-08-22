@@ -1,7 +1,7 @@
 import React from 'react';
 import './Lobby.css';
 
-import { ICONS } from "./Icons.jsx"
+import { ICONS } from "./Icons"
 
 import { Select } from 'antd';
 
@@ -11,9 +11,15 @@ const { Option } = Select;
  * @author JD Arthur
  * @date 26 Sep 2020
  */
-class SelectIcon extends React.Component {
+interface Props {
+    select: (value: string) => void
+    icon_name: string
+    excluded_icons: string[]
+}
 
-    select = (value) => {
+class SelectIcon extends React.Component<Props> {
+
+    select = (value: string) => {
         this.props.select(value)
         console.log("select " + value)
     }

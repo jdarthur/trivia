@@ -1,8 +1,8 @@
 import {notification, Typography} from "antd";
 import React from "react";
 
-export default function notify(success, message, noHeader) {
-    let m = null
+export default function notify(success: boolean, message: React.ReactNode, noHeader?: boolean): void {
+    let m: string | null = null
     if (!noHeader) {
         m = success ? "Success" : "Error"
     }
@@ -14,7 +14,7 @@ export default function notify(success, message, noHeader) {
     })
 }
 
-export function errorMessage(verb, noun, err) {
+export function errorMessage(verb: string, noun: string, err: any) {
     return <div>
         <div>Unable to {verb} {noun}.</div>
         Error: <Typography.Text code >{err?.data?.message} </Typography.Text>

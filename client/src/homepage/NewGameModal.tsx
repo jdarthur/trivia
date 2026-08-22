@@ -7,9 +7,19 @@ import GameNames from "./GameNames"
 import {PlusSquareOutlined} from "@ant-design/icons";
 import PageHeader from "../common/PageHeader";
 
-class NewGameModal extends React.Component {
+interface Props {
+    token: string
+}
 
-    state = {
+interface State {
+    open: boolean
+    selected_game: string
+    name: string
+}
+
+class NewGameModal extends React.Component<Props, State> {
+
+    state: State = {
         open: false,
         selected_game: "",
         name: ""
@@ -21,11 +31,11 @@ class NewGameModal extends React.Component {
     close = () => {
         this.setState({open: false})
     }
-    set_name = (event) => {
+    set_name = (event: React.ChangeEvent<HTMLInputElement>) => {
         this.setState({name: event.target.value})
     }
 
-    select_game = (game_id) => {
+    select_game = (game_id: string) => {
         if (this.state.selected_game === game_id) {
             this.setState({selected_game: ""})
         } else {
@@ -59,7 +69,7 @@ class NewGameModal extends React.Component {
 
                 <Modal
                     title="New Game"
-                    visible={this.state.open}
+                    open={this.state.open}
                     onOk={this.create_new_game}
                     okText="Create"
                     onCancel={this.close}
@@ -93,7 +103,7 @@ class NewGameModal extends React.Component {
     }
 }
 
-async function create_session(round_data) {
+async function create_session(round_data: any) {
     const url = "/gameplay/session"
     const body = JSON.stringify(round_data)
 

@@ -11,8 +11,16 @@ const GAME = "Games"
 
 const {SubMenu} = Menu
 
+interface Props {
+    edit: (section: string) => void
+    play: () => void
+    collapsed: boolean
+    authorized: boolean
+    setToken: (token: string) => void
+}
 
-export const AppMenu = (props) => {
+
+export const AppMenu = (props: Props) => {
 
     const edit_question = () => {
         props.edit(QUESTION)
@@ -46,5 +54,3 @@ export const AppMenu = (props) => {
         </Menu>
     );
 };
-
-

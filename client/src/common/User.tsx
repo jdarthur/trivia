@@ -5,8 +5,11 @@ import LogoutButton from "./Logout2";
 import {useAuth0} from "@auth0/auth0-react";
 import {MOCK_AVATAR, isMockMode} from "./mockUser";
 
+interface Props {
+    mockName?: string | null
+}
 
-const User = ({mockName}) => {
+const User = ({mockName}: Props) => {
 
     const {user} = useAuth0();
     const isMock = isMockMode();
@@ -19,7 +22,7 @@ const User = ({mockName}) => {
 
     return (
         <Popover content={content} title={name} trigger="click" placement="bottomRight">
-            <img src={picture} alt={name} style={{width: 40, height: 40, cursor: 'pointer'}}/>
+            <img src={picture} alt={name ?? undefined} style={{width: 40, height: 40, cursor: 'pointer'}}/>
         </Popover>
 
     );

@@ -1,7 +1,7 @@
 import React from 'react';
 import './Lobby.css';
 
-import {ICONS} from "./Icons.jsx"
+import {ICONS} from "./Icons"
 
 import {Card, Input, Button, Tooltip} from 'antd';
 
@@ -13,9 +13,22 @@ const REAL_NAME = "real_name"
 const ICON = "icon"
 const PLAYER_BASE = "/gameplay/player"
 
-class LobbyPlayer extends React.Component {
+interface Props {
+    session_id: string
+    player_id: string
+    excluded_icons: string[]
+}
 
-    constructor(props) {
+interface State {
+    team_name: string
+    real_name: string
+    icon: string
+    dirty: boolean
+}
+
+class LobbyPlayer extends React.Component<Props, State> {
+
+    constructor(props: Props) {
         super(props)
 
         const randInt = Math.floor(Math.random() * Object.keys(ICONS).length)
@@ -35,7 +48,7 @@ class LobbyPlayer extends React.Component {
             sendData(url, "GET")
                 .then((data) => {
                     console.log(data)
-                    const d = {team_name: data.team_name, real_name: data.real_name}
+                    const d: any = {team_name: data.team_name, real_name: data.real_name}
                     if (data.icon) {
                         d.icon = data.icon
                     }
@@ -44,14 +57,14 @@ class LobbyPlayer extends React.Component {
         }
     }
 
-    set_team_name = (event) => {
-        this.setState({[TEAM_NAME]: event.target.value, dirty: true})
+    set_team_name = (event: React.ChangeEvent<HTMLInputElement>) => {
+        this.setState({[TEAM_NAME]: event.target.value, dirty: true} as State)
     }
-    set_real_name = (event) => {
-        this.setState({[REAL_NAME]: event.target.value, dirty: true})
+    set_real_name = (event: React.ChangeEvent<HTMLInputElement>) => {
+        this.setState({[REAL_NAME]: event.target.value, dirty: true} as State)
     }
-    set_icon = (value) => {
-        this.setState({[ICON]: value, dirty: true})
+    set_icon = (value: string) => {
+        this.setState({[ICON]: value, dirty: true} as State)
     }
 
     save = () => {
@@ -81,7 +94,7 @@ class LobbyPlayer extends React.Component {
             })
     }
 
-    add_player_to_session = (player) => {
+    add_player_to_session = (player: any) => {
         //add player to
         const player_id = player.id
         const session_id = this.props.session_id
@@ -161,7 +174,7 @@ class LobbyPlayer extends React.Component {
 }
 
 
-async function sendData(url, method, data) {
+async function sendData(url: string, method: string, data?: any) {
     let body
     if (data !== undefined) {
         const copy = Object.assign({}, data)

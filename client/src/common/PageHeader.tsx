@@ -1,11 +1,17 @@
 import {Breadcrumb} from "antd";
 import React from "react";
 
-export default function PageHeader(props) {
+interface Props {
+    breadcrumbs?: React.ReactNode[]
+    header?: React.ReactNode
+    style?: React.CSSProperties
+}
+
+export default function PageHeader(props: Props) {
 
     const breadcrumbItems = props.breadcrumbs?.map((item, index) => <Breadcrumb.Item key={index}>{item}</Breadcrumb.Item>)
 
-    let style = { marginLeft: 20, marginTop: 15, display: "flex", alignItems: "center", justifyContent: "flex-start", flexWrap: "wrap" }
+    let style: React.CSSProperties = { marginLeft: 20, marginTop: 15, display: "flex", alignItems: "center", justifyContent: "flex-start", flexWrap: "wrap" }
     if (props.style) {
         style = Object.assign(style, props.style)
     }
@@ -20,4 +26,3 @@ export default function PageHeader(props) {
         </div>
     </div>
 }
-

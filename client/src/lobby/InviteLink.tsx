@@ -7,10 +7,14 @@ import {CopyOutlined, InfoCircleOutlined} from '@ant-design/icons';
 
 const INVITE_LINK = "inviteLink"
 
-class InviteLink extends React.Component {
+interface Props {
+    session_id: string
+}
+
+class InviteLink extends React.Component<Props> {
 
     copy_link = () => {
-        const copyText = document.getElementById(INVITE_LINK);
+        const copyText = document.getElementById(INVITE_LINK) as HTMLTextAreaElement;
 
         copyText.select();
         copyText.setSelectionRange(0, 99999); /*For mobile devices*/
