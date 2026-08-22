@@ -1,0 +1,154 @@
+import React, {useState} from 'react';
+import './Question.css';
+
+import {Input, Modal, Radio} from 'antd';
+import FormattedQuestion from "./FormattedQuestion"
+import EditorToolbar from "./EditorToolbar";
+import {ANSWER, CATEGORY, QUESTION} from "./EditQuestionController";
+import ScoringNote from "./ScoringNote";
+
+const {TextArea} = Input;
+
+const EDIT = "Edit"
+const PREVIEW = "Preview"
+
+interface Props {
+    title: string
+    visible: boolean
+    cancel: () => void
+    save_text: string
+    save?: () => void
+    save_action?: () => void
+    category: string
+    question: string
+    answer: string
+    scoring_note: string
+    footer: React.ReactNode
+    set_category: (value: string) => void
+    set_question: (value: string) => void
+    set_answer: (value: string) => void
+    set_scoring_note: (value: string) => void
+    set_scoring_note_was_cleared?: (value: boolean) => void
+    initialValues?: any
+}
+
+export default function EditQuestionModal(props: Props) {
+
+    const [selectedTab, setSelectedTab] = useState(EDIT)
+    const [focusedInput, setFocusedInput] = useState(CATEGORY)
+
+    const wrap = (wrapWith: string) => {
+        const activeElement = document.getElementById(focusedInput) as HTMLInputElement | null
+        if (activeElement) {
+            const selectionStart = activeElement.selectionStart as number
+            const selectionEnd = activeElement.selectionEnd as number
+            if (activeElement.id === QUESTION) {
+                const value = wrapValue(props.question, selectionStart, selectionEnd, wrapWith)
+                console.log(value)
+                props.set_question(value)
+            }
+            if (activeElement.id === ANSWER) {
+                props.set_answer(wrapValue(props.answer, selectionStart, selectionEnd, wrapWith))
+            }
+        }
+    }
+
+    const wrap_line = (wrapWithBefore: string, wrapWithAfter: string) => {
+        const activeElement = document.getElementById(focusedInput) as HTMLInputElement | null
+        if (activeElement) {
+            const selectionStart = activeElement.selectionStart as number
+            const selectionEnd = activeElement.selectionEnd as number
+
+            if (activeElement.id === QUESTION) {
+                let value = props.question.slice(0, selectionStart)
+                const selected = props.question.slice(selectionStart, selectionEnd)
+                const selected_lines = selected.split("\n")
+
+                selected_lines.forEach(line => value += [wrapWithBefore, line, wrapWithAfter ? wrapWithAfter : ""].join(""))
+                props.set_question(value + props.question.slice(selectionEnd))
+            }
+            if (activeElement.id === ANSWER) {
+                let value = props.answer.slice(0, selectionStart)
+                const selected = props.answer.slice(selectionStart, selectionEnd)
+                const selected_lines = selected.split("\n")
+
+                selected_lines.forEach(line => value += [wrapWithBefore, line, wrapWithAfter ? wrapWithAfter : ""].join(""))
+                props.set_answer(value + props.answer.slice(selectionEnd))
+            }
+        }
+    }
+
+    const insert = (text: string) => {
+        const activeElement = document.getElementById(focusedInput) as HTMLInputElement | null
+        if (activeElement) {
+            if (activeElement.id === QUESTION || activeElement.id === CATEGORY) {
+                props.set_question(props.question + text)
+            }
+            if (activeElement.id === ANSWER) {
+                props.set_answer(props.answer + text)
+            }
+        }
+    }
+
+
+    const view = selectedTab === EDIT ?
+        <div>
+            <TextArea autoFocus={!!props.category} placeholder="Question" value={props.question}
+                      style={{marginBottom: 10}} id={QUESTION} onClick={() => setFocusedInput(QUESTION)}
+                      onChange={(event) => props.set_question(event.target.value)} autoSize={{minRows: 4}}
+                      onPressEnter={null as any}/>
+
+            <TextArea autoFocus={!!(props.category && props.question && !props.answer)}
+                      placeholder="Answer" value={props.answer} autoSize={{minRows: 2}}
+                      onClick={() => setFocusedInput(ANSWER)} onChange={(event) => props.set_answer(event.target.value)}
+                      onPressEnter={null as any} id={ANSWER}/>
+        </div> :
+        <div style={{border: '1px solid #d9d9d9', borderRadius: 2, padding: 10}}>
+            <FormattedQuestion question={props.question}
+                               answer={props.answer} max_width={425}/>
+        </div>
+
+    return (
+        <Modal
+            open={props.visible}
+            onOk={props.save}
+            title={props.title}
+            onCancel={props.cancel}
+            footer={props.footer}
+            width="500px">
+
+            <div style={{display: "flex", flexDirection: "column"}}>
+                <span style={{display: "flex", marginBottom: 10}}>
+    <Input autoFocus={!props.category} placeholder="Category" value={props.category}
+           onClick={(event) => setFocusedInput(event as unknown as string)} id={CATEGORY}
+           onChange={(event) => props.set_category(event.target.value)} onPressEnter={null as any}/>
+                <ScoringNote scoring_note={props.scoring_note}
+                             set_scoring_note={props.set_scoring_note}
+                             set_scoring_note_was_cleared={props.set_scoring_note_was_cleared}
+                />
+                </span>
+
+                <span style={{display: "flex", justifyContent: "space-between", alignItems: "center"}}>
+
+                            <Radio.Group buttonStyle="solid" onChange={(event) => setSelectedTab(event.target.value)}
+                                         value={selectedTab}
+                                         defaultValue={EDIT} size="small">
+                                <Radio.Button key={EDIT} value={EDIT}> {EDIT} </Radio.Button>
+                                <Radio.Button key={PREVIEW} value={PREVIEW}> {PREVIEW} </Radio.Button>
+                            </Radio.Group>
+
+                            <EditorToolbar wrap={wrap} wrap_line={wrap_line} insert={insert}/>
+                        </span>
+
+                {view}
+            </div>
+        </Modal>
+    );
+
+}
+
+function wrapValue(value: string, fromIndex: number, toIndex: number, withValue: string) {
+    return [value.slice(0, fromIndex),
+        withValue, value.slice(fromIndex, toIndex), withValue,
+        value.slice(toIndex)].join("")
+}
