@@ -5,7 +5,16 @@ import PlayerIcon from '../lobby/PlayerIcon';
 import {Card} from "antd"
 import ShortTextWithPopover from "../common/ShortTextWithPopover";
 
-class PlayerScore extends React.Component {
+interface Props {
+    team_name: string
+    score: number
+    icon_name?: string
+    player_id?: string
+    current_player?: string
+    background: string
+}
+
+class PlayerScore extends React.Component<Props> {
     render() {
         const icon = <div className="delete-edit-mini">
             <PlayerIcon icon_name={this.props.icon_name}/>

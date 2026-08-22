@@ -5,9 +5,28 @@ import "./Scorer.css"
 
 import {Button} from "antd"
 
-class PlayerScorer extends React.Component {
+interface ScoreState {
+    correct?: boolean
+    score_override?: number | string | null
+}
 
-    state = {
+interface Props {
+    session_id: string
+    player_id: string
+    round_id: string | number
+    question_id: string | number
+    session_state: any
+    scored: boolean
+}
+
+interface State {
+    scores: Record<string, ScoreState>
+    answers: any[]
+}
+
+class PlayerScorer extends React.Component<Props, State> {
+
+    state: State = {
         scores: {},
         answers: []
     }
@@ -25,7 +44,7 @@ class PlayerScorer extends React.Component {
 
     }
 
-    componentDidUpdate(prevProps) {
+    componentDidUpdate(prevProps: Props) {
         if (this.props.session_state !== prevProps.session_state && prevProps.session_state) {
             if (this.props.question_id === prevProps.question_id) {
                 this.get_answers()
@@ -47,7 +66,7 @@ class PlayerScorer extends React.Component {
             url += "&question_id=" + this.props.question_id
             console.log(url)
             sendData(url, "GET")
-                .then((data) => {
+                .then((data: any) => {
                     this.log_answer_lag(data)
                     console.log(data)
                     sessionStorage.setItem("answers", JSON.stringify(data.answers))
@@ -58,7 +77,7 @@ class PlayerScorer extends React.Component {
         }
     }
 
-    log_answer_lag = (data) => {
+    log_answer_lag = (data: any) => {
         let timestamp = 0;
         for (let i = 0; i < data.length; i++) {
             let answers = data[i]?.answers || []
@@ -89,12 +108,12 @@ class PlayerScorer extends React.Component {
             }
 
             sendData(url, "PUT", body)
-                .then((data) => {
+                .then((data: any) => {
                 })
         }
     }
 
-    set_correct = (player_id, correct) => {
+    set_correct = (player_id: string, correct: boolean) => {
 
         const scores = this.state.scores
         if (scores[player_id] === undefined) {
@@ -104,7 +123,7 @@ class PlayerScorer extends React.Component {
 
         const wager = this.get_wager(player_id)
         if (correct) {
-            scores[player_id].score_override = wager
+            scores[player_id].score_override = wager as number | null
         }
         if (!correct) {
             scores[player_id].score_override = 0
@@ -113,7 +132,7 @@ class PlayerScorer extends React.Component {
         this.setState({scores: scores})
     }
 
-    get_wager = (player_id) => {
+    get_wager = (player_id: string): number | null | undefined => {
         for (let i = 0; i < this.state.answers.length; i++) {
             if (this.state.answers[i].player_id === player_id) {
                 return this.state.answers?.length > 0 ?
@@ -123,7 +142,7 @@ class PlayerScorer extends React.Component {
         }
     }
 
-    set_override = (player_id, value) => {
+    set_override = (player_id: string, value: number | string | null) => {
         const scores = this.state.scores
         if (scores[player_id] === undefined) {
             scores[player_id] = {}
@@ -132,14 +151,14 @@ class PlayerScorer extends React.Component {
         this.setState({scores: scores})
     }
 
-    clear = (player_id) => {
+    clear = (player_id: string) => {
         const scores = this.state.scores
         delete scores[player_id]
         this.setState({scores: scores})
     }
 
     scorable = () => {
-        if (this.state.scores.length === 0) {
+        if ((this.state.scores as any).length === 0) {
             return false
         }
         for (let i = 0; i < this.state.answers.length; i++) {
@@ -155,14 +174,14 @@ class PlayerScorer extends React.Component {
     }
 
     render() {
-        const answers = this.state.answers?.map(player => {
+        const answers = this.state.answers?.map((player: any) => {
             const status = this.state.scores[player.player_id] || {}
             const override_value = status.score_override !== undefined ? status.score_override : 0
             return <PlayerAnswer key={player.player_id} player_id={player.player_id}
                                  answers={player.answers} clear={this.clear} set_correct={this.set_correct}
                                  player_name={player.team_name} correct={status.correct}
                                  session_id={this.props.session_id}
-                                 set_override={this.set_override} override_value={override_value}/>
+                                 set_override={this.set_override} override_value={override_value as number}/>
         })
 
         return (

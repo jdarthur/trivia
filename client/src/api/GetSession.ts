@@ -1,5 +1,5 @@
-const get_session_remote = async function get_session(url, method, data) {
-    let body
+const get_session_remote = async function get_session(url: string, method: string, data?: unknown): Promise<any> {
+    let body: string | undefined
     if (data !== undefined) {
         const copy = Object.assign({}, data)
         body = JSON.stringify(copy)
@@ -13,8 +13,8 @@ const get_session_remote = async function get_session(url, method, data) {
     return response.json()
 }
 
-function get_session_from_browser_storage(session_id) {
+function get_session_from_browser_storage(session_id: string) {
 
 }
 
-export default get_session
+export default get_session_remote

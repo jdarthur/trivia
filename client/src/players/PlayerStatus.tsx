@@ -5,16 +5,30 @@ import CorrectOrNot from "./CorrectOrNot"
 import "./Players.css"
 import {Button, Modal} from 'antd';
 
+interface Props {
+    session_id: string
+    player_id: string
+    round_id: string | number | null | undefined
+    question_id: string | number | null | undefined
+    session_state: any
+    scored: boolean
+    is_mobile?: boolean
+}
 
-class PlayerStatus extends React.Component {
+interface State {
+    answers: any[]
+    modal_open: boolean
+}
 
-    state = {
+class PlayerStatus extends React.Component<Props, State> {
+
+    state: State = {
         answers: [],
         modal_open: false
     }
 
     componentDidMount() {
-        const statusStored = JSON.parse(sessionStorage.getItem("status"))
+        const statusStored = JSON.parse(sessionStorage.getItem("status") || "null")
         if (statusStored) {
             this.setState({answers: statusStored}, () => this.get_answers())
         } else {
@@ -22,7 +36,7 @@ class PlayerStatus extends React.Component {
         }
     }
 
-    componentDidUpdate(prevProps) {
+    componentDidUpdate(prevProps: Props) {
         if (this.props.session_state !== prevProps.session_state) {
             this.get_answers()
         } else if (this.props.question_id !== prevProps.question_id) {
@@ -43,7 +57,7 @@ class PlayerStatus extends React.Component {
 
             console.log(this.props)
             sendData(url, "GET")
-                .then((data) => {
+                .then((data: any) => {
                     console.log(data)
                     if (data.answers) {
                         sessionStorage.setItem("status", JSON.stringify(data.answers))
@@ -66,7 +80,7 @@ class PlayerStatus extends React.Component {
 
     render() {
 
-        const answers = this.state.answers?.map(player => {
+        const answers = this.state.answers?.map((player: any) => {
 
             if (this.props.scored)
                 return <CorrectOrNot key={player.team_name} player_name={player.team_name}
@@ -79,7 +93,7 @@ class PlayerStatus extends React.Component {
                                        current_player={this.props.player_id} player_id={player.player_id}/>
         })
 
-        const modal_answers = this.state.answers?.map(player => {
+        const modal_answers = this.state.answers?.map((player: any) => {
             return <CorrectOrNot key={player.team_name} player_name={player.team_name}
                                  answers={player.answers} wager={player.wager} correct={player.correct}
                                  points_awarded={player.points_awarded} icon_name={player.icon}
@@ -87,7 +101,7 @@ class PlayerStatus extends React.Component {
                                  is_mobile={false}/>
 
         })
-        const modal = <Modal title={null} visible={this.state.modal_open} onCancel={this.close_modal}
+        const modal = <Modal title={null} open={this.state.modal_open} onCancel={this.close_modal}
                              centered={true} width='min(250px, 70vw)' footer={null}>
             <div> {modal_answers} </div>
         </Modal>
@@ -104,7 +118,7 @@ class PlayerStatus extends React.Component {
     }
 }
 
-function ready_to_call(round_id, question_id) {
+function ready_to_call(round_id: string | number | null | undefined, question_id: string | number | null | undefined) {
     if (round_id === null) return false
     if (round_id === undefined) return false
     if (round_id === "") return false

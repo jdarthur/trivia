@@ -1,7 +1,12 @@
 import React from 'react';
 import './ActiveGame.css';
 
-class CategoryInRound extends React.Component {
+interface Props {
+    name: string
+    active: boolean
+}
+
+class CategoryInRound extends React.Component<Props> {
   render() {
     const rclass = "round-category" + (this.props.active ? " active" : "")
     return (

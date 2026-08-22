@@ -7,10 +7,35 @@ import AnswerQuestion from "../answer/AnswerQuestion"
 import PlayerScorer from "../admin-scorer/PlayerScorer"
 import PlayerStatus from "../players/PlayerStatus"
 import Scoreboard from '../scoreboard/Scoreboard';
+import type {RoundInGame} from "../types/models"
 
-class ActiveGame extends React.Component {
+interface Props {
+    session_id: string
+    player_id: string
+    session_state: any
+    is_mod: boolean
+    rounds: number[]
+    is_mobile?: boolean
+    fullRounds: RoundInGame[]
+}
 
-    constructor(props) {
+interface State {
+    question: string
+    answer: string
+    category: string
+    active_question: number | string
+    active_round: number | string
+    categories: string[]
+    wagers: number[]
+    scored: boolean | unknown[]
+    round_name: string
+    scoring_note?: string
+    scoring_note_id?: string
+}
+
+class ActiveGame extends React.Component<Props, State> {
+
+    constructor(props: Props) {
         super(props)
         this.state = {
             question: "",
@@ -30,7 +55,7 @@ class ActiveGame extends React.Component {
         this.get_round()
     }
 
-    componentDidUpdate(prevProps) {
+    componentDidUpdate(prevProps: Props) {
         if (this.props.session_state !== prevProps.session_state) {
             this.get_current_question().then(() => this.get_round())
         }
@@ -39,7 +64,7 @@ class ActiveGame extends React.Component {
     get_round = () => {
         let url = "/gameplay/session/" + this.props.session_id + "/current-round"
         return fetch(url).then(response => response.json())
-            .then(r => {
+            .then((r: {id: number, name: string, categories: string[], wagers: number[]}) => {
                 console.log(r)
                 this.setState({
                     categories: r.categories,
@@ -53,7 +78,10 @@ class ActiveGame extends React.Component {
     get_current_question = () => {
         let url = "/gameplay/session/" + this.props.session_id + "/current-question?player_id=" + this.props.player_id
         return fetch(url).then(response => response.json())
-            .then(q => {
+            .then((q: {
+                question: string, answer: string, category: string, id: number,
+                scored: boolean, scoring_note: string, scoring_note_id: string
+            }) => {
                 console.log(q)
                 this.setState({
                     question: q.question,
@@ -80,7 +108,7 @@ class ActiveGame extends React.Component {
                                          name={this.state.round_name}/>
                             <ActiveQuestion session_state={this.props.session_state} session_id={this.props.session_id}
                                             question={this.state.question} answer={this.state.answer}
-                                            scored={this.state.scored}
+                                            scored={this.state.scored as boolean}
                                             round_name={this.state.round_name} category={this.state.category}
                                             editable={this.props.is_mod}
                                             player_id={this.props.player_id} round_index={this.state.active_round}
@@ -95,7 +123,7 @@ class ActiveGame extends React.Component {
                                                               session_id={this.props.session_id}
                                                               player_id={this.props.player_id}
                                                               session_state={this.props.session_state}
-                                                              scored={this.state.scored}
+                                                              scored={this.state.scored as boolean}
                                                               wagers={this.state.wagers}/> : null}
 
                         {this.props.is_mod ?
@@ -117,13 +145,13 @@ class ActiveGame extends React.Component {
                     <PlayerScorer question_id={this.state.active_question}
                                   round_id={this.state.active_round} session_id={this.props.session_id}
                                   player_id={this.props.player_id} session_state={this.props.session_state}
-                                  scored={this.state.scored}/> : null}
+                                  scored={this.state.scored as boolean}/> : null}
 
                 {!this.props.is_mod ?
                     <PlayerStatus question_id={this.state.active_question}
                                   round_id={this.state.active_round} session_id={this.props.session_id}
                                   player_id={this.props.player_id} session_state={this.props.session_state}
-                                  scored={this.state.scored} is_mobile={this.props.is_mobile}/> : null}
+                                  scored={this.state.scored as boolean} is_mobile={this.props.is_mobile}/> : null}
             </div>
         );
     }

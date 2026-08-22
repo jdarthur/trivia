@@ -7,9 +7,30 @@ import FormattedQuestion, {MemoFormattedQuestion} from "../question/FormattedQue
 import HotEditQuestion from "./HotEditQuestion";
 import HotEditRoundName from "./HotEditRoundName";
 
-class ActiveQuestion extends React.Component {
+interface Props {
+    session_state: any
+    session_id: string
+    question: string
+    answer: string
+    scored: boolean
+    round_name: string
+    category: string
+    editable: boolean
+    player_id: string
+    round_index: number | string
+    question_index: number | string
+    scoring_note?: string
+    scoring_note_id?: string
+}
 
-    state = {
+interface State {
+    question_editor_open: boolean
+    round_editor_open: boolean
+}
+
+class ActiveQuestion extends React.Component<Props, State> {
+
+    state: State = {
         question_editor_open: false,
         round_editor_open: false
     }

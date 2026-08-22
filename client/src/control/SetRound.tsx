@@ -3,7 +3,15 @@ import sendData from "../index"
 
 import {Button} from "antd"
 
-class SetRound extends React.Component {
+interface Props {
+    session_id: string
+    player_id: string
+    target: number
+    question_target?: number
+    label: string
+}
+
+class SetRound extends React.Component<Props> {
 
     set_round = () => {
         const url = "/gameplay/session/" + this.props.session_id + "/current-round"
@@ -14,7 +22,7 @@ class SetRound extends React.Component {
         }
 
         sendData(url, "PUT", body)
-            .then((data) => {
+            .then((data: any) => {
                 console.log(data)
             })
     }

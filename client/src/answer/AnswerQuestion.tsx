@@ -7,9 +7,26 @@ import { Card, Input, Button } from 'antd';
 
 const { TextArea } = Input;
 
-class AnswerQuestion extends React.Component {
+interface Props {
+    question: number | string
+    round: number | string
+    session_id: string
+    player_id: string
+    session_state: any
+    scored: boolean
+    wagers?: number[]
+}
 
-    state = {
+interface State {
+    answer: string
+    wager: number | string | null
+    dirty: boolean
+    answered: boolean
+}
+
+class AnswerQuestion extends React.Component<Props, State> {
+
+    state: State = {
         answer: "",
         wager: null,
         dirty: false,
@@ -17,14 +34,14 @@ class AnswerQuestion extends React.Component {
     }
 
 
-    componentDidUpdate(prevProps) {
+    componentDidUpdate(prevProps: Props) {
         if (this.props.question !== prevProps.question || this.props.round !== prevProps.round) {
             this.setState({ answer: "", wager: null, dirty: false, answered: false })
         }
     }
 
-    set_answer = (event) => { this.setState({ answer: event.target.value, dirty: true }) }
-    set_wager = (event) => { this.setState({ wager: event.target.value, dirty: true }) }
+    set_answer = (event: any) => { this.setState({ answer: event.target.value, dirty: true }) }
+    set_wager = (event: any) => { this.setState({ wager: event.target.value, dirty: true }) }
 
     sendable = () => {
         return (
@@ -34,7 +51,7 @@ class AnswerQuestion extends React.Component {
             !this.props.scored)
     }
 
-    handleKeyPress = (event) => {
+    handleKeyPress = (event: React.KeyboardEvent) => {
         if (event.key === 'Enter') {
             if (event.altKey) {
                 console.log("alt-enter")
@@ -60,7 +77,7 @@ class AnswerQuestion extends React.Component {
             console.log(url)
             console.log(answer)
             sendData(url, "POST", answer)
-                .then((data) => { this.setState({ dirty: false, answered: true }) })
+                .then((data: any) => { this.setState({ dirty: false, answered: true }) })
         }
     }
 

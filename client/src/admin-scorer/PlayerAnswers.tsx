@@ -1,5 +1,5 @@
 import React from 'react';
-import ScorerLink from "./ScorerLink.jsx"
+import ScorerLink from "./ScorerLink"
 import MultiAnswer from "./MultiAnswer"
 
 import {Button, Card, InputNumber, Popover, Slider, Space} from "antd"
@@ -8,6 +8,23 @@ import {
     CheckOutlined, CloseOutlined, SlidersOutlined,
 } from '@ant-design/icons';
 import ShortTextWithPopover from "../common/ShortTextWithPopover";
+
+interface AnswerLike {
+    answer: string
+    wager: number
+}
+
+interface Props {
+    player_id: string
+    set_correct: (player_id: string, correct: boolean) => void
+    set_override: (player_id: string, value: number | string | null) => void
+    correct?: boolean
+    override_value: number
+    answers?: AnswerLike[]
+    session_id: string
+    player_name: string
+    clear?: (player_id: string) => void
+}
 
 export default function PlayerAnswers({
                                           player_id,
@@ -18,7 +35,7 @@ export default function PlayerAnswers({
                                           answers,
                                           session_id,
                                           player_name
-                                      }) {
+                                      }: Props) {
 
     // on new answer, clear out the existing score
 
@@ -30,7 +47,7 @@ export default function PlayerAnswers({
         set_correct(player_id, false)
     }
 
-    const setOverride = (value) => {
+    const setOverride = (value: number | string | null) => {
         set_override(player_id, value)
     }
 
@@ -41,7 +58,7 @@ export default function PlayerAnswers({
 
     let override = correct === false ? 0 : override_value
     const wager = <div style={{paddingLeft: '10px', fontSize: '1.3em', fontWeight: 'bold'}}>
-        {answers?.length > 0 ? answers[answers?.length - 1].wager : null}
+        {answers && answers.length > 0 ? answers[answers.length - 1].wager : null}
     </div>
 
     const modalContent = <div style={{width: 200, display: "flex", flexDirection: "column"}}>
@@ -60,7 +77,7 @@ export default function PlayerAnswers({
         <ShortTextWithPopover text={player_name} maxLength={20}/>
     </div>
 
-    let correctButtonText = ""
+    let correctButtonText: React.ReactNode = ""
     if (correct === true) {
         correctButtonText = override === 0 ? wager : override
     }
@@ -71,7 +88,7 @@ export default function PlayerAnswers({
               style={{'width': 200}} bodyStyle={{padding: 0}}>
             <div className="answered-or-not"> {answer_text} </div>
 
-            {answers?.length > 0 ?
+            {answers && answers.length > 0 ?
                 <div className="score-and-override">
                     <div className="answer-scorer">
 

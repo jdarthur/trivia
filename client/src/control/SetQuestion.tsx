@@ -3,9 +3,21 @@ import sendData from "../index"
 
 import { Button } from "antd"
 
-class SetQuestion extends React.Component {
+interface Props {
+    session_id: string
+    player_id: string
+    round_id: string | number
+    target: number
+    label: string
+}
 
-    state = {
+interface State {
+    loading: boolean
+}
+
+class SetQuestion extends React.Component<Props, State> {
+
+    state: State = {
         loading: false
     }
 
@@ -19,7 +31,7 @@ class SetQuestion extends React.Component {
         //TODO: come up with a better question ID solution
         this.setState({loading: true} , () => {
             sendData(url, "PUT", body)
-            .then((data) => {
+            .then((data: any) => {
               console.log(data)
               this.setState({loading: false})
             })
