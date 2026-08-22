@@ -7,17 +7,17 @@
 export const MOCK_AVATAR =
     "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40'%3E%3Crect width='40' height='40' fill='%2355acee'/%3E%3Ctext x='20' y='27' font-size='18' text-anchor='middle' fill='white' font-family='sans-serif'%3E?%3C/text%3E%3C/svg%3E";
 
-export function getMockUserName() {
+export function getMockUserName(): string | null {
     const params = new URLSearchParams(window.location.search);
     return params.get("mockUser");
 }
 
-export function isMockMode() {
+export function isMockMode(): boolean {
     return !!getMockUserName();
 }
 
 // base64url-encode a string (RFC 4648 §5), the form JWT segments use.
-function b64url(str) {
+function b64url(str: string): string {
     return btoa(unescape(encodeURIComponent(str)))
         .replace(/\+/g, "-")
         .replace(/\//g, "_")
@@ -26,7 +26,7 @@ function b64url(str) {
 
 // buildMockToken makes an unsigned (alg "none") JWT carrying the dev-mode sub
 // and a future exp. The trailing signature segment is empty for "none".
-export function buildMockToken(name) {
+export function buildMockToken(name: string): string {
     const header = b64url(JSON.stringify({alg: "none", typ: "JWT"}));
     const payload = b64url(JSON.stringify({
         sub: `dev|${name}`,

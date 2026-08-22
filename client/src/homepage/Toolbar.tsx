@@ -4,7 +4,12 @@ import './Toolbar.css';
 const PLAY = "play"
 const EDITOR = "editor"
 
-class Toolbar extends React.Component {
+interface Props {
+    select: (value: string) => void
+    selected: string
+}
+
+class Toolbar extends React.Component<Props> {
 
   gameplay = () => {
     console.log(PLAY)

@@ -6,8 +6,17 @@ import DeletePlayer from "./DeletePlayer"
 
 import { Card } from 'antd';
 
+interface Props {
+  team_name: string
+  real_name: string
+  create_date: string
+  icon_name: string
+  player_id: string
+  session_id: string
+  admin_id: string
+}
 
-class OtherPlayer extends React.Component {
+class OtherPlayer extends React.Component<Props> {
 
   render() {
     const date = new Date(this.props.create_date);

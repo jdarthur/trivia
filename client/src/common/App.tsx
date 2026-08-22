@@ -1,7 +1,7 @@
 import React, {useEffect, useState} from 'react';
 import {Link, Outlet, Route, Routes} from "react-router-dom";
 
-import HomePage from "../homepage/Homepage.jsx"
+import HomePage from "../homepage/Homepage"
 
 import './App.css';
 import logo from "./borttrivia.png"
@@ -79,7 +79,7 @@ export default function App() {
                 });
                 setToken(authToken)
                 dispatch(setAuthToken({authToken}));
-            } catch (e) {
+            } catch (e: any) {
                 console.error("could not get an editor access token:", e.error || e.message);
                 setToken("")
                 dispatch(logoutUser())

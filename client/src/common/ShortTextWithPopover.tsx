@@ -1,7 +1,12 @@
 import {Tooltip} from "antd";
 import React from "react";
 
-export default function ShortTextWithPopover({text, maxLength}) {
+interface Props {
+    text: string
+    maxLength: number
+}
+
+export default function ShortTextWithPopover({text, maxLength}: Props) {
 
     let usePopover = false
     let displayText = text
@@ -19,4 +24,3 @@ export default function ShortTextWithPopover({text, maxLength}) {
         return <span>{text}</span>
     }
 }
-

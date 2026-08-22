@@ -1,19 +1,19 @@
 import React from 'react';
 import {createRoot} from 'react-dom/client';
 import {Auth0Provider} from "@auth0/auth0-react";
-import App from './common/App.jsx';
+import App from './common/App';
 
 import {store, history} from './api/store';
 import {Provider} from "react-redux";
 import {AUDIENCE, SCOPE} from "./common/authConfig";
 
-function redirectCallBack(appState) {
+function redirectCallBack(appState: any) {
     if (appState?.returnTo) {
         history.replace((appState && appState.returnTo) || window.location.pathname);
     }
 }
 
-createRoot(document.getElementById('root')).render(
+createRoot(document.getElementById('root') as HTMLElement).render(
     <Auth0Provider
         domain="borttrivia.us.auth0.com"
         clientId="03cLv60jN7hC79K8oUXHDF1wsenRTMx5"
@@ -45,7 +45,7 @@ window.addEventListener('resize', () => {
     document.documentElement.style.setProperty('--vh', `${vh}px`);
 });
 
-const sendData = async function sendData(url, method, data) {
+const sendData = async function sendData(url: string, method: string, data?: any) {
     let body
     if (data !== undefined) {
         const copy = Object.assign({}, data)

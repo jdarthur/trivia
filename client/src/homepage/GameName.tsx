@@ -2,7 +2,16 @@ import React from 'react';
 import './Homepage.css';
 import { Card } from 'antd';
 
-class GameName extends React.Component {
+interface Props {
+    id: string
+    name: string
+    select: (game_id: string) => void
+    selected: boolean
+    round_count: number
+    create_date: string
+}
+
+class GameName extends React.Component<Props> {
 
   select_self = () => {
     this.props.select(this.props.id)
@@ -12,7 +21,7 @@ class GameName extends React.Component {
     const background = this.props.selected ? "#d9d9d9" : ""
     const date = new Date(this.props.create_date);
 
-    const options = { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' };
+    const options: Intl.DateTimeFormatOptions = { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' };
     const dateString = date.toLocaleDateString(undefined, options);
 
     return (

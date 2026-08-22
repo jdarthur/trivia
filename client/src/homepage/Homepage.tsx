@@ -3,12 +3,30 @@ import './Homepage.css';
 import NewGameModal from "./NewGameModal"
 import GameLobby from "../lobby/GameLobby"
 import ActiveGame from "../active/ActiveGame"
+import type {RoundInGame} from "../types/models"
 
 const SESSION_ID = "session_id"
 const PLAYER_ID = "player_id"
 
-class Homepage extends React.Component {
-    constructor(props) {
+interface Props {
+    set_started: (started: boolean, isMod: boolean) => void
+    is_mobile: boolean
+    set_is_mod: (isMod: boolean) => void
+    token: string
+}
+
+interface State {
+    session_id: string
+    player_id: string
+    sess_state: any
+    is_mod: boolean
+    started: boolean
+    rounds: number[]
+    fullRounds: RoundInGame[]
+}
+
+class Homepage extends React.Component<Props, State> {
+    constructor(props: Props) {
         super(props)
         this.state = {
             session_id: "",
@@ -27,7 +45,7 @@ class Homepage extends React.Component {
         let session_id = params.get(SESSION_ID);
         let player_id = params.get(PLAYER_ID);
 
-        const state = {}
+        const state: any = {}
         if (session_id) {
             state[SESSION_ID] = session_id
         }
@@ -73,8 +91,8 @@ class Homepage extends React.Component {
                 .then(response => response.json())
                 .then(state => {
                     console.log(state)
-                    const roundIndices = state.rounds ? state.rounds.map((round, index) => index) : []
-                    const update = {
+                    const roundIndices = state.rounds ? state.rounds.map((round: any, index: number) => index) : []
+                    const update: any = {
                         is_mod: state.mod !== undefined,
                         name: state.name,
                         started: !!state.started,
@@ -83,7 +101,7 @@ class Homepage extends React.Component {
                     }
 
                     if (!sessionStorage.getItem("started") && state.started) {
-                        sessionStorage.setItem("started", true)
+                        sessionStorage.setItem("started", "true")
                     }
                     if (!sessionStorage.getItem("is_mod") && update.is_mod) {
                         sessionStorage.setItem("is_mod", update.is_mod)

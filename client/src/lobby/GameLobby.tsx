@@ -7,9 +7,20 @@ import OtherPlayers from "./OtherPlayers"
 import {Layout, Button, Breadcrumb} from 'antd';
 import {PlaySquareOutlined} from '@ant-design/icons';
 
-class GameLobby extends React.Component {
-    state = {excluded_icons: []}
-    set_excluded_icons = (excluded_icons) => {
+interface Props {
+    session_id: string
+    player_id: string
+    session_state: any
+    is_mod: boolean
+}
+
+interface State {
+    excluded_icons: string[]
+}
+
+class GameLobby extends React.Component<Props, State> {
+    state: State = {excluded_icons: []}
+    set_excluded_icons = (excluded_icons: string[]) => {
         this.setState({excluded_icons: excluded_icons})
     }
 
@@ -55,7 +66,7 @@ class GameLobby extends React.Component {
     }
 }
 
-async function sendData(url, method, data) {
+async function sendData(url: string, method: string, data?: any) {
     let body
     if (data !== undefined) {
         const copy = Object.assign({}, data)

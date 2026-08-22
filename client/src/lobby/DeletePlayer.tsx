@@ -1,7 +1,13 @@
 import React from 'react';
 import DeleteConfirm from "../editor/DeleteConfirm"
 
-class ScorerLink extends React.Component {
+interface Props {
+    session_id: string
+    player_id: string
+    admin_id: string
+}
+
+class ScorerLink extends React.Component<Props> {
     delete = () => {
         console.log("Delete session " + this.props.session_id + " / user " + this.props.player_id + " as admin " + this.props.admin_id)
         deletePlayer(this.props.session_id, this.props.player_id, this.props.admin_id)
@@ -10,7 +16,7 @@ class ScorerLink extends React.Component {
     render() { return <DeleteConfirm delete={this.delete} /> }
 }
 
-async function deletePlayer(session_id, player_id, admin_id) {
+async function deletePlayer(session_id: string, player_id: string, admin_id: string) {
     const url = "/gameplay/session/" + session_id + "/remove"
 
     let body = JSON.stringify({

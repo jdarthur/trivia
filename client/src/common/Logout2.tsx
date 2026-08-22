@@ -4,7 +4,11 @@ import { Button } from "antd"
 import {useDispatch} from "react-redux";
 import {logoutUser} from "../api/auth";
 
-const LogoutButton = (props) => {
+interface Props {
+    mock?: boolean
+}
+
+const LogoutButton = (props: Props) => {
     const { logout } = useAuth0();
     const dispatch = useDispatch()
 

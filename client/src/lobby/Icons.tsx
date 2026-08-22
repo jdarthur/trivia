@@ -31,7 +31,7 @@ import {
 } from '@ant-design/icons';
 
 
-export const ICONS = {
+export const ICONS: Record<string, React.ReactNode> = {
     "fire": <FireOutlined />, "rocket": <RocketOutlined />,
     "crown": <CrownOutlined />, "experiment": <ExperimentOutlined />,
     "thunderbolt": <ThunderboltOutlined />, "like": <LikeOutlined />,
