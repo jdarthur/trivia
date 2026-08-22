@@ -405,6 +405,12 @@ test.describe('gameplay question flow, answering & wagering', () => {
 // Drive the player's answer card to submit an answer with a wager.
 async function answerQuestion(page: Page, wager: number, answer: string) {
   const card = playerAnswerCard(page);
+  // Wait for the answer card to settle into a fresh state (empty textarea).
+  // AnswerQuestion's componentDidUpdate resets answer/wager/dirty whenever the
+  // question/round prop changes, so if we interact before the player's long-poll
+  // has received the advanced question, the reset wipes our input and the Answer
+  // button stays disabled. Waiting for the empty textarea closes that race.
+  await expect(card.locator('textarea[placeholder="Your answer"]')).toHaveValue('');
   await card.locator('textarea[placeholder="Your answer"]').fill(answer);
   await card.locator('.ant-radio-button-wrapper').filter({ hasText: String(wager) }).click();
   const button = card.getByRole('button', { name: 'Answer', exact: true });
