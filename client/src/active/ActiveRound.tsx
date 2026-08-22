@@ -2,8 +2,13 @@ import React from 'react';
 import './ActiveGame.css';
 import CategoryInRound from "./CategoryInRound"
 
+interface Props {
+    categories?: string[]
+    active_question: number | string
+    name?: string
+}
 
-class ActiveRound extends React.Component {
+class ActiveRound extends React.Component<Props> {
 
   render() {
     const categories = this.props.categories?.map((category, index) => (

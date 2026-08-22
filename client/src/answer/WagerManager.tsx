@@ -3,9 +3,24 @@ import "./AnswerQuestion.css"
 import sendData from "../index"
 import {Radio} from 'antd';
 
-class WagerManager extends React.Component {
+interface Props {
+    session_id: string
+    player_id: string
+    round_id: number | string
+    question_id: number | string
+    wager?: number | string | null
+    select: (event: any) => void
+    all_wagers?: number[]
+}
 
-    constructor(props) {
+interface State {
+    available_wagers: number[]
+    avail_count?: Record<number, number>
+}
+
+class WagerManager extends React.Component<Props, State> {
+
+    constructor(props: Props) {
         super(props)
         this.state = {
             available_wagers: [],
@@ -13,20 +28,22 @@ class WagerManager extends React.Component {
         this.fetchCounter = 0
     }
 
+    fetchCounter = 0
+
     componentDidMount() {
         this.get_available_wagers()
     }
 
-    componentDidUpdate(prevProps) {
+    componentDidUpdate(prevProps: Props) {
         printDiffs(this.props, prevProps)
         if (this.props.question_id !== prevProps.question_id || this.props.round_id !== prevProps.round_id) {
             this.get_available_wagers()
         }
     }
 
-    set_available_wagers = (resp) => {
-        const available = []
-        const avail_count = {}
+    set_available_wagers = (resp: number[]) => {
+        const available: number[] = []
+        const avail_count: Record<number, number> = {}
         for (let i = 0; i < resp?.length; i++) {
             const wager = resp[i]
             if (available.indexOf(resp[i]) === -1) {
@@ -52,14 +69,14 @@ class WagerManager extends React.Component {
 
             console.log(url)
             sendData(url, "GET")
-                .then((data) => {
+                .then((data: number[]) => {
                     console.log(data)
                     // Only apply if this is still the latest request
                     if (currentFetch === this.fetchCounter) {
                         this.set_available_wagers(data)
                     }
                 })
-                .catch((err) => {
+                .catch((err: any) => {
                     console.error("Failed to fetch available wagers:", err)
                 })
         }
@@ -67,17 +84,19 @@ class WagerManager extends React.Component {
 
     render() {
         const sorted = this.props.all_wagers?.sort()
-        const wager_elements = []
-        const used_wagers = []
-        for (let i = 0; i < sorted?.length; i++) {
-            const wager = sorted[i]
-            if (!used_wagers.includes(wager)) {
-                const disabled = !(this.state.available_wagers || []).includes(wager)
-                wager_elements.push(<Radio.Button key={wager} value={wager}
-                                                  disabled={disabled}> {wager} </Radio.Button>)
-                used_wagers.push(wager)
-            }
+        const wager_elements: React.ReactNode[] = []
+        const used_wagers: number[] = []
+        if (sorted) {
+            for (let i = 0; i < sorted.length; i++) {
+                const wager = sorted[i]
+                if (!used_wagers.includes(wager)) {
+                    const disabled = !(this.state.available_wagers || []).includes(wager)
+                    wager_elements.push(<Radio.Button key={wager} value={wager}
+                                                      disabled={disabled}> {wager} </Radio.Button>)
+                    used_wagers.push(wager)
+                }
 
+            }
         }
 
         const can_wager = this.state.available_wagers.length > 0
@@ -95,7 +114,7 @@ class WagerManager extends React.Component {
     }
 }
 
-function printDiffs(current, previous) {
+function printDiffs(current: any, previous: any) {
     for (let key in current) {
         if (current[key] !== previous[key]) {
             console.log("update " + key + ", '" + previous[key] + "' -> '" + current[key] + "'")

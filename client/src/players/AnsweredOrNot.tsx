@@ -9,7 +9,16 @@ import {
 } from '@ant-design/icons';
 import ShortTextWithPopover from "../common/ShortTextWithPopover";
 
-class AnsweredOrNot extends React.Component {
+interface Props {
+    icon_name: string
+    player_name: string
+    player_id: string
+    current_player: string
+    answered: boolean
+    is_mobile?: boolean
+}
+
+class AnsweredOrNot extends React.Component<Props> {
 
     render() {
         const icon = <div className="delete-edit-mini">

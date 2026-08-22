@@ -1,13 +1,25 @@
 import React from 'react';
 import '../question/Question.css';
 
-class HotEditRoundName extends React.Component {
+interface Props {
+    round_index: number | string
+    round_name: string
+    close: () => void
+    session_id: string
+    player_id: string
+}
 
-    state = {
+interface State {
+    round_name: string
+}
+
+class HotEditRoundName extends React.Component<Props, State> {
+
+    state: State = {
         round_name: this.props.round_name
     }
 
-    set_round_name = (event) => {
+    set_round_name = (event: React.ChangeEvent<HTMLInputElement>) => {
         this.setState({round_name: event.target.value})
     }
 
@@ -18,7 +30,7 @@ class HotEditRoundName extends React.Component {
                 round_name: this.state.round_name
             }
 
-            save(this.props.session_id, this.props.player_id, body).then((data) => {
+            save(this.props.session_id, this.props.player_id, body).then((data: any) => {
                 this.props.close()
             })
         }
@@ -27,7 +39,7 @@ class HotEditRoundName extends React.Component {
         }
     }
 
-    handleKeyPress = (event) => {
+    handleKeyPress = (event: React.KeyboardEvent<HTMLInputElement>) => {
         if (event.key === 'Enter') {
             event.preventDefault()
             this.save_self()
@@ -42,7 +54,7 @@ class HotEditRoundName extends React.Component {
     }
 }
 
-async function save(session_id, player_id, body) {
+async function save(session_id: string, player_id: string, body: any): Promise<any> {
     const url = "/gameplay/session/" + session_id + "/hot-edit-round-name?player_id=" + player_id
     const response = await fetch(url, {
         method: "PUT",

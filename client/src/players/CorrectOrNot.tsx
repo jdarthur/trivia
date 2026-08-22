@@ -11,16 +11,34 @@ import {
 } from '@ant-design/icons';
 import ShortTextWithPopover from "../common/ShortTextWithPopover";
 
+interface AnswerLike {
+    answer: string
+    wager: number
+    correct?: boolean
+    points_awarded?: number
+}
+
+interface Props {
+    player_name: string
+    answers?: AnswerLike[]
+    icon_name: string
+    current_player: string
+    player_id: string
+    is_mobile?: boolean
+    wager?: number
+    correct?: boolean
+    points_awarded?: number
+}
 
 /**
  * this is a player view of other teams' correctness
  * aftr the question has been scored
  */
-class CorrectOrNot extends React.Component {
+class CorrectOrNot extends React.Component<Props> {
 
     render() {
-        let last_answer = {}
-        if (this.props.answers?.length > 0) {
+        let last_answer: AnswerLike = {answer: "", wager: 0}
+        if (this.props.answers && this.props.answers.length > 0) {
             last_answer = this.props.answers[this.props.answers.length - 1]
         }
 
@@ -37,7 +55,7 @@ class CorrectOrNot extends React.Component {
         </div>
 
         //correctness icon + wager
-        const class_name = "player-wager " + (last_answer.correct && last_answer.points_awarded > 0 ? "" : "in") + "correct"
+        const class_name = "player-wager " + (last_answer.correct && (last_answer.points_awarded ?? 0) > 0 ? "" : "in") + "correct"
         let correctness_and_wager = <div className={class_name}>
             <div> {last_answer.correct ? last_answer.points_awarded : last_answer.wager} </div>
             <div> {last_answer.correct ? <CheckSquareOutlined/> : <CloseSquareOutlined/>} </div>

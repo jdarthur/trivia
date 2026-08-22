@@ -8,16 +8,31 @@ import { Modal, Button } from 'antd';
 import {
     FundProjectionScreenOutlined
 } from '@ant-design/icons';
+import type { PlayerScore as PlayerScoreModel } from '../types/models';
 
-class Scoreboard extends React.Component {
+interface Props {
+    session_id: string
+    player_id: string
+    round_id: string | number | null
+    session_state: any
+    question_id?: string | number
+    is_mobile?: boolean
+}
 
-    state = {
+interface State {
+    scores: PlayerScoreModel[]
+    open: boolean
+}
+
+class Scoreboard extends React.Component<Props, State> {
+
+    state: State = {
         scores: [],
         open: false
     }
 
     componentDidMount() {
-        const scoresStored = JSON.parse(sessionStorage.getItem("scoreboard"))
+        const scoresStored = JSON.parse(sessionStorage.getItem("scoreboard") || "null")
         if (scoresStored) {
             this.setState({ scores: scoresStored }, () => this.get_scoreboard())
         } else {
@@ -25,7 +40,7 @@ class Scoreboard extends React.Component {
         }
     }
 
-    componentDidUpdate(prevProps) {
+    componentDidUpdate(prevProps: Props) {
         if (this.props.session_state !== prevProps.session_state) {
             this.get_scoreboard()
         }
@@ -45,7 +60,7 @@ class Scoreboard extends React.Component {
             url += "?player_id=" + this.props.player_id
             console.log(url)
             sendData(url, "GET")
-                .then((data) => {
+                .then((data: any) => {
                     console.log(data)
                     sessionStorage.setItem("scoreboard", JSON.stringify(data.scores))
                     this.setState({ scores: data.scores })
@@ -88,7 +103,7 @@ class Scoreboard extends React.Component {
                 <FundProjectionScreenOutlined />
             </Button>
 
-        const modal = <Modal title={null} visible={this.state.open}
+        const modal = <Modal title={null} open={this.state.open}
             onCancel={this.close} centered={true} width='min(250px, 70vw)' footer={null} >
             <div> {scoreboard} </div>
         </Modal>
@@ -103,7 +118,7 @@ class Scoreboard extends React.Component {
     }
 }
 
-function sum(list) {
+function sum(list: number[] | undefined) {
     return (list || []).reduce(function (a, b) { return a + b; }, 0);
 }
 

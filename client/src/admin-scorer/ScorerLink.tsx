@@ -1,7 +1,12 @@
 import React from 'react';
 import { ExportOutlined } from '@ant-design/icons';
 
-class ScorerLink extends React.Component {
+interface Props {
+    session_id: string
+    player_id: string
+}
+
+class ScorerLink extends React.Component<Props> {
 
     render() {
         const url = window.location.href.split("?")[0] + "?session_id=" +
