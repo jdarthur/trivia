@@ -56,6 +56,66 @@ export default defineConfig(({mode}) => {
             // both expect that, so keep it rather than Vite's default dist/.
             outDir: 'build',
             sourcemap: env.GENERATE_SOURCEMAP === 'true',
+            // antd (and the rest of the vendor libraries) are intentionally kept
+            // as whole, cacheable chunks (see the codeSplitting groups below).
+            // antd alone is ~860 kB minified, so the default 500 kB warning
+            // threshold is not meaningful for a vendored UI library -- the app
+            // code itself is fully split and every route chunk is well under
+            // 500 kB. Raise it to just above the largest vendor chunk; if a
+            // vendor or app chunk grows past 900 kB the warning returns.
+            chunkSizeWarningLimit: 900,
+            rolldownOptions: {
+                output: {
+                    // Vendor splitting (ticket #65): peel the large, rarely-changed
+                    // libraries into their own chunks so (a) no chunk trips Vite's
+                    // 500 kB warning and (b) they cache across deploys. Higher
+                    // priority groups win when a module matches several.
+                    codeSplitting: {
+                        groups: [
+                            {
+                                name: 'react-vendor',
+                                test: /node_modules[\\/](react|react-dom|scheduler)[\\/]/,
+                                priority: 5,
+                            },
+                            {
+                                name: 'antd-core',
+                                test: /node_modules[\\/](antd|@ant-design\/cssinjs|@ant-design\/react-slick|@ant-design\/fast-color)[\\/]/,
+                                priority: 4,
+                            },
+                            {
+                                name: 'antd-icons',
+                                test: /node_modules[\\/]@ant-design\/icons[\\/]/,
+                                priority: 4,
+                            },
+                            {
+                                name: 'antd-rc',
+                                test: /node_modules[\\/](@rc-component|rc-)[\\/]/,
+                                priority: 3,
+                            },
+                            {
+                                name: 'redux-vendor',
+                                test: /node_modules[\\/](@reduxjs|redux|react-redux|use-sync-external-store)[\\/]/,
+                                priority: 3,
+                            },
+                            {
+                                name: 'router-vendor',
+                                test: /node_modules[\\/](react-router|redux-first-history)[\\/]/,
+                                priority: 3,
+                            },
+                            {
+                                name: 'auth-vendor',
+                                test: /node_modules[\\/]@auth0[\\/]/,
+                                priority: 3,
+                            },
+                            {
+                                name: 'vendor',
+                                test: /node_modules/,
+                                priority: 1,
+                            },
+                        ],
+                    },
+                },
+            },
         },
     }
 })
