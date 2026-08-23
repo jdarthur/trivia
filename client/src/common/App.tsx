@@ -1,4 +1,4 @@
-import React, {useEffect, useState} from 'react';
+import React, {lazy, Suspense, useEffect, useState} from 'react';
 import {Link, Outlet, Route, Routes} from "react-router-dom";
 
 import HomePage from "../homepage/Homepage"
@@ -7,12 +7,8 @@ import './App.css';
 import logo from "./borttrivia.png"
 
 import 'antd/dist/reset.css';
-import {Layout, Menu} from 'antd';
+import {Layout, Menu, Spin} from 'antd';
 import {FormOutlined} from '@ant-design/icons';
-import QuestionList from "../question/QuestionList";
-import RoundList from "../round/RoundList";
-import GameList from "../game/GameList";
-import CollectionList from "../collections/CollectionList";
 import {useAuth0} from "@auth0/auth0-react";
 import {useDispatch} from "react-redux";
 import {setToken as setAuthToken, logoutUser} from "../api/auth";
@@ -30,6 +26,18 @@ const QUESTION = "Questions"
 const ROUND = "Rounds"
 const GAME = "Games"
 const COLLECTION = "Collections"
+
+// Editor lists are lazy-loaded so anonymous players (who only ever hit "/")
+// don't download the editor bundle. Each is fetched on first navigation to its
+// route. See ticket #65.
+const QuestionList = lazy(() => import("../question/QuestionList"));
+const RoundList = lazy(() => import("../round/RoundList"));
+const GameList = lazy(() => import("../game/GameList"));
+const CollectionList = lazy(() => import("../collections/CollectionList"));
+
+function RouteFallback() {
+    return <div style={{display: "flex", justifyContent: "center", padding: "3rem"}}><Spin/></div>;
+}
 
 export default function App() {
 
@@ -145,24 +153,26 @@ export default function App() {
                 <Content style={{display: 'flex', flexDirection: 'column'}}>
                     <HistoryRouter history={history}>
                         {showToolbar ? menu : null}
-                        <Routes>
-                            <Route path="/" element={<HomePage set_started={setInGame}
-                                                               is_mobile={isMobile}
-                                                               set_is_mod={setIsMod}
-                                                               token={token}/>}/>
-                            <Route path="questions"
-                                   element={<AuthRequired token={token} component={<QuestionList/>}/>}/>
-                            <Route path="rounds" element={authRequired}>
-                                <Route index element={<RoundList token={token}/>}/>
-                            </Route>
-                            <Route path="games" element={authRequired}>
-                                <Route index element={<GameList token={token}/>}/>
-                            </Route>
-                            <Route path="collections" element={authRequired}>
-                                <Route index element={<AuthRequired token={token} component={<CollectionList/>}/>}/>
-                            </Route>
-                            <Route path="*" element={nothingView}/>
-                        </Routes>
+                        <Suspense fallback={<RouteFallback/>}>
+                            <Routes>
+                                <Route path="/" element={<HomePage set_started={setInGame}
+                                                                   is_mobile={isMobile}
+                                                                   set_is_mod={setIsMod}
+                                                                   token={token}/>}/>
+                                <Route path="questions"
+                                       element={<AuthRequired token={token} component={<QuestionList/>}/>}/>
+                                <Route path="rounds" element={authRequired}>
+                                    <Route index element={<RoundList token={token}/>}/>
+                                </Route>
+                                <Route path="games" element={authRequired}>
+                                    <Route index element={<GameList token={token}/>}/>
+                                </Route>
+                                <Route path="collections" element={authRequired}>
+                                    <Route index element={<AuthRequired token={token} component={<CollectionList/>}/>}/>
+                                </Route>
+                                <Route path="*" element={nothingView}/>
+                            </Routes>
+                        </Suspense>
                     </HistoryRouter>
                 </Content>
             </Layout>
