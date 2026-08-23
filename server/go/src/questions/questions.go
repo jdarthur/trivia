@@ -194,25 +194,203 @@ func (e MissingPairsError) Data() interface{} {
 	return e.Pairs
 }
 
-// validateQuestionType enforces per-type payload rules before the row and its
-// children are written. freeform has no child rows; multiple_choice needs at
-// least one correct choice; matching needs at least one pair.
+// MissingAnswerError is returned when a freeform question has no answer
+// (freeform keeps the mod-written answer, unlike structured types).
+type MissingAnswerError struct {
+	Question string
+}
+
+func (e MissingAnswerError) Error() string {
+	return "freeform question requires an answer"
+}
+
+func (e MissingAnswerError) Field() string {
+	return "answer"
+}
+
+func (e MissingAnswerError) Data() interface{} {
+	return e.Question
+}
+
+// FreeformChildRowsError is returned when a freeform question carries
+// structured child rows (choices or pairs), which it must not.
+type FreeformChildRowsError struct {
+	FieldName string
+	Rows      interface{}
+}
+
+func (e FreeformChildRowsError) Error() string {
+	return "freeform question cannot have " + e.FieldName
+}
+
+func (e FreeformChildRowsError) Field() string {
+	return e.FieldName
+}
+
+func (e FreeformChildRowsError) Data() interface{} {
+	return e.Rows
+}
+
+// MultipleChoiceWithPairsError is returned when a multiple_choice question
+// carries matching pairs (the two structured payloads are mutually exclusive).
+type MultipleChoiceWithPairsError struct {
+	Pairs []models.QuestionPair
+}
+
+func (e MultipleChoiceWithPairsError) Error() string {
+	return "multiple_choice question cannot have pairs"
+}
+
+func (e MultipleChoiceWithPairsError) Field() string {
+	return models.Pairs
+}
+
+func (e MultipleChoiceWithPairsError) Data() interface{} {
+	return e.Pairs
+}
+
+// TooFewChoicesError is returned when a multiple_choice question has fewer than
+// two options.
+type TooFewChoicesError struct {
+	Choices []models.QuestionChoice
+}
+
+func (e TooFewChoicesError) Error() string {
+	return "multiple_choice question requires at least two choices"
+}
+
+func (e TooFewChoicesError) Field() string {
+	return models.Choices
+}
+
+func (e TooFewChoicesError) Data() interface{} {
+	return e.Choices
+}
+
+// DuplicateChoiceTextError is returned when a multiple_choice question has two
+// options with the same text (ambiguous selection).
+type DuplicateChoiceTextError struct {
+	Text string
+}
+
+func (e DuplicateChoiceTextError) Error() string {
+	return "multiple_choice question cannot have duplicate option text"
+}
+
+func (e DuplicateChoiceTextError) Field() string {
+	return models.Choices
+}
+
+func (e DuplicateChoiceTextError) Data() interface{} {
+	return e.Text
+}
+
+// MatchingWithChoicesError is returned when a matching question carries
+// multiple_choice options (the two structured payloads are mutually exclusive).
+type MatchingWithChoicesError struct {
+	Choices []models.QuestionChoice
+}
+
+func (e MatchingWithChoicesError) Error() string {
+	return "matching question cannot have choices"
+}
+
+func (e MatchingWithChoicesError) Field() string {
+	return models.Choices
+}
+
+func (e MatchingWithChoicesError) Data() interface{} {
+	return e.Choices
+}
+
+// DuplicatePairTextError is returned when a matching question has two pairs
+// sharing a left text or a right text — an unambiguous mapping (and therefore
+// the JSON-map answer) is impossible otherwise.
+type DuplicatePairTextError struct {
+	Side string
+	Text string
+}
+
+func (e DuplicatePairTextError) Error() string {
+	return "matching question cannot have duplicate " + e.Side + " text"
+}
+
+func (e DuplicatePairTextError) Field() string {
+	return models.Pairs
+}
+
+func (e DuplicatePairTextError) Data() interface{} {
+	return e.Text
+}
+
+// validateQuestionType enforces the per-type payload rules before the row and
+// its children are written. The matrix (ticket #99):
+//
+//	freeform         answer required; choices/pairs empty
+//	multiple_choice  derived answer; 2+ options; exactly one correct (app
+//	                 enforces >=1, the DB partial unique index enforces <=1);
+//	                 no duplicate option text; pairs empty
+//	matching         derived answer; 1+ pairs; left texts unique; right texts
+//	                 unique (unambiguous mapping, makes the JSON-map answer
+//	                 safe); choices empty
 func validateQuestionType(data models.Question) error {
 	switch data.QuestionType {
 	case "freeform":
+		if data.Answer == "" {
+			return MissingAnswerError{Question: data.Question}
+		}
+		if len(data.Choices) != 0 {
+			return FreeformChildRowsError{FieldName: models.Choices, Rows: data.Choices}
+		}
+		if len(data.Pairs) != 0 {
+			return FreeformChildRowsError{FieldName: models.Pairs, Rows: data.Pairs}
+		}
 		return nil
 	case "multiple_choice":
+		if len(data.Pairs) != 0 {
+			return MultipleChoiceWithPairsError{Pairs: data.Pairs}
+		}
+		if len(data.Choices) < 2 {
+			return TooFewChoicesError{Choices: data.Choices}
+		}
+		seen := make(map[string]bool)
+		correct := 0
 		for _, c := range data.Choices {
 			if c.IsCorrect {
-				return nil
+				correct++
 			}
+			text := strings.TrimSpace(c.Text)
+			if seen[text] {
+				return DuplicateChoiceTextError{Text: c.Text}
+			}
+			seen[text] = true
 		}
-		return MissingCorrectChoiceError{Choices: data.Choices}
+		if correct < 1 {
+			return MissingCorrectChoiceError{Choices: data.Choices}
+		}
+		return nil
 	case "matching":
-		if len(data.Pairs) > 0 {
-			return nil
+		if len(data.Choices) != 0 {
+			return MatchingWithChoicesError{Choices: data.Choices}
 		}
-		return MissingPairsError{Pairs: data.Pairs}
+		if len(data.Pairs) < 1 {
+			return MissingPairsError{Pairs: data.Pairs}
+		}
+		leftSeen := make(map[string]bool)
+		rightSeen := make(map[string]bool)
+		for _, p := range data.Pairs {
+			left := strings.TrimSpace(p.Left)
+			right := strings.TrimSpace(p.Right)
+			if leftSeen[left] {
+				return DuplicatePairTextError{Side: "left", Text: p.Left}
+			}
+			if rightSeen[right] {
+				return DuplicatePairTextError{Side: "right", Text: p.Right}
+			}
+			leftSeen[left] = true
+			rightSeen[right] = true
+		}
+		return nil
 	default:
 		return InvalidQuestionTypeError{QuestionType: data.QuestionType}
 	}

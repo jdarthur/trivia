@@ -7,6 +7,8 @@ import (
 
 var RoundsUsed = "rounds_used"
 var QuestionType = "question_type"
+var Choices = "choices"
+var Pairs = "pairs"
 
 type Question struct {
 	ID          string    `json:"id"`
