@@ -282,6 +282,62 @@ var migrations = []migration{
 			)`,
 		},
 	},
+	{
+		version: 8,
+		name:    "question types",
+		statements: []string{
+			// ticket #98: questions gain a question_type (freeform by default —
+			// current behavior) plus multiple_choice and matching. Structured
+			// payloads live in normalized child tables, not embedded columns.
+			// The type and child rows travel into the session via the
+			// session_question snapshot so auto-scoring can use the snapshot.
+			`ALTER TABLE question ADD COLUMN question_type TEXT NOT NULL DEFAULT 'freeform'
+				CHECK (question_type IN ('freeform', 'multiple_choice', 'matching'))`,
+
+			`CREATE TABLE question_choice (
+				question_id TEXT NOT NULL REFERENCES question(id) ON DELETE CASCADE,
+				position    INTEGER NOT NULL,
+				text        TEXT NOT NULL DEFAULT '',
+				is_correct  INTEGER NOT NULL DEFAULT 0,
+				PRIMARY KEY (question_id, position)
+			)`,
+			// at most one correct option per question (the app also enforces
+			// at least one on write).
+			`CREATE UNIQUE INDEX idx_question_choice_one_correct
+				ON question_choice(question_id) WHERE is_correct = 1`,
+
+			`CREATE TABLE question_match (
+				question_id TEXT NOT NULL REFERENCES question(id) ON DELETE CASCADE,
+				position    INTEGER NOT NULL,
+				left_text   TEXT NOT NULL DEFAULT '',
+				right_text  TEXT NOT NULL DEFAULT '',
+				PRIMARY KEY (question_id, position)
+			)`,
+
+			`ALTER TABLE session_question ADD COLUMN question_type TEXT NOT NULL DEFAULT 'freeform'
+				CHECK (question_type IN ('freeform', 'multiple_choice', 'matching'))`,
+
+			`CREATE TABLE session_question_choice (
+				session_id     TEXT NOT NULL REFERENCES session(id) ON DELETE CASCADE,
+				round_index    INTEGER NOT NULL,
+				question_index INTEGER NOT NULL,
+				position       INTEGER NOT NULL,
+				text           TEXT NOT NULL DEFAULT '',
+				is_correct     INTEGER NOT NULL DEFAULT 0,
+				PRIMARY KEY (session_id, round_index, question_index, position)
+			)`,
+
+			`CREATE TABLE session_question_match (
+				session_id     TEXT NOT NULL REFERENCES session(id) ON DELETE CASCADE,
+				round_index    INTEGER NOT NULL,
+				question_index INTEGER NOT NULL,
+				position       INTEGER NOT NULL,
+				left_text      TEXT NOT NULL DEFAULT '',
+				right_text     TEXT NOT NULL DEFAULT '',
+				PRIMARY KEY (session_id, round_index, question_index, position)
+			)`,
+		},
+	},
 }
 
 // Migrate brings db up to the latest schema version, applying each pending

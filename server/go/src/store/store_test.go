@@ -36,8 +36,8 @@ func TestMigrateCreatesBaselineSchema(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Version: %v", err)
 	}
-	if v != 7 {
-		t.Fatalf("user_version = %d, want 7", v)
+	if v != 8 {
+		t.Fatalf("user_version = %d, want 8", v)
 	}
 
 	tables := []string{
@@ -47,6 +47,8 @@ func TestMigrateCreatesBaselineSchema(t *testing.T) {
 		"scoring_note", "player", "session", "session_player",
 		"session_question", "answer", "session_score", "session_state",
 		"user",
+		"question_choice", "question_match",
+		"session_question_choice", "session_question_match",
 	}
 	for _, name := range tables {
 		var n int
@@ -241,8 +243,8 @@ func TestMigrateIsIdempotent(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Version: %v", err)
 	}
-	if v != 7 {
-		t.Fatalf("user_version = %d after re-migrate, want 7", v)
+	if v != 8 {
+		t.Fatalf("user_version = %d after re-migrate, want 8", v)
 	}
 }
 
