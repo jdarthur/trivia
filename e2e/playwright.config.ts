@@ -21,9 +21,10 @@ export default defineConfig({
   // --dev-mode so the server uses a scratch SQLite DB (data/trivia-dev.db) and
   // skips the Auth0 JWKS fetch — which hard-fails offline and would otherwise make
   // the harness depend on Auth0 reachability. CLIENT_DIR points at the built client.
+  // --addr must be loopback: --dev-mode refuses to start on any other interface.
   webServer: {
     command:
-      'cd client && npm ci && npm run build && cd ../server/go/src && rm -f data/trivia-dev.db && go run . --dev-mode',
+      'cd client && npm ci && npm run build && cd ../server/go/src && rm -f data/trivia-dev.db && go run . --dev-mode --addr 127.0.0.1:8080',
     cwd: repoRoot,
     url: 'http://localhost:8080/',
     timeout: 180000,

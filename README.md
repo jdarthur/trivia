@@ -83,12 +83,20 @@ unsigned mock JWTs:
 
 ```sh
 cd server/go/src
-go run . --dev-mode
+go run . --dev-mode --addr 127.0.0.1:8080
 ```
 
 It prints a loud `WARNING: running in dev mode, Auth0 verification disabled`
 banner on boot. The dev database is a scratch file — safe to delete, and it
 never touches the standard `trivia.db`.
+
+**Security guardrail:** dev mode is only allowed on the loopback interface.
+Because it disables Auth0 verification and accepts unsigned mock JWTs, the API
+refuses to start with `--dev-mode` unless the listen address binds to
+`127.0.0.1`, `localhost`, or `::1`. The default listen address is `:8080`
+(all interfaces) — pass `--addr 127.0.0.1:8080` (or similar) when running in
+dev mode, or the server exits with a refusal message. A production build never
+enables dev mode, so `?mockUser` is inert against a real backend.
 
 The seeded mock users are `alice`, `bob`, `carol`, and `dave` (subs
 `dev|alice`, `dev|bob`, `dev|carol`, `dev|dave`). Log in as one by adding a

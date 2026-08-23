@@ -14,6 +14,7 @@ import (
 	"github.com/jdarthur/trivia/store"
 	"github.com/joho/godotenv"
 	"log"
+	"net"
 	"os"
 )
 
@@ -24,7 +25,15 @@ func main() {
 	// (which hard-fails offline), and accepts unsigned mock JWTs. It is never
 	// turned on silently via the environment.
 	devMode := flag.Bool("dev-mode", false, "run against a transient SQLite DB with seeded mock users and no Auth0 verification")
+	addr := flag.String("addr", ":8080", "address to listen on (host:port), e.g. 127.0.0.1:8080")
 	flag.Parse()
+
+	// Dev mode disables Auth0 and accepts unsigned mock JWTs, so it must never
+	// be exposed beyond the loopback interface. Refuse to start rather than
+	// silently serving unauthenticated editor endpoints to the network.
+	if *devMode && !listenOnLoopback(*addr) {
+		log.Fatalf("refusing to enable --dev-mode: it disables Auth0 verification and accepts unsigned mock JWTs, so it may only listen on the loopback interface (127.0.0.1, localhost, or ::1); got %q. Bind to a loopback address (e.g. --addr 127.0.0.1:8080).", *addr)
+	}
 
 	err := godotenv.Load()
 	if err != nil {
@@ -159,5 +168,30 @@ func main() {
 	serveClient(router, clientDir)
 
 	fmt.Println()
-	router.Run()
+	router.Run(*addr)
+}
+
+// listenOnLoopback reports whether addr binds to the loopback interface only.
+// It is the guard for --dev-mode, which disables Auth0 verification and
+// accepts unsigned mock JWTs and therefore must never be reachable off-box.
+//
+// addr is a Gin/Go listen address of the form "host:port" (e.g. ":8080",
+// "127.0.0.1:8080", "[::1]:8080"). A missing host (":8080") means "all
+// interfaces", which is NOT loopback; "localhost" and any loopback IP are.
+func listenOnLoopback(addr string) bool {
+	host, _, err := net.SplitHostPort(addr)
+	if err != nil {
+		// Not "host:port" (e.g. a bare port) — treat as non-loopback rather
+		// than guessing and accidentally allowing a network exposure.
+		return false
+	}
+	if host == "" {
+		// ":8080" binds to all interfaces.
+		return false
+	}
+	if host == "localhost" {
+		return true
+	}
+	ip := net.ParseIP(host)
+	return ip != nil && ip.IsLoopback()
 }
