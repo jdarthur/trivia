@@ -19,6 +19,9 @@ interface Props {
     hide_extra?: boolean
     select?: (id: string) => void
     delete?: (id: string) => void
+    question_type?: string
+    choices?: { text: string, is_correct: boolean }[]
+    pairs?: { left: string, right: string }[]
 }
 
 class ReadOnlyQuestion extends React.Component<Props> {
@@ -44,6 +47,19 @@ class ReadOnlyQuestion extends React.Component<Props> {
                 style={{ width: 225, margin: 5, background: background, cursor: cursor }}>
                 <FormattedQuestion question={this.props.question}
                     answer={this.props.answer} max_width={200} />
+                {this.props.question_type === "multiple_choice" && (this.props.choices || []).length > 0 ?
+                    <ol style={{marginTop: 8, paddingLeft: 18}}>
+                        {(this.props.choices || []).map((choice, index) => <li key={index}>{choice.text}</li>)}
+                    </ol> : null}
+                {this.props.question_type === "matching" && (this.props.pairs || []).length > 0 ?
+                    <table style={{marginTop: 8, borderCollapse: "collapse"}}>
+                        {(this.props.pairs || []).map((pair, index) => (
+                            <tr key={index}>
+                                <td style={{border: "1px solid #d9d9d9", padding: "2px 6px"}}>{pair.left}</td>
+                                <td style={{border: "1px solid #d9d9d9", padding: "2px 6px"}}>{pair.right}</td>
+                            </tr>
+                        ))}
+                    </table> : null}
             </Card>
         );
     }

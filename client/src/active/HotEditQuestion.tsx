@@ -3,6 +3,7 @@ import '../question/Question.css';
 
 import {Button} from 'antd';
 import EditQuestionModal from "../question/EditQuestionModal";
+import type {QuestionChoice, QuestionPair} from "../types/models";
 
 interface Props {
     category: string
@@ -14,6 +15,9 @@ interface Props {
     round_index: number | string
     scoring_note?: string
     question_index: number | string
+    question_type?: string
+    choices?: string[]
+    pairs?: QuestionPair[]
 }
 
 interface State {
@@ -37,6 +41,10 @@ class HotEditQuestion extends React.Component<Props, State> {
         this.setState({[key]: value} as unknown as State)
     }
 
+    structured = () => {
+        return this.props.question_type === "multiple_choice" || this.props.question_type === "matching"
+    }
+
     save_self = () => {
         console.log("save")
 
@@ -46,8 +54,9 @@ class HotEditQuestion extends React.Component<Props, State> {
             question: {
                 category: this.state.category,
                 question: this.state.question,
-                answer: this.state.answer,
-                scoring_note: this.state.scoring_note
+                answer: this.structured() ? this.props.answer : this.state.answer,
+                scoring_note: this.state.scoring_note,
+                question_type: this.props.question_type
             }
         }
 
@@ -57,6 +66,9 @@ class HotEditQuestion extends React.Component<Props, State> {
     }
 
     disabled = () => {
+        if (this.structured()) {
+            return this.props.category === "" || this.props.question === ""
+        }
         return this.props.category === "" || this.props.question === "" || this.props.answer === ""
     }
 
@@ -77,6 +89,12 @@ class HotEditQuestion extends React.Component<Props, State> {
                                set_answer={(value) => this.set_value("answer", value)}
                                scoring_note={this.state.scoring_note as string}
                                set_scoring_note={(value) => this.set_value("scoring_note", value)}
+                               question_type={this.props.question_type}
+                               choices={(this.props.choices || []).map((text, index) => ({
+                                   text: text, is_correct: false
+                               }))}
+                               pairs={this.props.pairs}
+                               disabled={this.structured()}
                                visible={true}/>
         );
     }

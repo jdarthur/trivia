@@ -17,6 +17,7 @@ interface Props {
     question_id: string | number
     session_state: any
     scored: boolean
+    question_type?: string
 }
 
 interface State {
@@ -71,10 +72,36 @@ class PlayerScorer extends React.Component<Props, State> {
                     console.log(data)
                     sessionStorage.setItem("answers", JSON.stringify(data.answers))
                     if (!data.errors) {
-                        this.setState({answers: data.answers})
+                        this.setState({answers: data.answers}, () => {
+                            // Structured question types are auto-scored by the
+                            // backend against the snapshot answer key, so the
+                            // mod does not judge correctness. Pre-mark every
+                            // player correct (override = wager) so the backend
+                            // awards the wager to right answers and zeroes
+                            // wrong ones; the mod may still adjust an override.
+                            if (this.auto_scored()) {
+                                this.auto_score()
+                            }
+                        })
                     }
                 })
         }
+    }
+
+    // true when the active question is auto-scored (multiple_choice / matching).
+    auto_scored = () => {
+        return this.props.question_type === "multiple_choice" || this.props.question_type === "matching"
+    }
+
+    // Pre-populate scores so the Score button is ready and the backend's
+    // auto-scoring decides correctness (the mod's correct flag is ignored for
+    // structured types; ScoreOverride is still honored).
+    auto_score = () => {
+        const scores: Record<string, ScoreState> = {}
+        for (const player of this.state.answers) {
+            scores[player.player_id] = {correct: true, score_override: this.get_wager(player.player_id) ?? null}
+        }
+        this.setState({scores: scores})
     }
 
     log_answer_lag = (data: any) => {
@@ -181,7 +208,8 @@ class PlayerScorer extends React.Component<Props, State> {
                                  answers={player.answers} clear={this.clear} set_correct={this.set_correct}
                                  player_name={player.team_name} correct={status.correct}
                                  session_id={this.props.session_id}
-                                 set_override={this.set_override} override_value={override_value as number}/>
+                                 set_override={this.set_override} override_value={override_value as number}
+                                 auto_scored={this.auto_scored()}/>
         })
 
         return (

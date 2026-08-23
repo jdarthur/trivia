@@ -21,6 +21,10 @@ interface Props {
     question_index: number | string
     scoring_note?: string
     scoring_note_id?: string
+    question_type?: string
+    choices?: string[]
+    lefts?: string[]
+    rights?: string[]
 }
 
 interface State {
@@ -66,6 +70,9 @@ class ActiveQuestion extends React.Component<Props, State> {
                              round_index={this.props.round_index}
                              scoring_note={this.props.scoring_note_id}
                              question_index={this.props.question_index}
+                             question_type={this.props.question_type}
+                             choices={this.props.choices}
+                             pairs={(this.props.lefts || []).map((left, index) => ({left, right: (this.props.rights || [])[index] || ""}))}
             /> : null
 
 
@@ -107,6 +114,27 @@ class ActiveQuestion extends React.Component<Props, State> {
                                            answer={this.props.answer} max_width={350}
                                            scored={this.props.scored}
                     />
+                    {this.props.question_type === "multiple_choice" && (this.props.choices || []).length > 0 ?
+                        <ol style={{marginTop: 10, paddingLeft: 20}}>
+                            {(this.props.choices || []).map((choice, index) => <li key={index}>{choice}</li>)}
+                        </ol> : null}
+                    {this.props.question_type === "matching" && (this.props.lefts || []).length > 0 ?
+                        <table style={{marginTop: 10, borderCollapse: "collapse", width: "100%"}}>
+                            <tbody>
+                                <tr>
+                                    <td style={{border: "1px solid #d9d9d9", padding: "4px 8px", verticalAlign: "top"}}>
+                                        <ul style={{margin: 0, paddingLeft: 18}}>
+                                            {(this.props.lefts || []).map((left, index) => <li key={index}>{left}</li>)}
+                                        </ul>
+                                    </td>
+                                    <td style={{border: "1px solid #d9d9d9", padding: "4px 8px", verticalAlign: "top"}}>
+                                        <ul style={{margin: 0, paddingLeft: 18}}>
+                                            {(this.props.rights || []).map((right, index) => <li key={index}>{right}</li>)}
+                                        </ul>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table> : null}
                     {editQuestionModal}
                 </div>
             </Card>

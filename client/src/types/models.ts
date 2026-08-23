@@ -20,6 +20,19 @@ export interface Question {
   rounds_used: string[];
   user_id: string;
   scoring_note: string;
+  question_type?: string;
+  choices?: QuestionChoice[];
+  pairs?: QuestionPair[];
+}
+
+export interface QuestionChoice {
+  text: string;
+  is_correct: boolean;
+}
+
+export interface QuestionPair {
+  left: string;
+  right: string;
 }
 
 /** models.Round */
@@ -88,6 +101,10 @@ export interface QuestionInRound {
   id: number;
   scoring_note: string;
   scoring_note_id: string;
+  question_type?: string;
+  choices?: string[];
+  lefts?: string[];
+  rights?: string[];
 }
 
 /** models.RoundInGame */

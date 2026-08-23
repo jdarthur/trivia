@@ -12,6 +12,9 @@ interface State {
     question: string
     category: string
     answer: string
+    question_type: string
+    choices: { text: string, is_correct: boolean }[]
+    pairs: { left: string, right: string }[]
 }
 
 class RemovableQuestion extends React.Component<Props, State> {
@@ -21,6 +24,9 @@ class RemovableQuestion extends React.Component<Props, State> {
             question: "",
             category: "",
             answer: "",
+            question_type: "",
+            choices: [],
+            pairs: [],
         }
     }
 
@@ -38,7 +44,10 @@ class RemovableQuestion extends React.Component<Props, State> {
                     {
                         category: state.category,
                         question: state.question,
-                        answer: state.answer
+                        answer: state.answer,
+                        question_type: state.question_type || "",
+                        choices: state.choices || [],
+                        pairs: state.pairs || [],
                     })
             })
     }
@@ -53,7 +62,9 @@ class RemovableQuestion extends React.Component<Props, State> {
             <div onClick={this.select_self} className="actionable-question">
                 <ReadOnlyQuestion id={this.props.id} question={this.state.question}
                     answer={this.state.answer} category={this.state.category}
-                    selected={this.props.selected} hide_extra={true}  />
+                    selected={this.props.selected} hide_extra={true}
+                    question_type={this.state.question_type}
+                    choices={this.state.choices} pairs={this.state.pairs}  />
             </div>
         );
 

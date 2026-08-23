@@ -31,6 +31,10 @@ interface State {
     round_name: string
     scoring_note?: string
     scoring_note_id?: string
+    question_type: string
+    choices: string[]
+    lefts: string[]
+    rights: string[]
 }
 
 class ActiveGame extends React.Component<Props, State> {
@@ -46,7 +50,11 @@ class ActiveGame extends React.Component<Props, State> {
             categories: [],
             wagers: [],
             scored: [],
-            round_name: ""
+            round_name: "",
+            question_type: "",
+            choices: [],
+            lefts: [],
+            rights: []
         }
     }
 
@@ -80,7 +88,8 @@ class ActiveGame extends React.Component<Props, State> {
         return fetch(url).then(response => response.json())
             .then((q: {
                 question: string, answer: string, category: string, id: number,
-                scored: boolean, scoring_note: string, scoring_note_id: string
+                scored: boolean, scoring_note: string, scoring_note_id: string,
+                question_type: string, choices: string[], lefts: string[], rights: string[]
             }) => {
                 console.log(q)
                 this.setState({
@@ -91,6 +100,10 @@ class ActiveGame extends React.Component<Props, State> {
                     scored: q.scored === true,
                     scoring_note: q.scoring_note,
                     scoring_note_id: q.scoring_note_id,
+                    question_type: q.question_type || "",
+                    choices: q.choices || [],
+                    lefts: q.lefts || [],
+                    rights: q.rights || [],
                 })
             })
     }
@@ -115,6 +128,10 @@ class ActiveGame extends React.Component<Props, State> {
                                             question_index={this.state.active_question}
                                             scoring_note={this.state.scoring_note}
                                             scoring_note_id={this.state.scoring_note_id}
+                                            question_type={this.state.question_type}
+                                            choices={this.state.choices}
+                                            lefts={this.state.lefts}
+                                            rights={this.state.rights}
                             />
                         </div>
 
@@ -124,7 +141,11 @@ class ActiveGame extends React.Component<Props, State> {
                                                               player_id={this.props.player_id}
                                                               session_state={this.props.session_state}
                                                               scored={this.state.scored as boolean}
-                                                              wagers={this.state.wagers}/> : null}
+                                                              wagers={this.state.wagers}
+                                                              question_type={this.state.question_type}
+                                                              choices={this.state.choices}
+                                                              lefts={this.state.lefts}
+                                                              rights={this.state.rights}/> : null}
 
                         {this.props.is_mod ?
                             <NextOrPrevious questions={question_indices} rounds={this.props.rounds}
@@ -145,7 +166,8 @@ class ActiveGame extends React.Component<Props, State> {
                     <PlayerScorer question_id={this.state.active_question}
                                   round_id={this.state.active_round} session_id={this.props.session_id}
                                   player_id={this.props.player_id} session_state={this.props.session_state}
-                                  scored={this.state.scored as boolean}/> : null}
+                                  scored={this.state.scored as boolean}
+                                  question_type={this.state.question_type}/> : null}
 
                 {!this.props.is_mod ?
                     <PlayerStatus question_id={this.state.active_question}

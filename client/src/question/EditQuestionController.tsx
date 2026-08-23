@@ -5,7 +5,7 @@ import {Button} from 'antd';
 import EditQuestionModal from "./EditQuestionModal";
 import {useCreateQuestionMutation, useDeleteQuestionMutation, useUpdateQuestionMutation} from "../api/main";
 import notify, {errorMessage} from "../common/notify";
-import type {Question} from "../types/models";
+import type {Question, QuestionChoice, QuestionPair} from "../types/models";
 
 export const CATEGORY = "category"
 export const QUESTION = "question"
@@ -26,12 +26,18 @@ export default function EditQuestionController(props: Props) {
     const [question, setQuestion] = useState("")
     const [answer, setAnswer] = useState("")
     const [scoringNote, setScoringNote] = useState("")
+    const [question_type, setQuestionType] = useState("freeform")
+    const [choices, setChoices] = useState<QuestionChoice[]>([])
+    const [pairs, setPairs] = useState<QuestionPair[]>([])
 
     useEffect(() => {
         console.log("useEffect: ", props.selected)
         setCategory(props.selected?.category || "")
         setQuestion(props.selected?.question || "")
         setAnswer(props.selected?.answer || "")
+        setQuestionType(props.selected?.question_type || "freeform")
+        setChoices(props.selected?.choices || [])
+        setPairs(props.selected?.pairs || [])
 
         if (props.scoringNoteWasCleared === false) {
             setScoringNote(props.selected?.scoring_note || "")
@@ -61,8 +67,11 @@ export default function EditQuestionController(props: Props) {
         const body = {
             category: category,
             question: question,
-            answer: answer,
-            scoring_note: scoringNote
+            answer: question_type === "freeform" ? answer : "",
+            scoring_note: scoringNote,
+            question_type: question_type,
+            choices: choices,
+            pairs: pairs
         }
 
         const response = !!id
@@ -105,6 +114,9 @@ export default function EditQuestionController(props: Props) {
                            set_answer={setAnswer} answer={answer}
                            set_scoring_note={setScoringNote} scoring_note={scoringNote}
                            set_scoring_note_was_cleared={props.setScoringNoteWasCleared}
+                           question_type={question_type} set_question_type={setQuestionType}
+                           choices={choices} set_choices={setChoices}
+                           pairs={pairs} set_pairs={setPairs}
                            visible={props.visible}/>
     );
 }
