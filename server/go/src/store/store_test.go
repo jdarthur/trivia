@@ -321,3 +321,115 @@ func TestDBPathUsesEnvOrDefault(t *testing.T) {
 		t.Errorf("DBPath() = %q, want /tmp/trivia.db", got)
 	}
 }
+
+// TestQuestionTypeCheckConstraint verifies the CHECK constraint on
+// question.question_type and session_question.question_type rejects values
+// outside freeform / multiple_choice / matching (ticket #99).
+func TestQuestionTypeCheckConstraint(t *testing.T) {
+	db := openTestDB(t)
+
+	// question table rejects a bad type
+	if _, err := db.Exec(
+		`INSERT INTO question (id, create_date, question_type) VALUES ('q1', '2026-01-01T00:00:00.000000', 'bogus')`,
+	); err == nil {
+		t.Error("expected CHECK violation inserting bad question_type on question")
+	}
+	// the three valid values are accepted
+	for _, typ := range []string{"freeform", "multiple_choice", "matching"} {
+		mustExec(t, db,
+			`INSERT INTO question (id, create_date, question_type) VALUES (?, '2026-01-01T00:00:00.000000', ?)`,
+			"q-"+typ, typ)
+	}
+
+	// session_question rejects a bad type too
+	mustExec(t, db, `INSERT INTO session (id, create_date) VALUES ('s1', '2026-01-01T00:00:00.000000')`)
+	if _, err := db.Exec(
+		`INSERT INTO session_question (session_id, round_index, question_index, question_type)
+		 VALUES ('s1', 0, 0, 'bogus')`,
+	); err == nil {
+		t.Error("expected CHECK violation inserting bad question_type on session_question")
+	}
+}
+
+// TestQuestionChoicePartialUniqueIndex verifies the partial unique index
+// idx_question_choice_one_correct allows at most one is_correct = 1 row per
+// question (the app enforces at least one; the DB enforces at most one).
+func TestQuestionChoicePartialUniqueIndex(t *testing.T) {
+	db := openTestDB(t)
+	mustExec(t, db, `INSERT INTO question (id, create_date) VALUES ('q1', '2026-01-01T00:00:00.000000')`)
+
+	// first correct option is fine
+	mustExec(t, db,
+		`INSERT INTO question_choice (question_id, position, text, is_correct) VALUES ('q1', 0, 'A', 1)`)
+	// an incorrect option is fine
+	mustExec(t, db,
+		`INSERT INTO question_choice (question_id, position, text, is_correct) VALUES ('q1', 1, 'B', 0)`)
+	// a second correct option violates the partial unique index
+	if _, err := db.Exec(
+		`INSERT INTO question_choice (question_id, position, text, is_correct) VALUES ('q1', 2, 'C', 1)`,
+	); err == nil {
+		t.Error("expected partial unique index to reject a second correct choice")
+	}
+}
+
+// TestQuestionDeleteCascadesChildren verifies deleting a question removes its
+// normalized question_choice / question_match child rows.
+func TestQuestionDeleteCascadesChildren(t *testing.T) {
+	db := openTestDB(t)
+	mustExec(t, db, `INSERT INTO question (id, create_date) VALUES ('q1', '2026-01-01T00:00:00.000000')`)
+	mustExec(t, db,
+		`INSERT INTO question_choice (question_id, position, text, is_correct) VALUES ('q1', 0, 'A', 1)`)
+	mustExec(t, db,
+		`INSERT INTO question_match (question_id, position, left_text, right_text) VALUES ('q1', 0, 'L', 'R')`)
+
+	mustExec(t, db, `DELETE FROM question WHERE id = 'q1'`)
+
+	var n int
+	if err := db.QueryRow(`SELECT count(*) FROM question_choice WHERE question_id = 'q1'`).Scan(&n); err != nil {
+		t.Fatal(err)
+	}
+	if n != 0 {
+		t.Errorf("question_choice rows survived question delete: %d", n)
+	}
+	if err := db.QueryRow(`SELECT count(*) FROM question_match WHERE question_id = 'q1'`).Scan(&n); err != nil {
+		t.Fatal(err)
+	}
+	if n != 0 {
+		t.Errorf("question_match rows survived question delete: %d", n)
+	}
+}
+
+// TestSessionDeleteCascadesSnapshotChildren verifies deleting a session removes
+// its session_question_choice / session_question_match snapshot rows.
+func TestSessionDeleteCascadesSnapshotChildren(t *testing.T) {
+	db := openTestDB(t)
+	mustExec(t, db, `INSERT INTO session (id, create_date) VALUES ('s1', '2026-01-01T00:00:00.000000')`)
+	mustExec(t, db,
+		`INSERT INTO session_question (session_id, round_index, question_index) VALUES ('s1', 0, 0)`)
+	mustExec(t, db,
+		`INSERT INTO session_question_choice (session_id, round_index, question_index, position, text, is_correct)
+		 VALUES ('s1', 0, 0, 0, 'A', 1)`)
+	mustExec(t, db,
+		`INSERT INTO session_question_match (session_id, round_index, question_index, position, left_text, right_text)
+		 VALUES ('s1', 0, 0, 0, 'L', 'R')`)
+
+	mustExec(t, db, `DELETE FROM session WHERE id = 's1'`)
+
+	var n int
+	if err := db.QueryRow(
+		`SELECT count(*) FROM session_question_choice WHERE session_id = 's1'`,
+	).Scan(&n); err != nil {
+		t.Fatal(err)
+	}
+	if n != 0 {
+		t.Errorf("session_question_choice rows survived session delete: %d", n)
+	}
+	if err := db.QueryRow(
+		`SELECT count(*) FROM session_question_match WHERE session_id = 's1'`,
+	).Scan(&n); err != nil {
+		t.Fatal(err)
+	}
+	if n != 0 {
+		t.Errorf("session_question_match rows survived session delete: %d", n)
+	}
+}

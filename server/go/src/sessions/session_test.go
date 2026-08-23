@@ -11,6 +11,7 @@ import (
 
 	"github.com/jdarthur/trivia/common"
 	"github.com/jdarthur/trivia/models"
+	"github.com/jdarthur/trivia/questions"
 	"github.com/jdarthur/trivia/store"
 	"github.com/gin-gonic/gin"
 )
@@ -732,5 +733,307 @@ func TestStartSessionPersistsCurrentQuestion(t *testing.T) {
 	}
 	if q.Answer == "" {
 		t.Fatalf("mod should see the answer: %s", rec.Body.String())
+	}
+}
+
+// ---- question-type auto-scoring (ticket #99) ----
+
+func createMCQuestion(t *testing.T, env *Env, choices []models.QuestionChoice) string {
+	t.Helper()
+	q, err := questions.CreateOneQuestion((*questions.Env)(env), "user-1", models.Question{
+		Question: "MC?", QuestionType: "multiple_choice", Choices: choices,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return q.ID
+}
+
+func createMatchingQuestion(t *testing.T, env *Env, pairs []models.QuestionPair) string {
+	t.Helper()
+	q, err := questions.CreateOneQuestion((*questions.Env)(env), "user-1", models.Question{
+		Question: "M?", QuestionType: "matching", Pairs: pairs,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return q.ID
+}
+
+// newStructuredSession builds a session around a single given question, two
+// players, and the (0,0) snapshot set.
+func newStructuredSession(t *testing.T, env *Env, questionId string) (session models.Session, p1 models.PlayerId, p2 models.PlayerId) {
+	t.Helper()
+	round := models.Round{Name: "R", Questions: []string{questionId}, Wagers: []int{100}}
+	roundId, _, err := common.Create((*common.Env)(env), common.RoundTable, &round)
+	if err != nil {
+		t.Fatal(err)
+	}
+	game := models.Game{Name: "G", Rounds: []string{roundId}, RoundNames: map[string]string{roundId: "R"}}
+	gameId, _, err := common.Create((*common.Env)(env), common.GameTable, &game)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	mod := createPlayer(t, env, "mod")
+	p1 = createPlayer(t, env, "team-1")
+	p2 = createPlayer(t, env, "team-2")
+
+	sessionId, _, err := common.Create((*common.Env)(env), common.SessionTable,
+		&models.Session{Name: "S", GameId: gameId, Moderator: mod})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := common.IncrementState((*common.Env)(env), sessionId); err != nil {
+		t.Fatal(err)
+	}
+	for _, p := range []models.PlayerId{p1, p2} {
+		if err := common.Push((*common.Env)(env), common.SessionTable, sessionId, models.Players, p); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	if err := common.GetOne((*common.Env)(env), common.SessionTable, sessionId, &session); err != nil {
+		t.Fatal(err)
+	}
+	if err := _setCurrentRound(env, &session, 0, 0); err != nil {
+		t.Fatal(err)
+	}
+	if err := common.GetOne((*common.Env)(env), common.SessionTable, sessionId, &session); err != nil {
+		t.Fatal(err)
+	}
+	return session, p1, p2
+}
+
+func addPlayerToSession(t *testing.T, env *Env, sessionId, teamName string) models.PlayerId {
+	t.Helper()
+	p := createPlayer(t, env, teamName)
+	if err := common.Push((*common.Env)(env), common.SessionTable, sessionId, models.Players, p); err != nil {
+		t.Fatal(err)
+	}
+	return p
+}
+
+// addAnswer records one answer for the (0,0) question.
+func addAnswer(t *testing.T, env *Env, sessionId string, player models.PlayerId, answer string, wager int) {
+	t.Helper()
+	r := 0
+	q := 0
+	if _, _, err := common.Create((*common.Env)(env), common.AnswerTable, &models.Answer{
+		SessionId: sessionId, RoundIndex: &r, QuestionIndex: &q, PlayerId: player,
+		Answer: answer, Wager: wager,
+	}); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// TestSetCurrentQuestionSnapshotsStructuredType verifies that setting the
+// current question writes the question_type to session_question and copies the
+// canonical choice/match rows into the snapshot child tables.
+func TestSetCurrentQuestionSnapshotsStructuredType(t *testing.T) {
+	env := openSessionTestDB(t)
+
+	// multiple_choice snapshot
+	mcID := createMCQuestion(t, env, []models.QuestionChoice{{Text: "A", IsCorrect: true}, {Text: "B"}})
+	session, _, _ := newStructuredSession(t, env, mcID)
+	var typ string
+	if err := env.Db.QueryRow(
+		`SELECT question_type FROM session_question WHERE session_id = ? AND round_index = 0 AND question_index = 0`,
+		session.ID).Scan(&typ); err != nil {
+		t.Fatal(err)
+	}
+	if typ != "multiple_choice" {
+		t.Errorf("session_question question_type = %q, want multiple_choice", typ)
+	}
+	var n int
+	if err := env.Db.QueryRow(
+		`SELECT count(*) FROM session_question_choice WHERE session_id = ? AND round_index = 0 AND question_index = 0`,
+		session.ID).Scan(&n); err != nil {
+		t.Fatal(err)
+	}
+	if n != 2 {
+		t.Errorf("snapshot choices = %d, want 2", n)
+	}
+
+	// matching snapshot
+	mtID := createMatchingQuestion(t, env, []models.QuestionPair{{Left: "1", Right: "A"}, {Left: "2", Right: "B"}})
+	session2, _, _ := newStructuredSession(t, env, mtID)
+	if err := env.Db.QueryRow(
+		`SELECT question_type FROM session_question WHERE session_id = ? AND round_index = 0 AND question_index = 0`,
+		session2.ID).Scan(&typ); err != nil {
+		t.Fatal(err)
+	}
+	if typ != "matching" {
+		t.Errorf("session_question question_type = %q, want matching", typ)
+	}
+	if err := env.Db.QueryRow(
+		`SELECT count(*) FROM session_question_match WHERE session_id = ? AND round_index = 0 AND question_index = 0`,
+		session2.ID).Scan(&n); err != nil {
+		t.Fatal(err)
+	}
+	if n != 2 {
+		t.Errorf("snapshot matches = %d, want 2", n)
+	}
+}
+
+// TestAutoScoreMultipleChoice verifies MC auto-scoring: the answer equals the
+// snapshot's correct option text ⇒ correct, anything else ⇒ incorrect, and the
+// mod's correct flags are ignored (ScoreOverride is still honored).
+func TestAutoScoreMultipleChoice(t *testing.T) {
+	env := openSessionTestDB(t)
+	qid := createMCQuestion(t, env, []models.QuestionChoice{{Text: "Rome"}, {Text: "Paris", IsCorrect: true}, {Text: "Tokyo"}})
+	session, p1, p2 := newStructuredSession(t, env, qid)
+	p3 := addPlayerToSession(t, env, session.ID, "team-3")
+
+	// p1 correct option, p2 wrong option, p3 unknown text
+	addAnswer(t, env, session.ID, p1, "Paris", 100)
+	addAnswer(t, env, session.ID, p2, "Rome", 200)
+	addAnswer(t, env, session.ID, p3, "Atlantis", 300)
+
+	// mod's flags are deliberately wrong: they must be IGNORED for structured types
+	req := models.ScoreRequest{RoundIndex: 0, QuestionIndex: 0, Players: map[models.PlayerId]models.CorrectorNot{
+		p1: {Correct: false},
+		p2: {Correct: true},
+		p3: {Correct: true},
+	}}
+	if err := scoreQuestionTx(env, session, req, 0, 0); err != nil {
+		t.Fatal(err)
+	}
+
+	answers, err := latestAnswersForQuestion(env, session.ID, 0, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := map[models.PlayerId]models.Answer{}
+	for _, a := range answers {
+		got[a.PlayerId] = a
+	}
+	if !got[p1].Correct || got[p1].PointsAwarded != 100 {
+		t.Errorf("p1 = correct:%v points:%v, want correct with 100 (flag was ignored)", got[p1].Correct, got[p1].PointsAwarded)
+	}
+	if got[p2].Correct || got[p2].PointsAwarded != 0 {
+		t.Errorf("p2 = correct:%v points:%v, want incorrect with 0", got[p2].Correct, got[p2].PointsAwarded)
+	}
+	if got[p3].Correct || got[p3].PointsAwarded != 0 {
+		t.Errorf("p3 = correct:%v points:%v, want incorrect with 0 (unknown text)", got[p3].Correct, got[p3].PointsAwarded)
+	}
+
+	// ScoreOverride is still honored for a correct structured answer
+	override := 50.0
+	if err := scoreQuestionTx(env, session, models.ScoreRequest{
+		RoundIndex: 0, QuestionIndex: 0,
+		Players: map[models.PlayerId]models.CorrectorNot{
+			p1: {Correct: false, ScoreOverride: &override},
+			p2: {Correct: false},
+			p3: {Correct: false},
+		},
+	}, 0, 0); err != nil {
+		t.Fatal(err)
+	}
+	answers, err = latestAnswersForQuestion(env, session.ID, 0, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got = map[models.PlayerId]models.Answer{}
+	for _, a := range answers {
+		got[a.PlayerId] = a
+	}
+	if !got[p1].Correct || got[p1].PointsAwarded != 50 {
+		t.Errorf("p1 override = correct:%v points:%v, want correct with 50", got[p1].Correct, got[p1].PointsAwarded)
+	}
+}
+
+// TestAutoScoreMatching verifies matching auto-scoring: only a complete and
+// correct left->right mapping scores; partial, wrong, or malformed-JSON answers
+// are incorrect (not an error).
+func TestAutoScoreMatching(t *testing.T) {
+	env := openSessionTestDB(t)
+	qid := createMatchingQuestion(t, env, []models.QuestionPair{{Left: "1", Right: "A"}, {Left: "2", Right: "B"}})
+	session, p1, p2 := newStructuredSession(t, env, qid)
+	p3 := addPlayerToSession(t, env, session.ID, "team-3")
+	p4 := addPlayerToSession(t, env, session.ID, "team-4")
+
+	addAnswer(t, env, session.ID, p1, `{"1":"A","2":"B"}`, 100) // complete + correct
+	addAnswer(t, env, session.ID, p2, `{"1":"A"}`, 200)         // partial
+	addAnswer(t, env, session.ID, p3, `{"1":"B","2":"A"}`, 300) // wrong mapping
+	addAnswer(t, env, session.ID, p4, "not-json", 400)          // malformed JSON
+
+	req := models.ScoreRequest{RoundIndex: 0, QuestionIndex: 0, Players: map[models.PlayerId]models.CorrectorNot{
+		p1: {Correct: false},
+		p2: {Correct: true},
+		p3: {Correct: true},
+		p4: {Correct: true},
+	}}
+	if err := scoreQuestionTx(env, session, req, 0, 0); err != nil {
+		t.Fatal(err)
+	}
+
+	answers, err := latestAnswersForQuestion(env, session.ID, 0, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := map[models.PlayerId]models.Answer{}
+	for _, a := range answers {
+		got[a.PlayerId] = a
+	}
+	if !got[p1].Correct || got[p1].PointsAwarded != 100 {
+		t.Errorf("p1 = correct:%v points:%v, want correct with 100", got[p1].Correct, got[p1].PointsAwarded)
+	}
+	if got[p2].Correct || got[p2].PointsAwarded != 0 {
+		t.Errorf("p2 = correct:%v points:%v, want incorrect (partial mapping)", got[p2].Correct, got[p2].PointsAwarded)
+	}
+	if got[p3].Correct || got[p3].PointsAwarded != 0 {
+		t.Errorf("p3 = correct:%v points:%v, want incorrect (wrong mapping)", got[p3].Correct, got[p3].PointsAwarded)
+	}
+	if got[p4].Correct || got[p4].PointsAwarded != 0 {
+		t.Errorf("p4 = correct:%v points:%v, want incorrect (malformed JSON)", got[p4].Correct, got[p4].PointsAwarded)
+	}
+}
+
+// TestStructuredPlayerView verifies the player-facing current-question view
+// exposes the structured payload (choices / lefts / rights) but blanks the
+// answer key pre-score — nothing reveals the correct option or pairing.
+func TestStructuredPlayerView(t *testing.T) {
+	env := openSessionTestDB(t)
+	gin.SetMode(gin.TestMode)
+
+	// multiple_choice: choices present, answer blanked pre-score
+	mcID := createMCQuestion(t, env, []models.QuestionChoice{{Text: "A", IsCorrect: true}, {Text: "B"}})
+	session, _, p1 := newStructuredSession(t, env, mcID)
+
+	recorder := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(recorder)
+	c.Params = gin.Params{{Key: "id", Value: session.ID}}
+	c.Request = httptest.NewRequest(http.MethodGet,
+		"/gameplay/session/"+session.ID+"/current-question?player_id="+string(p1), nil)
+	env.GetCurrentQuestion(c)
+	var q models.QuestionInRound
+	if err := json.Unmarshal(recorder.Body.Bytes(), &q); err != nil {
+		t.Fatalf("bad current-question response %q: %v", recorder.Body.String(), err)
+	}
+	if len(q.Choices) != 2 {
+		t.Errorf("player choices = %+v, want 2 options", q.Choices)
+	}
+	if q.Answer != "" {
+		t.Errorf("player saw the MC answer key pre-score: %q", q.Answer)
+	}
+
+	// matching: lefts/rights present, no pairing revealed pre-score
+	mtID := createMatchingQuestion(t, env, []models.QuestionPair{{Left: "1", Right: "A"}, {Left: "2", Right: "B"}})
+	session2, _, p2 := newStructuredSession(t, env, mtID)
+	recorder = httptest.NewRecorder()
+	c, _ = gin.CreateTestContext(recorder)
+	c.Params = gin.Params{{Key: "id", Value: session2.ID}}
+	c.Request = httptest.NewRequest(http.MethodGet,
+		"/gameplay/session/"+session2.ID+"/current-question?player_id="+string(p2), nil)
+	env.GetCurrentQuestion(c)
+	if err := json.Unmarshal(recorder.Body.Bytes(), &q); err != nil {
+		t.Fatalf("bad current-question response %q: %v", recorder.Body.String(), err)
+	}
+	if len(q.Lefts) != 2 || len(q.Rights) != 2 {
+		t.Errorf("player lefts/rights = %+v / %+v, want 2 each", q.Lefts, q.Rights)
+	}
+	if q.Answer != "" {
+		t.Errorf("player saw the matching answer key pre-score: %q", q.Answer)
 	}
 }
