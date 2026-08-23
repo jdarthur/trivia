@@ -104,6 +104,14 @@ func formatTime(t time.Time) string {
 	return t.Format(timeFormat)
 }
 
+// FormatTime renders a time.Time in the API's historical wire/storage format.
+// Exported so handlers that write a row themselves (e.g. question create/update
+// in the questions package) can format a create date without depending on the
+// unexported formatTime.
+func FormatTime(t time.Time) string {
+	return formatTime(t)
+}
+
 // ParseTime converts a stored timestamp string (the API's historical
 // UTC-naive "2006-01-02T15:04:05.000000" format) back into a time.Time. It
 // tolerates RFC3339 timestamps in case a column ever holds one, otherwise
@@ -211,7 +219,7 @@ func scanQuestion(s rowScanner) (models.Question, error) {
 	var m models.Question
 	var createDate string
 	var scoringNoteId sql.NullString
-	err := s.Scan(&m.ID, &createDate, &m.Category, &m.Question, &m.Answer, &m.UserId, &scoringNoteId)
+	err := s.Scan(&m.ID, &createDate, &m.Category, &m.Question, &m.Answer, &m.UserId, &scoringNoteId, &m.QuestionType)
 	if err != nil {
 		return m, err
 	}
@@ -221,6 +229,10 @@ func scanQuestion(s rowScanner) (models.Question, error) {
 	// wire-format empty string.
 	if scoringNoteId.Valid {
 		m.ScoringNote = scoringNoteId.String
+	}
+	// Old rows (pre-migration 8) read back as freeform.
+	if m.QuestionType == "" {
+		m.QuestionType = "freeform"
 	}
 	return m, nil
 }
@@ -247,7 +259,7 @@ func loadQuestionRoundsUsed(db *sql.DB, m *models.Question) error {
 }
 
 func getQuestion(db *sql.DB, id string, m *models.Question) error {
-	row := db.QueryRow(`SELECT id, create_date, category, question, answer, user_id, scoring_note_id
+	row := db.QueryRow(`SELECT id, create_date, category, question, answer, user_id, scoring_note_id, question_type
 		FROM question WHERE id = ?`, id)
 	got, err := scanQuestion(row)
 	if errors.Is(err, sql.ErrNoRows) {
@@ -259,7 +271,75 @@ func getQuestion(db *sql.DB, id string, m *models.Question) error {
 	if err := loadQuestionRoundsUsed(db, &got); err != nil {
 		return err
 	}
+	if err := loadQuestionChildren(db, &got); err != nil {
+		return err
+	}
 	*m = got
+	return nil
+}
+
+// loadQuestionChildren fills a question's structured child rows (choices for
+// multiple_choice, pairs for matching) from the normalized child tables,
+// ordered by position. For structured types it also derives the answer string
+// from the child rows — MC = the correct option's text; matching = a rendered
+// "left -> right" string, one mapping per line — so every existing consumer
+// (FormattedQuestion, scorer display, score-time snapshot refresh) keeps
+// working.
+func loadQuestionChildren(db *sql.DB, m *models.Question) error {
+	m.Choices = make([]models.QuestionChoice, 0)
+	rows, err := db.Query(`SELECT text, is_correct FROM question_choice
+		WHERE question_id = ? ORDER BY position`, m.ID)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var text string
+		var isCorrect int
+		if err := rows.Scan(&text, &isCorrect); err != nil {
+			return err
+		}
+		m.Choices = append(m.Choices, models.QuestionChoice{Text: text, IsCorrect: isCorrect == 1})
+	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
+
+	m.Pairs = make([]models.QuestionPair, 0)
+	rows, err = db.Query(`SELECT left_text, right_text FROM question_match
+		WHERE question_id = ? ORDER BY position`, m.ID)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var left, right string
+		if err := rows.Scan(&left, &right); err != nil {
+			return err
+		}
+		m.Pairs = append(m.Pairs, models.QuestionPair{Left: left, Right: right})
+	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
+
+	if m.QuestionType == "multiple_choice" {
+		for _, c := range m.Choices {
+			if c.IsCorrect {
+				m.Answer = c.Text
+				break
+			}
+		}
+	} else if m.QuestionType == "matching" {
+		var sb strings.Builder
+		for i, p := range m.Pairs {
+			if i > 0 {
+				sb.WriteString("\n")
+			}
+			fmt.Fprintf(&sb, "%s -> %s", p.Left, p.Right)
+		}
+		m.Answer = sb.String()
+	}
 	return nil
 }
 
@@ -458,7 +538,7 @@ func loadSessionRounds(db *sql.DB, m *models.Session) error {
 
 	// Overlay the per-question snapshots taken at set/score/hot-edit time.
 	rows, err := db.Query(`SELECT round_index, question_index, question_id, category,
-		question, answer, scoring_note_id, scoring_note, scored
+		question, answer, scoring_note_id, scoring_note, scored, question_type
 		FROM session_question WHERE session_id = ?`, m.ID)
 	if err != nil {
 		return err
@@ -466,10 +546,10 @@ func loadSessionRounds(db *sql.DB, m *models.Session) error {
 	defer rows.Close()
 	for rows.Next() {
 		var roundIndex, questionIndex int
-		var questionId, category, question, answer, scoringNoteId, scoringNote string
+		var questionId, category, question, answer, scoringNoteId, scoringNote, questionType string
 		var scored int
 		if err := rows.Scan(&roundIndex, &questionIndex, &questionId, &category,
-			&question, &answer, &scoringNoteId, &scoringNote, &scored); err != nil {
+			&question, &answer, &scoringNoteId, &scoringNote, &scored, &questionType); err != nil {
 			return err
 		}
 		if roundIndex >= len(m.Rounds) || questionIndex >= len(m.Rounds[roundIndex].Questions) {
@@ -483,6 +563,66 @@ func loadSessionRounds(db *sql.DB, m *models.Session) error {
 		q.ScoringNoteId = scoringNoteId
 		q.ScoringNote = scoringNote
 		q.Scored = scored == 1
+		q.QuestionType = questionType
+	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
+
+	return loadSessionQuestionChildren(db, m)
+}
+
+// loadSessionQuestionChildren fills the structured payload (choices / pairs)
+// of each overlaid session question snapshot from the snapshot child tables.
+func loadSessionQuestionChildren(db *sql.DB, m *models.Session) error {
+	rows, err := db.Query(`SELECT round_index, question_index, position, text, is_correct
+		FROM session_question_choice WHERE session_id = ? ORDER BY round_index, question_index, position`, m.ID)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var roundIndex, questionIndex, position int
+		var text string
+		var isCorrect int
+		if err := rows.Scan(&roundIndex, &questionIndex, &position, &text, &isCorrect); err != nil {
+			return err
+		}
+		if roundIndex >= len(m.Rounds) || questionIndex >= len(m.Rounds[roundIndex].Questions) {
+			continue
+		}
+		q := &m.Rounds[roundIndex].Questions[questionIndex]
+		if q.Choices == nil {
+			q.Choices = make([]string, 0)
+		}
+		q.Choices = append(q.Choices, text)
+	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
+
+	rows, err = db.Query(`SELECT round_index, question_index, position, left_text, right_text
+		FROM session_question_match WHERE session_id = ? ORDER BY round_index, question_index, position`, m.ID)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var roundIndex, questionIndex, position int
+		var left, right string
+		if err := rows.Scan(&roundIndex, &questionIndex, &position, &left, &right); err != nil {
+			return err
+		}
+		if roundIndex >= len(m.Rounds) || questionIndex >= len(m.Rounds[roundIndex].Questions) {
+			continue
+		}
+		q := &m.Rounds[roundIndex].Questions[questionIndex]
+		if q.Lefts == nil {
+			q.Lefts = make([]string, 0)
+			q.Rights = make([]string, 0)
+		}
+		q.Lefts = append(q.Lefts, left)
+		q.Rights = append(q.Rights, right)
 	}
 	return rows.Err()
 }
@@ -674,9 +814,15 @@ func Create(e *Env, objectType string, data models.Object) (string, time.Time, e
 }
 
 func insertQuestion(db *sql.DB, m models.Question) error {
-	_, err := db.Exec(`INSERT INTO question (id, create_date, category, question, answer, user_id, scoring_note_id)
-		VALUES (?, ?, ?, ?, ?, ?, ?)`,
-		m.ID, formatTime(m.CreateDate), m.Category, m.Question, m.Answer, m.UserId, nilIfEmpty(m.ScoringNote))
+	// empty question_type defaults to freeform (current behavior); the column's
+	// CHECK constraint rejects anything else.
+	questionType := m.QuestionType
+	if questionType == "" {
+		questionType = "freeform"
+	}
+	_, err := db.Exec(`INSERT INTO question (id, create_date, category, question, answer, user_id, scoring_note_id, question_type)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+		m.ID, formatTime(m.CreateDate), m.Category, m.Question, m.Answer, m.UserId, nilIfEmpty(m.ScoringNote), questionType)
 	return err
 }
 
@@ -831,9 +977,13 @@ func rowsAffected(res sql.Result, err error, objectType string, objectId string)
 }
 
 func updateQuestion(db *sql.DB, id string, m models.Question) error {
+	questionType := m.QuestionType
+	if questionType == "" {
+		questionType = "freeform"
+	}
 	res, err := db.Exec(`UPDATE question SET category = ?, question = ?, answer = ?, user_id = ?,
-		scoring_note_id = ? WHERE id = ?`,
-		m.Category, m.Question, m.Answer, m.UserId, nilIfEmpty(m.ScoringNote), id)
+		scoring_note_id = ?, question_type = ? WHERE id = ?`,
+		m.Category, m.Question, m.Answer, m.UserId, nilIfEmpty(m.ScoringNote), questionType, id)
 	return rowsAffected(res, err, QuestionTable, id)
 }
 
@@ -1098,7 +1248,7 @@ func GetAll(e *Env, objectType string, filters interface{}) (interface{}, error)
 
 	switch objectType {
 	case QuestionTable:
-		rows, err := e.Db.Query(`SELECT id, create_date, category, question, answer, user_id, scoring_note_id
+		rows, err := e.Db.Query(`SELECT id, create_date, category, question, answer, user_id, scoring_note_id, question_type
 			FROM question`+where+` ORDER BY create_date`, args...)
 		if err != nil {
 			return nil, err
@@ -1111,6 +1261,9 @@ func GetAll(e *Env, objectType string, filters interface{}) (interface{}, error)
 				return nil, err
 			}
 			if err := loadQuestionRoundsUsed(e.Db, &m); err != nil {
+				return nil, err
+			}
+			if err := loadQuestionChildren(e.Db, &m); err != nil {
 				return nil, err
 			}
 			slice = append(slice, &m)

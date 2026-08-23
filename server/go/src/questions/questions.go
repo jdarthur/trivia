@@ -1,8 +1,10 @@
 package questions
 
 import (
+	"context"
 	"fmt"
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	"github.com/jdarthur/trivia/common"
 	"github.com/jdarthur/trivia/models"
 	"strings"
@@ -112,6 +114,15 @@ func merge(update *models.Question, original *models.Question) {
 	}
 
 	original.ScoringNote = update.ScoringNote
+
+	// question_type defaults to freeform on input; children are replaced
+	// wholesale from the update body (changing type drops the other table's
+	// rows via the replace-wholesale write below).
+	if update.QuestionType != "" {
+		original.QuestionType = update.QuestionType
+	}
+	original.Choices = update.Choices
+	original.Pairs = update.Pairs
 }
 
 type AttemptedToSetRoundsUsedError struct {
@@ -128,6 +139,156 @@ func (e AttemptedToSetRoundsUsedError) Field() string {
 
 func (e AttemptedToSetRoundsUsedError) Data() interface{} {
 	return e.RoundsUsed
+}
+
+// InvalidQuestionTypeError is returned when question_type is not one of
+// freeform / multiple_choice / matching.
+type InvalidQuestionTypeError struct {
+	QuestionType string
+}
+
+func (e InvalidQuestionTypeError) Error() string {
+	return "Invalid question type: '" + e.QuestionType + "' (expected freeform, multiple_choice, or matching)"
+}
+
+func (e InvalidQuestionTypeError) Field() string {
+	return models.QuestionType
+}
+
+func (e InvalidQuestionTypeError) Data() interface{} {
+	return e.QuestionType
+}
+
+// MissingCorrectChoiceError is returned when a multiple_choice question has no
+// correct option (the DB enforces at most one via a partial unique index).
+type MissingCorrectChoiceError struct {
+	Choices []models.QuestionChoice
+}
+
+func (e MissingCorrectChoiceError) Error() string {
+	return "multiple_choice question must have at least one correct choice"
+}
+
+func (e MissingCorrectChoiceError) Field() string {
+	return models.QuestionType
+}
+
+func (e MissingCorrectChoiceError) Data() interface{} {
+	return e.Choices
+}
+
+// MissingPairsError is returned when a matching question has no pairs.
+type MissingPairsError struct {
+	Pairs []models.QuestionPair
+}
+
+func (e MissingPairsError) Error() string {
+	return "matching question must have at least one pair"
+}
+
+func (e MissingPairsError) Field() string {
+	return models.QuestionType
+}
+
+func (e MissingPairsError) Data() interface{} {
+	return e.Pairs
+}
+
+// validateQuestionType enforces per-type payload rules before the row and its
+// children are written. freeform has no child rows; multiple_choice needs at
+// least one correct choice; matching needs at least one pair.
+func validateQuestionType(data models.Question) error {
+	switch data.QuestionType {
+	case "freeform":
+		return nil
+	case "multiple_choice":
+		for _, c := range data.Choices {
+			if c.IsCorrect {
+				return nil
+			}
+		}
+		return MissingCorrectChoiceError{Choices: data.Choices}
+	case "matching":
+		if len(data.Pairs) > 0 {
+			return nil
+		}
+		return MissingPairsError{Pairs: data.Pairs}
+	default:
+		return InvalidQuestionTypeError{QuestionType: data.QuestionType}
+	}
+}
+
+// derivedAnswer renders the question's answer string from its structured child
+// rows — MC = the correct option's text; matching = a "left -> right" string,
+// one mapping per line. Used when writing the question row so the stored answer
+// column (and everything that reads it, e.g. the score-time snapshot refresh)
+// carries the derived value. freeform returns the caller-supplied answer.
+func derivedAnswer(data models.Question) string {
+	switch data.QuestionType {
+	case "multiple_choice":
+		for _, c := range data.Choices {
+			if c.IsCorrect {
+				return c.Text
+			}
+		}
+		return ""
+	case "matching":
+		var sb strings.Builder
+		for i, p := range data.Pairs {
+			if i > 0 {
+				sb.WriteString("\n")
+			}
+			fmt.Fprintf(&sb, "%s -> %s", p.Left, p.Right)
+		}
+		return sb.String()
+	default:
+		return data.Answer
+	}
+}
+
+// nilOrEmpty maps an empty scoring note to NULL, the "no note" sentinel for the
+// nullable question.scoring_note_id FK column (ticket #85). Mirrors
+// common's nilIfEmpty for handlers that write the question row themselves.
+func nilOrEmpty(s string) interface{} {
+	if s == "" {
+		return nil
+	}
+	return s
+}
+
+// replaceQuestionChildren deletes and re-inserts a question's structured child
+// rows wholesale inside the caller's write transaction. position comes from the
+// slice index. Rows for the type the question is not using are dropped.
+func replaceQuestionChildren(q common.Queryer, ctx context.Context, data models.Question) error {
+	if _, err := q.ExecContext(ctx, `DELETE FROM question_choice WHERE question_id = ?`, data.ID); err != nil {
+		return err
+	}
+	if _, err := q.ExecContext(ctx, `DELETE FROM question_match WHERE question_id = ?`, data.ID); err != nil {
+		return err
+	}
+
+	if data.QuestionType == "multiple_choice" {
+		for i, c := range data.Choices {
+			correct := 0
+			if c.IsCorrect {
+				correct = 1
+			}
+			if _, err := q.ExecContext(ctx,
+				`INSERT INTO question_choice (question_id, position, text, is_correct) VALUES (?, ?, ?, ?)`,
+				data.ID, i, c.Text, correct); err != nil {
+				return err
+			}
+		}
+	} else if data.QuestionType == "matching" {
+		for i, p := range data.Pairs {
+			if _, err := q.ExecContext(ctx,
+				`INSERT INTO question_match (question_id, position, left_text, right_text) VALUES (?, ?, ?, ?)`,
+				data.ID, i, p.Left, p.Right); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }
 
 func GetAllQuestions(e *Env, userId string) ([]*models.Question, error) {
@@ -216,6 +377,16 @@ func CreateOneQuestion(e *Env, userId string, data models.Question) (models.Ques
 		return models.Question{}, AttemptedToSetRoundsUsedError{RoundsUsed: data.RoundsUsed}
 	}
 
+	// empty question_type on input defaults to freeform (current behavior)
+	if data.QuestionType == "" {
+		data.QuestionType = "freeform"
+	}
+
+	// validate per type before writing the row and its children
+	if err := validateQuestionType(data); err != nil {
+		return models.Question{}, err
+	}
+
 	// scoring_note must reference a note this user owns; the FK on
 	// question.scoring_note_id enforces existence, this check keeps the
 	// ownership rule and surfaces a clean NonexistentIdError (same as update).
@@ -226,13 +397,27 @@ func CreateOneQuestion(e *Env, userId string, data models.Question) (models.Ques
 		}
 	}
 
-	id, createDate, err := common.Create((*common.Env)(e), common.QuestionTable, &data)
+	id := uuid.New().String()
+	createDate := time.Now()
+	data.ID = id
+	data.CreateDate = createDate
+
+	// write the question row and replace its child rows wholesale in one
+	// transaction so the row and its children never diverge.
+	err := common.WithWriteTx(e.Db, func(q common.Queryer) error {
+		ctx := context.Background()
+		if _, err := q.ExecContext(ctx,
+			`INSERT INTO question (id, create_date, category, question, answer, user_id, scoring_note_id, question_type)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+			id, common.FormatTime(createDate), data.Category, data.Question, derivedAnswer(data),
+			data.UserId, nilOrEmpty(data.ScoringNote), data.QuestionType); err != nil {
+			return err
+		}
+		return replaceQuestionChildren(q, ctx, data)
+	})
 	if err != nil {
 		return models.Question{}, err
 	}
-
-	data.ID = id
-	data.CreateDate = createDate
 
 	if data.ScoringNote != "" {
 		err = UpdateLastUsedForScoringNote(e, userId, data.ScoringNote)
@@ -264,7 +449,24 @@ func UpdateOneQuestion(e *Env, userId, questionId string, data models.Question) 
 
 	merge(&data, &question)
 
-	err = common.Set((*common.Env)(e), common.QuestionTable, questionId, question)
+	// validate the merged question per type before writing
+	if err := validateQuestionType(question); err != nil {
+		return models.Question{}, err
+	}
+
+	// write the question row and replace its child rows wholesale in one
+	// transaction so the row and its children never diverge.
+	err = common.WithWriteTx(e.Db, func(q common.Queryer) error {
+		ctx := context.Background()
+		if _, err := q.ExecContext(ctx,
+			`UPDATE question SET category = ?, question = ?, answer = ?, user_id = ?,
+				scoring_note_id = ?, question_type = ? WHERE id = ?`,
+			question.Category, question.Question, derivedAnswer(question), question.UserId,
+			nilOrEmpty(question.ScoringNote), question.QuestionType, questionId); err != nil {
+			return err
+		}
+		return replaceQuestionChildren(q, ctx, question)
+	})
 	if err != nil {
 		return models.Question{}, err
 	}

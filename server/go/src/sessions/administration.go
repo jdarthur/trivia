@@ -3,7 +3,9 @@ package sessions
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/jdarthur/trivia/common"
@@ -94,7 +96,7 @@ func _setCurrentQuestion(e *Env, session *models.Session, roundIndex int, questi
 
 	err = upsertSessionQuestion(e, session.ID, roundIndex, questionIndex, questionId,
 		questionObject.Category, questionObject.Question, questionObject.Answer,
-		questionObject.ScoringNote, scoringNote)
+		questionObject.ScoringNote, scoringNote, questionObject.QuestionType)
 	if err != nil {
 		return err
 	}
@@ -104,21 +106,55 @@ func _setCurrentQuestion(e *Env, session *models.Session, roundIndex int, questi
 }
 
 // upsertSessionQuestion writes (or refreshes) one session_question snapshot
-// row. scored is deliberately not updated on conflict — re-navigating to a
-// scored question keeps it scored.
-func upsertSessionQuestion(e *Env, sessionId string, roundIndex int, questionIndex int, questionId string, category string, question string, answer string, scoringNoteId string, scoringNote string) error {
+// row, including the question_type and the canonical choice/match child rows
+// copied into the snapshot child tables. scored is deliberately not updated on
+// conflict — re-navigating to a scored question keeps it scored.
+func upsertSessionQuestion(e *Env, sessionId string, roundIndex int, questionIndex int, questionId string, category string, question string, answer string, scoringNoteId string, scoringNote string, questionType string) error {
 	_, err := e.Db.Exec(`INSERT INTO session_question
-		(session_id, round_index, question_index, question_id, category, question, answer, scoring_note_id, scoring_note, scored)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0)
+		(session_id, round_index, question_index, question_id, category, question, answer, scoring_note_id, scoring_note, scored, question_type)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?)
 		ON CONFLICT(session_id, round_index, question_index) DO UPDATE SET
 			question_id = excluded.question_id,
 			category = excluded.category,
 			question = excluded.question,
 			answer = excluded.answer,
 			scoring_note_id = excluded.scoring_note_id,
-			scoring_note = excluded.scoring_note`,
-		sessionId, roundIndex, questionIndex, questionId, category, question, answer, scoringNoteId, scoringNote)
-	return err
+			scoring_note = excluded.scoring_note,
+			question_type = excluded.question_type`,
+		sessionId, roundIndex, questionIndex, questionId, category, question, answer, scoringNoteId, scoringNote, questionType)
+	if err != nil {
+		return err
+	}
+	return replaceSnapshotChildren(e, sessionId, roundIndex, questionIndex, questionId)
+}
+
+// replaceSnapshotChildren copies the canonical question_choice / question_match
+// rows for a question into the session snapshot child tables, replacing any
+// prior snapshot rows for that (session, round, question) wholesale.
+func replaceSnapshotChildren(e *Env, sessionId string, roundIndex int, questionIndex int, questionId string) error {
+	if _, err := e.Db.Exec(`DELETE FROM session_question_choice
+		WHERE session_id = ? AND round_index = ? AND question_index = ?`,
+		sessionId, roundIndex, questionIndex); err != nil {
+		return err
+	}
+	if _, err := e.Db.Exec(`INSERT INTO session_question_choice
+		(session_id, round_index, question_index, position, text, is_correct)
+		SELECT ?, ?, ?, position, text, is_correct FROM question_choice WHERE question_id = ?`,
+		sessionId, roundIndex, questionIndex, questionId); err != nil {
+		return err
+	}
+	if _, err := e.Db.Exec(`DELETE FROM session_question_match
+		WHERE session_id = ? AND round_index = ? AND question_index = ?`,
+		sessionId, roundIndex, questionIndex); err != nil {
+		return err
+	}
+	if _, err := e.Db.Exec(`INSERT INTO session_question_match
+		(session_id, round_index, question_index, position, left_text, right_text)
+		SELECT ?, ?, ?, position, left_text, right_text FROM question_match WHERE question_id = ?`,
+		sessionId, roundIndex, questionIndex, questionId); err != nil {
+		return err
+	}
+	return nil
 }
 
 type CurrentRoundRequest struct {
@@ -314,11 +350,11 @@ func scoreQuestionTx(e *Env, session models.Session, requestBody models.ScoreReq
 
 		//read the question snapshot inside the transaction, so the scored
 		//check and the scored write cannot race
-		var questionId, snapshotAnswer string
+		var questionId, snapshotAnswer, questionType string
 		var scored int
-		err := q.QueryRowContext(ctx, `SELECT question_id, answer, scored FROM session_question
+		err := q.QueryRowContext(ctx, `SELECT question_id, answer, scored, question_type FROM session_question
 			WHERE session_id = ? AND round_index = ? AND question_index = ?`,
-			session.ID, roundIndex, questionIndex).Scan(&questionId, &snapshotAnswer, &scored)
+			session.ID, roundIndex, questionIndex).Scan(&questionId, &snapshotAnswer, &scored, &questionType)
 		if errors.Is(err, sql.ErrNoRows) {
 			return InvalidQuestionIndexError{QuestionIndex: questionIndex}
 		}
@@ -326,15 +362,51 @@ func scoreQuestionTx(e *Env, session models.Session, requestBody models.ScoreReq
 			return err
 		}
 
+		// for structured types, load the answer key from the snapshot so each
+		// player's correctness is auto-computed against it (the mod's correct
+		// flags are ignored; ScoreOverride is still honored).
+		correctChoiceText := ""
+		var matchLefts, matchRights []string
+		if questionType == "multiple_choice" {
+			err := q.QueryRowContext(ctx, `SELECT text FROM session_question_choice
+				WHERE session_id = ? AND round_index = ? AND question_index = ? AND is_correct = 1`,
+				session.ID, roundIndex, questionIndex).Scan(&correctChoiceText)
+			if err != nil && !errors.Is(err, sql.ErrNoRows) {
+				return err
+			}
+		} else if questionType == "matching" {
+			rows, err := q.QueryContext(ctx, `SELECT left_text, right_text FROM session_question_match
+				WHERE session_id = ? AND round_index = ? AND question_index = ? ORDER BY position`,
+				session.ID, roundIndex, questionIndex)
+			if err != nil {
+				return err
+			}
+			for rows.Next() {
+				var left, right string
+				if err := rows.Scan(&left, &right); err != nil {
+					rows.Close()
+					return err
+				}
+				matchLefts = append(matchLefts, left)
+				matchRights = append(matchRights, right)
+			}
+			if err := rows.Err(); err != nil {
+				rows.Close()
+				return err
+			}
+			rows.Close()
+		}
+
 		for playerId, correctOrNot := range requestBody.Players {
 			//the player's latest answer for this question
 			var answerId string
 			var oldPoints float64
 			var wager int
-			err := q.QueryRowContext(ctx, `SELECT id, points_awarded, wager FROM answer
+			var latestAnswer string
+			err := q.QueryRowContext(ctx, `SELECT id, points_awarded, wager, answer FROM answer
 				WHERE session_id = ? AND round_index = ? AND question_index = ? AND player_id = ?
 				ORDER BY rowid DESC LIMIT 1`,
-				session.ID, roundIndex, questionIndex, string(playerId)).Scan(&answerId, &oldPoints, &wager)
+				session.ID, roundIndex, questionIndex, string(playerId)).Scan(&answerId, &oldPoints, &wager, &latestAnswer)
 			if errors.Is(err, sql.ErrNoRows) {
 				return IllegalScoreError{PlayerId: playerId, RoundIndex: roundIndex, QuestionIndex: questionIndex}
 			}
@@ -342,10 +414,17 @@ func scoreQuestionTx(e *Env, session models.Session, requestBody models.ScoreReq
 				return err
 			}
 
+			// freeform keeps the mod's correct flag; structured types are
+			// auto-scored against the snapshot answer key.
+			isCorrect := correctOrNot.Correct
+			if questionType != "freeform" {
+				isCorrect = autoScoredCorrect(questionType, latestAnswer, correctChoiceText, matchLefts, matchRights)
+			}
+
 			//override wager if score override is provided.
 			//award 0 points if answer is incorrect
 			var pointsToAward float64
-			if correctOrNot.Correct {
+			if isCorrect {
 				if correctOrNot.ScoreOverride != nil {
 					pointsToAward = *correctOrNot.ScoreOverride
 				} else {
@@ -356,7 +435,7 @@ func scoreQuestionTx(e *Env, session models.Session, requestBody models.ScoreReq
 			}
 
 			correct := 0
-			if correctOrNot.Correct {
+			if isCorrect {
 				correct = 1
 			}
 			if _, err := q.ExecContext(ctx, `UPDATE answer SET correct = ?, points_awarded = ? WHERE id = ?`,
@@ -404,4 +483,33 @@ func scoreQuestionTx(e *Env, session models.Session, requestBody models.ScoreReq
 		//bump the state token in the same transaction
 		return common.IncrementStateTx(q, session.ID)
 	})
+}
+
+// autoScoredCorrect determines a player's correctness against the snapshot
+// answer key for a structured question type. multiple_choice: the trimmed
+// answer text equals the snapshot's correct option. matching: the answer is a
+// JSON map of left text -> chosen right text; it is correct only if the map has
+// exactly one entry per snapshot pair and every left maps to its right
+// (all-or-nothing).
+func autoScoredCorrect(questionType string, latestAnswer string, correctChoiceText string, matchLefts []string, matchRights []string) bool {
+	switch questionType {
+	case "multiple_choice":
+		return strings.TrimSpace(latestAnswer) == correctChoiceText
+	case "matching":
+		var mapping map[string]string
+		if err := json.Unmarshal([]byte(latestAnswer), &mapping); err != nil {
+			return false
+		}
+		if len(mapping) != len(matchLefts) {
+			return false
+		}
+		for i, left := range matchLefts {
+			if mapping[left] != matchRights[i] {
+				return false
+			}
+		}
+		return true
+	default:
+		return false
+	}
 }

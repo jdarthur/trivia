@@ -63,14 +63,18 @@ func (p PlayerId) String() string {
 }
 
 type QuestionInRound struct {
-	Category      string `json:"category,omitempty"`
-	Question      string `json:"question,omitempty"`
-	Answer        string `json:"answer,omitempty"`
-	Scored        bool   `json:"scored,omitempty"`
-	Index         int    `json:"id"`
-	QuestionId    string `json:"-"`
-	ScoringNote   string `json:"scoring_note"`
-	ScoringNoteId string `json:"scoring_note_id"`
+	Category      string   `json:"category,omitempty"`
+	Question      string   `json:"question,omitempty"`
+	Answer        string   `json:"answer,omitempty"`
+	Scored        bool     `json:"scored,omitempty"`
+	Index         int      `json:"id"`
+	QuestionId    string   `json:"-"`
+	ScoringNote   string   `json:"scoring_note"`
+	ScoringNoteId string   `json:"scoring_note_id"`
+	QuestionType  string   `json:"question_type"`
+	Choices       []string `json:"choices,omitempty"` // MC: option texts, NO is_correct
+	Lefts         []string `json:"lefts,omitempty"`   // matching: column A
+	Rights        []string `json:"rights,omitempty"`  // matching: column B
 }
 
 type ScoreRequest struct {
