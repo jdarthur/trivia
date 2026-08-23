@@ -209,7 +209,8 @@ class PlayerScorer extends React.Component<Props, State> {
                                  player_name={player.team_name} correct={status.correct}
                                  session_id={this.props.session_id}
                                  set_override={this.set_override} override_value={override_value as number}
-                                 auto_scored={this.auto_scored()}/>
+                                 auto_scored={this.auto_scored()}
+                                 question_type={this.props.question_type}/>
         })
 
         return (

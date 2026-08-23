@@ -25,6 +25,7 @@ interface Props {
     player_name: string
     clear?: (player_id: string) => void
     auto_scored?: boolean
+    question_type?: string
 }
 
 export default function PlayerAnswers({
@@ -36,7 +37,8 @@ export default function PlayerAnswers({
                                           answers,
                                           session_id,
                                           player_name,
-                                          auto_scored
+                                          auto_scored,
+                                          question_type
                                       }: Props) {
 
     // on new answer, clear out the existing score
@@ -56,7 +58,7 @@ export default function PlayerAnswers({
     const incorrectButtonStyle = correct === false ? {background: "#ffccc7"} : {}
     const correctButtonStyle = correct === true ? {background: "#d9f7be"} : {}
 
-    let answer_text = <MultiAnswer answers={answers}/>
+    let answer_text = <MultiAnswer answers={answers} question_type={question_type}/>
 
     let override = correct === false ? 0 : override_value
     const wager = <div style={{paddingLeft: '10px', fontSize: '1.3em', fontWeight: 'bold'}}>
