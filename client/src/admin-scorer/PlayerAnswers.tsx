@@ -24,6 +24,7 @@ interface Props {
     session_id: string
     player_name: string
     clear?: (player_id: string) => void
+    auto_scored?: boolean
 }
 
 export default function PlayerAnswers({
@@ -34,7 +35,8 @@ export default function PlayerAnswers({
                                           override_value,
                                           answers,
                                           session_id,
-                                          player_name
+                                          player_name,
+                                          auto_scored
                                       }: Props) {
 
     // on new answer, clear out the existing score
@@ -88,7 +90,10 @@ export default function PlayerAnswers({
               style={{'width': 200}} bodyStyle={{padding: 0}}>
             <div className="answered-or-not"> {answer_text} </div>
 
-            {answers && answers.length > 0 ?
+            {/* For auto-scored question types the backend judges correctness, so
+                the manual correct/incorrect buttons are hidden; the override
+                slider (via `extra` above) is still available. */}
+            {answers && answers.length > 0 && !auto_scored ?
                 <div className="score-and-override">
                     <div className="answer-scorer">
 
