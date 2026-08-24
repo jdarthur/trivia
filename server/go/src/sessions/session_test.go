@@ -736,6 +736,111 @@ func TestStartSessionPersistsCurrentQuestion(t *testing.T) {
 	}
 }
 
+// ---- inactivate a player mid-game (ticket #5) ----
+
+// deactivate flips a player's session_player.active flag to 0 directly.
+func deactivate(t *testing.T, env *Env, sessionId string, player models.PlayerId) {
+	t.Helper()
+	if _, err := env.Db.Exec(`UPDATE session_player SET active = 0
+		WHERE session_id = ? AND player_id = ?`, sessionId, string(player)); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// TestScoreQuestionOmitsInactivePlayer verifies that when an inactive player is
+// left out of a ScoreRequest, scoreQuestion succeeds — loadSessionPlayers only
+// returns active members, so the requirement loop never demands the inactive
+// player's verdict (ticket #5).
+func TestScoreQuestionOmitsInactivePlayer(t *testing.T) {
+	env := openSessionTestDB(t)
+	session, p1, p2 := newScoredFixture(t, env)
+
+	// boot p2; a fresh session read now lists only p1 as a member
+	deactivate(t, env, session.ID, p2)
+	var session2 models.Session
+	if err := common.GetOne((*common.Env)(env), common.SessionTable, session.ID, &session2); err != nil {
+		t.Fatal(err)
+	}
+	if len(session2.Players) != 1 || session2.Players[0] != p1 {
+		t.Fatalf("active members = %+v, want [%v]", session2.Players, p1)
+	}
+
+	// scoring with only p1 in the request (p2 omitted) must succeed
+	request := models.ScoreRequest{
+		RoundIndex: 0, QuestionIndex: 0,
+		Players: map[models.PlayerId]models.CorrectorNot{p1: {Correct: true}},
+	}
+	if err := scoreQuestionTx(env, session2, request, 0, 0); err != nil {
+		t.Fatalf("scoring with inactive player omitted failed: %v", err)
+	}
+	// p1's score was applied
+	var roundTotal float64
+	if err := env.Db.QueryRow(`SELECT points FROM session_score
+		WHERE session_id = ? AND player_id = ? AND round_index = 0`, session.ID, string(p1)).Scan(&roundTotal); err != nil {
+		t.Fatal(err)
+	}
+	if roundTotal != 100 {
+		t.Fatalf("player 1 round total = %v, want 100", roundTotal)
+	}
+}
+
+// TestAnswerRejectsInactivePlayer verifies AnswerQuestion returns
+// PlayerInactiveError for an inactive member instead of recording the answer.
+func TestAnswerRejectsInactivePlayer(t *testing.T) {
+	env := openSessionTestDB(t)
+	session, p1, _ := newScoredFixture(t, env)
+
+	deactivate(t, env, session.ID, p1)
+
+	// the fixture already recorded one answer for p1; an inactive player must
+	// not add any more
+	answersBefore := func() int {
+		var n int
+		if err := env.Db.QueryRow(`SELECT count(*) FROM answer
+			WHERE session_id = ? AND player_id = ?`, session.ID, string(p1)).Scan(&n); err != nil {
+			t.Fatal(err)
+		}
+		return n
+	}
+	before := answersBefore()
+
+	gin.SetMode(gin.TestMode)
+	recorder := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(recorder)
+	c.Params = gin.Params{{Key: "id", Value: session.ID}}
+	body, err := json.Marshal(map[string]interface{}{
+		"player_id": string(p1), "answer": "guess", "wager": 100,
+		"round_id": 0, "question_id": 0,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	c.Request = httptest.NewRequest(http.MethodPost, "/gameplay/session/"+session.ID+"/answer", bytes.NewReader(body))
+	c.Request.Header.Set("Content-Type", "application/json")
+
+	env.AnswerQuestion(c)
+
+	if c.IsAborted() {
+		t.Fatalf("AnswerQuestion aborted: %s", recorder.Body.String())
+	}
+	if recorder.Code != http.StatusBadRequest {
+		t.Fatalf("AnswerQuestion status = %d, want 400: %s", recorder.Code, recorder.Body.String())
+	}
+	var resp struct {
+		Errors string `json:"errors"`
+	}
+	if err := json.Unmarshal(recorder.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("bad error response %q: %v", recorder.Body.String(), err)
+	}
+	if resp.Errors == "" {
+		t.Fatalf("expected an error, got %s", recorder.Body.String())
+	}
+	// no new answer row recorded for the inactive player
+	if after := answersBefore(); after != before {
+		t.Fatalf("inactive player's answer was recorded: %d -> %d rows", before, after)
+	}
+}
+
 // ---- question-type auto-scoring (ticket #99) ----
 
 func createMCQuestion(t *testing.T, env *Env, choices []models.QuestionChoice) string {

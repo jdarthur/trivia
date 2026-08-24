@@ -629,8 +629,11 @@ func loadSessionQuestionChildren(db *sql.DB, m *models.Session) error {
 
 func loadSessionPlayers(db *sql.DB, m *models.Session) error {
 	m.Players = make([]models.PlayerId, 0)
+	// Only active members: this drives scoreQuestion's requirement loop, so an
+	// inactive player (left or booted, ticket #5) is naturally skipped and the
+	// game continues without hand-answering their questions.
 	rows, err := db.Query(`SELECT player_id FROM session_player
-		WHERE session_id = ? ORDER BY position`, m.ID)
+		WHERE session_id = ? AND active = 1 ORDER BY position`, m.ID)
 	if err != nil {
 		return err
 	}

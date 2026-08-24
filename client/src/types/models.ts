@@ -78,13 +78,14 @@ export interface ScoringNote {
 /** models.PlayerId — a branded string used as a map key (e.g. scoreboard). */
 export type PlayerId = string;
 
-/** models.Player (id is `json:"id,omitempty"`) */
+/** models.Player (id is `json:"id,omitempty"`; active is session-roster-only) */
 export interface Player {
   id?: string;
   create_date: WireTimestamp;
   team_name: string;
   real_name: string;
   icon: string;
+  active?: boolean;
 }
 
 /**
@@ -135,6 +136,7 @@ export interface PlayerScore {
   score: number[];
   team_name: string;
   player_id?: PlayerId;
+  active?: boolean;
 }
 
 /** models.PlayerScoreboard */
@@ -154,4 +156,52 @@ export interface ScoreRequest {
   round_index: number;
   player_id: PlayerId;
   players: Record<PlayerId, CorrectorNot>;
+}
+
+/** models.AnswerUnscored */
+export interface AnswerUnscored {
+  team_name: string;
+  icon: string;
+  answered: boolean;
+  player_id?: PlayerId;
+  active?: boolean;
+}
+
+/** models.ScoredTeam (one entry per player in an AnswersResponseScored) */
+export interface ScoredTeam {
+  team_name: string;
+  icon: string;
+  player_id?: PlayerId;
+  active?: boolean;
+  answers: ScoredAnswer[];
+}
+
+/** models.ScoredAnswer */
+export interface ScoredAnswer {
+  wager: number;
+  correct: boolean;
+  points_awarded: number;
+  answer: string;
+}
+
+/** models.Answer (session_id is `json:"-"`, never serialized) */
+export interface Answer {
+  id: string;
+  create_date: WireTimestamp;
+  question_id?: number;
+  round_id?: number;
+  player_id: PlayerId;
+  answer: string;
+  wager: number;
+  correct?: boolean;
+  points_awarded?: number;
+}
+
+/** sessions.IndividualAnswerAsMod (one entry per player in the mod's AnswersAsMod) */
+export interface IndividualAnswerAsMod {
+  player_id: PlayerId;
+  team_name: string;
+  answered: boolean;
+  active?: boolean;
+  answers: Answer[];
 }

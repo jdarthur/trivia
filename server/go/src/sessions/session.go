@@ -286,9 +286,11 @@ func (e *Env) GetPlayersInSession(c *gin.Context) {
 }
 
 // getPlayersInSession returns the session's players, in join order, from the
-// session_player membership join — the canonical membership list.
+// session_player membership join — the canonical membership list. Unlike
+// loadSessionPlayers it includes inactive members, carrying each row's active
+// flag so the roster / scoreboard / scorer UIs can render them greyed.
 func getPlayersInSession(e *Env, sessionId string) ([]models.Player, error) {
-	rows, err := e.Db.Query(`SELECT p.id, p.create_date, p.team_name, p.real_name, p.icon
+	rows, err := e.Db.Query(`SELECT p.id, p.create_date, p.team_name, p.real_name, p.icon, sp.active
 		FROM session_player sp
 		JOIN player p ON p.id = sp.player_id
 		WHERE sp.session_id = ?
@@ -302,10 +304,12 @@ func getPlayersInSession(e *Env, sessionId string) ([]models.Player, error) {
 	for rows.Next() {
 		var player models.Player
 		var createDate string
-		if err := rows.Scan(&player.ID, &createDate, &player.TeamName, &player.RealName, &player.Icon); err != nil {
+		var active int
+		if err := rows.Scan(&player.ID, &createDate, &player.TeamName, &player.RealName, &player.Icon, &active); err != nil {
 			return nil, err
 		}
 		player.CreateDate = common.ParseTime(createDate)
+		player.Active = active == 1
 		sessionPlayers = append(sessionPlayers, player)
 	}
 	return sessionPlayers, rows.Err()

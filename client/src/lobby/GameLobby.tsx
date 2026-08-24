@@ -3,6 +3,7 @@ import './Lobby.css';
 import InviteLink from "./InviteLink"
 import LobbyPlayer from "./LobbyPlayer"
 import OtherPlayers from "./OtherPlayers"
+import LeaveGame from "./LeaveGame"
 
 import {Layout, Button, Breadcrumb} from 'antd';
 import {PlaySquareOutlined} from '@ant-design/icons';
@@ -12,6 +13,7 @@ interface Props {
     player_id: string
     session_state: any
     is_mod: boolean
+    started: boolean
 }
 
 interface State {
@@ -52,13 +54,15 @@ class GameLobby extends React.Component<Props, State> {
                     {this.props.is_mod ? null : <LobbyPlayer session_id={this.props.session_id}
                                                              player_id={this.props.player_id}
                                                              excluded_icons={this.state.excluded_icons}/>}
+                    {this.props.is_mod ? null : <LeaveGame session_id={this.props.session_id}
+                                                           player_id={this.props.player_id}/>}
                 </div>
                 <br/>
                 <span style={{marginLeft: 10}}>{otherPlayersTitle}</span>
 
                 <div className="game-lobby">
                     <OtherPlayers player_id={this.props.player_id} session_id={this.props.session_id}
-                                  session_state={this.props.session_state}
+                                  session_state={this.props.session_state} started={this.props.started}
                                   set_excluded_icons={this.set_excluded_icons}/>
                 </div>
             </Layout>

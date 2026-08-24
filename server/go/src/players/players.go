@@ -126,6 +126,111 @@ func (e *Env) RemovePlayerFromSession(c *gin.Context) {
 	common.Respond(c, requestBody, err)
 }
 
+type LeaveSession struct {
+	PlayerId  models.PlayerId `json:"player_id"`
+	SessionId string          `json:"session_id"`
+}
+
+// LeaveSession sets the caller's own session_player.active to 0 (self-leave).
+// No moderator is required. The membership row (and any score / answers) is
+// kept; the player just stops being scored and can no longer submit.
+func (e *Env) LeaveSession(c *gin.Context) {
+	sessionId := c.Param("id")
+
+	var requestBody LeaveSession
+	requestBody.SessionId = sessionId
+
+	err := c.ShouldBind(&requestBody)
+	if err != nil {
+		common.Respond(c, requestBody, err)
+		return
+	}
+
+	var session models.Session
+	err = common.GetOne((*common.Env)(e), common.SessionTable, sessionId, &session)
+	if err != nil {
+		common.Respond(c, requestBody, err)
+		return
+	}
+
+	if !playerInSession(e, sessionId, requestBody.PlayerId) {
+		common.Respond(c, requestBody, sessions.PlayerNotInSessionError{PlayerId: requestBody.PlayerId, SessionId: sessionId})
+		return
+	}
+
+	err = deactivatePlayer(e, sessionId, requestBody.PlayerId)
+	if err == nil {
+		err = common.IncrementState((*common.Env)(e), sessionId)
+	}
+	common.Respond(c, requestBody, err)
+}
+
+type InactivatePlayer struct {
+	PlayerId  models.PlayerId `json:"player_id"`
+	AdminId   models.PlayerId `json:"admin_id"`
+	SessionId string          `json:"session_id"`
+}
+
+// InactivatePlayer is a moderator-only boot: it sets the target's
+// session_player.active to 0 while keeping the row and score — distinct from
+// the pre-start hard remove (RemovePlayerFromSession), which drops membership.
+func (e *Env) InactivatePlayer(c *gin.Context) {
+	sessionId := c.Param("id")
+
+	var requestBody InactivatePlayer
+	requestBody.SessionId = sessionId
+
+	err := c.ShouldBind(&requestBody)
+	if err != nil {
+		common.Respond(c, requestBody, err)
+		return
+	}
+
+	var session models.Session
+	err = common.GetOne((*common.Env)(e), common.SessionTable, sessionId, &session)
+	if err != nil {
+		common.Respond(c, requestBody, err)
+		return
+	}
+
+	// moderator-only action
+	if requestBody.AdminId != session.Moderator {
+		common.Respond(c, requestBody, sessions.UnauthorizedSessionActionError{ModeratorId: requestBody.AdminId})
+		return
+	}
+
+	if !playerInSession(e, sessionId, requestBody.PlayerId) {
+		common.Respond(c, requestBody, sessions.PlayerNotInSessionError{PlayerId: requestBody.PlayerId, SessionId: sessionId})
+		return
+	}
+
+	err = deactivatePlayer(e, sessionId, requestBody.PlayerId)
+	if err == nil {
+		err = common.IncrementState((*common.Env)(e), sessionId)
+	}
+	common.Respond(c, requestBody, err)
+}
+
+// playerInSession reports whether the player has a membership row in the
+// session (active or not).
+func playerInSession(e *Env, sessionId string, target models.PlayerId) bool {
+	var n int
+	err := e.Db.QueryRow(`SELECT count(*) FROM session_player
+		WHERE session_id = ? AND player_id = ?`, sessionId, string(target)).Scan(&n)
+	if err != nil {
+		return false
+	}
+	return n > 0
+}
+
+// deactivatePlayer flips a session_player membership row's active flag to 0,
+// keeping the row and any accumulated score / answers (ticket #5).
+func deactivatePlayer(e *Env, sessionId string, playerId models.PlayerId) error {
+	_, err := e.Db.Exec(`UPDATE session_player SET active = 0
+		WHERE session_id = ? AND player_id = ?`, sessionId, string(playerId))
+	return err
+}
+
 func (e *Env) UpdatePlayer(c *gin.Context) {
 
 	playerId := c.Param("id")

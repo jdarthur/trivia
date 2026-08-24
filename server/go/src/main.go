@@ -142,6 +142,8 @@ func main() {
 	router.PUT("/gameplay/player/:id", p.UpdatePlayer)
 	router.POST("/gameplay/session/:id/add", p.AddPlayerToSession)
 	router.POST("/gameplay/session/:id/remove", p.RemovePlayerFromSession)
+	router.POST("/gameplay/session/:id/leave", p.LeaveSession)
+	router.POST("/gameplay/session/:id/inactivate", p.InactivatePlayer)
 	router.DELETE("/gameplay/player/:id", p.DeletePlayer)
 
 	fmt.Println("\nCollection API:")
