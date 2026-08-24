@@ -54,6 +54,7 @@ type AnswerUnscored struct {
 	Icon     string   `json:"icon"`
 	Answered bool     `json:"answered"`
 	PlayerId PlayerId `json:"player_id,omitempty"`
+	Active   bool     `json:"active,omitempty"`
 }
 
 type AnswersResponseScored struct {
@@ -65,6 +66,7 @@ type ScoredTeam struct {
 	TeamName string         `json:"team_name"`
 	Icon     string         `json:"icon"`
 	PlayerId PlayerId       `json:"player_id,omitempty"`
+	Active   bool           `json:"active,omitempty"`
 	Answers  []ScoredAnswer `json:"answers"`
 }
 

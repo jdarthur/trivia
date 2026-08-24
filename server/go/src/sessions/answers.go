@@ -38,6 +38,16 @@ func (e *Env) AnswerQuestion(c *gin.Context) {
 		return
 	}
 
+	active, err := playerIsActive(e, sessionId, answer.PlayerId)
+	if err != nil {
+		common.Respond(c, nil, err)
+		return
+	}
+	if !active {
+		common.Respond(c, nil, PlayerInactiveError{PlayerId: answer.PlayerId, SessionId: sessionId})
+		return
+	}
+
 	err = checkValidRoundAndQuestionIndex(session, *answer.RoundIndex, *answer.QuestionIndex)
 	if err != nil {
 		common.Respond(c, nil, err)
@@ -313,6 +323,7 @@ func getAnswersUnscored(e *Env, session models.Session, roundIndex int, question
 		}
 		p.TeamName = player.TeamName
 		p.Icon = player.Icon
+		p.Active = player.Active
 
 		answered, err := playerAnsweredQuestion(e, session.ID, roundIndex, questionIndex, thisPlayerId)
 		if err != nil {
@@ -347,6 +358,7 @@ func getAnswersScored(e *Env, session models.Session, roundIndex int, questionIn
 
 		team.Icon = player.Icon
 		team.TeamName = player.TeamName
+		team.Active = player.Active
 
 		for _, answer := range allAnswers {
 			if answer.PlayerId != playerId {
@@ -376,6 +388,7 @@ type IndividualAnswerAsMod struct {
 	PlayerId models.PlayerId `json:"player_id"`
 	TeamName string          `json:"team_name"`
 	Answered bool            `json:"answered"`
+	Active   bool            `json:"active,omitempty"`
 	Answers  []models.Answer `json:"answers"`
 }
 
@@ -405,6 +418,7 @@ func getAnswersAsMod(e *Env, session models.Session, roundIndex int, questionInd
 		var teamAnswer IndividualAnswerAsMod
 		teamAnswer.PlayerId = playerId
 		teamAnswer.TeamName = player.TeamName
+		teamAnswer.Active = player.Active
 		teamAnswer.Answers = make([]models.Answer, 0)
 
 		for _, individualAnswer := range allAnswers {
@@ -429,6 +443,22 @@ func playerInSession(e *Env, sessionId string, target models.PlayerId) bool {
 		return false
 	}
 	return n > 0
+}
+
+// playerIsActive reports whether the membership row exists and is active. An
+// inactive row still exists (it is not hard-removed), so the caller must check
+// membership separately.
+func playerIsActive(e *Env, sessionId string, target models.PlayerId) (bool, error) {
+	var active int
+	err := e.Db.QueryRow(`SELECT active FROM session_player
+		WHERE session_id = ? AND player_id = ?`, sessionId, string(target)).Scan(&active)
+	if errors.Is(err, sql.ErrNoRows) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	return active == 1, nil
 }
 
 func wagerIsLegal(legalWagers []int, wager int) bool {

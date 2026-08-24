@@ -338,6 +338,18 @@ var migrations = []migration{
 			)`,
 		},
 	},
+	{
+		version: 9,
+		name:    "session player active flag",
+		statements: []string{
+			// ticket #5: an explicit "inactive" state on the per-(session,player)
+			// membership row so the game continues when someone leaves or is
+			// booted without hand-answering their questions. Inactive players
+			// stay on the roster/scoreboard (greyed, score frozen), are excluded
+			// from the scoreQuestion requirement, and can no longer submit.
+			`ALTER TABLE session_player ADD COLUMN active INTEGER NOT NULL DEFAULT 1`,
+		},
+	},
 }
 
 // Migrate brings db up to the latest schema version, applying each pending

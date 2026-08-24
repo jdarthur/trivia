@@ -86,7 +86,8 @@ class Scoreboard extends React.Component<Props, State> {
             const background = ((index + 1) % 2) === 1 ? "#fafafa" : ""
             return <PlayerScore key={player.team_name} team_name={player.team_name}
                 score={sum(player.score)} icon_name={player.icon} background={background}
-                player_id={player.player_id} current_player={this.props.player_id} />
+                player_id={player.player_id} current_player={this.props.player_id}
+                active={player.active} />
         })
 
         const marginLeft = this.props.is_mobile ? 0 : 100

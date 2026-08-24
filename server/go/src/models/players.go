@@ -15,6 +15,10 @@ type Player struct {
 	TeamName   string    `json:"team_name"`
 	RealName   string    `json:"real_name"`
 	Icon       string    `json:"icon"`
+	// Active is populated on session-roster reads only (session_player.active);
+	// the global player table has no such column, so editor reads leave it false
+	// and omitempty keeps it off the wire.
+	Active bool `json:"active,omitempty"`
 }
 
 func (p Player) SetCreateDate(createDate time.Time) Object {

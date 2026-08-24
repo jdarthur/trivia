@@ -79,6 +79,7 @@ func getSessionScoreboard(e *Env, sessionId string, callerPlayerId string) (mode
 		var playerScore models.PlayerScore
 		playerScore.Icon = player.Icon
 		playerScore.TeamName = player.TeamName
+		playerScore.Active = player.Active
 		playerScore.Score = scores[playerId]
 		if playerScore.Score == nil {
 			playerScore.Score = make([]float64, 0)

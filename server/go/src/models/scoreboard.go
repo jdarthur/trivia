@@ -5,6 +5,7 @@ type PlayerScore struct {
 	Score    []float64 `json:"score"`
 	TeamName string    `json:"team_name"`
 	PlayerId PlayerId  `json:"player_id,omitempty"`
+	Active   bool      `json:"active,omitempty"`
 }
 
 type PlayerScoreboard struct {

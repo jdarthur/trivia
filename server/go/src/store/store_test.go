@@ -36,8 +36,8 @@ func TestMigrateCreatesBaselineSchema(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Version: %v", err)
 	}
-	if v != 8 {
-		t.Fatalf("user_version = %d, want 8", v)
+	if v != 9 {
+		t.Fatalf("user_version = %d, want 9", v)
 	}
 
 	tables := []string{
@@ -60,6 +60,32 @@ func TestMigrateCreatesBaselineSchema(t *testing.T) {
 		if n != 1 {
 			t.Errorf("table %q not created by baseline migration", name)
 		}
+	}
+
+	// migration 9 (ticket #5) adds the session_player.active membership flag
+	rows, err := db.Query("PRAGMA table_info(session_player)")
+	if err != nil {
+		t.Fatalf("query table_info: %v", err)
+	}
+	defer rows.Close()
+	found := false
+	for rows.Next() {
+		var cid int
+		var name, typ string
+		var notnull, pk int
+		var dflt interface{}
+		if err := rows.Scan(&cid, &name, &typ, &notnull, &dflt, &pk); err != nil {
+			t.Fatalf("scan table_info row: %v", err)
+		}
+		if name == "active" {
+			found = true
+		}
+	}
+	if err := rows.Err(); err != nil {
+		t.Fatalf("iterate table_info: %v", err)
+	}
+	if !found {
+		t.Error("session_player.active column missing after migration")
 	}
 }
 
@@ -243,8 +269,8 @@ func TestMigrateIsIdempotent(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Version: %v", err)
 	}
-	if v != 8 {
-		t.Fatalf("user_version = %d after re-migrate, want 8", v)
+	if v != 9 {
+		t.Fatalf("user_version = %d after re-migrate, want 9", v)
 	}
 }
 

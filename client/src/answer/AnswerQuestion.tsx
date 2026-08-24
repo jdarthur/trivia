@@ -1,6 +1,7 @@
 import React from 'react';
 import "./AnswerQuestion.css"
 import WagerManager from "./WagerManager"
+import LeaveGame from "../lobby/LeaveGame"
 import sendData from "../index"
 
 import { Card, Input, Button, Radio, Select } from 'antd';
@@ -32,6 +33,7 @@ interface State {
     answered: boolean
     selected_choice: string | null
     matches: Record<string, string>
+    active: boolean
 }
 
 class AnswerQuestion extends React.Component<Props, State> {
@@ -43,13 +45,35 @@ class AnswerQuestion extends React.Component<Props, State> {
         answered: false,
         selected_choice: null,
         matches: {},
+        active: true,
     }
 
+    componentDidMount() {
+        this.check_active()
+    }
 
     componentDidUpdate(prevProps: Props) {
+        if (this.props.session_state !== prevProps.session_state) {
+            this.check_active()
+        }
         if (this.props.question !== prevProps.question || this.props.round !== prevProps.round) {
             this.setState({ answer: "", wager: null, dirty: false, answered: false, selected_choice: null, matches: {} })
         }
+    }
+
+    // An inactive (left/booted) player can no longer submit; learn the flag
+    // from the roster, where the caller's own row carries their player_id.
+    check_active = () => {
+        const url = "/gameplay/session/" + this.props.session_id + "/players?player_id=" + this.props.player_id
+        fetch(url)
+            .then(response => response.json())
+            .then((data: any) => {
+                const players = data.players || []
+                const self = players.find((p: any) => p.player_id === this.props.player_id)
+                if (self && self.active === false) {
+                    this.setState({active: false})
+                }
+            })
     }
 
     set_answer = (event: any) => { this.setState({ answer: event.target.value, dirty: true }) }
@@ -151,8 +175,20 @@ class AnswerQuestion extends React.Component<Props, State> {
                 onPressEnter={this.handleKeyPress} style={{fontSize: 16}} />
         )
 
+        // A player who left the game sees a disabled "You left the game" card.
+        if (!this.props.player_id) {
+            return null
+        }
+        if (!this.state.active) {
+            return (
+                <Card style={{ width: 'min(400px, 100%)', marginTop: 15}} bodyStyle={{ padding: 15 }}
+                      title="You left the game">
+                    <p>You are no longer in this game and cannot submit answers.</p>
+                    <LeaveGame session_id={this.props.session_id} player_id={this.props.player_id}/>
+                </Card>
+            )
+        }
         return (
-            this.props.player_id ?
             <Card style={{ width: 'min(400px, 100%)', marginTop: 15}} bodyStyle={{ padding: 15 }}  >
                 {answer_input}
 
@@ -164,7 +200,6 @@ class AnswerQuestion extends React.Component<Props, State> {
                         onClick={this.send} disabled={!this.sendable()}> {send_text} </Button>
                 </div>
             </Card>
-            : null
         );
     }
 }

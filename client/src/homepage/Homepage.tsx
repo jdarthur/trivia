@@ -122,7 +122,8 @@ class Homepage extends React.Component<Props, State> {
             :
 
             <GameLobby session_id={this.state.session_id} player_id={this.state.player_id}
-                       session_state={this.state.sess_state} is_mod={this.state.is_mod}/>)
+                       session_state={this.state.sess_state} is_mod={this.state.is_mod}
+                       started={this.state.started}/>)
         return (
             <div className="homepage">
                 {this.state.session_id === "" ? <NewGameModal token={this.props.token}/> : null}

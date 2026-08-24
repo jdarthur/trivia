@@ -93,12 +93,18 @@ class PlayerScorer extends React.Component<Props, State> {
         return this.props.question_type === "multiple_choice" || this.props.question_type === "matching"
     }
 
+    // Players still in the game (active = true on the wire; inactive members are
+    // greyed out and excluded from scoring — ticket #5).
+    active_answers = () => {
+        return (this.state.answers || []).filter((player: any) => player.active === true)
+    }
+
     // Pre-populate scores so the Score button is ready and the backend's
     // auto-scoring decides correctness (the mod's correct flag is ignored for
     // structured types; ScoreOverride is still honored).
     auto_score = () => {
         const scores: Record<string, ScoreState> = {}
-        for (const player of this.state.answers) {
+        for (const player of this.active_answers()) {
             scores[player.player_id] = {correct: true, score_override: this.get_wager(player.player_id) ?? null}
         }
         this.setState({scores: scores})
@@ -127,11 +133,15 @@ class PlayerScorer extends React.Component<Props, State> {
         if (this.scorable()) {
 
             const url = "/gameplay/session/" + this.props.session_id + "/score"
+            const players: Record<string, ScoreState> = {}
+            for (const player of this.active_answers()) {
+                players[player.player_id] = this.state.scores[player.player_id]
+            }
             const body = {
                 player_id: this.props.player_id,
                 round_index: this.props.round_id,
                 question_index: this.props.question_id,
-                players: this.state.scores
+                players
             }
 
             sendData(url, "PUT", body)
@@ -185,11 +195,12 @@ class PlayerScorer extends React.Component<Props, State> {
     }
 
     scorable = () => {
-        if ((this.state.scores as any).length === 0) {
+        const active = this.active_answers()
+        if (active.length === 0) {
             return false
         }
-        for (let i = 0; i < this.state.answers.length; i++) {
-            const player_id = this.state.answers[i].player_id
+        for (const player of active) {
+            const player_id = player.player_id
             if (this.state.scores[player_id] === undefined) {
                 return false
             }
@@ -202,15 +213,21 @@ class PlayerScorer extends React.Component<Props, State> {
 
     render() {
         const answers = this.state.answers?.map((player: any) => {
+            const active = player.active === true
             const status = this.state.scores[player.player_id] || {}
             const override_value = status.score_override !== undefined ? status.score_override : 0
-            return <PlayerAnswer key={player.player_id} player_id={player.player_id}
-                                 answers={player.answers} clear={this.clear} set_correct={this.set_correct}
-                                 player_name={player.team_name} correct={status.correct}
-                                 session_id={this.props.session_id}
-                                 set_override={this.set_override} override_value={override_value as number}
-                                 auto_scored={this.auto_scored()}
-                                 question_type={this.props.question_type}/>
+            const card = <PlayerAnswer key={player.player_id} player_id={player.player_id}
+                                       answers={player.answers} clear={this.clear} set_correct={this.set_correct}
+                                       player_name={player.team_name} correct={status.correct}
+                                       session_id={this.props.session_id}
+                                       set_override={this.set_override} override_value={override_value as number}
+                                       auto_scored={this.auto_scored()}
+                                       question_type={this.props.question_type}/>
+            if (!active) {
+                return <div key={player.player_id} className="player-scorer-inactive"
+                            style={{opacity: 0.5, filter: 'grayscale(1)'}}>{card}</div>
+            }
+            return card
         })
 
         return (

@@ -34,3 +34,18 @@ func (e PlayerNotInSessionError) Field() string {
 func (e PlayerNotInSessionError) Data() interface{} {
 	return e.PlayerId
 }
+
+//Error when an inactive (left/booted) player tries to submit an answer
+type PlayerInactiveError struct {
+	PlayerId models.PlayerId
+	SessionId string
+}
+func (e PlayerInactiveError) Error() string {
+	return fmt.Sprintf("Player %v is inactive in session %v", e.PlayerId, e.SessionId)
+}
+func (e PlayerInactiveError) Field() string {
+	return models.PlayerIdParam
+}
+func (e PlayerInactiveError) Data() interface{} {
+	return e.PlayerId
+}
