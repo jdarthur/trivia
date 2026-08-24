@@ -179,6 +179,17 @@ class PlayerScorer extends React.Component<Props, State> {
         }
     }
 
+    // true when the player's latest answer opted into Moneyball (ticket #3).
+    get_moneyball = (player_id: string): boolean => {
+        for (let i = 0; i < this.state.answers.length; i++) {
+            if (this.state.answers[i].player_id === player_id) {
+                const answers = this.state.answers[i].answers || []
+                return answers.length > 0 && answers[answers.length - 1].use_moneyball === true
+            }
+        }
+        return false
+    }
+
     set_override = (player_id: string, value: number | string | null) => {
         const scores = this.state.scores
         if (scores[player_id] === undefined) {
@@ -222,7 +233,9 @@ class PlayerScorer extends React.Component<Props, State> {
                                        session_id={this.props.session_id}
                                        set_override={this.set_override} override_value={override_value as number}
                                        auto_scored={this.auto_scored()}
-                                       question_type={this.props.question_type}/>
+                                       question_type={this.props.question_type}
+                                       moneyball={this.get_moneyball(player.player_id)}
+                                       scored={this.props.scored}/>
             if (!active) {
                 return <div key={player.player_id} className="player-scorer-inactive"
                             style={{opacity: 0.5, filter: 'grayscale(1)'}}>{card}</div>

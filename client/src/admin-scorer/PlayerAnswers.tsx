@@ -2,7 +2,7 @@ import React from 'react';
 import ScorerLink from "./ScorerLink"
 import MultiAnswer from "./MultiAnswer"
 
-import {Button, Card, InputNumber, Popover, Slider, Space} from "antd"
+import {Button, Card, InputNumber, Popover, Slider, Space, Tooltip} from "antd"
 
 import {
     CheckOutlined, CloseOutlined, SlidersOutlined,
@@ -12,6 +12,9 @@ import ShortTextWithPopover from "../common/ShortTextWithPopover";
 interface AnswerLike {
     answer: string
     wager: number
+    use_moneyball?: boolean
+    correct?: boolean
+    points_awarded?: number
 }
 
 interface Props {
@@ -26,6 +29,13 @@ interface Props {
     clear?: (player_id: string) => void
     auto_scored?: boolean
     question_type?: string
+    // moneyball: the latest answer opted into the Moneyball mechanic, so its
+    // points are computed by the backend (ticket #3) and the override slider
+    // is disabled.
+    moneyball?: boolean
+    // scored: the question has been scored, so the answers carry the points
+    // the backend actually awarded.
+    scored?: boolean
 }
 
 export default function PlayerAnswers({
@@ -38,7 +48,9 @@ export default function PlayerAnswers({
                                           session_id,
                                           player_name,
                                           auto_scored,
-                                          question_type
+                                          question_type,
+                                          moneyball,
+                                          scored
                                       }: Props) {
 
     // on new answer, clear out the existing score
@@ -65,6 +77,18 @@ export default function PlayerAnswers({
         {answers && answers.length > 0 ? answers[answers.length - 1].wager : null}
     </div>
 
+    // Moneyball answers are scored by the backend formula (ticket #3), so the
+    // mod's score-override slider is replaced with a 🤑 marker. Before scoring
+    // the number shown is the wager; once the question is scored it is what
+    // the backend actually awarded (2X / normal / 0 / −1X).
+    const lastAnswer = answers && answers.length > 0 ? answers[answers.length - 1] : null
+    const moneyballAward = scored && lastAnswer && lastAnswer.points_awarded !== undefined
+        ? lastAnswer.points_awarded
+        : (lastAnswer ? lastAnswer.wager : null)
+    const moneyballBadge = <Tooltip title="Moneyball: points are auto-computed (2X lone correct / normal with 1 other / 0 with 2+ others / −1X wrong)">
+        <span style={{fontSize: "1.3em"}}>🤑 {moneyballAward}</span>
+    </Tooltip>
+
     const modalContent = <div style={{width: 200, display: "flex", flexDirection: "column"}}>
         <Slider min={-10} max={10} step={0.5} value={override} onChange={setOverride} style={{flexGrow: 1}}/>
         <InputNumber value={override} onChange={setOverride} step={0.5}
@@ -83,12 +107,14 @@ export default function PlayerAnswers({
 
     let correctButtonText: React.ReactNode = ""
     if (correct === true) {
-        correctButtonText = override === 0 ? wager : override
+        // moneyball players have no meaningful override; show the wager before
+        // scoring and the awarded points after
+        correctButtonText = moneyball ? moneyballAward : (override === 0 ? wager : override)
     }
 
     return (
 
-        <Card size="small" title={title} extra={correct === true ? sliderMiniModal : wager}
+        <Card size="small" title={title} extra={moneyball ? moneyballBadge : (correct === true ? sliderMiniModal : wager)}
               style={{'width': 200}} bodyStyle={{padding: 0}}>
             <div className="answered-or-not"> {answer_text} </div>
 

@@ -4,7 +4,8 @@ import WagerManager from "./WagerManager"
 import LeaveGame from "../lobby/LeaveGame"
 import sendData from "../index"
 
-import { Card, Input, Button, Radio, Select } from 'antd';
+import { Card, Input, Button, Radio, Select, Checkbox, Tooltip } from 'antd';
+import { QuestionCircleOutlined } from '@ant-design/icons';
 
 const { TextArea } = Input;
 
@@ -34,6 +35,10 @@ interface State {
     selected_choice: string | null
     matches: Record<string, string>
     active: boolean
+    moneyball: boolean
+    // the player's own scored answer for this question, fetched once scored,
+    // so the answer box can show the Moneyball outcome
+    scored_result: any
 }
 
 class AnswerQuestion extends React.Component<Props, State> {
@@ -46,10 +51,15 @@ class AnswerQuestion extends React.Component<Props, State> {
         selected_choice: null,
         matches: {},
         active: true,
+        moneyball: false,
+        scored_result: null,
     }
 
     componentDidMount() {
         this.check_active()
+        if (this.props.scored) {
+            this.fetch_scored_result()
+        }
     }
 
     componentDidUpdate(prevProps: Props) {
@@ -57,7 +67,13 @@ class AnswerQuestion extends React.Component<Props, State> {
             this.check_active()
         }
         if (this.props.question !== prevProps.question || this.props.round !== prevProps.round) {
-            this.setState({ answer: "", wager: null, dirty: false, answered: false, selected_choice: null, matches: {} })
+            this.setState({ answer: "", wager: null, dirty: false, answered: false, selected_choice: null, matches: {}, moneyball: false, scored_result: null })
+            if (this.props.scored) {
+                this.fetch_scored_result()
+            }
+        }
+        if (this.props.scored && !prevProps.scored) {
+            this.fetch_scored_result()
         }
     }
 
@@ -84,6 +100,47 @@ class AnswerQuestion extends React.Component<Props, State> {
             matches: {...prevState.matches, [left]: value},
             dirty: true
         }))
+    }
+    set_moneyball = (checked: boolean) => { this.setState({ moneyball: checked, dirty: true }) }
+
+    // fetch the player's own scored answer for this question; the Moneyball
+    // outcome indicator is derived from it (the flag + points the backend
+    // actually awarded).
+    fetch_scored_result = () => {
+        const url = "/gameplay/session/" + this.props.session_id + "/answers"
+            + "?player_id=" + this.props.player_id
+            + "&round_id=" + this.props.round
+            + "&question_id=" + this.props.question
+        fetch(url)
+            .then(response => response.json())
+            .then((data: any) => {
+                const team = (data.answers || []).find((t: any) => t.player_id === this.props.player_id)
+                const answers = team?.answers || []
+                this.setState({scored_result: answers.length > 0 ? answers[answers.length - 1] : null})
+            })
+    }
+
+    // Moneyball outcome for the player's own scored answer, per ticket #3:
+    // 2X lone correct, normal with one other correct, 0 with two+ others
+    // correct, -1X incorrect. A correct answer that pays 0 is a busted bet
+    // ("2+ others got it right"), not a missed answer.
+    moneyball_status = (): {text: string, emoji: string, success: boolean} | null => {
+        const result = this.state.scored_result
+        if (!result || !result.use_moneyball) return null
+        const wager = result.wager || 0
+        // wager > 0 guards the 2X/normal checks: with a 0 wager every award is
+        // 0 and would falsely match 2*wager. (The editor rejects wagers <= 0,
+        // so this is purely defensive.)
+        if (result.correct && wager > 0 && result.points_awarded === 2 * wager) {
+            return {text: "Moneyball successful — 2X points!", emoji: "🤑", success: true}
+        }
+        if (result.correct && wager > 0 && result.points_awarded === wager) {
+            return {text: "Moneyball — normal points, no bonus", emoji: "🤑", success: true}
+        }
+        if (result.correct) {
+            return {text: "Moneyball busted — correct, but no payout", emoji: "😞", success: false}
+        }
+        return {text: "Missed Moneyball — get 'em next time!", emoji: "😞", success: false}
     }
 
     question_type = () => this.props.question_type || FREEFORM
@@ -133,6 +190,7 @@ class AnswerQuestion extends React.Component<Props, State> {
                 player_id: this.props.player_id,
                 answer: this.build_answer(),
                 wager: this.state.wager,
+                use_moneyball: this.state.moneyball,
             }
 
             const url = "/gameplay/session/" + this.props.session_id + "/answer"
@@ -148,6 +206,7 @@ class AnswerQuestion extends React.Component<Props, State> {
         const type = this.question_type()
         const button_class = this.sendable() ? "" : "disabled"
         const send_text = this.state.answered ? "Update" : "Answer"
+        const moneyball_status = this.moneyball_status()
 
         const answer_input = type === MULTIPLE_CHOICE ? (
             <Radio.Group value={this.state.selected_choice}
@@ -191,6 +250,27 @@ class AnswerQuestion extends React.Component<Props, State> {
         return (
             <Card style={{ width: 'min(400px, 100%)', marginTop: 15}} bodyStyle={{ padding: 15 }}  >
                 {answer_input}
+
+                {/* Moneyball opt-in (ticket #3): risk the wager for a 2X payout. */}
+                {!this.props.scored ? (
+                    <div className="moneyball-row" style={{marginTop: 10}}>
+                        <Checkbox checked={this.state.moneyball}
+                                  onChange={(event) => this.set_moneyball(event.target.checked)}>
+                            🤑 Moneyball
+                        </Checkbox>
+                        <Tooltip title="Moneyball: risk your wager for a 2X payout. Correct and alone → 2X points. Correct with one other → normal points. Correct with two or more others → 0 points. Wrong → −1X points.">
+                            <QuestionCircleOutlined style={{marginLeft: 4, color: "#999"}}/>
+                        </Tooltip>
+                    </div>
+                ) : null}
+
+                {/* Moneyball outcome, shown once the question is scored. */}
+                {moneyball_status ? (
+                    <div className={"moneyball-outcome " + (moneyball_status.success ? "success" : "missed")}
+                         style={{marginTop: 10, fontWeight: "bold"}}>
+                        <span style={{fontSize: "1.3em"}}>{moneyball_status.emoji}</span> {moneyball_status.text}
+                    </div>
+                ) : null}
 
                 <div className="answer-footer">
                     <WagerManager session_id={this.props.session_id} player_id={this.props.player_id}

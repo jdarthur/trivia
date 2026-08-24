@@ -17,6 +17,7 @@ type Answer struct {
 	PlayerId      PlayerId  `json:"player_id" binding:"required"`
 	Answer        string    `json:"answer" binding:"required"`
 	Wager         int       `json:"wager" binding:"required"`
+	UseMoneyball  bool      `json:"use_moneyball,omitempty"`
 	Correct       bool      `json:"correct,omitempty"`
 	PointsAwarded float64   `json:"points_awarded,omitempty"`
 	// SessionId is set server-side on create; it is not part of the API.
@@ -72,6 +73,7 @@ type ScoredTeam struct {
 
 type ScoredAnswer struct {
 	Wager         int     `json:"wager"`
+	UseMoneyball  bool    `json:"use_moneyball"`
 	Correct       bool    `json:"correct"`
 	PointsAwarded float64 `json:"points_awarded"`
 	Answer        string  `json:"answer"`
