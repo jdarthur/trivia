@@ -13,6 +13,8 @@ interface AnswerLike {
     answer: string
     wager: number
     use_moneyball?: boolean
+    correct?: boolean
+    points_awarded?: number
 }
 
 interface Props {
@@ -31,6 +33,9 @@ interface Props {
     // points are computed by the backend (ticket #3) and the override slider
     // is disabled.
     moneyball?: boolean
+    // scored: the question has been scored, so the answers carry the points
+    // the backend actually awarded.
+    scored?: boolean
 }
 
 export default function PlayerAnswers({
@@ -44,7 +49,8 @@ export default function PlayerAnswers({
                                           player_name,
                                           auto_scored,
                                           question_type,
-                                          moneyball
+                                          moneyball,
+                                          scored
                                       }: Props) {
 
     // on new answer, clear out the existing score
@@ -72,9 +78,15 @@ export default function PlayerAnswers({
     </div>
 
     // Moneyball answers are scored by the backend formula (ticket #3), so the
-    // mod's score-override slider is replaced with a 🤑 marker + wager.
+    // mod's score-override slider is replaced with a 🤑 marker. Before scoring
+    // the number shown is the wager; once the question is scored it is what
+    // the backend actually awarded (2X / normal / 0 / −1X).
+    const lastAnswer = answers && answers.length > 0 ? answers[answers.length - 1] : null
+    const moneyballAward = scored && lastAnswer && lastAnswer.points_awarded !== undefined
+        ? lastAnswer.points_awarded
+        : (lastAnswer ? lastAnswer.wager : null)
     const moneyballBadge = <Tooltip title="Moneyball: points are auto-computed (2X lone correct / normal with 1 other / 0 with 2+ others / −1X wrong)">
-        <span style={{fontSize: "1.3em"}}>🤑 {answers && answers.length > 0 ? answers[answers.length - 1].wager : null}</span>
+        <span style={{fontSize: "1.3em"}}>🤑 {moneyballAward}</span>
     </Tooltip>
 
     const modalContent = <div style={{width: 200, display: "flex", flexDirection: "column"}}>
@@ -95,8 +107,9 @@ export default function PlayerAnswers({
 
     let correctButtonText: React.ReactNode = ""
     if (correct === true) {
-        // moneyball players have no meaningful override; show the wager
-        correctButtonText = moneyball ? wager : (override === 0 ? wager : override)
+        // moneyball players have no meaningful override; show the wager before
+        // scoring and the awarded points after
+        correctButtonText = moneyball ? moneyballAward : (override === 0 ? wager : override)
     }
 
     return (

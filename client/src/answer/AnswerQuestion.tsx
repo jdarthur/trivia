@@ -122,16 +122,23 @@ class AnswerQuestion extends React.Component<Props, State> {
 
     // Moneyball outcome for the player's own scored answer, per ticket #3:
     // 2X lone correct, normal with one other correct, 0 with two+ others
-    // correct, -1X incorrect.
+    // correct, -1X incorrect. A correct answer that pays 0 is a busted bet
+    // ("2+ others got it right"), not a missed answer.
     moneyball_status = (): {text: string, emoji: string, success: boolean} | null => {
         const result = this.state.scored_result
         if (!result || !result.use_moneyball) return null
         const wager = result.wager || 0
-        if (result.correct && result.points_awarded === 2 * wager) {
+        // wager > 0 guards the 2X/normal checks: with a 0 wager every award is
+        // 0 and would falsely match 2*wager. (The editor rejects wagers <= 0,
+        // so this is purely defensive.)
+        if (result.correct && wager > 0 && result.points_awarded === 2 * wager) {
             return {text: "Moneyball successful — 2X points!", emoji: "🤑", success: true}
         }
-        if (result.correct && result.points_awarded === wager) {
+        if (result.correct && wager > 0 && result.points_awarded === wager) {
             return {text: "Moneyball — normal points, no bonus", emoji: "🤑", success: true}
+        }
+        if (result.correct) {
+            return {text: "Moneyball busted — correct, but no payout", emoji: "😞", success: false}
         }
         return {text: "Missed Moneyball — get 'em next time!", emoji: "😞", success: false}
     }

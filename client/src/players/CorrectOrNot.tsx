@@ -77,7 +77,9 @@ class CorrectOrNot extends React.Component<Props> {
         </div>
 
         //correctness icon + wager
-        const class_name = "player-wager " + (last_answer.correct && (last_answer.points_awarded ?? 0) > 0 ? "" : "in") + "correct"
+        //color by correctness: a correct moneyball answer that pays 0 (2+
+        //others correct) is still a correct answer and gets the green card
+        const class_name = "player-wager " + (last_answer.correct ? "" : "in") + "correct"
         let correctness_and_wager = <div className={class_name}>
             <div> {last_answer.correct ? last_answer.points_awarded : last_answer.wager} {this.moneyball_marker(last_answer)} </div>
             <div> {last_answer.correct ? <CheckSquareOutlined/> : <CloseSquareOutlined/>} </div>
