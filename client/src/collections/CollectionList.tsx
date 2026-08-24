@@ -5,7 +5,7 @@ import NewCollection from "./NewCollection";
 import NewButton from "../editor/NewButton";
 import {useGetCollectionsQuery} from "../api/main";
 import PageHeader from "../common/PageHeader";
-import {useSearchParams} from "react-router-dom";
+import {useSearchParams} from "react-router";
 import ImportCollection from "./ImportCollection";
 
 interface Props {
