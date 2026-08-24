@@ -397,49 +397,91 @@ func scoreQuestionTx(e *Env, session models.Session, requestBody models.ScoreReq
 			rows.Close()
 		}
 
+		// First pass: read every player's latest answer and determine
+		// correctness. Correctness must be known for all players before any
+		// points are computed, because a moneyball answer's points depend on
+		// how many other players are correct.
+		type playerScore struct {
+			playerId     models.PlayerId
+			answerId     string
+			oldPoints    float64
+			wager        int
+			useMoneyball bool
+			isCorrect    bool
+			override     *float64
+		}
+		scores := make([]playerScore, 0, len(requestBody.Players))
 		for playerId, correctOrNot := range requestBody.Players {
 			//the player's latest answer for this question
-			var answerId string
-			var oldPoints float64
-			var wager int
+			var score playerScore
 			var latestAnswer string
-			err := q.QueryRowContext(ctx, `SELECT id, points_awarded, wager, answer FROM answer
+			var useMoneyball int
+			score.playerId = playerId
+			score.override = correctOrNot.ScoreOverride
+			err := q.QueryRowContext(ctx, `SELECT id, points_awarded, wager, use_moneyball, answer FROM answer
 				WHERE session_id = ? AND round_index = ? AND question_index = ? AND player_id = ?
 				ORDER BY rowid DESC LIMIT 1`,
-				session.ID, roundIndex, questionIndex, string(playerId)).Scan(&answerId, &oldPoints, &wager, &latestAnswer)
+				session.ID, roundIndex, questionIndex, string(playerId)).
+				Scan(&score.answerId, &score.oldPoints, &score.wager, &useMoneyball, &latestAnswer)
 			if errors.Is(err, sql.ErrNoRows) {
 				return IllegalScoreError{PlayerId: playerId, RoundIndex: roundIndex, QuestionIndex: questionIndex}
 			}
 			if err != nil {
 				return err
 			}
+			score.useMoneyball = useMoneyball == 1
 
 			// freeform keeps the mod's correct flag; structured types are
 			// auto-scored against the snapshot answer key.
-			isCorrect := correctOrNot.Correct
+			score.isCorrect = correctOrNot.Correct
 			if questionType != "freeform" {
-				isCorrect = autoScoredCorrect(questionType, latestAnswer, correctChoiceText, matchLefts, matchRights)
+				score.isCorrect = autoScoredCorrect(questionType, latestAnswer, correctChoiceText, matchLefts, matchRights)
 			}
 
-			//override wager if score override is provided.
-			//award 0 points if answer is incorrect
+			scores = append(scores, score)
+		}
+
+		// Moneyball (ticket #3): a player who opted in gets 2X for a lone
+		// correct answer, normal points with exactly one other correct, 0 when
+		// two or more others are correct, and -1X for an incorrect answer.
+		// The formula is enforced server-side — any score override on a
+		// moneyball answer is ignored, so the scorer cannot mis-award.
+		correctCount := 0
+		for _, score := range scores {
+			if score.isCorrect {
+				correctCount++
+			}
+		}
+
+		for _, score := range scores {
 			var pointsToAward float64
-			if isCorrect {
-				if correctOrNot.ScoreOverride != nil {
-					pointsToAward = *correctOrNot.ScoreOverride
+			if score.useMoneyball {
+				switch {
+				case !score.isCorrect:
+					pointsToAward = -float64(score.wager)
+				case correctCount == 1:
+					pointsToAward = 2 * float64(score.wager)
+				case correctCount == 2:
+					pointsToAward = float64(score.wager)
+				default:
+					pointsToAward = 0
+				}
+			} else if score.isCorrect {
+				if score.override != nil {
+					pointsToAward = *score.override
 				} else {
-					pointsToAward = float64(wager)
+					pointsToAward = float64(score.wager)
 				}
 			} else {
 				pointsToAward = 0
 			}
 
 			correct := 0
-			if isCorrect {
+			if score.isCorrect {
 				correct = 1
 			}
 			if _, err := q.ExecContext(ctx, `UPDATE answer SET correct = ?, points_awarded = ? WHERE id = ?`,
-				correct, pointsToAward, answerId); err != nil {
+				correct, pointsToAward, score.answerId); err != nil {
 				return err
 			}
 
@@ -447,19 +489,19 @@ func scoreQuestionTx(e *Env, session models.Session, requestBody models.ScoreReq
 			var roundTotal float64
 			err = q.QueryRowContext(ctx, `SELECT points FROM session_score
 				WHERE session_id = ? AND player_id = ? AND round_index = ?`,
-				session.ID, string(playerId), roundIndex).Scan(&roundTotal)
+				session.ID, string(score.playerId), roundIndex).Scan(&roundTotal)
 			if err != nil && !errors.Is(err, sql.ErrNoRows) {
 				return err
 			}
 			if errors.Is(err, sql.ErrNoRows) {
 				roundTotal = 0
 			}
-			roundTotal = roundTotal - oldPoints + pointsToAward
+			roundTotal = roundTotal - score.oldPoints + pointsToAward
 
 			if _, err := q.ExecContext(ctx, `INSERT INTO session_score (session_id, player_id, round_index, points)
 				VALUES (?, ?, ?, ?)
 				ON CONFLICT(session_id, player_id, round_index) DO UPDATE SET points = excluded.points`,
-				session.ID, string(playerId), roundIndex, roundTotal); err != nil {
+				session.ID, string(score.playerId), roundIndex, roundTotal); err != nil {
 				return err
 			}
 		}

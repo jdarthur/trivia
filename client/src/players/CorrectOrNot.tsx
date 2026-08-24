@@ -3,7 +3,7 @@ import "./Players.css"
 import PlayerIcon from '../lobby/PlayerIcon';
 import MultiAnswer from "../admin-scorer/MultiAnswer"
 
-import {Card} from "antd"
+import {Card, Tooltip} from "antd"
 
 import {
     CheckSquareOutlined,
@@ -16,6 +16,7 @@ interface AnswerLike {
     wager: number
     correct?: boolean
     points_awarded?: number
+    use_moneyball?: boolean
 }
 
 interface Props {
@@ -35,6 +36,27 @@ interface Props {
  * aftr the question has been scored
  */
 class CorrectOrNot extends React.Component<Props> {
+
+    // Moneyball outcome marker (ticket #3): 🤑 on a 2X hit, 🤑 with a note
+    // when the moneyball paid normal points, 😞 when it missed (0 points or
+    // negative).
+    moneyball_marker = (answer: AnswerLike): React.ReactNode => {
+        if (!answer.use_moneyball) return null
+        const wager = answer.wager || 0
+        let text: string
+        let emoji: string
+        if (answer.correct && answer.points_awarded === 2 * wager) {
+            text = "Moneyball successful — 2X points!"
+            emoji = "🤑"
+        } else if (answer.correct && answer.points_awarded === wager) {
+            text = "Moneyball — normal points, no bonus"
+            emoji = "🤑"
+        } else {
+            text = "Missed Moneyball — get 'em next time!"
+            emoji = "😞"
+        }
+        return <Tooltip title={text}><span style={{marginLeft: 4}}>{emoji}</span></Tooltip>
+    }
 
     render() {
         let last_answer: AnswerLike = {answer: "", wager: 0}
@@ -57,7 +79,7 @@ class CorrectOrNot extends React.Component<Props> {
         //correctness icon + wager
         const class_name = "player-wager " + (last_answer.correct && (last_answer.points_awarded ?? 0) > 0 ? "" : "in") + "correct"
         let correctness_and_wager = <div className={class_name}>
-            <div> {last_answer.correct ? last_answer.points_awarded : last_answer.wager} </div>
+            <div> {last_answer.correct ? last_answer.points_awarded : last_answer.wager} {this.moneyball_marker(last_answer)} </div>
             <div> {last_answer.correct ? <CheckSquareOutlined/> : <CloseSquareOutlined/>} </div>
         </div>
 

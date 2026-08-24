@@ -225,9 +225,9 @@ func scanAnswerRow(s rowScanner) (models.Answer, error) {
 	var createDate string
 	var roundIndex, questionIndex sql.NullInt64
 	var playerId string
-	var correct int
+	var correct, useMoneyball int
 	err := s.Scan(&m.ID, &createDate, &m.SessionId, &roundIndex, &questionIndex, &playerId,
-		&m.Answer, &m.Wager, &correct, &m.PointsAwarded)
+		&m.Answer, &m.Wager, &useMoneyball, &correct, &m.PointsAwarded)
 	if err != nil {
 		return m, err
 	}
@@ -235,6 +235,7 @@ func scanAnswerRow(s rowScanner) (models.Answer, error) {
 	m.RoundIndex = intPtr(roundIndex)
 	m.QuestionIndex = intPtr(questionIndex)
 	m.PlayerId = models.PlayerId(playerId)
+	m.UseMoneyball = useMoneyball == 1
 	m.Correct = correct == 1
 	return m, nil
 }
@@ -256,7 +257,7 @@ func intPtr(n sql.NullInt64) *int {
 // oldest first.
 func answersForQuestion(e *Env, sessionId string, roundIndex int, questionIndex int) ([]models.Answer, error) {
 	rows, err := e.Db.Query(`SELECT id, create_date, session_id, round_index, question_index,
-		player_id, answer, wager, correct, points_awarded
+		player_id, answer, wager, use_moneyball, correct, points_awarded
 		FROM answer
 		WHERE session_id = ? AND round_index = ? AND question_index = ?
 		ORDER BY rowid`, sessionId, roundIndex, questionIndex)
@@ -279,7 +280,7 @@ func answersForQuestion(e *Env, sessionId string, roundIndex int, questionIndex 
 // question — the one scoring reads and wagers deduct from.
 func latestAnswersForQuestion(e *Env, sessionId string, roundIndex int, questionIndex int) ([]models.Answer, error) {
 	rows, err := e.Db.Query(`SELECT a.id, a.create_date, a.session_id, a.round_index, a.question_index,
-		a.player_id, a.answer, a.wager, a.correct, a.points_awarded
+		a.player_id, a.answer, a.wager, a.use_moneyball, a.correct, a.points_awarded
 		FROM answer a
 		WHERE a.session_id = ? AND a.round_index = ? AND a.question_index = ?
 			AND a.id = (
@@ -367,6 +368,7 @@ func getAnswersScored(e *Env, session models.Session, roundIndex int, questionIn
 			var a models.ScoredAnswer
 			a.Answer = answer.Answer
 			a.Wager = answer.Wager
+			a.UseMoneyball = answer.UseMoneyball
 			a.Correct = answer.Correct
 			a.PointsAwarded = answer.PointsAwarded
 			team.Answers = append(team.Answers, a)

@@ -704,11 +704,11 @@ func getAnswer(db *sql.DB, id string, m *models.Answer) error {
 	var createDate string
 	var roundIndex, questionIndex sql.NullInt64
 	var playerId string
-	var correct int
+	var correct, useMoneyball int
 	err := db.QueryRow(`SELECT id, create_date, session_id, round_index, question_index, player_id,
-		answer, wager, correct, points_awarded FROM answer WHERE id = ?`, id).
+		answer, wager, use_moneyball, correct, points_awarded FROM answer WHERE id = ?`, id).
 		Scan(&m.ID, &createDate, &m.SessionId, &roundIndex, &questionIndex, &playerId,
-			&m.Answer, &m.Wager, &correct, &m.PointsAwarded)
+			&m.Answer, &m.Wager, &useMoneyball, &correct, &m.PointsAwarded)
 	if errors.Is(err, sql.ErrNoRows) {
 		return NonexistentIdError{RecordType: AnswerTable, ID: id}
 	}
@@ -719,6 +719,7 @@ func getAnswer(db *sql.DB, id string, m *models.Answer) error {
 	m.RoundIndex = intPtr(roundIndex)
 	m.QuestionIndex = intPtr(questionIndex)
 	m.PlayerId = models.PlayerId(playerId)
+	m.UseMoneyball = useMoneyball == 1
 	m.Correct = correct == 1
 	return nil
 }
@@ -901,10 +902,10 @@ func insertAnswer(db *sql.DB, m models.Answer) error {
 		questionIndex = *m.QuestionIndex
 	}
 	_, err := db.Exec(`INSERT INTO answer (id, create_date, session_id, round_index, question_index,
-		player_id, answer, wager, correct, points_awarded)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		player_id, answer, wager, use_moneyball, correct, points_awarded)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		m.ID, formatTime(m.CreateDate), m.SessionId, roundIndex, questionIndex,
-		string(m.PlayerId), m.Answer, m.Wager, boolToInt(m.Correct), m.PointsAwarded)
+		string(m.PlayerId), m.Answer, m.Wager, boolToInt(m.UseMoneyball), boolToInt(m.Correct), m.PointsAwarded)
 	return err
 }
 
@@ -1080,9 +1081,9 @@ func updateAnswer(db *sql.DB, id string, m models.Answer) error {
 	if m.QuestionIndex != nil {
 		questionIndex = *m.QuestionIndex
 	}
-	res, err := db.Exec(`UPDATE answer SET player_id = ?, answer = ?, wager = ?, correct = ?,
+	res, err := db.Exec(`UPDATE answer SET player_id = ?, answer = ?, wager = ?, use_moneyball = ?, correct = ?,
 		points_awarded = ?, round_index = ?, question_index = ? WHERE id = ?`,
-		string(m.PlayerId), m.Answer, m.Wager, boolToInt(m.Correct), m.PointsAwarded,
+		string(m.PlayerId), m.Answer, m.Wager, boolToInt(m.UseMoneyball), boolToInt(m.Correct), m.PointsAwarded,
 		roundIndex, questionIndex, id)
 	return rowsAffected(res, err, AnswerTable, id)
 }

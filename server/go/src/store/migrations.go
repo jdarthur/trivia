@@ -350,6 +350,18 @@ var migrations = []migration{
 			`ALTER TABLE session_player ADD COLUMN active INTEGER NOT NULL DEFAULT 1`,
 		},
 	},
+	{
+		version: 10,
+		name:    "answer moneyball flag",
+		statements: []string{
+			// ticket #3: the Moneyball mechanic. A player opts in per answer;
+			// at score time the backend awards 2X for a lone correct answer,
+			// normal points with one other correct, 0 with two or more others
+			// correct, and -1X for an incorrect answer. Old rows (no flag)
+			// read back as not-moneyball.
+			`ALTER TABLE answer ADD COLUMN use_moneyball INTEGER NOT NULL DEFAULT 0`,
+		},
+	},
 }
 
 // Migrate brings db up to the latest schema version, applying each pending

@@ -212,6 +212,202 @@ func TestScoreQuestionWritesAnswersScoresAndState(t *testing.T) {
 	}
 }
 
+// newMoneyballFixture builds the standard scored fixture, then re-answers
+// question 0 for p1 with moneyball opted in, so p1's latest answer carries
+// use_moneyball (scoring reads the latest answer per player).
+func newMoneyballFixture(t *testing.T, env *Env) (session models.Session, p1 models.PlayerId, p2 models.PlayerId) {
+	t.Helper()
+	session, p1, p2 = newScoredFixture(t, env)
+	r, q := 0, 0
+	if _, _, err := common.Create((*common.Env)(env), common.AnswerTable, &models.Answer{
+		SessionId: session.ID, RoundIndex: &r, QuestionIndex: &q, PlayerId: p1,
+		Answer: "guess", Wager: 100, UseMoneyball: true,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	return session, p1, p2
+}
+
+// scoredAnswersByPlayer returns the latest answer per player for question 0.
+func scoredAnswersByPlayer(t *testing.T, env *Env, sessionId string) map[models.PlayerId]models.Answer {
+	t.Helper()
+	answers, err := latestAnswersForQuestion(env, sessionId, 0, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := map[models.PlayerId]models.Answer{}
+	for _, a := range answers {
+		got[a.PlayerId] = a
+	}
+	return got
+}
+
+func TestScoreQuestionMoneyballLoneCorrect(t *testing.T) {
+	env := openSessionTestDB(t)
+	session, p1, p2 := newMoneyballFixture(t, env)
+
+	// p1 moneyball is the only correct answer -> 2X = 200
+	if err := scoreQuestionTx(env, session, scoreRequest(p1, p2), 0, 0); err != nil {
+		t.Fatal(err)
+	}
+	got := scoredAnswersByPlayer(t, env, session.ID)
+	if !got[p1].UseMoneyball || got[p1].PointsAwarded != 200 {
+		t.Fatalf("player 1 answer = %+v, want moneyball lone correct with 200 points", got[p1])
+	}
+	if got[p2].PointsAwarded != 0 {
+		t.Fatalf("player 2 answer = %+v, want incorrect with 0 points", got[p2])
+	}
+}
+
+func TestScoreQuestionMoneyballWithOneOtherCorrect(t *testing.T) {
+	env := openSessionTestDB(t)
+	session, p1, p2 := newMoneyballFixture(t, env)
+
+	// one other player is also correct -> moneyball pays normal points (100)
+	request := models.ScoreRequest{
+		RoundIndex: 0, QuestionIndex: 0,
+		Players: map[models.PlayerId]models.CorrectorNot{
+			p1: {Correct: true},
+			p2: {Correct: true},
+		},
+	}
+	if err := scoreQuestionTx(env, session, request, 0, 0); err != nil {
+		t.Fatal(err)
+	}
+	got := scoredAnswersByPlayer(t, env, session.ID)
+	if got[p1].PointsAwarded != 100 {
+		t.Fatalf("player 1 answer = %+v, want moneyball with one other correct paying 100", got[p1])
+	}
+	if got[p2].PointsAwarded != 200 {
+		t.Fatalf("player 2 answer = %+v, want correct with 200 points", got[p2])
+	}
+}
+
+func TestScoreQuestionMoneyballTwoOthersCorrect(t *testing.T) {
+	env := openSessionTestDB(t)
+	session, p1, p2 := newMoneyballFixture(t, env)
+
+	// two other players correct -> moneyball pays 0 even though p1 is right
+	p3 := createPlayer(t, env, "team-3")
+	if err := common.Push((*common.Env)(env), common.SessionTable, session.ID, models.Players, p3); err != nil {
+		t.Fatal(err)
+	}
+	r, q := 0, 0
+	if _, _, err := common.Create((*common.Env)(env), common.AnswerTable, &models.Answer{
+		SessionId: session.ID, RoundIndex: &r, QuestionIndex: &q, PlayerId: p3,
+		Answer: "guess", Wager: 300,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	request := models.ScoreRequest{
+		RoundIndex: 0, QuestionIndex: 0,
+		Players: map[models.PlayerId]models.CorrectorNot{
+			p1: {Correct: true},
+			p2: {Correct: true},
+			p3: {Correct: true},
+		},
+	}
+	if err := scoreQuestionTx(env, session, request, 0, 0); err != nil {
+		t.Fatal(err)
+	}
+	got := scoredAnswersByPlayer(t, env, session.ID)
+	if got[p1].PointsAwarded != 0 {
+		t.Fatalf("player 1 answer = %+v, want moneyball with two others correct paying 0", got[p1])
+	}
+	if got[p2].PointsAwarded != 200 || got[p3].PointsAwarded != 300 {
+		t.Fatalf("other players not scored normally: p2 = %+v, p3 = %+v", got[p2], got[p3])
+	}
+}
+
+func TestScoreQuestionMoneyballIncorrect(t *testing.T) {
+	env := openSessionTestDB(t)
+	session, p1, p2 := newMoneyballFixture(t, env)
+
+	// moneyball answer wrong -> -1X = -100
+	request := models.ScoreRequest{
+		RoundIndex: 0, QuestionIndex: 0,
+		Players: map[models.PlayerId]models.CorrectorNot{
+			p1: {Correct: false},
+			p2: {Correct: true},
+		},
+	}
+	if err := scoreQuestionTx(env, session, request, 0, 0); err != nil {
+		t.Fatal(err)
+	}
+	got := scoredAnswersByPlayer(t, env, session.ID)
+	if got[p1].PointsAwarded != -100 {
+		t.Fatalf("player 1 answer = %+v, want moneyball incorrect paying -100", got[p1])
+	}
+
+	// the round total reflects the negative award
+	var roundTotal float64
+	if err := env.Db.QueryRow(`SELECT points FROM session_score
+		WHERE session_id = ? AND player_id = ? AND round_index = 0`, session.ID, string(p1)).Scan(&roundTotal); err != nil {
+		t.Fatal(err)
+	}
+	if roundTotal != -100 {
+		t.Fatalf("player 1 round total = %v, want -100", roundTotal)
+	}
+}
+
+func TestScoreQuestionMoneyballIgnoresOverride(t *testing.T) {
+	env := openSessionTestDB(t)
+	session, p1, p2 := newMoneyballFixture(t, env)
+
+	// the mod must not be able to mis-award a moneyball answer: the override
+	// is ignored and the formula (lone correct -> 2X) applies
+	override := 999.0
+	request := models.ScoreRequest{
+		RoundIndex: 0, QuestionIndex: 0,
+		Players: map[models.PlayerId]models.CorrectorNot{
+			p1: {Correct: true, ScoreOverride: &override},
+			p2: {Correct: false},
+		},
+	}
+	if err := scoreQuestionTx(env, session, request, 0, 0); err != nil {
+		t.Fatal(err)
+	}
+	got := scoredAnswersByPlayer(t, env, session.ID)
+	if got[p1].PointsAwarded != 200 {
+		t.Fatalf("player 1 answer = %+v, want moneyball lone correct 200 despite override 999", got[p1])
+	}
+}
+
+func TestScoreQuestionMoneyballRescoreRecomputes(t *testing.T) {
+	env := openSessionTestDB(t)
+	session, p1, p2 := newMoneyballFixture(t, env)
+
+	// first score: p1 moneyball lone correct -> 200
+	if err := scoreQuestionTx(env, session, scoreRequest(p1, p2), 0, 0); err != nil {
+		t.Fatal(err)
+	}
+
+	// rescore with p2 also correct -> moneyball now pays normal points, and the
+	// round total is adjusted (200 -> 100) instead of accumulating
+	request := models.ScoreRequest{
+		RoundIndex: 0, QuestionIndex: 0,
+		Players: map[models.PlayerId]models.CorrectorNot{
+			p1: {Correct: true},
+			p2: {Correct: true},
+		},
+	}
+	if err := scoreQuestionTx(env, session, request, 0, 0); err != nil {
+		t.Fatal(err)
+	}
+	got := scoredAnswersByPlayer(t, env, session.ID)
+	if got[p1].PointsAwarded != 100 {
+		t.Fatalf("player 1 answer after rescore = %+v, want 100", got[p1])
+	}
+	var roundTotal float64
+	if err := env.Db.QueryRow(`SELECT points FROM session_score
+		WHERE session_id = ? AND player_id = ? AND round_index = 0`, session.ID, string(p1)).Scan(&roundTotal); err != nil {
+		t.Fatal(err)
+	}
+	if roundTotal != 100 {
+		t.Fatalf("player 1 round total after rescore = %v, want 100", roundTotal)
+	}
+}
+
 func TestScoreQuestionRollsBackOnMissingAnswer(t *testing.T) {
 	env := openSessionTestDB(t)
 	session, p1, p2 := newScoredFixture(t, env)

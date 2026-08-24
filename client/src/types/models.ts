@@ -179,6 +179,7 @@ export interface ScoredTeam {
 /** models.ScoredAnswer */
 export interface ScoredAnswer {
   wager: number;
+  use_moneyball: boolean;
   correct: boolean;
   points_awarded: number;
   answer: string;
@@ -193,6 +194,7 @@ export interface Answer {
   player_id: PlayerId;
   answer: string;
   wager: number;
+  use_moneyball?: boolean;
   correct?: boolean;
   points_awarded?: number;
 }
