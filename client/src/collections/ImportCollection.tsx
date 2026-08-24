@@ -3,7 +3,7 @@ import React, {useState} from 'react';
 import {Button, Card, Modal, Tag} from 'antd';
 import {useGetCollectionQuery, useImportCollectionMutation} from "../api/main";
 import FormattedQuestion from "../question/FormattedQuestion";
-import {Link, useNavigate} from "react-router-dom";
+import {Link, useNavigate} from "react-router";
 import notify, {errorMessage} from "../common/notify";
 
 

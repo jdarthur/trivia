@@ -1,5 +1,5 @@
 import React, {lazy, Suspense, useEffect, useState} from 'react';
-import {Link, Outlet, Route, Routes} from "react-router-dom";
+import {Link, Outlet, Route, Routes} from "react-router";
 
 import HomePage from "../homepage/Homepage"
 
