@@ -12,6 +12,9 @@ interface Props {
     answer?: string
     scored?: boolean
     max_width?: number
+    // When set, the answer block is rendered in bold (used by the gameplay
+    // question box for multiple-choice once the question is scored, ticket #160).
+    boldAnswer?: boolean
 }
 
 export default function FormattedQuestion(props: Props) {
@@ -30,13 +33,21 @@ export default function FormattedQuestion(props: Props) {
             <pre style={{background: "#262626", color: "#fafafa"}}>{asCode(String(children))}</pre>)),
         // text: ({ value, children }) => (<p style={{ "marginBottom": 5 }} > {children} </p>)
     };
+    // The answer block gets its own renderers so it can be emphasized
+    // independently of the question text (ticket #160).
+    const answerRenderers: Components = props.boldAnswer ? {
+        ...renderers,
+        p: ({children}) => (<p style={{"marginBottom": 5, "fontWeight": "bold"}}> {children} </p>),
+    } : renderers;
     return (
         <div>
             <ReactMarkdown components={renderers}
                            children={props.question}
                            remarkPlugins={[remarkGfm]}
             />
-            <ReactMarkdown components={renderers} children={answer}/>
+            <ReactMarkdown components={answerRenderers} children={answer}
+                           remarkPlugins={[remarkGfm]}
+            />
         </div>
     );
 }

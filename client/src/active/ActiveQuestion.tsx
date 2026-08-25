@@ -113,10 +113,19 @@ class ActiveQuestion extends React.Component<Props, State> {
                     <MemoFormattedQuestion question={this.props.question}
                                            answer={this.props.answer} max_width={350}
                                            scored={this.props.scored}
+                                           boldAnswer={this.props.scored && this.props.question_type === "multiple_choice"}
                     />
                     {this.props.question_type === "multiple_choice" && (this.props.choices || []).length > 0 ?
                         <ol style={{marginTop: 10, paddingLeft: 20}}>
-                            {(this.props.choices || []).map((choice, index) => <li key={index}>{choice}</li>)}
+                            {(this.props.choices || []).map((choice, index) => {
+                                // Ticket #160: once scored, mark the correct option
+                                // (the one matching the answer text) with ✅ + bold
+                                // and every other option with ❌.
+                                const isCorrect = this.props.scored && choice === this.props.answer
+                                return <li key={index} style={isCorrect ? {fontWeight: "bold"} : undefined}>
+                                    {this.props.scored ? (isCorrect ? "✅ " : "❌ ") : null}{choice}
+                                </li>
+                            })}
                         </ol> : null}
                     {this.props.question_type === "matching" && (this.props.lefts || []).length > 0 ?
                         <table style={{marginTop: 10, borderCollapse: "collapse", width: "100%"}}>
