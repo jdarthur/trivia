@@ -36,8 +36,8 @@ func TestMigrateCreatesBaselineSchema(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Version: %v", err)
 	}
-	if v != 10 {
-		t.Fatalf("user_version = %d, want 10", v)
+	if v != 11 {
+		t.Fatalf("user_version = %d, want 11", v)
 	}
 
 	tables := []string{
@@ -45,7 +45,7 @@ func TestMigrateCreatesBaselineSchema(t *testing.T) {
 		"game", "game_round", "game_round_name",
 		"collection", "collection_question",
 		"scoring_note", "player", "session", "session_player",
-		"session_question", "answer", "session_score", "session_state",
+		"session_question", "answer", "answer_reaction", "session_score", "session_state",
 		"user",
 		"question_choice", "question_match",
 		"session_question_choice", "session_question_match",
@@ -295,8 +295,8 @@ func TestMigrateIsIdempotent(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Version: %v", err)
 	}
-	if v != 10 {
-		t.Fatalf("user_version = %d after re-migrate, want 10", v)
+	if v != 11 {
+		t.Fatalf("user_version = %d after re-migrate, want 11", v)
 	}
 }
 
@@ -483,5 +483,91 @@ func TestSessionDeleteCascadesSnapshotChildren(t *testing.T) {
 	}
 	if n != 0 {
 		t.Errorf("session_question_match rows survived session delete: %d", n)
+	}
+}
+
+// TestAnswerReactionTable verifies migration 11 (ticket #154): the
+// answer_reaction table enforces one reaction per (answer, player) via a
+// UNIQUE constraint, rejects unknown answer/player FKs, and cascades deletes
+// from answer and player.
+func TestAnswerReactionTable(t *testing.T) {
+	db := openTestDB(t)
+
+	// schema: the table exposes the expected columns
+	rows, err := db.Query("PRAGMA table_info(answer_reaction)")
+	if err != nil {
+		t.Fatalf("query table_info: %v", err)
+	}
+	defer rows.Close()
+	cols := map[string]bool{}
+	for rows.Next() {
+		var cid int
+		var name, typ string
+		var notnull, pk int
+		var dflt interface{}
+		if err := rows.Scan(&cid, &name, &typ, &notnull, &dflt, &pk); err != nil {
+			t.Fatalf("scan table_info row: %v", err)
+		}
+		cols[name] = true
+	}
+	if err := rows.Err(); err != nil {
+		t.Fatalf("iterate table_info: %v", err)
+	}
+	for _, want := range []string{"id", "create_date", "answer_id", "player_id", "emoji"} {
+		if !cols[want] {
+			t.Errorf("answer_reaction missing column %q", want)
+		}
+	}
+
+	mustExec(t, db, `INSERT INTO session (id, create_date) VALUES ('s1', '2026-01-01T00:00:00.000000')`)
+	mustExec(t, db, `INSERT INTO player (id, create_date) VALUES ('p1', '2026-01-01T00:00:00.000000')`)
+	mustExec(t, db, `INSERT INTO player (id, create_date) VALUES ('p2', '2026-01-01T00:00:00.000000')`)
+	mustExec(t, db, `INSERT INTO answer (id, create_date, session_id, round_index, question_index, player_id)
+		VALUES ('a1', '2026-01-01T00:00:00.000000', 's1', 0, 0, 'p1')`)
+
+	// a first reaction is fine
+	mustExec(t, db, `INSERT INTO answer_reaction (id, create_date, answer_id, player_id, emoji)
+		VALUES ('r1', '2026-01-01T00:00:00.000000', 'a1', 'p2', '👍')`)
+
+	// a second reaction from the same player on the same answer violates UNIQUE
+	if _, err := db.Exec(`INSERT INTO answer_reaction (id, create_date, answer_id, player_id, emoji)
+		VALUES ('r2', '2026-01-01T00:00:00.000000', 'a1', 'p2', '❤️')`); err == nil {
+		t.Error("expected UNIQUE violation for a second reaction by the same player on the same answer")
+	}
+	// a different player may react to the same answer
+	mustExec(t, db, `INSERT INTO answer_reaction (id, create_date, answer_id, player_id, emoji)
+		VALUES ('r3', '2026-01-01T00:00:00.000000', 'a1', 'p1', '😂')`)
+
+	// unknown answer / player FKs are rejected
+	if _, err := db.Exec(`INSERT INTO answer_reaction (id, create_date, answer_id, player_id, emoji)
+		VALUES ('r4', '2026-01-01T00:00:00.000000', 'nope', 'p2', '👍')`); err == nil {
+		t.Error("expected FK violation for unknown answer_id")
+	}
+	if _, err := db.Exec(`INSERT INTO answer_reaction (id, create_date, answer_id, player_id, emoji)
+		VALUES ('r5', '2026-01-01T00:00:00.000000', 'a1', 'nope', '👍')`); err == nil {
+		t.Error("expected FK violation for unknown player_id")
+	}
+
+	// deleting the answer cascades to its reactions
+	mustExec(t, db, `DELETE FROM answer WHERE id = 'a1'`)
+	var n int
+	if err := db.QueryRow(`SELECT count(*) FROM answer_reaction WHERE answer_id = 'a1'`).Scan(&n); err != nil {
+		t.Fatal(err)
+	}
+	if n != 0 {
+		t.Errorf("answer_reaction rows survived answer delete: %d", n)
+	}
+
+	// deleting the player cascades to their reactions
+	mustExec(t, db, `INSERT INTO answer (id, create_date, session_id, round_index, question_index, player_id)
+		VALUES ('a2', '2026-01-01T00:00:00.000000', 's1', 0, 1, 'p1')`)
+	mustExec(t, db, `INSERT INTO answer_reaction (id, create_date, answer_id, player_id, emoji)
+		VALUES ('r6', '2026-01-01T00:00:00.000000', 'a2', 'p2', '😂')`)
+	mustExec(t, db, `DELETE FROM player WHERE id = 'p2'`)
+	if err := db.QueryRow(`SELECT count(*) FROM answer_reaction WHERE player_id = 'p2'`).Scan(&n); err != nil {
+		t.Fatal(err)
+	}
+	if n != 0 {
+		t.Errorf("answer_reaction rows survived player delete: %d", n)
 	}
 }

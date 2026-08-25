@@ -362,6 +362,27 @@ var migrations = []migration{
 			`ALTER TABLE answer ADD COLUMN use_moneyball INTEGER NOT NULL DEFAULT 0`,
 		},
 	},
+	{
+		version: 11,
+		name:    "answer reaction table",
+		statements: []string{
+			// ticket #154: emoji reactions on scored answers. One row is one
+			// reaction by one player to one answer; UNIQUE(answer_id,
+			// player_id) enforces "react once" at the DB level, so modifying
+			// is an UPDATE on the same row and removing is a DELETE. Reads
+			// join answer_reaction -> answer on (session_id, round_index,
+			// question_index), which answer already carries, so no
+			// denormalized session/round/question columns are stored here.
+			`CREATE TABLE answer_reaction (
+				id          TEXT PRIMARY KEY,
+				create_date TEXT NOT NULL,
+				answer_id   TEXT NOT NULL REFERENCES answer(id) ON DELETE CASCADE,
+				player_id   TEXT NOT NULL REFERENCES player(id) ON DELETE CASCADE,
+				emoji       TEXT NOT NULL DEFAULT '',
+				UNIQUE (answer_id, player_id)
+			)`,
+		},
+	},
 }
 
 // Migrate brings db up to the latest schema version, applying each pending
