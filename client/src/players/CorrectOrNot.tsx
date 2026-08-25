@@ -33,6 +33,9 @@ interface Props {
     wager?: number
     correct?: boolean
     points_awarded?: number
+    // question_type lets the player-status view render structured answers
+    // readably (matching answers are a JSON map string — ticket #162).
+    question_type?: string
 }
 
 /**
@@ -111,6 +114,7 @@ class CorrectOrNot extends React.Component<Props> {
                         <div className="answer-text"><MultiAnswer answers={this.props.answers} omitWager={true}
                                                                   session_id={this.props.session_id}
                                                                   current_player={this.props.current_player}
+                                                                  question_type={this.props.question_type}
                                                                   scored={true}/></div>
                         {correctness_and_wager}
                     </Card>}

@@ -214,7 +214,8 @@ class ActiveGame extends React.Component<Props, State> {
                     <PlayerStatus question_id={this.state.active_question}
                                   round_id={this.state.active_round} session_id={this.props.session_id}
                                   player_id={this.props.player_id} session_state={this.props.session_state}
-                                  scored={this.state.scored as boolean} is_mobile={this.props.is_mobile}/> : null}
+                                  scored={this.state.scored as boolean} is_mobile={this.props.is_mobile}
+                                  question_type={this.state.question_type}/> : null}
             </div>
         );
     }

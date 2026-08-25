@@ -13,6 +13,7 @@ interface Props {
     session_state: any
     scored: boolean
     is_mobile?: boolean
+    question_type?: string
 }
 
 interface State {
@@ -99,6 +100,7 @@ class PlayerStatus extends React.Component<Props, State> {
                                      answers={player.answers} icon_name={player.icon}
                                      current_player={this.props.player_id} player_id={player.player_id}
                                      session_id={this.props.session_id}
+                                     question_type={this.props.question_type}
                                      is_mobile={this.props.is_mobile}/>
             else return <AnsweredOrNot key={player.team_name} player_name={player.team_name}
                                        answered={player.answered} icon_name={player.icon}
@@ -112,6 +114,7 @@ class PlayerStatus extends React.Component<Props, State> {
                                  points_awarded={player.points_awarded} icon_name={player.icon}
                                  current_player={this.props.player_id} player_id={player.player_id}
                                  session_id={this.props.session_id}
+                                 question_type={this.props.question_type}
                                  is_mobile={false}/>
 
         })
