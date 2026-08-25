@@ -32,6 +32,7 @@ interface State {
     wager: number | string | null
     dirty: boolean
     answered: boolean
+    sending: boolean
     selected_choice: string | null
     matches: Record<string, string>
     active: boolean
@@ -48,6 +49,7 @@ class AnswerQuestion extends React.Component<Props, State> {
         wager: null,
         dirty: false,
         answered: false,
+        sending: false,
         selected_choice: null,
         matches: {},
         active: true,
@@ -204,7 +206,7 @@ class AnswerQuestion extends React.Component<Props, State> {
     }
 
     send = () => {
-        if (this.sendable()) {
+        if (this.sendable() && !this.state.sending) {
             const answer = {
                 question_id: this.props.question,
                 round_id: this.props.round,
@@ -217,8 +219,19 @@ class AnswerQuestion extends React.Component<Props, State> {
             const url = "/gameplay/session/" + this.props.session_id + "/answer"
             console.log(url)
             console.log(answer)
+            // Guard against rapid double-clicks / double Enter: clear `dirty`
+            // only on success so a failed send stays retryable (ticket #147).
+            this.setState({sending: true})
             sendData(url, "POST", answer)
-                .then((data: any) => { this.setState({ dirty: false, answered: true }) })
+                .then((data: any) => {
+                    this.setState({ dirty: false, answered: true })
+                })
+                .catch((error: any) => {
+                    console.log(error)
+                })
+                .finally(() => {
+                    this.setState({sending: false})
+                })
         }
     }
 
@@ -298,7 +311,7 @@ class AnswerQuestion extends React.Component<Props, State> {
                         round_id={this.props.round} wager={this.state.wager} select={this.set_wager}
                         question_id={this.props.question} all_wagers={this.props.wagers}/>
                     <Button type="primary" className={button_class}
-                        onClick={this.send} disabled={!this.sendable()}> {send_text} </Button>
+                        onClick={this.send} disabled={!this.sendable() || this.state.sending}> {send_text} </Button>
                 </div>
             </Card>
         );

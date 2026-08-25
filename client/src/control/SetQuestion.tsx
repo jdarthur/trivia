@@ -33,6 +33,11 @@ class SetQuestion extends React.Component<Props, State> {
             sendData(url, "PUT", body)
             .then((data: any) => {
               console.log(data)
+            })
+            .catch((error: any) => {
+              console.log(error)
+            })
+            .finally(() => {
               this.setState({loading: false})
             })
         })
@@ -40,7 +45,7 @@ class SetQuestion extends React.Component<Props, State> {
 
     render() {
         return (
-            <Button type="primary" onClick={this.set_question}> {this.props.label} </Button>
+            <Button type="primary" onClick={this.set_question} disabled={this.state.loading}> {this.props.label} </Button>
         );
     }
 }

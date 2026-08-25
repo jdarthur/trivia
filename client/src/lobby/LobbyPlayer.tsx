@@ -24,6 +24,7 @@ interface State {
     real_name: string
     icon: string
     dirty: boolean
+    sending: boolean
 }
 
 class LobbyPlayer extends React.Component<Props, State> {
@@ -38,7 +39,8 @@ class LobbyPlayer extends React.Component<Props, State> {
             team_name: "",
             real_name: "",
             icon: randIcon,
-            dirty: false
+            dirty: false,
+            sending: false
         }
     }
 
@@ -86,11 +88,18 @@ class LobbyPlayer extends React.Component<Props, State> {
             icon: this.state.icon
         }
 
+        // Disable the button for the whole chain: a double-click would create
+        // two players, add both to the session, and orphan the first (ticket #147).
+        this.setState({sending: true})
         const url = PLAYER_BASE
         sendData(url, "POST", player)
             .then((data) => {
                 console.log(data)
-                this.add_player_to_session(data)
+                return this.add_player_to_session(data)
+            })
+            .catch((error) => {
+                console.log(error)
+                this.setState({sending: false})
             })
     }
 
@@ -100,7 +109,7 @@ class LobbyPlayer extends React.Component<Props, State> {
         const session_id = this.props.session_id
 
         const url = "/gameplay/session/" + session_id + "/add"
-        sendData(url, "POST", {player_id: player_id})
+        return sendData(url, "POST", {player_id: player_id})
             .then((data) => {
                 window.location.href = window.location.href + "&player_id=" + player_id
             })
@@ -113,11 +122,18 @@ class LobbyPlayer extends React.Component<Props, State> {
             icon: this.state.icon
         }
 
+        this.setState({sending: true})
         const url = PLAYER_BASE + "/" + this.props.player_id
         sendData(url, "PUT", player)
             .then((data) => {
                 console.log(data)
                 this.setState({dirty: false})
+            })
+            .catch((error) => {
+                console.log(error)
+            })
+            .finally(() => {
+                this.setState({sending: false})
             })
     }
 
@@ -136,7 +152,7 @@ class LobbyPlayer extends React.Component<Props, State> {
         const button_text = this.props.player_id ? "Update" : "Join game"
         const selectIcon = <SelectIcon select={this.set_icon} icon_name={this.state.icon}
                                        excluded_icons={this.props.excluded_icons}/>
-        const disabled = !this.state.dirty || !this.saveable()
+        const disabled = !this.state.dirty || !this.saveable() || this.state.sending
         return (
             <Card title="You" extra={selectIcon}
                   style={{width: 250, margin: 5}}>
