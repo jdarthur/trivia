@@ -92,6 +92,11 @@ class ActiveQuestion extends React.Component<Props, State> {
                 <InfoCircleOutlined style={{marginLeft: "0.5em"}}/>
             </Tooltip> : null
 
+        // Ticket #160: once a multiple-choice question is scored, the option
+        // list below already shows the correct answer (✅ + bold), so the
+        // standalone answer line is hidden to avoid duplicating it.
+        const mcScored = this.props.scored && this.props.question_type === "multiple_choice"
+
         return (
             <Card style={{width: 'min(400px, 100%)', marginTop: 10}} bodyStyle={{padding: 20}}>
                 <span style={{display: "flex", justifyContent: "space-between", alignItems: "center", width: "100%"}}>
@@ -111,9 +116,8 @@ class ActiveQuestion extends React.Component<Props, State> {
 
                 <div className="active-question-box">
                     <MemoFormattedQuestion question={this.props.question}
-                                           answer={this.props.answer} max_width={350}
-                                           scored={this.props.scored}
-                                           boldAnswer={this.props.scored && this.props.question_type === "multiple_choice"}
+                                           answer={mcScored ? "" : this.props.answer} max_width={350}
+                                           scored={mcScored ? false : this.props.scored}
                     />
                     {this.props.question_type === "multiple_choice" && (this.props.choices || []).length > 0 ?
                         <ol style={{marginTop: 10, paddingLeft: 20}}>

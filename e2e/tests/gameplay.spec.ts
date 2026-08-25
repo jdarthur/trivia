@@ -905,9 +905,14 @@ test.describe('gameplay navigation, hot-edit, spectator & edge cases', () => {
     // Chrome reports the resolved weight as "700" (bold normalizes to numeric).
     expect(['bold', '700']).toContain(fontWeight);
 
+    // The standalone answer line is hidden — the option list already shows the
+    // correct answer, so no paragraph duplicates "Answer C".
+    await expect(modBox.locator('p').filter({ hasText: 'Answer C' })).toHaveCount(0);
+
     await expect(correctOption(playerPage.locator('.active-question-box'))).toContainText('✅', {
       timeout: 30000,
     });
+    await expect(playerPage.locator('.active-question-box').locator('p').filter({ hasText: 'Answer C' })).toHaveCount(0);
 
     await playerContext.close();
     await modContext.close();
