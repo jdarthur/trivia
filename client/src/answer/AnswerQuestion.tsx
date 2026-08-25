@@ -55,6 +55,13 @@ class AnswerQuestion extends React.Component<Props, State> {
         scored_result: null,
     }
 
+    // Ticket #146: a slow response for a previous question/round must not
+    // overwrite the current one (WagerManager pattern). Separate counters per
+    // fetch: check_active fires on session_state changes and fetch_scored_result
+    // on question/round/scored changes, so they must not invalidate each other.
+    activeCounter = 0
+    fetchCounter = 0
+
     componentDidMount() {
         this.check_active()
         if (this.props.scored) {
@@ -79,11 +86,17 @@ class AnswerQuestion extends React.Component<Props, State> {
 
     // An inactive (left/booted) player can no longer submit; learn the flag
     // from the roster, where the caller's own row carries their player_id.
+    // Guarded so a slow response can't set the flag after a newer check.
     check_active = () => {
+        this.activeCounter += 1
+        const currentCheck = this.activeCounter
         const url = "/gameplay/session/" + this.props.session_id + "/players?player_id=" + this.props.player_id
         fetch(url)
             .then(response => response.json())
             .then((data: any) => {
+                if (currentCheck !== this.activeCounter) {
+                    return
+                }
                 const players = data.players || []
                 const self = players.find((p: any) => p.player_id === this.props.player_id)
                 if (self && self.active === false) {
@@ -105,8 +118,13 @@ class AnswerQuestion extends React.Component<Props, State> {
 
     // fetch the player's own scored answer for this question; the Moneyball
     // outcome indicator is derived from it (the flag + points the backend
-    // actually awarded).
+    // actually awarded). Guarded: two triggers (question/round change and the
+    // scored flip) can leave two fetches for different questions in flight, and
+    // a slow response for the previous question must not overwrite the current
+    // one (ticket #146).
     fetch_scored_result = () => {
+        this.fetchCounter += 1
+        const currentFetch = this.fetchCounter
         const url = "/gameplay/session/" + this.props.session_id + "/answers"
             + "?player_id=" + this.props.player_id
             + "&round_id=" + this.props.round
@@ -114,6 +132,9 @@ class AnswerQuestion extends React.Component<Props, State> {
         fetch(url)
             .then(response => response.json())
             .then((data: any) => {
+                if (currentFetch !== this.fetchCounter) {
+                    return
+                }
                 const team = (data.answers || []).find((t: any) => t.player_id === this.props.player_id)
                 const answers = team?.answers || []
                 this.setState({scored_result: answers.length > 0 ? answers[answers.length - 1] : null})

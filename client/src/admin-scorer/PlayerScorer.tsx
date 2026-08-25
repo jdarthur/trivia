@@ -32,6 +32,11 @@ class PlayerScorer extends React.Component<Props, State> {
         answers: []
     }
 
+    // Ticket #146: a slow response for a previous question/round must not
+    // overwrite the current one (WagerManager pattern). This also keeps the
+    // sessionStorage write in the same order as the state it accompanies.
+    fetchCounter = 0
+
     // The id of each player's latest answer as of the last fetch. Used to
     // detect a player submitting a new answer, so the mod's prior judgment
     // for them can be dropped (ticket #8).
@@ -69,6 +74,8 @@ class PlayerScorer extends React.Component<Props, State> {
 
         if (this.props.round_id !== "" && this.props.question_id !== "") {
             console.log(this.props)
+            this.fetchCounter += 1
+            const currentFetch = this.fetchCounter
             let url = "/gameplay/session/" + this.props.session_id + "/answers"
             url += "?player_id=" + this.props.player_id
             url += "&round_id=" + this.props.round_id
@@ -76,6 +83,10 @@ class PlayerScorer extends React.Component<Props, State> {
             console.log(url)
             sendData(url, "GET")
                 .then((data: any) => {
+                    // Only apply if this is still the latest request.
+                    if (currentFetch !== this.fetchCounter) {
+                        return
+                    }
                     this.log_answer_lag(data)
                     console.log(data)
                     sessionStorage.setItem("answers", JSON.stringify(data.answers))

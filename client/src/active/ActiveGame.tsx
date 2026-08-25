@@ -58,15 +58,32 @@ class ActiveGame extends React.Component<Props, State> {
         }
     }
 
+    // Ticket #146: a slow response for a previous question/round must not
+    // overwrite the current one. Each refetch bumps the counter; a response
+    // only applies while it is still the latest fetch (WagerManager pattern).
+    fetchCounter = 0
+    currentFetch = 0
+
     componentDidMount() {
-        this.get_current_question()
-        this.get_round()
+        this.refetch()
     }
 
     componentDidUpdate(prevProps: Props) {
         if (this.props.session_state !== prevProps.session_state) {
-            this.get_current_question().then(() => this.get_round())
+            this.refetch()
         }
+    }
+
+    refetch = () => {
+        this.fetchCounter += 1
+        this.currentFetch = this.fetchCounter
+        this.get_current_question().then(() => {
+            // Only fire the round fetch for the latest question fetch; a stale
+            // question response must not trigger a round overwrite either.
+            if (this.currentFetch === this.fetchCounter) {
+                this.get_round()
+            }
+        })
     }
 
     get_round = () => {
@@ -74,6 +91,9 @@ class ActiveGame extends React.Component<Props, State> {
         return fetch(url).then(response => response.json())
             .then((r: {id: number, name: string, categories: string[], wagers: number[]}) => {
                 console.log(r)
+                if (this.currentFetch !== this.fetchCounter) {
+                    return
+                }
                 this.setState({
                     categories: r.categories,
                     wagers: r.wagers,
@@ -92,6 +112,9 @@ class ActiveGame extends React.Component<Props, State> {
                 question_type: string, choices: string[], lefts: string[], rights: string[]
             }) => {
                 console.log(q)
+                if (this.currentFetch !== this.fetchCounter) {
+                    return
+                }
                 this.setState({
                     question: q.question,
                     answer: q.answer,

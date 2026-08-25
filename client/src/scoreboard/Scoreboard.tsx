@@ -31,6 +31,10 @@ class Scoreboard extends React.Component<Props, State> {
         open: false
     }
 
+    // Ticket #146: a slow response for a previous question/round must not
+    // overwrite the current one (WagerManager pattern).
+    fetchCounter = 0
+
     componentDidMount() {
         const scoresStored = JSON.parse(sessionStorage.getItem("scoreboard") || "null")
         if (scoresStored) {
@@ -55,6 +59,8 @@ class Scoreboard extends React.Component<Props, State> {
     get_scoreboard = () => {
 
         if (this.props.round_id !== "" && this.props.round_id !== null && this.props.round_id !== undefined) {
+            this.fetchCounter += 1
+            const currentFetch = this.fetchCounter
 
             let url = "/gameplay/session/" + this.props.session_id + "/scoreboard"
             url += "?player_id=" + this.props.player_id
@@ -62,8 +68,11 @@ class Scoreboard extends React.Component<Props, State> {
             sendData(url, "GET")
                 .then((data: any) => {
                     console.log(data)
-                    sessionStorage.setItem("scoreboard", JSON.stringify(data.scores))
-                    this.setState({ scores: data.scores })
+                    // Only apply if this is still the latest request.
+                    if (currentFetch === this.fetchCounter) {
+                        sessionStorage.setItem("scoreboard", JSON.stringify(data.scores))
+                        this.setState({ scores: data.scores })
+                    }
                 })
         }
     }
