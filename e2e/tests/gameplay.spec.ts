@@ -80,6 +80,37 @@ async function seedStartableGame(request: APIRequestContext, prefix: string) {
   return { gameId, roundId, qids: [q1, q2] };
 }
 
+// Create a multiple-choice question whose options are Answer A / B / C with C
+// correct (the stored answer is derived from the correct option, ticket #160).
+async function createMCQuestion(request: APIRequestContext, category: string, question: string): Promise<string> {
+  const res = await request.post('/editor/question', {
+    headers: { 'borttrivia-token': token },
+    data: {
+      category,
+      question,
+      answer: '',
+      scoring_note: '',
+      question_type: 'multiple_choice',
+      choices: [
+        { text: 'Answer A', is_correct: false },
+        { text: 'Answer B', is_correct: false },
+        { text: 'Answer C', is_correct: true },
+      ],
+    },
+  });
+  expect(res.ok()).toBeTruthy();
+  return (await res.json()).id;
+}
+
+// Seed a startable game whose first question is multiple choice (ticket #160).
+async function seedStartableMCGame(request: APIRequestContext, prefix: string) {
+  const q1 = await createMCQuestion(request, `e2e-cat-${prefix}`, `MC question ${prefix}`);
+  const q2 = await createQuestion(request, `e2e-cat-${prefix}`, `Second question ${prefix}`, 'Answer two');
+  const roundId = await createRound(request, `e2e-round-${prefix}`, [q1, q2], [100, 200]);
+  const gameId = await createGame(request, `e2e-game-${prefix}`, roundId);
+  return { gameId, roundId, qids: [q1, q2] };
+}
+
 // Create a session for the game; the response carries the mod's player id.
 async function createSession(request: APIRequestContext, name: string, gameId: string) {
   const res = await request.post('/gameplay/session', { data: { name, game_id: gameId } });
@@ -814,5 +845,72 @@ test.describe('gameplay navigation, hot-edit, spectator & edge cases', () => {
     await g.playerContext.close();
     await g.modContext.close();
     await cleanup(request, g.seeded, { sessionId: g.sessionId, modId: g.modId, playerIds: [g.playerId] });
+  });
+
+  test('scoring a multiple-choice question bolds the correct answer and marks ✅/❌ options', async ({
+    browser,
+    request,
+  }) => {
+    test.setTimeout(90000);
+    const prefix = unique();
+    const seeded = await seedStartableMCGame(request, prefix);
+    const { sessionId, modId } = await createSession(request, `e2e-session-${prefix}`, seeded.gameId);
+    const { context: modContext, page: modPage } = await openModLobby(browser, sessionId, modId);
+    const { context: playerContext, page: playerPage, playerId } = await joinPlayer(
+      browser,
+      sessionId,
+      `Team ${prefix}`,
+      `Player ${prefix}`,
+    );
+    await modPage.locator('.start-button').click();
+    await expect(modPage.locator('.active-game')).toBeVisible({ timeout: 30000 });
+    await expect(playerPage.locator('.active-game')).toBeVisible({ timeout: 30000 });
+
+    // Pre-score: the options render as a plain list (no ✅/❌ yet).
+    const modBox = modPage.locator('.active-question-box');
+    await expect(modBox.locator('li').first()).not.toContainText('❌', { timeout: 30000 });
+
+    // The player picks the correct option (a Radio, not the freeform textarea)
+    // and submits with a wager.
+    const card = playerPage.locator('.ant-card').filter({
+      has: playerPage.getByRole('button', { name: 'Answer', exact: true }),
+    });
+    await expect(card.locator('.ant-radio-wrapper').filter({ hasText: 'Answer C' })).toBeVisible({ timeout: 30000 });
+    await card.locator('.ant-radio-wrapper').filter({ hasText: 'Answer C' }).click();
+    await card.locator('.ant-radio-button-wrapper').filter({ hasText: '100' }).click();
+    const answerButton = card.getByRole('button', { name: 'Answer', exact: true });
+    await expect(answerButton).toBeEnabled();
+    await answerButton.click();
+
+    // Wait for the player's answer to be recorded server-side.
+    await expect
+      .poll(async () => (await playerAnswers(request, sessionId, modId, playerId, 0, 0)).length)
+      .toBe(1);
+
+    // Multiple choice is auto-scored by the backend, so the mod's scorer has
+    // no manual correct/incorrect buttons — the Score button is all that's
+    // needed (see PlayerAnswers' !auto_scored guard).
+    const scoreButton = modPage.locator('.player-scorer').getByRole('button', { name: 'Score', exact: true });
+    await expect(scoreButton).toBeEnabled({ timeout: 30000 });
+    await scoreButton.click();
+
+    // The scored question box marks the correct option ✅ (bold) and the other
+    // options ❌, for both the mod and the player (ticket #160).
+    const correctOption = (box: ReturnType<Page['locator']>) =>
+      box.locator('li').filter({ hasText: 'Answer C' });
+    await expect(correctOption(modBox)).toContainText('✅', { timeout: 30000 });
+    await expect(modBox.locator('li').filter({ hasText: 'Answer A' })).toContainText('❌');
+    await expect(modBox.locator('li').filter({ hasText: 'Answer B' })).toContainText('❌');
+    const fontWeight = await correctOption(modBox).evaluate((el) => getComputedStyle(el).fontWeight);
+    // Chrome reports the resolved weight as "700" (bold normalizes to numeric).
+    expect(['bold', '700']).toContain(fontWeight);
+
+    await expect(correctOption(playerPage.locator('.active-question-box'))).toContainText('✅', {
+      timeout: 30000,
+    });
+
+    await playerContext.close();
+    await modContext.close();
+    await cleanup(request, seeded, { sessionId, modId, playerIds: [playerId] });
   });
 });
