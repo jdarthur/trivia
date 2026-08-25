@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
+	"sort"
 	"sync"
 	"testing"
 
@@ -1337,4 +1338,105 @@ func TestStructuredPlayerView(t *testing.T) {
 	if q.Answer != "" {
 		t.Errorf("player saw the matching answer key pre-score: %q", q.Answer)
 	}
+}
+
+// TestMatchingRightsShuffledForPlayers verifies ticket #161: pre-score, the
+// player-facing rights column of a matching question is a deterministic
+// permutation of the canonical pairs — the same order for every player and
+// every refetch — while the mod's view stays canonical (it is the answer
+// key). Once scored, the player's view returns to canonical order, revealing
+// the correct pairing the way multiple-choice reveals its answer.
+func TestMatchingRightsShuffledForPlayers(t *testing.T) {
+	env := openSessionTestDB(t)
+	gin.SetMode(gin.TestMode)
+
+	pairs := []models.QuestionPair{
+		{Left: "1", Right: "A"},
+		{Left: "2", Right: "B"},
+		{Left: "3", Right: "C"},
+	}
+	mtID := createMatchingQuestion(t, env, pairs)
+	session, p1, p2 := newStructuredSession(t, env, mtID)
+
+	fetch := func(player models.PlayerId) models.QuestionInRound {
+		t.Helper()
+		recorder := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(recorder)
+		c.Params = gin.Params{{Key: "id", Value: session.ID}}
+		c.Request = httptest.NewRequest(http.MethodGet,
+			"/gameplay/session/"+session.ID+"/current-question?player_id="+string(player), nil)
+		env.GetCurrentQuestion(c)
+		var q models.QuestionInRound
+		if err := json.Unmarshal(recorder.Body.Bytes(), &q); err != nil {
+			t.Fatalf("bad current-question response %q: %v", recorder.Body.String(), err)
+		}
+		return q
+	}
+
+	canonical := make([]string, 0, len(pairs))
+	for _, p := range pairs {
+		canonical = append(canonical, p.Right)
+	}
+
+	// pre-score: players see a permutation of the canonical rights, identical
+	// across players and across refetches
+	q1 := fetch(p1)
+	q1again := fetch(p1)
+	q2 := fetch(p2)
+	if len(q1.Rights) != len(pairs) {
+		t.Fatalf("player rights = %v, want %d entries", q1.Rights, len(pairs))
+	}
+	if !sameStrings(q1.Rights, canonical) {
+		t.Errorf("player rights %v are not a permutation of canonical %v", q1.Rights, canonical)
+	}
+	if !sameOrder(q1.Rights, q1again.Rights) {
+		t.Errorf("refetch changed the player's rights order: %v vs %v", q1.Rights, q1again.Rights)
+	}
+	if !sameOrder(q1.Rights, q2.Rights) {
+		t.Errorf("players saw different rights orders: %v vs %v", q1.Rights, q2.Rights)
+	}
+
+	// the mod's view stays canonical — it is the answer key
+	qMod := fetch(session.Moderator)
+	if !sameOrder(qMod.Rights, canonical) {
+		t.Errorf("mod rights %v, want canonical %v", qMod.Rights, canonical)
+	}
+
+	// once scored, the player's view returns to canonical (answer reveal)
+	addAnswer(t, env, session.ID, p1, `{"1":"A","2":"B","3":"C"}`, 100)
+	addAnswer(t, env, session.ID, p2, `{"1":"A","2":"B","3":"C"}`, 100)
+	req := models.ScoreRequest{RoundIndex: 0, QuestionIndex: 0, Players: map[models.PlayerId]models.CorrectorNot{
+		p1: {Correct: true},
+		p2: {Correct: true},
+	}}
+	if err := scoreQuestionTx(env, session, req, 0, 0); err != nil {
+		t.Fatal(err)
+	}
+	qScored := fetch(p1)
+	if !sameOrder(qScored.Rights, canonical) {
+		t.Errorf("post-score player rights %v, want canonical %v", qScored.Rights, canonical)
+	}
+}
+
+func sameOrder(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
+}
+
+func sameStrings(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	ac := append([]string(nil), a...)
+	bc := append([]string(nil), b...)
+	sort.Strings(ac)
+	sort.Strings(bc)
+	return sameOrder(ac, bc)
 }
