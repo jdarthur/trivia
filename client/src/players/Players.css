@@ -76,3 +76,42 @@
     justify-content: center;
 }
 
+/* Emoji reactions on scored answers (ticket #156). */
+.reaction-control {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    margin-top: 4px;
+}
+
+.reaction-chip {
+    cursor: default;
+    border: 1px solid #d9d9d9;
+    border-radius: 10px;
+    padding: 0 6px;
+    font-size: 0.85em;
+    line-height: 18px;
+    background: #fff;
+}
+
+/* The caller's own reaction is highlighted and tap-to-remove. */
+.reaction-chip.mine {
+    cursor: pointer;
+    background: #d9f7be;
+    border-color: #52c41a;
+    font-weight: bold;
+}
+
+.reaction-add-button {
+    cursor: pointer;
+    border: 1px dashed #d9d9d9;
+    border-radius: 10px;
+    padding: 0 6px;
+    font-size: 0.85em;
+    line-height: 18px;
+    background: #fff;
+}
+

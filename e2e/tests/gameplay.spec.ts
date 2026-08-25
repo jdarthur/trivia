@@ -427,6 +427,15 @@ async function scoreCurrentQuestion(modPage: Page, correct: boolean) {
   await scoreButton.click();
 }
 
+// Pick an emoji from the open reaction picker popover. The picker virtualizes
+// its emoji grid (only the in-viewport emojis are in the DOM), so search first
+// to narrow the results to the target, then click its button by unified code.
+async function pickEmoji(page: Page, search: string, unified: string) {
+  const popover = page.locator('.ant-popover:visible');
+  await popover.getByLabel('Type to search for an emoji').fill(search);
+  await popover.locator(`button[data-unified="${unified}"]`).click();
+}
+
 // Full setup for a scoring test: seed a game, open a session, start it with a
 // joined player, and return every handle plus the unique team name.
 async function setupActiveGame(
@@ -585,6 +594,70 @@ test.describe('gameplay scoring, scoreboard & statuses', () => {
     await expect(
       g.modPage.locator('.scoreboard .ant-card').filter({ hasText: g.teamName }),
     ).toContainText('300', { timeout: 30000 });
+
+    await g.playerContext.close();
+    await g.modContext.close();
+    await cleanup(request, g.seeded, { sessionId: g.sessionId, modId: g.modId, playerIds: [g.playerId] });
+  });
+
+  test('emoji reactions: players and mod add, modify and remove reactions on a scored answer', async ({
+    browser,
+    request,
+  }) => {
+    test.setTimeout(120000);
+    const prefix = unique();
+    const g = await setupActiveGame(browser, request, prefix);
+
+    // Reactions only exist once the question is scored: neither the player's
+    // status bar nor the mod's scorer renders the control before that.
+    await expect(g.playerPage.locator('.reaction-control')).toHaveCount(0);
+    await expect(g.modPage.locator('.reaction-control')).toHaveCount(0);
+
+    await answerQuestion(g.playerPage, 100, 'First answer');
+    await scoreCurrentQuestion(g.modPage, true);
+    await expect(g.playerPage.locator('.player-status-bar .anticon-check-square')).toBeVisible({
+      timeout: 30000,
+    });
+
+    // The player adds a 👍 reaction on their team's answer card. The mod's
+    // own card has no answer, so exactly one control exists per page.
+    const playerControl = g.playerPage.locator('.player-status-bar .reaction-control');
+    await expect(playerControl).toHaveCount(1, { timeout: 30000 });
+    await playerControl.locator('.reaction-add-button').click();
+    await pickEmoji(g.playerPage, 'thumbs up', '1f44d');
+    await expect(playerControl.locator('.reaction-chip.mine').filter({ hasText: '👍' })).toContainText('1', {
+      timeout: 30000,
+    });
+
+    // The reaction appears on the mod's page after the session-state refetch.
+    const modControl = g.modPage.locator('.player-scorer .reaction-control');
+    await expect(modControl).toHaveCount(1, { timeout: 30000 });
+    await expect(modControl.locator('.reaction-chip').filter({ hasText: '👍' })).toContainText('1', {
+      timeout: 30000,
+    });
+
+    // The mod (also a player) adds their own ❤️ reaction.
+    await modControl.locator('.reaction-add-button').click();
+    await pickEmoji(g.modPage, 'red heart', '2764-fe0f');
+    await expect(modControl.locator('.reaction-chip.mine').filter({ hasText: '❤️' })).toContainText('1', {
+      timeout: 30000,
+    });
+
+    // The player modifies their reaction from 👍 to 😂.
+    await playerControl.locator('.reaction-add-button').click();
+    await pickEmoji(g.playerPage, 'face with tears of joy', '1f602');
+    await expect(playerControl.locator('.reaction-chip.mine').filter({ hasText: '😂' })).toContainText('1', {
+      timeout: 30000,
+    });
+    await expect(playerControl.locator('.reaction-chip').filter({ hasText: '👍' })).toHaveCount(0, {
+      timeout: 30000,
+    });
+
+    // Tapping the highlighted chip removes the player's reaction; the mod's
+    // ❤️ remains.
+    await playerControl.locator('.reaction-chip.mine').click();
+    await expect(playerControl.locator('.reaction-chip')).toHaveCount(1, { timeout: 30000 });
+    await expect(playerControl.locator('.reaction-chip').filter({ hasText: '😂' })).toHaveCount(0);
 
     await g.playerContext.close();
     await g.modContext.close();

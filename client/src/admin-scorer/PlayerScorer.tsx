@@ -277,7 +277,8 @@ class PlayerScorer extends React.Component<Props, State> {
                                        auto_scored={this.auto_scored()}
                                        question_type={this.props.question_type}
                                        moneyball={this.get_moneyball(player.player_id)}
-                                       scored={this.props.scored}/>
+                                       scored={this.props.scored}
+                                       current_player={this.props.player_id}/>
             if (!active) {
                 return <div key={player.player_id} className="player-scorer-inactive"
                             style={{opacity: 0.5, filter: 'grayscale(1)'}}>{card}</div>

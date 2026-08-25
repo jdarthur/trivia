@@ -425,6 +425,14 @@ func getAnswersAsMod(e *Env, session models.Session, roundIndex int, questionInd
 		return answers, err
 	}
 
+	// The mod is a player in the session too, so their view carries the same
+	// reaction data as the scored player view (ticket #156): the aggregated
+	// emoji counts plus the mod's own reaction, keyed by answer id.
+	reactions, err := reactionsForQuestion(e, session.ID, roundIndex, questionIndex, session.Moderator)
+	if err != nil {
+		return answers, err
+	}
+
 	for _, player := range players {
 		playerId := models.PlayerId(player.ID)
 
@@ -437,6 +445,11 @@ func getAnswersAsMod(e *Env, session models.Session, roundIndex int, questionInd
 		for _, individualAnswer := range allAnswers {
 			if individualAnswer.PlayerId != playerId {
 				continue
+			}
+			individualAnswer.AnswerId = individualAnswer.ID
+			if ra, ok := reactions[individualAnswer.ID]; ok {
+				individualAnswer.Reactions = ra.counts
+				individualAnswer.MyReaction = ra.myReaction
 			}
 			teamAnswer.Answers = append(teamAnswer.Answers, individualAnswer)
 		}
