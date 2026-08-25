@@ -26,6 +26,14 @@ interface State {
 }
 
 class Homepage extends React.Component<Props, State> {
+
+    // The session poll is a chained fetch loop (get_session_state → get_session →
+    // get_session_state). `mounted` stops the loop once this component unmounts and
+    // `pollController` cancels whichever request is in flight at that moment, so a
+    // dead Homepage never keeps polling (and a remount never runs two loops at once).
+    private mounted = true
+    private pollController: AbortController | null = null
+
     constructor(props: Props) {
         super(props)
         this.state = {
@@ -37,6 +45,12 @@ class Homepage extends React.Component<Props, State> {
             rounds: [],
             fullRounds: []
         }
+    }
+
+    componentWillUnmount() {
+        this.mounted = false
+        this.pollController?.abort()
+        this.pollController = null
     }
 
     componentDidMount() {
@@ -70,11 +84,23 @@ class Homepage extends React.Component<Props, State> {
     get_session_state = () => {
         if (this.state.session_id !== "") {
             let url = "/gameplay/session/" + this.state.session_id + "/state?current=" + this.state.sess_state
-            fetch(url)
+            this.pollController?.abort()
+            const controller = new AbortController()
+            this.pollController = controller
+            fetch(url, {signal: controller.signal})
                 .then(response => response.json())
                 .then(state => {
+                    if (!this.mounted) return
                     console.log(state.state)
-                    this.setState({sess_state: state.state}, () => this.get_session())
+                    this.setState({sess_state: state.state}, () => {
+                        if (this.mounted) this.get_session()
+                    })
+                })
+                .catch((err: any) => {
+                    // AbortError fires on unmount (or when a newer request supersedes
+                    // this one); the loop is intentionally dead in both cases.
+                    if (err?.name === "AbortError") return
+                    console.error("Failed to fetch session state:", err)
                 })
         } else {
             console.log(this.state)
@@ -87,9 +113,13 @@ class Homepage extends React.Component<Props, State> {
             if (this.state.player_id) {
                 url = url + "?player_id=" + this.state.player_id
             }
-            fetch(url)
+            this.pollController?.abort()
+            const controller = new AbortController()
+            this.pollController = controller
+            fetch(url, {signal: controller.signal})
                 .then(response => response.json())
                 .then(state => {
+                    if (!this.mounted) return
                     console.log(state)
                     const roundIndices = state.rounds ? state.rounds.map((round: any, index: number) => index) : []
                     const update: any = {
@@ -107,7 +137,13 @@ class Homepage extends React.Component<Props, State> {
                         sessionStorage.setItem("is_mod", update.is_mod)
                     }
 
-                    this.setState(update, () => this.get_session_state())
+                    this.setState(update, () => {
+                        if (this.mounted) this.get_session_state()
+                    })
+                })
+                .catch((err: any) => {
+                    if (err?.name === "AbortError") return
+                    console.error("Failed to fetch session:", err)
                 })
         }
     }
