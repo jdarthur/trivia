@@ -271,6 +271,86 @@ func TestRemoveReactionRejectsForeignAnswer(t *testing.T) {
 	}
 }
 
+// advanceCurrentQuestion moves the session's current question to (0,1) via
+// the SetCurrentQuestion handler, so the scored (0,0) question is no longer
+// the one everyone is looking at.
+func advanceCurrentQuestion(t *testing.T, env *Env, session models.Session) {
+	t.Helper()
+	rec := reactionRequest(t, env, env.SetCurrentQuestion, http.MethodPut, session.ID,
+		map[string]interface{}{"question_id": 1, "round_id": 0, "player_id": string(session.Moderator)})
+	if rec.Code != http.StatusOK {
+		t.Fatalf("SetCurrentQuestion = %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestSetReactionRequiresCurrentQuestion(t *testing.T) {
+	env := openSessionTestDB(t)
+	session, p1, p2 := scoredFixture(t, env)
+	p1Answer := answerIdFor(t, env, session.ID, p1)
+
+	// a reaction is fine while the scored question is the current one
+	rec := reactionRequest(t, env, env.SetReaction, http.MethodPut, session.ID,
+		models.AnswerReaction{AnswerId: p1Answer, PlayerId: p2, Emoji: "👍"})
+	if rec.Code != http.StatusOK {
+		t.Fatalf("PUT reaction on current question = %d: %s", rec.Code, rec.Body.String())
+	}
+
+	// once the moderator advances, the same reaction is rejected
+	advanceCurrentQuestion(t, env, session)
+	rec = reactionRequest(t, env, env.SetReaction, http.MethodPut, session.ID,
+		models.AnswerReaction{AnswerId: p1Answer, PlayerId: p2, Emoji: "👍"})
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("PUT reaction on past question = %d: %s", rec.Code, rec.Body.String())
+	}
+	var resp struct {
+		Field string `json:"field"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatal(err)
+	}
+	if resp.Field != models.QuestionIndex {
+		t.Errorf("field = %q, want %q", resp.Field, models.QuestionIndex)
+	}
+}
+
+func TestRemoveReactionGatesMatchSet(t *testing.T) {
+	env := openSessionTestDB(t)
+	session, p1, p2 := scoredFixture(t, env)
+	p1Answer := answerIdFor(t, env, session.ID, p1)
+
+	rec := reactionRequest(t, env, env.SetReaction, http.MethodPut, session.ID,
+		models.AnswerReaction{AnswerId: p1Answer, PlayerId: p2, Emoji: "👍"})
+	if rec.Code != http.StatusOK {
+		t.Fatalf("PUT reaction = %d: %s", rec.Code, rec.Body.String())
+	}
+
+	// once the question is no longer current, the owner cannot remove either
+	advanceCurrentQuestion(t, env, session)
+	rec = reactionRequest(t, env, env.RemoveReaction, http.MethodDelete, session.ID,
+		models.AnswerReaction{AnswerId: p1Answer, PlayerId: p2})
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("DELETE reaction on past question = %d: %s", rec.Code, rec.Body.String())
+	}
+
+	// and an inactivated player cannot remove their reaction
+	session2, p3, p4 := scoredFixture(t, env)
+	p3Answer := answerIdFor(t, env, session2.ID, p3)
+	rec = reactionRequest(t, env, env.SetReaction, http.MethodPut, session2.ID,
+		models.AnswerReaction{AnswerId: p3Answer, PlayerId: p4, Emoji: "😂"})
+	if rec.Code != http.StatusOK {
+		t.Fatalf("PUT reaction = %d: %s", rec.Code, rec.Body.String())
+	}
+	if _, err := env.Db.Exec(`UPDATE session_player SET active = 0
+		WHERE session_id = ? AND player_id = ?`, session2.ID, string(p4)); err != nil {
+		t.Fatal(err)
+	}
+	rec = reactionRequest(t, env, env.RemoveReaction, http.MethodDelete, session2.ID,
+		models.AnswerReaction{AnswerId: p3Answer, PlayerId: p4})
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("DELETE reaction by inactive player = %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
 // teamByName finds a scored team by its team name.
 func teamByName(t *testing.T, resp models.AnswersResponseScored, name string) models.ScoredTeam {
 	t.Helper()
@@ -360,6 +440,8 @@ func TestIsSingleEmoji(t *testing.T) {
 		// not survive copy/paste round-trips reliably
 		"\U0001F468\u200D\U0001F469\u200D\U0001F467\u200D\U0001F466",
 		"🇺🇸", "1️⃣", " 😀 ", "🤑", "🎉",
+		// enclosed ideographic supplement (🈷️) and chess symbols (🨀)
+		"\U0001F237\uFE0F", "\U0001FA00",
 	}
 	for _, emoji := range valid {
 		if !isSingleEmoji(emoji) {

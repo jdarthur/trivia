@@ -41,33 +41,9 @@ func (e *Env) SetReaction(c *gin.Context) {
 		return
 	}
 
-	answer, err := answerInSession(e, sessionId, req.AnswerId)
+	answer, err := validateReactionTarget(e, sessionId, req)
 	if err != nil {
 		common.Respond(c, nil, err)
-		return
-	}
-
-	if !playerInSession(e, sessionId, req.PlayerId) {
-		common.Respond(c, nil, PlayerNotInSessionError{PlayerId: req.PlayerId, SessionId: sessionId})
-		return
-	}
-	active, err := playerIsActive(e, sessionId, req.PlayerId)
-	if err != nil {
-		common.Respond(c, nil, err)
-		return
-	}
-	if !active {
-		common.Respond(c, nil, PlayerInactiveError{PlayerId: req.PlayerId, SessionId: sessionId})
-		return
-	}
-
-	snapshot, err := sessionQuestionSnapshot(e, sessionId, answer.RoundIndex, answer.QuestionIndex)
-	if err != nil {
-		common.Respond(c, nil, err)
-		return
-	}
-	if !snapshot.Scored {
-		common.Respond(c, nil, QuestionNotScoredError{QuestionIndex: answer.QuestionIndex, RoundIndex: answer.RoundIndex})
 		return
 	}
 
@@ -96,9 +72,10 @@ func (e *Env) SetReaction(c *gin.Context) {
 
 // RemoveReaction deletes a player's reaction on one answer (DELETE). Only the
 // owner can remove their own reaction: the delete targets the (answer_id,
-// player_id) row the caller names, and the answer must belong to this session
-// so a caller cannot touch reactions on another session's answers by guessing
-// IDs.
+// player_id) row the caller names. The same target validation as SetReaction
+// applies (answer in this session, active member, scored, current question),
+// so removal is not possible on another session's answers or once the
+// question has moved on.
 func (e *Env) RemoveReaction(c *gin.Context) {
 	sessionId := c.Param("id")
 
@@ -108,13 +85,14 @@ func (e *Env) RemoveReaction(c *gin.Context) {
 		return
 	}
 
-	if _, err := answerInSession(e, sessionId, req.AnswerId); err != nil {
+	answer, err := validateReactionTarget(e, sessionId, req)
+	if err != nil {
 		common.Respond(c, nil, err)
 		return
 	}
 
 	res, err := e.Db.Exec(`DELETE FROM answer_reaction WHERE answer_id = ? AND player_id = ?`,
-		req.AnswerId, string(req.PlayerId))
+		answer.ID, string(req.PlayerId))
 	if err != nil {
 		common.Respond(c, nil, err)
 		return
@@ -123,7 +101,7 @@ func (e *Env) RemoveReaction(c *gin.Context) {
 		common.Respond(c, nil, err)
 		return
 	} else if n == 0 {
-		common.Respond(c, nil, ReactionNotFoundError{AnswerId: req.AnswerId, PlayerId: req.PlayerId})
+		common.Respond(c, nil, ReactionNotFoundError{AnswerId: answer.ID, PlayerId: req.PlayerId})
 		return
 	}
 
@@ -161,6 +139,62 @@ func answerInSession(e *Env, sessionId string, answerId string) (answerRow, erro
 		return row, InvalidAnswerIdError{AnswerId: answerId, SessionId: sessionId}
 	}
 	return row, nil
+}
+
+// validateReactionTarget enforces the shared rules for setting and removing a
+// reaction: the answer belongs to this session, the player is an active
+// member, the question has been scored, and it is the session's current
+// question (a reaction on a past question would never be seen). It returns
+// the answer row on success.
+func validateReactionTarget(e *Env, sessionId string, req ReactionRequest) (answerRow, error) {
+	answer, err := answerInSession(e, sessionId, req.AnswerId)
+	if err != nil {
+		return answerRow{}, err
+	}
+
+	if !playerInSession(e, sessionId, req.PlayerId) {
+		return answerRow{}, PlayerNotInSessionError{PlayerId: req.PlayerId, SessionId: sessionId}
+	}
+	active, err := playerIsActive(e, sessionId, req.PlayerId)
+	if err != nil {
+		return answerRow{}, err
+	}
+	if !active {
+		return answerRow{}, PlayerInactiveError{PlayerId: req.PlayerId, SessionId: sessionId}
+	}
+
+	snapshot, err := sessionQuestionSnapshot(e, sessionId, answer.RoundIndex, answer.QuestionIndex)
+	if err != nil {
+		return answerRow{}, err
+	}
+	if !snapshot.Scored {
+		return answerRow{}, QuestionNotScoredError{QuestionIndex: answer.QuestionIndex, RoundIndex: answer.RoundIndex}
+	}
+
+	curRound, curQuestion, ok, err := currentQuestionIndexes(e, sessionId)
+	if err != nil {
+		return answerRow{}, err
+	}
+	if !ok || answer.RoundIndex != curRound || answer.QuestionIndex != curQuestion {
+		return answerRow{}, QuestionNotCurrentError{QuestionIndex: answer.QuestionIndex, RoundIndex: answer.RoundIndex}
+	}
+
+	return answer, nil
+}
+
+// currentQuestionIndexes returns the session's current round/question and
+// whether one is set at all (a session that has not been started has none).
+func currentQuestionIndexes(e *Env, sessionId string) (roundIndex int, questionIndex int, ok bool, err error) {
+	var r, q sql.NullInt64
+	err = e.Db.QueryRow(`SELECT current_round, current_question FROM session WHERE id = ?`, sessionId).
+		Scan(&r, &q)
+	if err != nil {
+		return 0, 0, false, err
+	}
+	if !r.Valid || !q.Valid {
+		return 0, 0, false, nil
+	}
+	return int(r.Int64), int(q.Int64), true, nil
 }
 
 // getReaction reads back one player's reaction row on an answer.
@@ -330,6 +364,8 @@ func isEmojiBase(r rune) bool {
 		return true
 	case r >= 0x1f100 && r <= 0x1f1e5: // enclosed alphanumerics
 		return true
+	case r >= 0x1f200 && r <= 0x1f2ff: // enclosed ideographic supplement (🈷️, 🈶, 🈯, ...)
+		return true
 	case r >= 0x1f300 && r <= 0x1f5ff: // misc symbols and pictographs
 		return true
 	case r >= 0x1f600 && r <= 0x1f64f: // emoticons
@@ -339,6 +375,8 @@ func isEmojiBase(r rune) bool {
 	case r >= 0x1f700 && r <= 0x1f7ff: // alchemical + geometric shapes extended
 		return true
 	case r >= 0x1f900 && r <= 0x1f9ff: // supplemental symbols and pictographs
+		return true
+	case r >= 0x1fa00 && r <= 0x1fa6f: // chess symbols (🨀, ...)
 		return true
 	case r >= 0x1fa70 && r <= 0x1faff: // symbols and pictographs extended-A
 		return true

@@ -56,6 +56,24 @@ func (e QuestionNotScoredError) Data() interface{} {
 	return e.QuestionIndex
 }
 
+// Error when reacting to an answer that is not on the session's current
+// question. Reactions are meant for the question everyone is currently
+// looking at — a reaction on a past scored question would never be seen.
+type QuestionNotCurrentError struct {
+	QuestionIndex int
+	RoundIndex    int
+}
+
+func (e QuestionNotCurrentError) Error() string {
+	return fmt.Sprintf("Round %v Question %v is not the current question", e.RoundIndex, e.QuestionIndex)
+}
+func (e QuestionNotCurrentError) Field() string {
+	return models.QuestionIndex
+}
+func (e QuestionNotCurrentError) Data() interface{} {
+	return e.QuestionIndex
+}
+
 // Error when trying to remove a reaction the player does not have on an
 // answer.
 type ReactionNotFoundError struct {
