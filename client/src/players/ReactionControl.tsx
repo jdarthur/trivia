@@ -37,14 +37,17 @@ class ReactionControl extends React.Component<Props, State> {
 
     // PUT creates or modifies (upsert); DELETE removes. Fire-and-forget like
     // the other gameplay mutations — the state-token bump drives a refetch.
+    // Failures are logged (and the picker still closes); the player can retry.
     set_reaction = (emoji: string) => {
         const {session_id, current_player, answer_id, my_reaction} = this.props
         if (!answer_id) return
         const url = "/gameplay/session/" + session_id + "/reaction"
         if (emoji === my_reaction) {
             sendData(url, "DELETE", {answer_id, player_id: current_player})
+                .catch((error) => console.error("Failed to remove reaction:", error))
         } else {
             sendData(url, "PUT", {answer_id, player_id: current_player, emoji})
+                .catch((error) => console.error("Failed to set reaction:", error))
         }
         this.setState({picker_open: false})
     }
@@ -54,7 +57,7 @@ class ReactionControl extends React.Component<Props, State> {
         if (!answer_id) return
         sendData("/gameplay/session/" + session_id + "/reaction", "DELETE", {
             answer_id, player_id: current_player
-        })
+        }).catch((error) => console.error("Failed to remove reaction:", error))
     }
 
     render() {

@@ -88,7 +88,13 @@ class ActiveGame extends React.Component<Props, State> {
 
     get_round = () => {
         let url = "/gameplay/session/" + this.props.session_id + "/current-round"
-        return fetch(url).then(response => response.json())
+        return fetch(url)
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`Request failed (${response.status} ${response.statusText})`)
+                }
+                return response.json()
+            })
             .then((r: {id: number, name: string, categories: string[], wagers: number[]}) => {
                 console.log(r)
                 if (this.currentFetch !== this.fetchCounter) {
@@ -101,11 +107,20 @@ class ActiveGame extends React.Component<Props, State> {
                     round_name: r.name || ""
                 })
             })
+            .catch((error) => {
+                console.error("Failed to fetch current round:", error)
+            })
     }
 
     get_current_question = () => {
         let url = "/gameplay/session/" + this.props.session_id + "/current-question?player_id=" + this.props.player_id
-        return fetch(url).then(response => response.json())
+        return fetch(url)
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`Request failed (${response.status} ${response.statusText})`)
+                }
+                return response.json()
+            })
             .then((q: {
                 question: string, answer: string, category: string, id: number,
                 scored: boolean, scoring_note: string, scoring_note_id: string,
@@ -128,6 +143,9 @@ class ActiveGame extends React.Component<Props, State> {
                     lefts: q.lefts || [],
                     rights: q.rights || [],
                 })
+            })
+            .catch((error) => {
+                console.error("Failed to fetch current question:", error)
             })
     }
 

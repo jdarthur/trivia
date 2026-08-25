@@ -15,6 +15,10 @@ export default function LeaveGame({session_id, player_id}: Props) {
             method: "POST",
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({player_id})
+        }).then(response => {
+            if (!response.ok) {
+                throw new Error(`Request failed (${response.status} ${response.statusText})`)
+            }
         }).then(() => {
             sessionStorage.removeItem("session_id")
             sessionStorage.removeItem("player_id")
@@ -24,6 +28,10 @@ export default function LeaveGame({session_id, player_id}: Props) {
             sessionStorage.removeItem("answers")
             sessionStorage.removeItem("status")
             window.location.href = window.location.origin + window.location.pathname
+        }).catch((error) => {
+            // A failed leave keeps the player in the game: don't clear
+            // sessionStorage or redirect.
+            console.error("Failed to leave game:", error)
         })
     }
     return <button className="ant-btn ant-btn-dangerous" onClick={leave}>Leave game</button>
