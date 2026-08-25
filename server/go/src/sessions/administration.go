@@ -3,8 +3,12 @@ package sessions
 import (
 	"context"
 	"database/sql"
+	"encoding/binary"
 	"encoding/json"
 	"errors"
+	"hash/fnv"
+	"math/rand/v2"
+	"strconv"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -240,12 +244,50 @@ func getCurrentQuestion(e *Env, c *gin.Context) (models.QuestionInRound, error) 
 		if models.PlayerId(playerId) != session.Moderator && !question.Scored {
 			question.Answer = ""
 			question.QuestionId = ""
+			if question.QuestionType == "matching" {
+				// Ticket #161: shuffle the rights column so the correct
+				// pairing isn't revealed by row alignment. The shuffle is
+				// deterministic per (session, round, question), so every
+				// player's question box and answer box — both fed by this
+				// same response — show the same order, and refetches
+				// reproduce it. Once scored, the canonical order is served
+				// again, revealing the correct pairing like multiple-choice
+				// does. The snapshot pairs are never reordered; scoring still
+				// compares each left to its canonical right.
+				question.Rights = shuffledMatchRights(question.Rights, session.ID, currentRound, currentQuestion)
+			}
 		}
 
 		return question, err
 	}
 
 	return models.QuestionInRound{}, err
+}
+
+// shuffledMatchRights returns a deterministic shuffle of a matching question's
+// rights column, seeded from the session + (round, question) identity via
+// FNV-128a. The caller's slice is not mutated.
+func shuffledMatchRights(rights []string, sessionId string, roundIndex int, questionIndex int) []string {
+	if len(rights) < 2 {
+		return rights
+	}
+	out := make([]string, len(rights))
+	copy(out, rights)
+
+	h := fnv.New128a()
+	h.Write([]byte(sessionId))
+	h.Write([]byte{0})
+	h.Write([]byte(strconv.Itoa(roundIndex)))
+	h.Write([]byte{0})
+	h.Write([]byte(strconv.Itoa(questionIndex)))
+	sum := h.Sum(nil)
+
+	rng := rand.New(rand.NewPCG(
+		binary.LittleEndian.Uint64(sum[0:8]),
+		binary.LittleEndian.Uint64(sum[8:16]),
+	))
+	rng.Shuffle(len(out), func(i, j int) { out[i], out[j] = out[j], out[i] })
+	return out
 }
 
 type CurrentRoundResponse struct {
