@@ -74,6 +74,9 @@ class Scoreboard extends React.Component<Props, State> {
                         this.setState({ scores: data.scores })
                     }
                 })
+                .catch((error) => {
+                    console.error("Failed to fetch scoreboard:", error)
+                })
         }
     }
 

@@ -44,7 +44,12 @@ class OtherPlayers extends React.Component<Props, State> {
     const currentFetch = this.fetchCounter
     let url = "/gameplay/session/" + this.props.session_id + "/players?player_id=" + this.props.player_id
     fetch(url)
-      .then(response => response.json())
+      .then(response => {
+        if (!response.ok) {
+          throw new Error(`Request failed (${response.status} ${response.statusText})`)
+        }
+        return response.json()
+      })
       .then(state => {
         // Only apply if this is still the latest request.
         if (currentFetch !== this.fetchCounter) {
@@ -58,6 +63,9 @@ class OtherPlayers extends React.Component<Props, State> {
           }
         }
         this.setState({ players: state.players }, () => { this.set_excluded_icons(excluded_icons) })
+      })
+      .catch((error) => {
+        console.error("Failed to fetch players:", error)
       })
   }
 

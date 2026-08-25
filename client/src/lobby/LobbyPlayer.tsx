@@ -1,5 +1,6 @@
 import React from 'react';
 import './Lobby.css';
+import sendData from "../index"
 
 import {ICONS} from "./Icons"
 
@@ -55,6 +56,9 @@ class LobbyPlayer extends React.Component<Props, State> {
                         d.icon = data.icon
                     }
                     this.setState(d)
+                })
+                .catch((error) => {
+                    console.error("Failed to load player:", error)
                 })
         }
     }
@@ -189,22 +193,5 @@ class LobbyPlayer extends React.Component<Props, State> {
     }
 }
 
-
-async function sendData(url: string, method: string, data?: any) {
-    let body
-    if (data !== undefined) {
-        const copy = Object.assign({}, data)
-        delete copy.id
-        delete copy.create_date
-        body = JSON.stringify(copy)
-    }
-
-    const response = await fetch(url, {
-        method: method,
-        headers: {'Content-Type': 'application/json'},
-        body: body
-    })
-    return response.json()
-}
 
 export default LobbyPlayer;

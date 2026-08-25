@@ -73,6 +73,9 @@ class PlayerStatus extends React.Component<Props, State> {
                         }
                     }
                 })
+                .catch((error) => {
+                    console.error("Failed to fetch answers:", error)
+                })
         }
     }
 

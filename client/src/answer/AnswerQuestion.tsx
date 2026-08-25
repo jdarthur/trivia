@@ -94,7 +94,12 @@ class AnswerQuestion extends React.Component<Props, State> {
         const currentCheck = this.activeCounter
         const url = "/gameplay/session/" + this.props.session_id + "/players?player_id=" + this.props.player_id
         fetch(url)
-            .then(response => response.json())
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`Request failed (${response.status} ${response.statusText})`)
+                }
+                return response.json()
+            })
             .then((data: any) => {
                 if (currentCheck !== this.activeCounter) {
                     return
@@ -104,6 +109,9 @@ class AnswerQuestion extends React.Component<Props, State> {
                 if (self && self.active === false) {
                     this.setState({active: false})
                 }
+            })
+            .catch((error) => {
+                console.error("Failed to check player status:", error)
             })
     }
 
@@ -132,7 +140,12 @@ class AnswerQuestion extends React.Component<Props, State> {
             + "&round_id=" + this.props.round
             + "&question_id=" + this.props.question
         fetch(url)
-            .then(response => response.json())
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`Request failed (${response.status} ${response.statusText})`)
+                }
+                return response.json()
+            })
             .then((data: any) => {
                 if (currentFetch !== this.fetchCounter) {
                     return
@@ -140,6 +153,9 @@ class AnswerQuestion extends React.Component<Props, State> {
                 const team = (data.answers || []).find((t: any) => t.player_id === this.props.player_id)
                 const answers = team?.answers || []
                 this.setState({scored_result: answers.length > 0 ? answers[answers.length - 1] : null})
+            })
+            .catch((error) => {
+                console.error("Failed to fetch scored answer:", error)
             })
     }
 

@@ -59,7 +59,16 @@ const sendData = async function sendData(url: string, method: string, data?: any
         headers: {'Content-Type': 'application/json'},
         body: body
     })
-    return response.json()
+    if (!response.ok) {
+        // Surface the server's error body (e.g. {"errors": "..."}) when there
+        // is one; fall back to the status line otherwise.
+        const detail = await response.text().catch(() => "")
+        throw new Error(`Request failed (${response.status} ${response.statusText}): ${detail}`)
+    }
+    // Some responses have an empty body; response.json() would throw on that,
+    // so parse defensively and return null instead.
+    const text = await response.text()
+    return text ? JSON.parse(text) : null
 }
 
 export default sendData

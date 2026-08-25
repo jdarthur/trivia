@@ -88,7 +88,12 @@ class Homepage extends React.Component<Props, State> {
             const controller = new AbortController()
             this.pollController = controller
             fetch(url, {signal: controller.signal})
-                .then(response => response.json())
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`Request failed (${response.status} ${response.statusText})`)
+                    }
+                    return response.json()
+                })
                 .then(state => {
                     if (!this.mounted) return
                     console.log(state.state)
@@ -117,7 +122,12 @@ class Homepage extends React.Component<Props, State> {
             const controller = new AbortController()
             this.pollController = controller
             fetch(url, {signal: controller.signal})
-                .then(response => response.json())
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`Request failed (${response.status} ${response.statusText})`)
+                    }
+                    return response.json()
+                })
                 .then(state => {
                     if (!this.mounted) return
                     console.log(state)

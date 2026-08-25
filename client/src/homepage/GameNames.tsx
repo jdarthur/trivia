@@ -33,10 +33,18 @@ class GameNames extends React.Component<Props, State> {
   get_games = () => {
     let url = "/editor/games"
     fetch(url, {headers:{"borttrivia-token": this.props.token}})
-      .then(response => response.json())
+      .then(response => {
+        if (!response.ok) {
+          throw new Error(`Request failed (${response.status} ${response.statusText})`)
+        }
+        return response.json()
+      })
       .then(state => {
         console.log(state.games)
         this.setState({ games: state.games })
+      })
+      .catch((error) => {
+        console.error("Failed to fetch games:", error)
       })
   }
 

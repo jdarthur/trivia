@@ -109,6 +109,9 @@ class PlayerScorer extends React.Component<Props, State> {
                         })
                     }
                 })
+                .catch((error) => {
+                    console.error("Failed to fetch answers:", error)
+                })
         }
     }
 
@@ -188,6 +191,9 @@ class PlayerScorer extends React.Component<Props, State> {
 
             sendData(url, "PUT", body)
                 .then((data: any) => {
+                })
+                .catch((error) => {
+                    console.error("Failed to score answers:", error)
                 })
         }
     }
