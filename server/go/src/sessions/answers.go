@@ -2,6 +2,7 @@ package sessions
 
 import (
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strconv"
@@ -59,6 +60,16 @@ func (e *Env) AnswerQuestion(c *gin.Context) {
 		return
 	}
 
+	// Matching is one-to-one (ticket #163): reject an answer that isn't a
+	// complete, distinct left->right mapping before it is stored.
+	question := session.Rounds[*answer.RoundIndex].Questions[*answer.QuestionIndex]
+	if question.QuestionType == "matching" {
+		if err := validateMatchingAnswer(question, answer.Answer); err != nil {
+			common.Respond(c, nil, err)
+			return
+		}
+	}
+
 	availableWagers, err := getWagers(e, session, *answer.RoundIndex, answer.PlayerId)
 	if err != nil {
 		common.Respond(c, nil, err)
@@ -84,6 +95,47 @@ func (e *Env) AnswerQuestion(c *gin.Context) {
 	}
 
 	common.Respond(c, answer, err)
+}
+
+// validateMatchingAnswer enforces the one-to-one shape of a matching answer
+// (ticket #163): the answer must be a JSON object with exactly one entry per
+// question left, each value must be one of the question's rights, and no right
+// may be chosen more than once. Anything else is rejected with
+// InvalidMatchingAnswerError instead of being stored as a certain miss.
+func validateMatchingAnswer(question models.QuestionInRound, answer string) error {
+	var mapping map[string]string
+	if err := json.Unmarshal([]byte(answer), &mapping); err != nil {
+		return InvalidMatchingAnswerError{Answer: answer, Reason: "answer must be a JSON object mapping each left to a right"}
+	}
+
+	lefts := make(map[string]bool, len(question.Lefts))
+	for _, left := range question.Lefts {
+		lefts[left] = true
+	}
+	rights := make(map[string]bool, len(question.Rights))
+	for _, right := range question.Rights {
+		rights[right] = true
+	}
+
+	// JSON object keys are unique, so len(mapping) == len(lefts) plus every
+	// key being a known left means the mapping covers exactly the lefts.
+	if len(mapping) != len(question.Lefts) {
+		return InvalidMatchingAnswerError{Answer: answer, Reason: "answer must map every left to exactly one right"}
+	}
+	rightSeen := make(map[string]bool, len(question.Rights))
+	for left, right := range mapping {
+		if !lefts[left] {
+			return InvalidMatchingAnswerError{Answer: answer, Reason: "answer contains an unknown left: " + left}
+		}
+		if !rights[right] {
+			return InvalidMatchingAnswerError{Answer: answer, Reason: "answer contains an unknown right: " + right}
+		}
+		if rightSeen[right] {
+			return InvalidMatchingAnswerError{Answer: answer, Reason: "each right may be chosen only once"}
+		}
+		rightSeen[right] = true
+	}
+	return nil
 }
 
 func (e *Env) GetWagers(c *gin.Context) {

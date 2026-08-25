@@ -1038,6 +1038,78 @@ func TestAnswerRejectsInactivePlayer(t *testing.T) {
 	}
 }
 
+// TestAnswerRejectsNonOneToOneMatching verifies ticket #163: the API rejects a
+// matching answer that isn't a complete one-to-one mapping — duplicate right,
+// unknown left/right, missing left, malformed JSON — with a 400 and stores
+// nothing, while a valid one-to-one answer is accepted.
+func TestAnswerRejectsNonOneToOneMatching(t *testing.T) {
+	env := openSessionTestDB(t)
+	gin.SetMode(gin.TestMode)
+
+	qid := createMatchingQuestion(t, env, []models.QuestionPair{
+		{Left: "a", Right: "1"},
+		{Left: "b", Right: "2"},
+		{Left: "c", Right: "3"},
+	})
+	session, p1, _ := newStructuredSession(t, env, qid)
+
+	post := func(answer string) *httptest.ResponseRecorder {
+		t.Helper()
+		recorder := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(recorder)
+		c.Params = gin.Params{{Key: "id", Value: session.ID}}
+		body, err := json.Marshal(map[string]interface{}{
+			"player_id": string(p1), "answer": answer, "wager": 100,
+			"round_id": 0, "question_id": 0,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		c.Request = httptest.NewRequest(http.MethodPost, "/gameplay/session/"+session.ID+"/answer", bytes.NewReader(body))
+		c.Request.Header.Set("Content-Type", "application/json")
+		env.AnswerQuestion(c)
+		return recorder
+	}
+
+	invalid := map[string]string{
+		"duplicate right": `{"a":"1","b":"1","c":"3"}`,
+		"unknown left":    `{"a":"1","b":"2","d":"3"}`,
+		"unknown right":   `{"a":"1","b":"2","c":"9"}`,
+		"missing left":    `{"a":"1","b":"2"}`,
+		"malformed JSON":  "a->1",
+	}
+	for name, answer := range invalid {
+		rec := post(answer)
+		if rec.Code != http.StatusBadRequest {
+			t.Errorf("%s: status = %d, want 400: %s", name, rec.Code, rec.Body.String())
+		}
+		var resp struct {
+			Errors string `json:"errors"`
+		}
+		if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+			t.Fatalf("%s: bad error response %q: %v", name, rec.Body.String(), err)
+		}
+		if resp.Errors == "" {
+			t.Errorf("%s: expected an error, got %s", name, rec.Body.String())
+		}
+	}
+
+	// none of the rejected answers were stored
+	var n int
+	if err := env.Db.QueryRow(`SELECT count(*) FROM answer
+		WHERE session_id = ? AND player_id = ?`, session.ID, string(p1)).Scan(&n); err != nil {
+		t.Fatal(err)
+	}
+	if n != 0 {
+		t.Fatalf("rejected matching answers were stored: %d rows", n)
+	}
+
+	// a complete one-to-one mapping is accepted
+	if rec := post(`{"a":"1","b":"2","c":"3"}`); rec.Code != http.StatusOK {
+		t.Fatalf("valid one-to-one answer status = %d, want 200: %s", rec.Code, rec.Body.String())
+	}
+}
+
 // ---- question-type auto-scoring (ticket #99) ----
 
 func createMCQuestion(t *testing.T, env *Env, choices []models.QuestionChoice) string {
