@@ -11,7 +11,15 @@ interface Props {
     label: string
 }
 
-class SetRound extends React.Component<Props> {
+interface State {
+    loading: boolean
+}
+
+class SetRound extends React.Component<Props, State> {
+
+    state: State = {
+        loading: false
+    }
 
     set_round = () => {
         const url = "/gameplay/session/" + this.props.session_id + "/current-round"
@@ -21,16 +29,24 @@ class SetRound extends React.Component<Props> {
             question_id: this.props.question_target,
         }
 
-        sendData(url, "PUT", body)
-            .then((data: any) => {
-                console.log(data)
-            })
+        this.setState({loading: true}, () => {
+            sendData(url, "PUT", body)
+                .then((data: any) => {
+                    console.log(data)
+                })
+                .catch((error: any) => {
+                    console.log(error)
+                })
+                .finally(() => {
+                    this.setState({loading: false})
+                })
+        })
     }
 
 
     render() {
         return (
-            <Button type="primary" onClick={this.set_round}> {this.props.label} </Button>
+            <Button type="primary" onClick={this.set_round} disabled={this.state.loading}> {this.props.label} </Button>
         );
     }
 }

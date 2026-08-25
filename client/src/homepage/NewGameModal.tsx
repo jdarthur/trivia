@@ -15,6 +15,7 @@ interface State {
     open: boolean
     selected_game: string
     name: string
+    creating: boolean
 }
 
 class NewGameModal extends React.Component<Props, State> {
@@ -22,7 +23,8 @@ class NewGameModal extends React.Component<Props, State> {
     state: State = {
         open: false,
         selected_game: "",
-        name: ""
+        name: "",
+        creating: false
     }
 
     open = () => {
@@ -44,12 +46,15 @@ class NewGameModal extends React.Component<Props, State> {
     }
 
     create_new_game = () => {
-        if (this.state.selected_game !== "") {
+        if (this.state.selected_game !== "" && !this.state.creating) {
             console.log("new game:")
             const session = {
                 name: this.state.name,
                 game_id: this.state.selected_game
             }
+            // Guard double-OK: a second click would create an orphaned session.
+            // `creating` stays true until the redirect on success (ticket #147).
+            this.setState({creating: true})
             create_session(session)
                 .then((data) => {
                     console.log(data)
@@ -58,6 +63,10 @@ class NewGameModal extends React.Component<Props, State> {
                     //this.props?.start_game(game_id)
                     window.location.href = window.location.href.split("?")[0] + "?session_id=" + game_id + "&player_id=" + player_id
                     //this.close()
+                })
+                .catch((error) => {
+                    console.log(error)
+                    this.setState({creating: false})
                 })
         }
     }
@@ -72,6 +81,7 @@ class NewGameModal extends React.Component<Props, State> {
                     open={this.state.open}
                     onOk={this.create_new_game}
                     okText="Create"
+                    okButtonProps={{disabled: this.state.creating}}
                     onCancel={this.close}
                     width="65vw">
 

@@ -11,12 +11,14 @@ interface Props {
 
 interface State {
     round_name: string
+    saving: boolean
 }
 
 class HotEditRoundName extends React.Component<Props, State> {
 
     state: State = {
-        round_name: this.props.round_name
+        round_name: this.props.round_name,
+        saving: false
     }
 
     set_round_name = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -24,15 +26,27 @@ class HotEditRoundName extends React.Component<Props, State> {
     }
 
     save_self = () => {
+        if (this.state.saving) {
+            return
+        }
         if (this.state.round_name !== this.props.round_name) {
             const body = {
                 round_index: this.props.round_index,
                 round_name: this.state.round_name
             }
 
-            save(this.props.session_id, this.props.player_id, body).then((data: any) => {
-                this.props.close()
-            })
+            // Guard double Enter: only one PUT per save (ticket #147).
+            this.setState({saving: true})
+            save(this.props.session_id, this.props.player_id, body)
+                .then((data: any) => {
+                    this.props.close()
+                })
+                .catch((error) => {
+                    console.log(error)
+                })
+                .finally(() => {
+                    this.setState({saving: false})
+                })
         }
         else {
             this.props.close()

@@ -25,6 +25,7 @@ interface State {
     question: string
     answer: string
     scoring_note?: string
+    saving: boolean
 }
 
 class HotEditQuestion extends React.Component<Props, State> {
@@ -34,6 +35,7 @@ class HotEditQuestion extends React.Component<Props, State> {
         question: this.props.question,
         answer: this.props.answer,
         scoring_note: this.props.scoring_note,
+        saving: false,
     }
 
     set_value = (key: string, value: string) => {
@@ -46,6 +48,9 @@ class HotEditQuestion extends React.Component<Props, State> {
     }
 
     save_self = () => {
+        if (this.state.saving) {
+            return
+        }
         console.log("save")
 
         const question = {
@@ -60,12 +65,24 @@ class HotEditQuestion extends React.Component<Props, State> {
             }
         }
 
-        save(this.props.session_id, this.props.player_id, question).then((data: any) => {
-            this.props.close()
-        })
+        // Guard double-clicks on Update (ticket #147).
+        this.setState({saving: true})
+        save(this.props.session_id, this.props.player_id, question)
+            .then((data: any) => {
+                this.props.close()
+            })
+            .catch((error: any) => {
+                console.log(error)
+            })
+            .finally(() => {
+                this.setState({saving: false})
+            })
     }
 
     disabled = () => {
+        if (this.state.saving) {
+            return true
+        }
         if (this.structured()) {
             return this.props.category === "" || this.props.question === ""
         }

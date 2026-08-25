@@ -18,19 +18,27 @@ interface Props {
 
 interface State {
     excluded_icons: string[]
+    starting: boolean
 }
 
 class GameLobby extends React.Component<Props, State> {
-    state: State = {excluded_icons: []}
+    state: State = {excluded_icons: [], starting: false}
     set_excluded_icons = (excluded_icons: string[]) => {
         this.setState({excluded_icons: excluded_icons})
     }
 
     start = () => {
         const url = "/gameplay/session/" + this.props.session_id + "/start"
+        this.setState({starting: true})
         sendData(url, "POST", {player_id: this.props.player_id})
             .then((data) => {
                 console.log(data)
+            })
+            .catch((error) => {
+                console.log(error)
+            })
+            .finally(() => {
+                this.setState({starting: false})
             })
     }
 
@@ -49,7 +57,7 @@ class GameLobby extends React.Component<Props, State> {
 
                 <div style={{margin: 10, display: "flex", alignItems: "center"}}>
                     {this.props.is_mod ? <InviteLink session_id={this.props.session_id}/> : null}
-                    {this.props.is_mod ? <Button type="primary" onClick={this.start} className="start-button"> Start
+                    {this.props.is_mod ? <Button type="primary" onClick={this.start} disabled={this.state.starting} className="start-button"> Start
                         Game </Button> : null}
                     {this.props.is_mod ? null : <LobbyPlayer session_id={this.props.session_id}
                                                              player_id={this.props.player_id}
