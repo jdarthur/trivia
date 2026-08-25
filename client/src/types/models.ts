@@ -183,6 +183,18 @@ export interface ScoredAnswer {
   correct: boolean;
   points_awarded: number;
   answer: string;
+  answer_id: string;
+  reactions: Record<string, number>;
+  my_reaction?: string;
+}
+
+/** models.AnswerReaction — one emoji reaction by one player to one answer */
+export interface AnswerReaction {
+  id: string;
+  create_date: WireTimestamp;
+  answer_id: string;
+  player_id: PlayerId;
+  emoji: string;
 }
 
 /** models.Answer (session_id is `json:"-"`, never serialized) */

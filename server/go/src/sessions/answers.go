@@ -347,6 +347,10 @@ func getAnswersScored(e *Env, session models.Session, roundIndex int, questionIn
 	if err != nil {
 		return models.AnswersResponseScored{}, err
 	}
+	reactions, err := reactionsForQuestion(e, session.ID, roundIndex, questionIndex, callerPlayerId)
+	if err != nil {
+		return models.AnswersResponseScored{}, err
+	}
 	var response models.AnswersResponseScored
 	response.Scored = true
 	for _, player := range players {
@@ -371,6 +375,13 @@ func getAnswersScored(e *Env, session models.Session, roundIndex int, questionIn
 			a.UseMoneyball = answer.UseMoneyball
 			a.Correct = answer.Correct
 			a.PointsAwarded = answer.PointsAwarded
+			a.AnswerId = answer.ID
+			if ra, ok := reactions[answer.ID]; ok {
+				a.Reactions = ra.counts
+				a.MyReaction = ra.myReaction
+			} else {
+				a.Reactions = make(map[string]int)
+			}
 			team.Answers = append(team.Answers, a)
 		}
 
