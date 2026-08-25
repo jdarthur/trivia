@@ -8,6 +8,8 @@ import (
 var Correct = "correct"
 var PlayerIdParam = "player_id"
 var Wager = "wager"
+var AnswerIdParam = "answer_id"
+var Emoji = "emoji"
 
 type Answer struct {
 	ID            string    `json:"id"`
@@ -72,9 +74,50 @@ type ScoredTeam struct {
 }
 
 type ScoredAnswer struct {
-	Wager         int     `json:"wager"`
-	UseMoneyball  bool    `json:"use_moneyball"`
-	Correct       bool    `json:"correct"`
-	PointsAwarded float64 `json:"points_awarded"`
-	Answer        string  `json:"answer"`
+	Wager         int            `json:"wager"`
+	UseMoneyball  bool           `json:"use_moneyball"`
+	Correct       bool           `json:"correct"`
+	PointsAwarded float64        `json:"points_awarded"`
+	Answer        string         `json:"answer"`
+	// AnswerId lets clients target a reaction at a specific answer (a player
+	// may have submitted more than one for a question). Reactions are the
+	// emoji counts on that answer; MyReaction is the caller's own emoji, so
+	// the UI can highlight their selection without broadcasting who reacted
+	// (the scored view only ever exposes the caller's own player_id).
+	AnswerId   string         `json:"answer_id"`
+	Reactions  map[string]int `json:"reactions"`
+	MyReaction string         `json:"my_reaction,omitempty"`
+}
+
+// AnswerReaction is one emoji reaction by one player to one answer. The
+// answer_reaction table's UNIQUE(answer_id, player_id) constraint guarantees
+// at most one row per (answer, player), so modifying is an UPDATE on the same
+// row and removing is a DELETE.
+type AnswerReaction struct {
+	ID         string    `json:"id"`
+	CreateDate time.Time `json:"create_date"`
+	AnswerId   string    `json:"answer_id"`
+	PlayerId   PlayerId  `json:"player_id"`
+	Emoji      string    `json:"emoji"`
+}
+
+func (r AnswerReaction) SetCreateDate(createDate time.Time) Object {
+	r.CreateDate = createDate
+	return r
+}
+
+func (r AnswerReaction) SetId(objectId string) Object {
+	r.ID = objectId
+	return r
+}
+
+func (r AnswerReaction) MarshalJSON() ([]byte, error) {
+	type Alias AnswerReaction
+	return json.Marshal(&struct {
+		CreateDate string `json:"create_date"`
+		Alias
+	}{
+		CreateDate: dateFormat(r.CreateDate),
+		Alias:      Alias(r),
+	})
 }
