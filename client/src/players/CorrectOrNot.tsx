@@ -17,6 +17,9 @@ interface AnswerLike {
     correct?: boolean
     points_awarded?: number
     use_moneyball?: boolean
+    answer_id?: string
+    reactions?: Record<string, number>
+    my_reaction?: string
 }
 
 interface Props {
@@ -25,6 +28,7 @@ interface Props {
     icon_name: string
     current_player: string
     player_id: string
+    session_id: string
     is_mobile?: boolean
     wager?: number
     correct?: boolean
@@ -104,7 +108,10 @@ class CorrectOrNot extends React.Component<Props> {
                               justifyContent: 'space-between'
                           }}>
 
-                        <div className="answer-text"><MultiAnswer answers={this.props.answers} omitWager={true}/></div>
+                        <div className="answer-text"><MultiAnswer answers={this.props.answers} omitWager={true}
+                                                                  session_id={this.props.session_id}
+                                                                  current_player={this.props.current_player}
+                                                                  scored={true}/></div>
                         {correctness_and_wager}
                     </Card>}
             </div>

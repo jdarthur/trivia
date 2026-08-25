@@ -15,6 +15,9 @@ interface AnswerLike {
     use_moneyball?: boolean
     correct?: boolean
     points_awarded?: number
+    answer_id?: string
+    reactions?: Record<string, number>
+    my_reaction?: string
 }
 
 interface Props {
@@ -36,6 +39,10 @@ interface Props {
     // scored: the question has been scored, so the answers carry the points
     // the backend actually awarded.
     scored?: boolean
+    // current_player is the moderator's own player id, used for emoji
+    // reactions on the scored answers (the mod is also a player in the
+    // session, ticket #156).
+    current_player?: string
 }
 
 export default function PlayerAnswers({
@@ -50,7 +57,8 @@ export default function PlayerAnswers({
                                           auto_scored,
                                           question_type,
                                           moneyball,
-                                          scored
+                                          scored,
+                                          current_player
                                       }: Props) {
 
     // on new answer, clear out the existing score
@@ -70,7 +78,9 @@ export default function PlayerAnswers({
     const incorrectButtonStyle = correct === false ? {background: "#ffccc7"} : {}
     const correctButtonStyle = correct === true ? {background: "#d9f7be"} : {}
 
-    let answer_text = <MultiAnswer answers={answers} question_type={question_type}/>
+    let answer_text = <MultiAnswer answers={answers} question_type={question_type}
+                                   session_id={session_id} current_player={current_player}
+                                   scored={scored}/>
 
     let override = correct === false ? 0 : override_value
     const wager = <div style={{paddingLeft: '10px', fontSize: '1.3em', fontWeight: 'bold'}}>

@@ -95,6 +95,7 @@ class PlayerStatus extends React.Component<Props, State> {
                 return <CorrectOrNot key={player.team_name} player_name={player.team_name}
                                      answers={player.answers} icon_name={player.icon}
                                      current_player={this.props.player_id} player_id={player.player_id}
+                                     session_id={this.props.session_id}
                                      is_mobile={this.props.is_mobile}/>
             else return <AnsweredOrNot key={player.team_name} player_name={player.team_name}
                                        answered={player.answered} icon_name={player.icon}
@@ -107,6 +108,7 @@ class PlayerStatus extends React.Component<Props, State> {
                                  answers={player.answers} wager={player.wager} correct={player.correct}
                                  points_awarded={player.points_awarded} icon_name={player.icon}
                                  current_player={this.props.player_id} player_id={player.player_id}
+                                 session_id={this.props.session_id}
                                  is_mobile={false}/>
 
         })

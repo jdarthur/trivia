@@ -152,15 +152,24 @@ func validateReactionTarget(e *Env, sessionId string, req ReactionRequest) (answ
 		return answerRow{}, err
 	}
 
-	if !playerInSession(e, sessionId, req.PlayerId) {
-		return answerRow{}, PlayerNotInSessionError{PlayerId: req.PlayerId, SessionId: sessionId}
-	}
-	active, err := playerIsActive(e, sessionId, req.PlayerId)
-	if err != nil {
+	// The moderator created the session but — unlike joined players — has no
+	// session_player row; they are still an active member and may react to
+	// scored answers like any other player (ticket #156).
+	var session models.Session
+	if err := common.GetOne((*common.Env)(e), common.SessionTable, sessionId, &session); err != nil {
 		return answerRow{}, err
 	}
-	if !active {
-		return answerRow{}, PlayerInactiveError{PlayerId: req.PlayerId, SessionId: sessionId}
+	if req.PlayerId != session.Moderator {
+		if !playerInSession(e, sessionId, req.PlayerId) {
+			return answerRow{}, PlayerNotInSessionError{PlayerId: req.PlayerId, SessionId: sessionId}
+		}
+		active, err := playerIsActive(e, sessionId, req.PlayerId)
+		if err != nil {
+			return answerRow{}, err
+		}
+		if !active {
+			return answerRow{}, PlayerInactiveError{PlayerId: req.PlayerId, SessionId: sessionId}
+		}
 	}
 
 	snapshot, err := sessionQuestionSnapshot(e, sessionId, answer.RoundIndex, answer.QuestionIndex)

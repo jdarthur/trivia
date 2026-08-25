@@ -433,6 +433,73 @@ func TestGetAnswersScoredIncludesReactions(t *testing.T) {
 	}
 }
 
+func TestGetAnswersAsModIncludesReactions(t *testing.T) {
+	env := openSessionTestDB(t)
+	session, p1, p2 := scoredFixture(t, env)
+	p2Answer := answerIdFor(t, env, session.ID, p2)
+
+	react := func(player models.PlayerId, answerId, emoji string) {
+		t.Helper()
+		rec := reactionRequest(t, env, env.SetReaction, http.MethodPut, session.ID,
+			models.AnswerReaction{AnswerId: answerId, PlayerId: player, Emoji: emoji})
+		if rec.Code != http.StatusOK {
+			t.Fatalf("PUT reaction = %d: %s", rec.Code, rec.Body.String())
+		}
+	}
+	react(p1, p2Answer, "👍")
+	react(p2, p2Answer, "😂")
+	react(session.Moderator, p2Answer, "❤️")
+
+	// viewed as the mod: answer_id on every answer, aggregated counts, and the
+	// mod's own reaction highlighted (same shape as the player scored view)
+	asMod, err := getAnswersAsMod(env, session, 0, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !asMod.Scored {
+		t.Error("Scored = false, want true")
+	}
+	var team2 *IndividualAnswerAsMod
+	for i := range asMod.Answers {
+		if asMod.Answers[i].TeamName == "team-2" {
+			team2 = &asMod.Answers[i]
+			break
+		}
+	}
+	if team2 == nil || len(team2.Answers) != 1 {
+		t.Fatalf("team-2 = %+v, want one answer", asMod.Answers)
+	}
+	a2 := team2.Answers[0]
+	if a2.AnswerId != p2Answer {
+		t.Errorf("answer_id = %q, want %q", a2.AnswerId, p2Answer)
+	}
+	if a2.Reactions["👍"] != 1 || a2.Reactions["😂"] != 1 || a2.Reactions["❤️"] != 1 {
+		t.Errorf("reactions = %+v, want 👍=1 😂=1 ❤️=1", a2.Reactions)
+	}
+	if a2.MyReaction != "❤️" {
+		t.Errorf("mod my_reaction = %q, want ❤️", a2.MyReaction)
+	}
+}
+
+func TestModeratorCanReactWithoutJoinRow(t *testing.T) {
+	env := openSessionTestDB(t)
+	session, p1, _ := scoredFixture(t, env)
+	p1Answer := answerIdFor(t, env, session.ID, p1)
+
+	// The moderator created the session (no session_player join row) but is
+	// still an active member: they can add and remove a reaction.
+	rec := reactionRequest(t, env, env.SetReaction, http.MethodPut, session.ID,
+		models.AnswerReaction{AnswerId: p1Answer, PlayerId: session.Moderator, Emoji: "👍"})
+	if rec.Code != http.StatusOK {
+		t.Fatalf("mod PUT reaction = %d: %s", rec.Code, rec.Body.String())
+	}
+	rec = reactionRequest(t, env, env.RemoveReaction, http.MethodDelete, session.ID,
+		models.AnswerReaction{AnswerId: p1Answer, PlayerId: session.Moderator})
+	if rec.Code != http.StatusOK {
+		t.Fatalf("mod DELETE reaction = %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
 func TestIsSingleEmoji(t *testing.T) {
 	valid := []string{
 		"👍", "😀", "❤️", "👍🏽",
