@@ -32,6 +32,11 @@ class PlayerScorer extends React.Component<Props, State> {
         answers: []
     }
 
+    // The id of each player's latest answer as of the last fetch. Used to
+    // detect a player submitting a new answer, so the mod's prior judgment
+    // for them can be dropped (ticket #8).
+    latest_answer_ids: Record<string, string> = {}
+
     componentDidMount() {
         const answers = sessionStorage.getItem("answers")
         if (answers && answers !== "undefined") {
@@ -46,14 +51,17 @@ class PlayerScorer extends React.Component<Props, State> {
     }
 
     componentDidUpdate(prevProps: Props) {
-        if (this.props.session_state !== prevProps.session_state && prevProps.session_state) {
-            if (this.props.question_id === prevProps.question_id) {
-                this.get_answers()
-            }
-        } else if (this.props.question_id !== prevProps.question_id) {
+        // Question/round change is checked first: when the mod advances
+        // questions, session_state bumps in the same render, so the old
+        // session_state-first chain never reached the question-change branch
+        // and the scorer kept the previous question's answers (ticket #145/#7).
+        if (this.props.question_id !== prevProps.question_id || this.props.round_id !== prevProps.round_id) {
+            this.latest_answer_ids = {}
             this.setState({scores: {}}, () => this.get_answers())
-        } else if (this.props.round_id !== prevProps.round_id) {
-            this.setState({scores: {}}, () => this.get_answers())
+        } else if (this.props.session_state !== prevProps.session_state && prevProps.session_state) {
+            // Same question, state bumped (a player answered, or the question
+            // was scored): refetch the answers.
+            this.get_answers()
         }
     }
 
@@ -73,6 +81,11 @@ class PlayerScorer extends React.Component<Props, State> {
                     sessionStorage.setItem("answers", JSON.stringify(data.answers))
                     if (!data.errors) {
                         this.setState({answers: data.answers}, () => {
+                            // A player may have submitted a new answer since
+                            // the last fetch (e.g. a new wager); drop their
+                            // stale correct/override so the mod re-judges
+                            // against the new answer (ticket #8).
+                            this.clear_stale_scores()
                             // Structured question types are auto-scored by the
                             // backend against the snapshot answer key, so the
                             // mod does not judge correctness. Pre-mark every
@@ -106,6 +119,24 @@ class PlayerScorer extends React.Component<Props, State> {
         const scores: Record<string, ScoreState> = {}
         for (const player of this.active_answers()) {
             scores[player.player_id] = {correct: true, score_override: this.get_wager(player.player_id) ?? null}
+        }
+        this.setState({scores: scores})
+    }
+
+    // Drop the mod's correct/override for any player whose latest answer
+    // changed since the last fetch — their judgment applied to the old answer,
+    // so the player is unscored until the mod re-judges (ticket #8).
+    clear_stale_scores = () => {
+        const scores = {...this.state.scores}
+        for (const player of this.state.answers || []) {
+            const playerAnswers = player.answers || []
+            const latest = playerAnswers[playerAnswers.length - 1]
+            if (latest && this.latest_answer_ids[player.player_id] !== latest.id) {
+                delete scores[player.player_id]
+            }
+            if (latest) {
+                this.latest_answer_ids[player.player_id] = latest.id
+            }
         }
         this.setState({scores: scores})
     }
