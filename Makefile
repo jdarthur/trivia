@@ -2,6 +2,7 @@
 #
 #   make build   # compile the Go server + build the React client (default)
 #   make run     # build both, then run the server serving the built client
+#   make prod    # like `make run`, but serving HTTPS (server-cert.pem/server-key.pem)
 #   make check   # go vet + go test + npm audit (mirrors CI)
 #   make e2e     # run the Playwright end-to-end suite (e2e/)
 #   make clean   # remove generated artifacts
@@ -9,7 +10,7 @@
 # The server is a single Go binary that also serves the built client, so
 # "build the stack" is just these two steps. No Docker, no database service.
 
-.PHONY: build build-server build-client run check e2e clean
+.PHONY: build build-server build-client run prod check e2e clean
 
 # Default: compile both halves of the stack.
 build: build-server build-client
@@ -28,6 +29,12 @@ server-bin:
 # client on :8080 (DB_PATH/IMAGE_DIR default under server/go/src).
 run: build-client server-bin
 	cd server/go/src && CLIENT_DIR=../../../client/build ./trivia-server
+
+# Like `make run`, but serving HTTPS: the server terminates TLS itself, using
+# the certificate and key files server-cert.pem / server-key.pem in the server
+# module directory. Drop a production cert/key under those names to use it.
+prod: build-client server-bin
+	cd server/go/src && CLIENT_DIR=../../../client/build ./trivia-server --tls-cert server-cert.pem --tls-key server-key.pem
 
 # Same checks CI runs (server build/vet/test, client audit).
 check:

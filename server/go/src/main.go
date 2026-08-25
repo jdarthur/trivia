@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/tls"
 	"flag"
 	"fmt"
 	"github.com/gin-gonic/gin"
@@ -26,7 +27,14 @@ func main() {
 	// turned on silently via the environment.
 	devMode := flag.Bool("dev-mode", false, "run against a transient SQLite DB with seeded mock users and no Auth0 verification")
 	addr := flag.String("addr", ":8080", "address to listen on (host:port), e.g. 127.0.0.1:8080")
+	tlsCert := flag.String("tls-cert", "", "path to an x509 TLS certificate file (PEM). When set, the server listens on HTTPS and --tls-key must also be set")
+	tlsKey := flag.String("tls-key", "", "path to the TLS private key file (PEM) matching --tls-cert. When set, --tls-cert must also be set")
 	flag.Parse()
+
+	tlsOpts := tlsOptions{certFile: *tlsCert, keyFile: *tlsKey}
+	if err := tlsOpts.validate(); err != nil {
+		log.Fatalf("invalid TLS configuration: %v", err)
+	}
 
 	// Dev mode disables Auth0 and accepts unsigned mock JWTs, so it must never
 	// be exposed beyond the loopback interface. Refuse to start rather than
@@ -174,7 +182,9 @@ func main() {
 	serveClient(router, clientDir)
 
 	fmt.Println()
-	router.Run(*addr)
+	if err := serve(router, *addr, tlsOpts); err != nil {
+		log.Fatal(err)
+	}
 }
 
 // listenOnLoopback reports whether addr binds to the loopback interface only.
@@ -200,4 +210,70 @@ func listenOnLoopback(addr string) bool {
 	}
 	ip := net.ParseIP(host)
 	return ip != nil && ip.IsLoopback()
+}
+
+// tlsOptions carries the optional x509 certificate and private key file paths
+// used to serve HTTPS. An empty certFile means the server serves plain HTTP.
+type tlsOptions struct {
+	certFile string
+	keyFile  string
+}
+
+// validate checks that the TLS options form a consistent, loadable pair.
+// Either both files are empty (plain HTTP), or both are set and name existing,
+// regular, readable files that parse as a matching x509 certificate + private
+// key. A certificate without a key (or vice versa) is a configuration error.
+func (o tlsOptions) validate() error {
+	switch {
+	case o.certFile == "" && o.keyFile == "":
+		return nil
+	case o.certFile == "":
+		return fmt.Errorf("--tls-key is set but --tls-cert is not: a certificate is required to serve TLS")
+	case o.keyFile == "":
+		return fmt.Errorf("--tls-cert is set but --tls-key is not: a private key is required to serve TLS")
+	}
+	for _, f := range []struct {
+		path string
+		kind string
+	}{
+		{o.certFile, "certificate"},
+		{o.keyFile, "key"},
+	} {
+		if err := checkTLSFile(f.path, f.kind); err != nil {
+			return err
+		}
+	}
+	if _, err := tls.LoadX509KeyPair(o.certFile, o.keyFile); err != nil {
+		return fmt.Errorf("invalid TLS certificate/key pair: %w", err)
+	}
+	return nil
+}
+
+// checkTLSFile verifies that path names an existing, regular, readable file.
+func checkTLSFile(path, kind string) error {
+	info, err := os.Stat(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return fmt.Errorf("TLS %s file %q does not exist", kind, path)
+		}
+		return fmt.Errorf("cannot access TLS %s file %q: %w", kind, path, err)
+	}
+	if !info.Mode().IsRegular() {
+		return fmt.Errorf("TLS %s path %q is not a regular file", kind, path)
+	}
+	f, err := os.Open(path)
+	if err != nil {
+		return fmt.Errorf("TLS %s file %q is not readable: %w", kind, path, err)
+	}
+	f.Close()
+	return nil
+}
+
+// serve starts the Gin router on addr. If TLS options are set it serves HTTPS
+// via RunTLS; otherwise it serves plain HTTP via Run.
+func serve(router *gin.Engine, addr string, opts tlsOptions) error {
+	if opts.certFile != "" {
+		return router.RunTLS(addr, opts.certFile, opts.keyFile)
+	}
+	return router.Run(addr)
 }

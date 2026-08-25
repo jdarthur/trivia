@@ -152,6 +152,31 @@ The server reads three environment variables (all with defaults, so a plain
 deployment that does not want one — the server logs that it is skipping the
 client and serves the API alone.
 
+### Serving HTTPS
+
+The server can terminate TLS itself — no proxy in front. Pass it an x509
+certificate and private key and it serves HTTPS instead of HTTP:
+
+```sh
+cd server/go/src && go build -o trivia-server .
+CLIENT_DIR=../../../client/build ./trivia-server \
+  --tls-cert /path/to/server-cert.pem --tls-key /path/to/server-key.pem
+```
+
+The two flags must be given together, and the files must exist, be readable,
+and be a matching certificate/key pair. The server validates all of this at
+startup and refuses to start with a clear error otherwise. With no `--tls-cert`,
+the server listens on plain HTTP as before.
+
+For a one-shot build-and-serve over HTTPS, the `make prod` target is `make run`
+plus the TLS flags, using `server-cert.pem` / `server-key.pem` from the server
+module directory — drop your production certificate and key under those names
+and run it:
+
+```sh
+make prod
+```
+
 Because the database driver is pure Go (no CGO), the server cross-compiles to
 any platform trivially — e.g. a static Linux/amd64 binary for a remote host:
 
