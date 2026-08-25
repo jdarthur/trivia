@@ -27,6 +27,10 @@ class PlayerStatus extends React.Component<Props, State> {
         modal_open: false
     }
 
+    // Ticket #146: a slow response for a previous question/round must not
+    // overwrite the current one (WagerManager pattern).
+    fetchCounter = 0
+
     componentDidMount() {
         const statusStored = JSON.parse(sessionStorage.getItem("status") || "null")
         if (statusStored) {
@@ -48,6 +52,8 @@ class PlayerStatus extends React.Component<Props, State> {
 
     get_answers = () => {
         if (ready_to_call(this.props.round_id, this.props.question_id)) {
+            this.fetchCounter += 1
+            const currentFetch = this.fetchCounter
 
             let url = "/gameplay/session/" + this.props.session_id + "/answers"
             url += "?player_id=" + this.props.player_id
@@ -59,9 +65,12 @@ class PlayerStatus extends React.Component<Props, State> {
             sendData(url, "GET")
                 .then((data: any) => {
                     console.log(data)
-                    if (data.answers) {
-                        sessionStorage.setItem("status", JSON.stringify(data.answers))
-                        this.setState({answers: data.answers})
+                    // Only apply if this is still the latest request.
+                    if (currentFetch === this.fetchCounter) {
+                        if (data.answers) {
+                            sessionStorage.setItem("status", JSON.stringify(data.answers))
+                            this.setState({answers: data.answers})
+                        }
                     }
                 })
         }

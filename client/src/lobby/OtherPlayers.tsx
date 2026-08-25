@@ -21,6 +21,10 @@ class OtherPlayers extends React.Component<Props, State> {
     players: []
   }
 
+  // Ticket #146: a slow response for a previous session_state must not
+  // overwrite the current one (WagerManager pattern).
+  fetchCounter = 0
+
   componentDidMount() {
     this.get_players()
   }
@@ -36,10 +40,16 @@ class OtherPlayers extends React.Component<Props, State> {
   }
 
   get_players = () => {
+    this.fetchCounter += 1
+    const currentFetch = this.fetchCounter
     let url = "/gameplay/session/" + this.props.session_id + "/players?player_id=" + this.props.player_id
     fetch(url)
       .then(response => response.json())
       .then(state => {
+        // Only apply if this is still the latest request.
+        if (currentFetch !== this.fetchCounter) {
+          return
+        }
         console.log(state)
         const excluded_icons: string[] = []
         for (let i = 0; i < state.length; i++) {
