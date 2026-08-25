@@ -25,7 +25,8 @@ from their own devices. React client + Go/Gin API. Work in progress — see
   (intended behavior), `archive/` (past games, reference only).
 
 ## Commands
-There is no Makefile; CI (`.github/workflows/ci.yml`) is the source of truth
+The Makefile at the repo root wraps the common checks (`make build`, `make run`,
+`make check`, `make e2e`); CI (`.github/workflows/ci.yml`) is the source of truth
 for checks.
 ```sh
 cd server/go/src && go build ./...          # build
@@ -35,6 +36,7 @@ cd server/go/src && go install golang.org/x/vuln/cmd/govulncheck@latest && govul
 
 cd client && npm ci && npm run build        # client build
 cd client && npm audit                      # strict: any finding blocks CI
+cd e2e && npx playwright test               # e2e suite (browsers: npx playwright install chromium)
 ```
 Local dev (two servers):
 ```sh
@@ -50,9 +52,14 @@ Verify: `cd server/go/src && go build ./...` succeeds.
 
 ## Verification for UI changes
 - The client has no unit tests. A UI change is "done" when `npm run build`
-  passes and `npm audit` is clean — CI treats `npm audit` as a **blocking** step
+  passes, `npm audit` is clean — CI treats `npm audit` as a **blocking** step
   (no `--audit-level`, so even a low in a dev-only transitive dependency blocks
-  the merge; see the CI workflow comment).
+  the merge; see the CI workflow comment) — and the Playwright e2e suite passes
+  (`make e2e`, or at least the relevant specs in `e2e/tests/`).
+- The e2e suite (`e2e/`, Playwright) drives the real stack: its `webServer`
+  config builds the client and boots the Go API against a scratch SQLite DB
+  (see `e2e/playwright.config.ts`), so a green `make e2e` is the end-to-end
+  done-ness gate for UI behavior. CI runs the same suite on every PR.
 - Server changes must pass `go build ./... && go vet ./... && go test ./...`.
   The integration tests in `test/` run against a temp-file SQLite DB with no
   external service.
