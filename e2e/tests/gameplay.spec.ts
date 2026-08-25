@@ -10,7 +10,7 @@ import { expect, test, type APIRequestContext, type BrowserContext, type Page } 
 // every test uses a unique prefix and cleans up what it created.
 const unique = () => String(Date.now());
 
-const BASE_URL = 'http://localhost:8080/';
+const BASE_URL = 'http://localhost:8081/';
 const DEV_USER = 'alice';
 
 // Build the same unsigned (alg "none") dev-mode mock JWT the client produces

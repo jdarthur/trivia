@@ -35,8 +35,11 @@ check:
 	cd client && npm audit
 
 # Run the Playwright end-to-end suite (e2e/). The playwright webServer config
-# builds the client and boots the Go API against a scratch SQLite DB itself, so
-# this single target drives the whole harness. Browsers are installed once:
+# builds the client and boots the Go API itself — on port 8081 (not the :8080
+# `make run` uses, so the suite can run while a dev server is up) and against
+# the scratch dev-mode SQLite file (data/trivia-dev.db, distinct from the local
+# prod trivia.db and removed before each run) — so this single target drives the
+# whole harness. Browsers are installed once:
 # `cd e2e && npx playwright install chromium` (CI uses --with-deps).
 e2e:
 	cd e2e && (test -d node_modules || npm ci) && npx playwright test

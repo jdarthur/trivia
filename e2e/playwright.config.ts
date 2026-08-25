@@ -13,7 +13,7 @@ export default defineConfig({
   retries: process.env.CI ? 1 : 0,
   reporter: [['list'], ['html', { open: 'never' }]],
   use: {
-    baseURL: 'http://localhost:8080/',
+    baseURL: 'http://localhost:8081/',
     trace: 'on-first-retry',
   },
   // Same single-server topology as deployment (no proxy): build the client, then
@@ -22,17 +22,20 @@ export default defineConfig({
   // skips the Auth0 JWKS fetch — which hard-fails offline and would otherwise make
   // the harness depend on Auth0 reachability. CLIENT_DIR points at the built client.
   // --addr must be loopback: --dev-mode refuses to start on any other interface.
+  // Port 8081 (not the 8080 that `make run` uses) so a manually-running dev
+  // server never collides with the suite; the dev-mode scratch DB file is
+  // distinct from the local prod trivia.db and is removed before each run.
   webServer: {
     command:
-      'cd client && npm ci && npm run build && cd ../server/go/src && rm -f data/trivia-dev.db && go run . --dev-mode --addr 127.0.0.1:8080',
+      'cd client && npm ci && npm run build && cd ../server/go/src && rm -f data/trivia-dev.db && go run . --dev-mode --addr 127.0.0.1:8081',
     cwd: repoRoot,
-    url: 'http://localhost:8080/',
+    url: 'http://localhost:8081/',
     timeout: 180000,
     reuseExistingServer: !process.env.CI,
     env: {
       ...process.env,
       CLIENT_DIR: clientBuildDir,
-      PORT: '8080',
+      PORT: '8081',
     },
   },
   projects: [
