@@ -12,6 +12,7 @@ const { TextArea } = Input;
 const FREEFORM = "freeform"
 const MULTIPLE_CHOICE = "multiple_choice"
 const MATCHING = "matching"
+const BUCKETING = "bucketing"
 
 interface Props {
     question: number | string
@@ -25,6 +26,8 @@ interface Props {
     choices?: string[]
     lefts?: string[]
     rights?: string[]
+    buckets?: string[]
+    items?: string[]
 }
 
 interface State {
@@ -143,6 +146,16 @@ class AnswerQuestion extends React.Component<Props, State> {
             return null
         })
     }
+    // Bucketing is many-to-one (ticket #164): several items may share a
+    // bucket, so assigning a bucket never displaces another item's choice.
+    set_bucket = (item: string, value: string) => {
+        this.setState(prevState => {
+            if (prevState.matches[item] !== value) {
+                return {matches: {...prevState.matches, [item]: value}, dirty: true}
+            }
+            return null
+        })
+    }
     set_moneyball = (checked: boolean) => { this.setState({ moneyball: checked, dirty: true }) }
 
     // fetch the player's own scored answer for this question; the Moneyball
@@ -214,6 +227,9 @@ class AnswerQuestion extends React.Component<Props, State> {
         if (type === MATCHING) {
             return (this.props.lefts || []).every(left => this.state.matches[left])
         }
+        if (type === BUCKETING) {
+            return (this.props.items || []).every(item => this.state.matches[item])
+        }
         return this.state.answer !== ""
     }
 
@@ -234,7 +250,7 @@ class AnswerQuestion extends React.Component<Props, State> {
         if (type === MULTIPLE_CHOICE) {
             return this.state.selected_choice
         }
-        if (type === MATCHING) {
+        if (type === MATCHING || type === BUCKETING) {
             return JSON.stringify(this.state.matches)
         }
         return this.state.answer
@@ -294,6 +310,18 @@ class AnswerQuestion extends React.Component<Props, State> {
                                 value={this.state.matches[left]}
                                 onChange={(value) => this.set_match(left, value)}
                                 options={(this.props.rights || []).map(right => ({value: right, label: right}))}/>
+                    </div>
+                ))}
+            </div>
+        ) : type === BUCKETING ? (
+            <div style={{display: "flex", flexDirection: "column", gap: 8}}>
+                {(this.props.items || []).map((item, index) => (
+                    <div key={index} style={{display: "flex", alignItems: "center", justifyContent: "space-between"}}>
+                        <span style={{flexGrow: 1, marginRight: 8}}>{item}</span>
+                        <Select style={{width: 180}} placeholder="Bucket"
+                                value={this.state.matches[item]}
+                                onChange={(value) => this.set_bucket(item, value)}
+                                options={(this.props.buckets || []).map(bucket => ({value: bucket, label: bucket}))}/>
                     </div>
                 ))}
             </div>

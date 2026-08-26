@@ -167,6 +167,127 @@ func TestCreateQuestionValidationMatrix(t *testing.T) {
 		t.Errorf("expected InvalidQuestionTypeError, got %T: %v", err, err)
 	}
 
+	// bucketing: fewer than two buckets rejected
+	if _, err := CreateOneQuestion(env, userId, models.Question{
+		Question: "q?", QuestionType: "bucketing",
+		Buckets: []models.QuestionBucket{{Text: "B"}},
+		Items:   []models.QuestionBucketItem{{Text: "I", Bucket: "B"}},
+	}); err == nil {
+		t.Error("expected MissingBucketsError for a single bucket")
+	} else if _, ok := err.(MissingBucketsError); !ok {
+		t.Errorf("expected MissingBucketsError, got %T: %v", err, err)
+	}
+	// bucketing: no items rejected
+	if _, err := CreateOneQuestion(env, userId, models.Question{
+		Question: "q?", QuestionType: "bucketing",
+		Buckets: []models.QuestionBucket{{Text: "B1"}, {Text: "B2"}},
+	}); err == nil {
+		t.Error("expected MissingItemsError for no items")
+	} else if _, ok := err.(MissingItemsError); !ok {
+		t.Errorf("expected MissingItemsError, got %T: %v", err, err)
+	}
+	// bucketing: duplicate bucket text rejected
+	if _, err := CreateOneQuestion(env, userId, models.Question{
+		Question: "q?", QuestionType: "bucketing",
+		Buckets: []models.QuestionBucket{{Text: "B"}, {Text: "B"}},
+		Items:   []models.QuestionBucketItem{{Text: "I", Bucket: "B"}},
+	}); err == nil {
+		t.Error("expected DuplicateBucketTextError for duplicate bucket")
+	} else if _, ok := err.(DuplicateBucketTextError); !ok {
+		t.Errorf("expected DuplicateBucketTextError, got %T: %v", err, err)
+	}
+	// bucketing: duplicate item text rejected
+	if _, err := CreateOneQuestion(env, userId, models.Question{
+		Question: "q?", QuestionType: "bucketing",
+		Buckets: []models.QuestionBucket{{Text: "B1"}, {Text: "B2"}},
+		Items:   []models.QuestionBucketItem{{Text: "I", Bucket: "B1"}, {Text: "I", Bucket: "B2"}},
+	}); err == nil {
+		t.Error("expected DuplicateItemTextError for duplicate item")
+	} else if _, ok := err.(DuplicateItemTextError); !ok {
+		t.Errorf("expected DuplicateItemTextError, got %T: %v", err, err)
+	}
+	// bucketing: item assigned to an undeclared bucket rejected
+	if _, err := CreateOneQuestion(env, userId, models.Question{
+		Question: "q?", QuestionType: "bucketing",
+		Buckets: []models.QuestionBucket{{Text: "B1"}, {Text: "B2"}},
+		Items:   []models.QuestionBucketItem{{Text: "I", Bucket: "Nope"}},
+	}); err == nil {
+		t.Error("expected UnknownBucketError for undeclared bucket")
+	} else if _, ok := err.(UnknownBucketError); !ok {
+		t.Errorf("expected UnknownBucketError, got %T: %v", err, err)
+	}
+	// bucketing: choices rejected (mutually exclusive payloads)
+	if _, err := CreateOneQuestion(env, userId, models.Question{
+		Question: "q?", QuestionType: "bucketing",
+		Buckets: []models.QuestionBucket{{Text: "B1"}, {Text: "B2"}},
+		Items:   []models.QuestionBucketItem{{Text: "I", Bucket: "B1"}},
+		Choices: []models.QuestionChoice{{Text: "A", IsCorrect: true}},
+	}); err == nil {
+		t.Error("expected BucketingWithChoicesError")
+	} else if _, ok := err.(BucketingWithChoicesError); !ok {
+		t.Errorf("expected BucketingWithChoicesError, got %T: %v", err, err)
+	}
+	// bucketing: pairs rejected (mutually exclusive payloads)
+	if _, err := CreateOneQuestion(env, userId, models.Question{
+		Question: "q?", QuestionType: "bucketing",
+		Buckets: []models.QuestionBucket{{Text: "B1"}, {Text: "B2"}},
+		Items:   []models.QuestionBucketItem{{Text: "I", Bucket: "B1"}},
+		Pairs:   []models.QuestionPair{{Left: "L", Right: "R"}},
+	}); err == nil {
+		t.Error("expected BucketingWithPairsError")
+	} else if _, ok := err.(BucketingWithPairsError); !ok {
+		t.Errorf("expected BucketingWithPairsError, got %T: %v", err, err)
+	}
+	// bucketing: valid (many items may share a bucket)
+	if _, err := CreateOneQuestion(env, userId, models.Question{
+		Question: "q?", QuestionType: "bucketing",
+		Buckets: []models.QuestionBucket{{Text: "B1"}, {Text: "B2"}},
+		Items: []models.QuestionBucketItem{
+			{Text: "I1", Bucket: "B1"}, {Text: "I2", Bucket: "B1"}, {Text: "I3", Bucket: "B2"},
+		},
+	}); err != nil {
+		t.Fatalf("bucketing create: %v", err)
+	}
+
+	// matching: buckets rejected (mutually exclusive payloads)
+	if _, err := CreateOneQuestion(env, userId, models.Question{
+		Question: "q?", QuestionType: "matching",
+		Pairs:   []models.QuestionPair{{Left: "L", Right: "R"}},
+		Buckets: []models.QuestionBucket{{Text: "B1"}, {Text: "B2"}},
+	}); err == nil {
+		t.Error("expected MatchingWithBucketsError")
+	} else if _, ok := err.(MatchingWithBucketsError); !ok {
+		t.Errorf("expected MatchingWithBucketsError, got %T: %v", err, err)
+	}
+	// multiple_choice: buckets rejected (mutually exclusive payloads)
+	if _, err := CreateOneQuestion(env, userId, models.Question{
+		Question: "q?", QuestionType: "multiple_choice",
+		Choices: []models.QuestionChoice{{Text: "A", IsCorrect: true}, {Text: "B"}},
+		Items:   []models.QuestionBucketItem{{Text: "I", Bucket: "B1"}},
+	}); err == nil {
+		t.Error("expected MultipleChoiceWithBucketsError")
+	} else if _, ok := err.(MultipleChoiceWithBucketsError); !ok {
+		t.Errorf("expected MultipleChoiceWithBucketsError, got %T: %v", err, err)
+	}
+	// freeform: buckets rejected
+	if _, err := CreateOneQuestion(env, userId, models.Question{
+		Question: "q?", Answer: "a", QuestionType: "freeform",
+		Buckets: []models.QuestionBucket{{Text: "B1"}, {Text: "B2"}},
+	}); err == nil {
+		t.Error("expected FreeformChildRowsError for freeform with buckets")
+	} else if _, ok := err.(FreeformChildRowsError); !ok {
+		t.Errorf("expected FreeformChildRowsError, got %T: %v", err, err)
+	}
+	// freeform: items rejected
+	if _, err := CreateOneQuestion(env, userId, models.Question{
+		Question: "q?", Answer: "a", QuestionType: "freeform",
+		Items: []models.QuestionBucketItem{{Text: "I", Bucket: "B1"}},
+	}); err == nil {
+		t.Error("expected FreeformChildRowsError for freeform with items")
+	} else if _, ok := err.(FreeformChildRowsError); !ok {
+		t.Errorf("expected FreeformChildRowsError, got %T: %v", err, err)
+	}
+
 	// empty question_type on input defaults to freeform (old clients keep working)
 	q, err := CreateOneQuestion(env, userId, models.Question{Question: "q?", Answer: "a"})
 	if err != nil {
@@ -227,6 +348,36 @@ func TestCreateQuestionDerivedAnswer(t *testing.T) {
 	}
 	if len(got.Choices) != 0 {
 		t.Errorf("matching should have no choices, got %+v", got.Choices)
+	}
+
+	bk, err := CreateOneQuestion(env, userId, models.Question{
+		Question: "q?", QuestionType: "bucketing",
+		Buckets: []models.QuestionBucket{{Text: "Amphibian"}, {Text: "Mammal"}},
+		Items: []models.QuestionBucketItem{
+			{Text: "frog", Bucket: "Amphibian"},
+			{Text: "lion", Bucket: "Mammal"},
+			{Text: "human", Bucket: "Mammal"},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err = GetOneQuestion(env, userId, bk.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want = "frog -> Amphibian\nlion -> Mammal\nhuman -> Mammal"
+	if got.Answer != want {
+		t.Errorf("bucketing derived answer = %q, want %q", got.Answer, want)
+	}
+	if len(got.Buckets) != 2 || got.Buckets[0].Text != "Amphibian" {
+		t.Errorf("bucketing buckets not loaded: %+v", got.Buckets)
+	}
+	if len(got.Items) != 3 || got.Items[2].Bucket != "Mammal" {
+		t.Errorf("bucketing items not loaded: %+v", got.Items)
+	}
+	if len(got.Choices) != 0 || len(got.Pairs) != 0 {
+		t.Errorf("bucketing should have no choices/pairs, got %+v %+v", got.Choices, got.Pairs)
 	}
 }
 
@@ -289,9 +440,42 @@ func TestUpdateQuestionTypeChangeReplacesChildren(t *testing.T) {
 	if n := countChildren(t, env.Db, "question_match", q.ID); n != 0 {
 		t.Errorf("after freeform update, matches = %d, want 0", n)
 	}
+	if n := countChildren(t, env.Db, "question_bucket", q.ID); n != 0 {
+		t.Errorf("after freeform update, buckets = %d, want 0", n)
+	}
+	if n := countChildren(t, env.Db, "question_bucket_item", q.ID); n != 0 {
+		t.Errorf("after freeform update, items = %d, want 0", n)
+	}
 	got, _ = GetOneQuestion(env, userId, q.ID)
 	if got.QuestionType != "freeform" || got.Answer != "new answer" {
 		t.Errorf("freeform update readback: type=%s answer=%q", got.QuestionType, got.Answer)
+	}
+
+	// freeform -> bucketing: buckets/items written, choices/pairs cleared
+	if _, err := UpdateOneQuestion(env, userId, q.ID, models.Question{
+		QuestionType: "bucketing",
+		Buckets:      []models.QuestionBucket{{Text: "B1"}, {Text: "B2"}},
+		Items: []models.QuestionBucketItem{
+			{Text: "I1", Bucket: "B1"}, {Text: "I2", Bucket: "B2"},
+		},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if n := countChildren(t, env.Db, "question_bucket", q.ID); n != 2 {
+		t.Errorf("after bucketing update, buckets = %d, want 2", n)
+	}
+	if n := countChildren(t, env.Db, "question_bucket_item", q.ID); n != 2 {
+		t.Errorf("after bucketing update, items = %d, want 2", n)
+	}
+	if n := countChildren(t, env.Db, "question_choice", q.ID); n != 0 {
+		t.Errorf("after bucketing update, choices = %d, want 0", n)
+	}
+	if n := countChildren(t, env.Db, "question_match", q.ID); n != 0 {
+		t.Errorf("after bucketing update, matches = %d, want 0", n)
+	}
+	got, _ = GetOneQuestion(env, userId, q.ID)
+	if got.QuestionType != "bucketing" || got.Answer != "I1 -> B1\nI2 -> B2" {
+		t.Errorf("bucketing update readback: type=%s answer=%q", got.QuestionType, got.Answer)
 	}
 }
 

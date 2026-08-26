@@ -5,7 +5,7 @@ import {Button} from 'antd';
 import EditQuestionModal from "./EditQuestionModal";
 import {useCreateQuestionMutation, useDeleteQuestionMutation, useUpdateQuestionMutation} from "../api/main";
 import notify, {errorMessage} from "../common/notify";
-import type {Question, QuestionChoice, QuestionPair} from "../types/models";
+import type {Question, QuestionBucket, QuestionBucketItem, QuestionChoice, QuestionPair} from "../types/models";
 
 export const CATEGORY = "category"
 export const QUESTION = "question"
@@ -29,6 +29,8 @@ export default function EditQuestionController(props: Props) {
     const [question_type, setQuestionType] = useState("freeform")
     const [choices, setChoices] = useState<QuestionChoice[]>([])
     const [pairs, setPairs] = useState<QuestionPair[]>([])
+    const [buckets, setBuckets] = useState<QuestionBucket[]>([])
+    const [items, setItems] = useState<QuestionBucketItem[]>([])
 
     useEffect(() => {
         console.log("useEffect: ", props.selected)
@@ -38,6 +40,8 @@ export default function EditQuestionController(props: Props) {
         setQuestionType(props.selected?.question_type || "freeform")
         setChoices(props.selected?.choices || [])
         setPairs(props.selected?.pairs || [])
+        setBuckets(props.selected?.buckets || [])
+        setItems(props.selected?.items || [])
 
         if (props.scoringNoteWasCleared === false) {
             setScoringNote(props.selected?.scoring_note || "")
@@ -71,7 +75,9 @@ export default function EditQuestionController(props: Props) {
             scoring_note: scoringNote,
             question_type: question_type,
             choices: choices,
-            pairs: pairs
+            pairs: pairs,
+            buckets: buckets,
+            items: items
         }
 
         const response = !!id
@@ -117,6 +123,8 @@ export default function EditQuestionController(props: Props) {
                            question_type={question_type} set_question_type={setQuestionType}
                            choices={choices} set_choices={setChoices}
                            pairs={pairs} set_pairs={setPairs}
+                           buckets={buckets} set_buckets={setBuckets}
+                           items={items} set_items={setItems}
                            visible={props.visible}/>
     );
 }

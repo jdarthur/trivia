@@ -15,6 +15,8 @@ interface State {
     question_type: string
     choices: { text: string, is_correct: boolean }[]
     pairs: { left: string, right: string }[]
+    buckets: { text: string }[]
+    items: { text: string, bucket: string }[]
 }
 
 class RemovableQuestion extends React.Component<Props, State> {
@@ -27,6 +29,8 @@ class RemovableQuestion extends React.Component<Props, State> {
             question_type: "",
             choices: [],
             pairs: [],
+            buckets: [],
+            items: [],
         }
     }
 
@@ -48,6 +52,8 @@ class RemovableQuestion extends React.Component<Props, State> {
                         question_type: state.question_type || "",
                         choices: state.choices || [],
                         pairs: state.pairs || [],
+                        buckets: state.buckets || [],
+                        items: state.items || [],
                     })
             })
     }
@@ -64,7 +70,8 @@ class RemovableQuestion extends React.Component<Props, State> {
                     answer={this.state.answer} category={this.state.category}
                     selected={this.props.selected} hide_extra={true}
                     question_type={this.state.question_type}
-                    choices={this.state.choices} pairs={this.state.pairs}  />
+                    choices={this.state.choices} pairs={this.state.pairs}
+                    buckets={this.state.buckets} items={this.state.items} />
             </div>
         );
 

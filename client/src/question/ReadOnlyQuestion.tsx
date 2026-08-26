@@ -22,6 +22,8 @@ interface Props {
     question_type?: string
     choices?: { text: string, is_correct: boolean }[]
     pairs?: { left: string, right: string }[]
+    buckets?: { text: string }[]
+    items?: { text: string, bucket: string }[]
 }
 
 class ReadOnlyQuestion extends React.Component<Props> {
@@ -57,6 +59,15 @@ class ReadOnlyQuestion extends React.Component<Props> {
                             <tr key={index}>
                                 <td style={{border: "1px solid #d9d9d9", padding: "2px 6px"}}>{pair.left}</td>
                                 <td style={{border: "1px solid #d9d9d9", padding: "2px 6px"}}>{pair.right}</td>
+                            </tr>
+                        ))}
+                    </table> : null}
+                {this.props.question_type === "bucketing" && (this.props.items || []).length > 0 ?
+                    <table style={{marginTop: 8, borderCollapse: "collapse"}}>
+                        {(this.props.items || []).map((item, index) => (
+                            <tr key={index}>
+                                <td style={{border: "1px solid #d9d9d9", padding: "2px 6px"}}>{item.text}</td>
+                                <td style={{border: "1px solid #d9d9d9", padding: "2px 6px"}}>{item.bucket}</td>
                             </tr>
                         ))}
                     </table> : null}

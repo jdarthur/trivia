@@ -35,6 +35,8 @@ interface State {
     choices: string[]
     lefts: string[]
     rights: string[]
+    buckets: string[]
+    items: string[]
 }
 
 class ActiveGame extends React.Component<Props, State> {
@@ -54,7 +56,9 @@ class ActiveGame extends React.Component<Props, State> {
             question_type: "",
             choices: [],
             lefts: [],
-            rights: []
+            rights: [],
+            buckets: [],
+            items: []
         }
     }
 
@@ -124,7 +128,8 @@ class ActiveGame extends React.Component<Props, State> {
             .then((q: {
                 question: string, answer: string, category: string, id: number,
                 scored: boolean, scoring_note: string, scoring_note_id: string,
-                question_type: string, choices: string[], lefts: string[], rights: string[]
+                question_type: string, choices: string[], lefts: string[], rights: string[],
+                buckets: string[], items: string[]
             }) => {
                 console.log(q)
                 if (this.currentFetch !== this.fetchCounter) {
@@ -142,6 +147,8 @@ class ActiveGame extends React.Component<Props, State> {
                     choices: q.choices || [],
                     lefts: q.lefts || [],
                     rights: q.rights || [],
+                    buckets: q.buckets || [],
+                    items: q.items || [],
                 })
             })
             .catch((error) => {
@@ -173,6 +180,8 @@ class ActiveGame extends React.Component<Props, State> {
                                             choices={this.state.choices}
                                             lefts={this.state.lefts}
                                             rights={this.state.rights}
+                                            buckets={this.state.buckets}
+                                            items={this.state.items}
                             />
                         </div>
 
@@ -186,7 +195,9 @@ class ActiveGame extends React.Component<Props, State> {
                                                               question_type={this.state.question_type}
                                                               choices={this.state.choices}
                                                               lefts={this.state.lefts}
-                                                              rights={this.state.rights}/> : null}
+                                                              rights={this.state.rights}
+                                                              buckets={this.state.buckets}
+                                                              items={this.state.items}/> : null}
 
                         {this.props.is_mod ?
                             <NextOrPrevious questions={question_indices} rounds={this.props.rounds}

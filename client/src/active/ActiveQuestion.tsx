@@ -25,6 +25,8 @@ interface Props {
     choices?: string[]
     lefts?: string[]
     rights?: string[]
+    buckets?: string[]
+    items?: string[]
 }
 
 interface State {
@@ -73,6 +75,8 @@ class ActiveQuestion extends React.Component<Props, State> {
                              question_type={this.props.question_type}
                              choices={this.props.choices}
                              pairs={(this.props.lefts || []).map((left, index) => ({left, right: (this.props.rights || [])[index] || ""}))}
+                             buckets={(this.props.buckets || []).map(text => ({text}))}
+                             items={(this.props.items || []).map(text => ({text, bucket: ""}))}
             /> : null
 
 
@@ -143,6 +147,23 @@ class ActiveQuestion extends React.Component<Props, State> {
                                     <td style={{border: "1px solid #d9d9d9", padding: "4px 8px", verticalAlign: "top"}}>
                                         <ul style={{margin: 0, paddingLeft: 18}}>
                                             {(this.props.rights || []).map((right, index) => <li key={index}>{right}</li>)}
+                                        </ul>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table> : null}
+                    {this.props.question_type === "bucketing" && (this.props.items || []).length > 0 ?
+                        <table style={{marginTop: 10, borderCollapse: "collapse", width: "100%"}}>
+                            <tbody>
+                                <tr>
+                                    <td style={{border: "1px solid #d9d9d9", padding: "4px 8px", verticalAlign: "top"}}>
+                                        <ul style={{margin: 0, paddingLeft: 18}}>
+                                            {(this.props.items || []).map((item, index) => <li key={index}>{item}</li>)}
+                                        </ul>
+                                    </td>
+                                    <td style={{border: "1px solid #d9d9d9", padding: "4px 8px", verticalAlign: "top"}}>
+                                        <ul style={{margin: 0, paddingLeft: 18}}>
+                                            {(this.props.buckets || []).map((bucket, index) => <li key={index}>{bucket}</li>)}
                                         </ul>
                                     </td>
                                 </tr>

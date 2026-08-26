@@ -1,13 +1,13 @@
 import React, {useState} from 'react';
 import './Question.css';
 
-import {Input, Modal, Radio, Button} from 'antd';
+import {Input, Modal, Radio, Button, Select} from 'antd';
 import {MinusCircleOutlined} from '@ant-design/icons';
 import FormattedQuestion from "./FormattedQuestion"
 import EditorToolbar from "./EditorToolbar";
 import {ANSWER, CATEGORY, QUESTION} from "./EditQuestionController";
 import ScoringNote from "./ScoringNote";
-import type {QuestionChoice, QuestionPair} from "../types/models";
+import type {QuestionBucket, QuestionBucketItem, QuestionChoice, QuestionPair} from "../types/models";
 
 const {TextArea} = Input;
 
@@ -17,6 +17,7 @@ const PREVIEW = "Preview"
 const FREEFORM = "freeform"
 const MULTIPLE_CHOICE = "multiple_choice"
 const MATCHING = "matching"
+const BUCKETING = "bucketing"
 
 interface Props {
     title: string
@@ -42,6 +43,10 @@ interface Props {
     set_choices?: (choices: QuestionChoice[]) => void
     pairs?: QuestionPair[]
     set_pairs?: (pairs: QuestionPair[]) => void
+    buckets?: QuestionBucket[]
+    set_buckets?: (buckets: QuestionBucket[]) => void
+    items?: QuestionBucketItem[]
+    set_items?: (items: QuestionBucketItem[]) => void
     disabled?: boolean
 }
 
@@ -140,6 +145,37 @@ export default function EditQuestionModal(props: Props) {
         props.set_pairs?.((props.pairs || []).filter((_, i) => i !== index))
     }
 
+    const set_bucket_text = (index: number, value: string) => {
+        const next = (props.buckets || []).map((bucket, i) => i === index ? {...bucket, text: value} : bucket)
+        props.set_buckets?.(next)
+    }
+
+    const add_bucket = () => {
+        props.set_buckets?.([...(props.buckets || []), {text: ""}])
+    }
+
+    const remove_bucket = (index: number) => {
+        props.set_buckets?.((props.buckets || []).filter((_, i) => i !== index))
+    }
+
+    const set_item_text = (index: number, value: string) => {
+        const next = (props.items || []).map((item, i) => i === index ? {...item, text: value} : item)
+        props.set_items?.(next)
+    }
+
+    const set_item_bucket = (index: number, value: string) => {
+        const next = (props.items || []).map((item, i) => i === index ? {...item, bucket: value} : item)
+        props.set_items?.(next)
+    }
+
+    const add_item = () => {
+        props.set_items?.([...(props.items || []), {text: "", bucket: ""}])
+    }
+
+    const remove_item = (index: number) => {
+        props.set_items?.((props.items || []).filter((_, i) => i !== index))
+    }
+
     const questionType = props.question_type || FREEFORM
     const correctIndex = (props.choices || []).findIndex(choice => choice.is_correct)
 
@@ -205,8 +241,48 @@ export default function EditQuestionModal(props: Props) {
         </div>
     </div>
 
+    // bucketing (ticket #164): define the bucket list, then each item with the
+    // bucket it correctly belongs to.
+    const bucketsView = <div>
+        <TextArea autoFocus={!!props.category} placeholder="Question" value={props.question}
+                  style={{marginBottom: 10}} id={QUESTION} onClick={() => setFocusedInput(QUESTION)}
+                  onChange={(event) => props.set_question(event.target.value)} autoSize={{minRows: 4}}
+                  onPressEnter={null as any}/>
+
+        {structuredNote}
+        <div style={{marginBottom: 10}}>
+            <div style={{fontWeight: 600, marginBottom: 4}}>Buckets</div>
+            {(props.buckets || []).map((bucket, index) => (
+                <div key={index} style={{display: "flex", alignItems: "center", marginBottom: 6}}>
+                    <Input placeholder="Bucket" value={bucket.text} style={{flexGrow: 1}} disabled={props.disabled}
+                           onChange={(event) => set_bucket_text(index, event.target.value)}/>
+                    <MinusCircleOutlined onClick={() => remove_bucket(index)} disabled={props.disabled}
+                                         style={{marginLeft: 8, cursor: "pointer"}}/>
+                </div>
+            ))}
+            <Button size="small" type="dashed" onClick={add_bucket} disabled={props.disabled}> Add bucket </Button>
+        </div>
+        <div style={{marginBottom: 10}}>
+            <div style={{fontWeight: 600, marginBottom: 4}}>Items</div>
+            {(props.items || []).map((item, index) => (
+                <div key={index} style={{display: "flex", alignItems: "center", marginBottom: 6}}>
+                    <Input placeholder="Item" value={item.text} style={{flexGrow: 1, marginRight: 6}} disabled={props.disabled}
+                           onChange={(event) => set_item_text(index, event.target.value)}/>
+                    <Select placeholder="Bucket" style={{width: 160}} value={item.bucket || undefined}
+                            disabled={props.disabled}
+                            onChange={(value) => set_item_bucket(index, value)}
+                            options={(props.buckets || []).map(bucket => ({value: bucket.text, label: bucket.text}))}/>
+                    <MinusCircleOutlined onClick={() => remove_item(index)} disabled={props.disabled}
+                                         style={{marginLeft: 8, cursor: "pointer"}}/>
+                </div>
+            ))}
+            <Button size="small" type="dashed" onClick={add_item} disabled={props.disabled}> Add item </Button>
+        </div>
+    </div>
+
     const editView = questionType === MULTIPLE_CHOICE ? choicesView :
-        questionType === MATCHING ? pairsView : freeformView
+        questionType === MATCHING ? pairsView :
+        questionType === BUCKETING ? bucketsView : freeformView
 
     const previewBody = () => {
         if (questionType === MULTIPLE_CHOICE) {
@@ -225,6 +301,19 @@ export default function EditQuestionModal(props: Props) {
                         <tr key={index}>
                             <td style={{border: "1px solid #d9d9d9", padding: "4px 8px"}}>{pair.left}</td>
                             <td style={{border: "1px solid #d9d9d9", padding: "4px 8px"}}>{pair.right}</td>
+                        </tr>
+                    ))}
+                </table>
+            </div>
+        }
+        if (questionType === BUCKETING) {
+            return <div>
+                <FormattedQuestion question={props.question} answer={""} max_width={425}/>
+                <table style={{marginTop: 10, borderCollapse: "collapse"}}>
+                    {(props.items || []).map((item, index) => (
+                        <tr key={index}>
+                            <td style={{border: "1px solid #d9d9d9", padding: "4px 8px"}}>{item.text}</td>
+                            <td style={{border: "1px solid #d9d9d9", padding: "4px 8px"}}>{item.bucket}</td>
                         </tr>
                     ))}
                 </table>
@@ -265,6 +354,7 @@ export default function EditQuestionModal(props: Props) {
                     <Radio.Button value={FREEFORM}> Freeform </Radio.Button>
                     <Radio.Button value={MULTIPLE_CHOICE}> Multiple choice </Radio.Button>
                     <Radio.Button value={MATCHING}> Matching </Radio.Button>
+                    <Radio.Button value={BUCKETING}> Bucketing </Radio.Button>
                 </Radio.Group>
 
                 <span style={{display: "flex", justifyContent: "space-between", alignItems: "center"}}>

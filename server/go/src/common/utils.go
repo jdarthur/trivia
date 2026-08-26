@@ -280,12 +280,13 @@ func getQuestion(db *sql.DB, id string, m *models.Question) error {
 }
 
 // loadQuestionChildren fills a question's structured child rows (choices for
-// multiple_choice, pairs for matching) from the normalized child tables,
-// ordered by position. For structured types it also derives the answer string
-// from the child rows — MC = the correct option's text; matching = a rendered
-// "left -> right" string, one mapping per line — so every existing consumer
-// (FormattedQuestion, scorer display, score-time snapshot refresh) keeps
-// working.
+// multiple_choice, pairs for matching, buckets + items for bucketing) from the
+// normalized child tables, ordered by position. For structured types it also
+// derives the answer string from the child rows — MC = the correct option's
+// text; matching = a rendered "left -> right" string, one mapping per line;
+// bucketing = a rendered "item -> bucket" string, one mapping per line — so
+// every existing consumer (FormattedQuestion, scorer display, score-time
+// snapshot refresh) keeps working.
 func loadQuestionChildren(db *sql.DB, m *models.Question) error {
 	m.Choices = make([]models.QuestionChoice, 0)
 	rows, err := db.Query(`SELECT text, is_correct FROM question_choice
@@ -324,6 +325,42 @@ func loadQuestionChildren(db *sql.DB, m *models.Question) error {
 		return err
 	}
 
+	m.Buckets = make([]models.QuestionBucket, 0)
+	rows, err = db.Query(`SELECT text FROM question_bucket
+		WHERE question_id = ? ORDER BY position`, m.ID)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var text string
+		if err := rows.Scan(&text); err != nil {
+			return err
+		}
+		m.Buckets = append(m.Buckets, models.QuestionBucket{Text: text})
+	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
+
+	m.Items = make([]models.QuestionBucketItem, 0)
+	rows, err = db.Query(`SELECT text, bucket_text FROM question_bucket_item
+		WHERE question_id = ? ORDER BY position`, m.ID)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var text, bucket string
+		if err := rows.Scan(&text, &bucket); err != nil {
+			return err
+		}
+		m.Items = append(m.Items, models.QuestionBucketItem{Text: text, Bucket: bucket})
+	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
+
 	if m.QuestionType == "multiple_choice" {
 		for _, c := range m.Choices {
 			if c.IsCorrect {
@@ -338,6 +375,15 @@ func loadQuestionChildren(db *sql.DB, m *models.Question) error {
 				sb.WriteString("\n")
 			}
 			fmt.Fprintf(&sb, "%s -> %s", p.Left, p.Right)
+		}
+		m.Answer = sb.String()
+	} else if m.QuestionType == "bucketing" {
+		var sb strings.Builder
+		for i, item := range m.Items {
+			if i > 0 {
+				sb.WriteString("\n")
+			}
+			fmt.Fprintf(&sb, "%s -> %s", item.Text, item.Bucket)
 		}
 		m.Answer = sb.String()
 	}
@@ -573,8 +619,9 @@ func loadSessionRounds(db *sql.DB, m *models.Session) error {
 	return loadSessionQuestionChildren(db, m)
 }
 
-// loadSessionQuestionChildren fills the structured payload (choices / pairs)
-// of each overlaid session question snapshot from the snapshot child tables.
+// loadSessionQuestionChildren fills the structured payload (choices / pairs /
+// buckets / items) of each overlaid session question snapshot from the
+// snapshot child tables.
 func loadSessionQuestionChildren(db *sql.DB, m *models.Session) error {
 	rows, err := db.Query(`SELECT round_index, question_index, position, text, is_correct
 		FROM session_question_choice WHERE session_id = ? ORDER BY round_index, question_index, position`, m.ID)
@@ -624,6 +671,56 @@ func loadSessionQuestionChildren(db *sql.DB, m *models.Session) error {
 		}
 		q.Lefts = append(q.Lefts, left)
 		q.Rights = append(q.Rights, right)
+	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
+
+	rows, err = db.Query(`SELECT round_index, question_index, position, text
+		FROM session_question_bucket WHERE session_id = ? ORDER BY round_index, question_index, position`, m.ID)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var roundIndex, questionIndex, position int
+		var text string
+		if err := rows.Scan(&roundIndex, &questionIndex, &position, &text); err != nil {
+			return err
+		}
+		if roundIndex >= len(m.Rounds) || questionIndex >= len(m.Rounds[roundIndex].Questions) {
+			continue
+		}
+		q := &m.Rounds[roundIndex].Questions[questionIndex]
+		if q.Buckets == nil {
+			q.Buckets = make([]string, 0)
+		}
+		q.Buckets = append(q.Buckets, text)
+	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
+
+	rows, err = db.Query(`SELECT round_index, question_index, position, text
+		FROM session_question_bucket_item WHERE session_id = ? ORDER BY round_index, question_index, position`, m.ID)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var roundIndex, questionIndex, position int
+		var text string
+		if err := rows.Scan(&roundIndex, &questionIndex, &position, &text); err != nil {
+			return err
+		}
+		if roundIndex >= len(m.Rounds) || questionIndex >= len(m.Rounds[roundIndex].Questions) {
+			continue
+		}
+		q := &m.Rounds[roundIndex].Questions[questionIndex]
+		if q.Items == nil {
+			q.Items = make([]string, 0)
+		}
+		q.Items = append(q.Items, text)
 	}
 	return rows.Err()
 }

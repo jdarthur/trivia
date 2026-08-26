@@ -133,8 +133,9 @@ func upsertSessionQuestion(e *Env, sessionId string, roundIndex int, questionInd
 }
 
 // replaceSnapshotChildren copies the canonical question_choice / question_match
-// rows for a question into the session snapshot child tables, replacing any
-// prior snapshot rows for that (session, round, question) wholesale.
+// / question_bucket / question_bucket_item rows for a question into the
+// session snapshot child tables, replacing any prior snapshot rows for that
+// (session, round, question) wholesale.
 func replaceSnapshotChildren(e *Env, sessionId string, roundIndex int, questionIndex int, questionId string) error {
 	if _, err := e.Db.Exec(`DELETE FROM session_question_choice
 		WHERE session_id = ? AND round_index = ? AND question_index = ?`,
@@ -155,6 +156,28 @@ func replaceSnapshotChildren(e *Env, sessionId string, roundIndex int, questionI
 	if _, err := e.Db.Exec(`INSERT INTO session_question_match
 		(session_id, round_index, question_index, position, left_text, right_text)
 		SELECT ?, ?, ?, position, left_text, right_text FROM question_match WHERE question_id = ?`,
+		sessionId, roundIndex, questionIndex, questionId); err != nil {
+		return err
+	}
+	if _, err := e.Db.Exec(`DELETE FROM session_question_bucket
+		WHERE session_id = ? AND round_index = ? AND question_index = ?`,
+		sessionId, roundIndex, questionIndex); err != nil {
+		return err
+	}
+	if _, err := e.Db.Exec(`INSERT INTO session_question_bucket
+		(session_id, round_index, question_index, position, text)
+		SELECT ?, ?, ?, position, text FROM question_bucket WHERE question_id = ?`,
+		sessionId, roundIndex, questionIndex, questionId); err != nil {
+		return err
+	}
+	if _, err := e.Db.Exec(`DELETE FROM session_question_bucket_item
+		WHERE session_id = ? AND round_index = ? AND question_index = ?`,
+		sessionId, roundIndex, questionIndex); err != nil {
+		return err
+	}
+	if _, err := e.Db.Exec(`INSERT INTO session_question_bucket_item
+		(session_id, round_index, question_index, position, text, bucket_text)
+		SELECT ?, ?, ?, position, text, bucket_text FROM question_bucket_item WHERE question_id = ?`,
 		sessionId, roundIndex, questionIndex, questionId); err != nil {
 		return err
 	}
@@ -254,7 +277,18 @@ func getCurrentQuestion(e *Env, c *gin.Context) (models.QuestionInRound, error) 
 				// again, revealing the correct pairing like multiple-choice
 				// does. The snapshot pairs are never reordered; scoring still
 				// compares each left to its canonical right.
-				question.Rights = shuffledMatchRights(question.Rights, session.ID, currentRound, currentQuestion)
+				question.Rights = shuffledStrings(question.Rights, session.ID, currentRound, currentQuestion)
+			}
+			if question.QuestionType == "bucketing" {
+				// Ticket #164: same defense-in-depth as matching — shuffle
+				// the bucket column pre-score so a parallel items/buckets
+				// display can't hint at the author's canonical bucket order.
+				// Deterministic per (session, round, question); canonical
+				// order (and the correct item -> bucket mapping) is served
+				// once scored. The snapshot items/buckets are never
+				// reordered; scoring still compares each item to its
+				// canonical bucket.
+				question.Buckets = shuffledStrings(question.Buckets, session.ID, currentRound, currentQuestion)
 			}
 		}
 
@@ -264,15 +298,15 @@ func getCurrentQuestion(e *Env, c *gin.Context) (models.QuestionInRound, error) 
 	return models.QuestionInRound{}, err
 }
 
-// shuffledMatchRights returns a deterministic shuffle of a matching question's
-// rights column, seeded from the session + (round, question) identity via
-// FNV-128a. The caller's slice is not mutated.
-func shuffledMatchRights(rights []string, sessionId string, roundIndex int, questionIndex int) []string {
-	if len(rights) < 2 {
-		return rights
+// shuffledStrings returns a deterministic shuffle of a string column (the
+// matching rights, or the bucketing buckets), seeded from the session +
+// (round, question) identity via FNV-128a. The caller's slice is not mutated.
+func shuffledStrings(values []string, sessionId string, roundIndex int, questionIndex int) []string {
+	if len(values) < 2 {
+		return values
 	}
-	out := make([]string, len(rights))
-	copy(out, rights)
+	out := make([]string, len(values))
+	copy(out, values)
 
 	h := fnv.New128a()
 	h.Write([]byte(sessionId))
@@ -288,6 +322,12 @@ func shuffledMatchRights(rights []string, sessionId string, roundIndex int, ques
 	))
 	rng.Shuffle(len(out), func(i, j int) { out[i], out[j] = out[j], out[i] })
 	return out
+}
+
+// shuffledMatchRights is the ticket #161 shuffle of a matching question's
+// rights column; see shuffledStrings.
+func shuffledMatchRights(rights []string, sessionId string, roundIndex int, questionIndex int) []string {
+	return shuffledStrings(rights, sessionId, roundIndex, questionIndex)
 }
 
 type CurrentRoundResponse struct {
@@ -409,6 +449,7 @@ func scoreQuestionTx(e *Env, session models.Session, requestBody models.ScoreReq
 		// flags are ignored; ScoreOverride is still honored).
 		correctChoiceText := ""
 		var matchLefts, matchRights []string
+		var bucketItems, bucketBuckets []string
 		if questionType == "multiple_choice" {
 			err := q.QueryRowContext(ctx, `SELECT text FROM session_question_choice
 				WHERE session_id = ? AND round_index = ? AND question_index = ? AND is_correct = 1`,
@@ -431,6 +472,27 @@ func scoreQuestionTx(e *Env, session models.Session, requestBody models.ScoreReq
 				}
 				matchLefts = append(matchLefts, left)
 				matchRights = append(matchRights, right)
+			}
+			if err := rows.Err(); err != nil {
+				rows.Close()
+				return err
+			}
+			rows.Close()
+		} else if questionType == "bucketing" {
+			rows, err := q.QueryContext(ctx, `SELECT text, bucket_text FROM session_question_bucket_item
+				WHERE session_id = ? AND round_index = ? AND question_index = ? ORDER BY position`,
+				session.ID, roundIndex, questionIndex)
+			if err != nil {
+				return err
+			}
+			for rows.Next() {
+				var item, bucket string
+				if err := rows.Scan(&item, &bucket); err != nil {
+					rows.Close()
+					return err
+				}
+				bucketItems = append(bucketItems, item)
+				bucketBuckets = append(bucketBuckets, bucket)
 			}
 			if err := rows.Err(); err != nil {
 				rows.Close()
@@ -477,7 +539,7 @@ func scoreQuestionTx(e *Env, session models.Session, requestBody models.ScoreReq
 			// auto-scored against the snapshot answer key.
 			score.isCorrect = correctOrNot.Correct
 			if questionType != "freeform" {
-				score.isCorrect = autoScoredCorrect(questionType, latestAnswer, correctChoiceText, matchLefts, matchRights)
+				score.isCorrect = autoScoredCorrect(questionType, latestAnswer, correctChoiceText, matchLefts, matchRights, bucketItems, bucketBuckets)
 			}
 
 			scores = append(scores, score)
@@ -574,8 +636,10 @@ func scoreQuestionTx(e *Env, session models.Session, requestBody models.ScoreReq
 // answer text equals the snapshot's correct option. matching: the answer is a
 // JSON map of left text -> chosen right text; it is correct only if the map has
 // exactly one entry per snapshot pair and every left maps to its right
-// (all-or-nothing).
-func autoScoredCorrect(questionType string, latestAnswer string, correctChoiceText string, matchLefts []string, matchRights []string) bool {
+// (all-or-nothing). bucketing: the answer is a JSON map of item text -> chosen
+// bucket text; it is correct only if the map has exactly one entry per
+// snapshot item and every item maps to its bucket (all-or-nothing).
+func autoScoredCorrect(questionType string, latestAnswer string, correctChoiceText string, matchLefts []string, matchRights []string, bucketItems []string, bucketBuckets []string) bool {
 	switch questionType {
 	case "multiple_choice":
 		return strings.TrimSpace(latestAnswer) == correctChoiceText
@@ -589,6 +653,20 @@ func autoScoredCorrect(questionType string, latestAnswer string, correctChoiceTe
 		}
 		for i, left := range matchLefts {
 			if mapping[left] != matchRights[i] {
+				return false
+			}
+		}
+		return true
+	case "bucketing":
+		var mapping map[string]string
+		if err := json.Unmarshal([]byte(latestAnswer), &mapping); err != nil {
+			return false
+		}
+		if len(mapping) != len(bucketItems) {
+			return false
+		}
+		for i, item := range bucketItems {
+			if mapping[item] != bucketBuckets[i] {
 				return false
 			}
 		}

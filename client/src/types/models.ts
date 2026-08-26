@@ -23,6 +23,8 @@ export interface Question {
   question_type?: string;
   choices?: QuestionChoice[];
   pairs?: QuestionPair[];
+  buckets?: QuestionBucket[];
+  items?: QuestionBucketItem[];
 }
 
 export interface QuestionChoice {
@@ -33,6 +35,17 @@ export interface QuestionChoice {
 export interface QuestionPair {
   left: string;
   right: string;
+}
+
+/** models.QuestionBucket — one bucket in a bucketing question */
+export interface QuestionBucket {
+  text: string;
+}
+
+/** models.QuestionBucketItem — one item plus the bucket it belongs to */
+export interface QuestionBucketItem {
+  text: string;
+  bucket: string;
 }
 
 /** models.Round */
@@ -106,6 +119,8 @@ export interface QuestionInRound {
   choices?: string[];
   lefts?: string[];
   rights?: string[];
+  buckets?: string[];
+  items?: string[];
 }
 
 /** models.RoundInGame */
