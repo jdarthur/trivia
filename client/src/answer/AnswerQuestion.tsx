@@ -119,10 +119,29 @@ class AnswerQuestion extends React.Component<Props, State> {
     set_wager = (event: any) => { this.setState({ wager: event.target.value, dirty: true }) }
     set_choice = (value: string) => { this.setState({ selected_choice: value, dirty: true }) }
     set_match = (left: string, value: string) => {
-        this.setState(prevState => ({
-            matches: {...prevState.matches, [left]: value},
-            dirty: true
-        }))
+        this.setState(prevState => {
+            const matches = {...prevState.matches}
+            // Matching is one-to-one (ticket #163): a right already assigned to
+            // another left moves here, and that other left takes over this
+            // left's previous selection (if any) — so no right is ever chosen
+            // twice and no assignment is lost.
+            if (matches[left] !== value) {
+                const previous = matches[left]
+                for (const [otherLeft, right] of Object.entries(matches)) {
+                    if (otherLeft !== left && right === value) {
+                        if (previous !== undefined) {
+                            matches[otherLeft] = previous
+                        } else {
+                            delete matches[otherLeft]
+                        }
+                        break
+                    }
+                }
+                matches[left] = value
+                return {matches, dirty: true}
+            }
+            return null
+        })
     }
     set_moneyball = (checked: boolean) => { this.setState({ moneyball: checked, dirty: true }) }
 

@@ -49,3 +49,23 @@ func (e PlayerInactiveError) Field() string {
 func (e PlayerInactiveError) Data() interface{} {
 	return e.PlayerId
 }
+
+// InvalidMatchingAnswerError is returned when a matching answer violates the
+// one-to-one shape of the question (ticket #163): the answer must be a JSON
+// object with exactly one entry per left, each value must be one of the
+// question's rights, and no right may be chosen more than once. Matching is
+// one-to-one by design, so a malformed or duplicate-right answer is rejected
+// at submit time instead of being stored as a certain miss.
+type InvalidMatchingAnswerError struct {
+	Answer string
+	Reason string
+}
+func (e InvalidMatchingAnswerError) Error() string {
+	return "invalid matching answer: " + e.Reason
+}
+func (e InvalidMatchingAnswerError) Field() string {
+	return "answer"
+}
+func (e InvalidMatchingAnswerError) Data() interface{} {
+	return e.Answer
+}
