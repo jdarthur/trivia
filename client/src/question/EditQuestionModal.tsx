@@ -2,7 +2,7 @@ import React, {useEffect, useState} from 'react';
 import './Question.css';
 
 import {Input, Modal, Radio, Button, Select, Steps, Popconfirm, Tooltip} from 'antd';
-import {CheckSquareOutlined, ContainerOutlined, EditOutlined, MinusCircleOutlined, SwapOutlined} from '@ant-design/icons';
+import {ContainerOutlined, EditOutlined, MinusCircleOutlined, OrderedListOutlined, SwapOutlined} from '@ant-design/icons';
 import FormattedQuestion from "./FormattedQuestion"
 import EditorToolbar from "./EditorToolbar";
 import {ANSWER, CATEGORY, QUESTION} from "./EditQuestionController";
@@ -29,7 +29,7 @@ export const STEP_COUNT = 3
 const QUESTION_TYPES = [
     {value: FREEFORM, icon: <EditOutlined/>, label: "Freeform",
      description: "Players type their own answer, which is compared against your answer."},
-    {value: MULTIPLE_CHOICE, icon: <CheckSquareOutlined/>, label: "Multiple choice",
+    {value: MULTIPLE_CHOICE, icon: <OrderedListOutlined/>, label: "Multiple choice",
      description: "Players pick one answer from a list of options; you mark the correct one."},
     {value: MATCHING, icon: <SwapOutlined/>, label: "Matching",
      description: "Players match each item on the left with its correct partner on the right."},
@@ -411,10 +411,11 @@ export default function EditQuestionModal(props: Props) {
     const typeRadio = (
         <Radio.Group value={questionType}
                      onChange={(event) => props.steps ? requestTypeChange(event.target.value) : props.set_question_type?.(event.target.value)}
-                     style={{marginBottom: 10}} disabled={props.disabled}>
+                     style={{display: "flex", flexDirection: "column", alignItems: "flex-start", marginBottom: 10}}
+                     disabled={props.disabled}>
             {QUESTION_TYPES.map(type => (
                 <Tooltip key={type.value} title={type.description}>
-                    <Radio value={type.value} style={{marginRight: 16}}>
+                    <Radio value={type.value} style={{marginRight: 0, marginBottom: 6}}>
                         {type.icon} <span style={{marginLeft: 6}}>{type.label}</span>
                     </Radio>
                 </Tooltip>
