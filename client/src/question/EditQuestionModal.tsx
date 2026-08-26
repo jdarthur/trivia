@@ -80,9 +80,22 @@ export default function EditQuestionModal(props: Props) {
 
     // Ticket #166: changing the question type clears the question + answer (and
     // the structured sub-data), but only after the user confirms via the
-    // Popconfirm tooltip — the type is a consequential reset.
+    // Popconfirm tooltip when there is actually content to lose. With an empty
+    // question there is nothing to reset, so the type changes immediately.
+    const hasQuestionContent = () => {
+        return props.question.trim() !== "" || props.answer.trim() !== ""
+            || (props.choices || []).some(choice => choice.text.trim() !== "")
+            || (props.pairs || []).some(pair => pair.left.trim() !== "" || pair.right.trim() !== "")
+            || (props.buckets || []).some(bucket => bucket.text.trim() !== "")
+            || (props.items || []).some(item => item.text.trim() !== "")
+    }
+
     const requestTypeChange = (value: string) => {
         if (value === questionType) {
+            return
+        }
+        if (!hasQuestionContent()) {
+            props.set_question_type?.(value)
             return
         }
         setPendingType(value)

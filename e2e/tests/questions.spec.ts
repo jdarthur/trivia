@@ -155,4 +155,29 @@ editorTest.describe('question type change (ticket #166)', () => {
 
     await deleteQuestion(editorPage, cat);
   });
+
+  editorTest('no confirmation when the question has no content yet', async ({ editorPage }) => {
+    // Opening "Add question" — nothing is filled in, so switching the type
+    // should change immediately with no confirmation tooltip.
+    await editorPage.getByRole('button', { name: /New/ }).first().click();
+    const modal = editorPage.locator('.ant-modal:has(.ant-modal-title)');
+    await expect(modal).toBeVisible();
+    await expect(modal.locator('.ant-modal-title')).toHaveText('Add question');
+
+    // Step 1 (Basic info): switch the type to "Multiple choice".
+    await modal.locator('.ant-radio-button-wrapper', { hasText: 'Multiple choice' }).click();
+
+    // No confirmation tooltip appears.
+    await expect(editorPage.locator('.ant-popover:visible')).toHaveCount(0);
+
+    // Advance to step 2: the type is already multiple choice, so the choices
+    // view (not the freeform answer box) is shown.
+    await modal.getByRole('button', { name: 'Next', exact: true }).click();
+    await expect(modal.getByRole('button', { name: /Add choice/ })).toBeVisible();
+    await expect(modal.locator('#answer')).toHaveCount(0);
+
+    // Dismiss without saving (the form is empty, so the X button just closes).
+    await modal.locator('.ant-modal-close').click();
+    await expect(modal).toBeHidden();
+  });
 });
