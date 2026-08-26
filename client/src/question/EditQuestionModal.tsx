@@ -1,7 +1,7 @@
-import React, {useState} from 'react';
+import React, {useEffect, useState} from 'react';
 import './Question.css';
 
-import {Input, Modal, Radio, Button, Select} from 'antd';
+import {Input, Modal, Radio, Button, Select, Steps, Popconfirm} from 'antd';
 import {MinusCircleOutlined} from '@ant-design/icons';
 import FormattedQuestion from "./FormattedQuestion"
 import EditorToolbar from "./EditorToolbar";
@@ -18,6 +18,12 @@ const FREEFORM = "freeform"
 const MULTIPLE_CHOICE = "multiple_choice"
 const MATCHING = "matching"
 const BUCKETING = "bucketing"
+
+// Ticket #166: the three steps of the multi-step question editor.
+const STEP_BASIC = 0
+const STEP_EDITOR = 1
+const STEP_PREVIEW = 2
+export const STEP_COUNT = 3
 
 interface Props {
     title: string
@@ -48,12 +54,58 @@ interface Props {
     items?: QuestionBucketItem[]
     set_items?: (items: QuestionBucketItem[]) => void
     disabled?: boolean
+    // Ticket #166: opt into the three-step <Steps /> flow. When false/omitted
+    // (e.g. the live in-game hot-edit), the legacy single-view modal renders.
+    steps?: boolean
+    step?: number
 }
 
 export default function EditQuestionModal(props: Props) {
 
     const [selectedTab, setSelectedTab] = useState(EDIT)
     const [focusedInput, setFocusedInput] = useState(CATEGORY)
+    const [confirmTypeChange, setConfirmTypeChange] = useState(false)
+    const [pendingType, setPendingType] = useState<string | null>(null)
+
+    // Ticket #166: reset to the first step whenever the modal is (re)opened so
+    // the editor always starts at "Basic info".
+    useEffect(() => {
+        if (props.visible) {
+            setConfirmTypeChange(false)
+            setPendingType(null)
+        }
+    }, [props.visible])
+
+    const questionType = props.question_type || FREEFORM
+
+    // Ticket #166: changing the question type clears the question + answer (and
+    // the structured sub-data), but only after the user confirms via the
+    // Popconfirm tooltip — the type is a consequential reset.
+    const requestTypeChange = (value: string) => {
+        if (value === questionType) {
+            return
+        }
+        setPendingType(value)
+        setConfirmTypeChange(true)
+    }
+
+    const clearQuestionAndAnswer = () => {
+        props.set_question("")
+        props.set_answer("")
+        props.set_choices?.([])
+        props.set_pairs?.([])
+        props.set_buckets?.([])
+        props.set_items?.([])
+    }
+
+    const applyTypeChange = () => {
+        if (pendingType) {
+            clearQuestionAndAnswer()
+            props.set_question_type?.(pendingType)
+        }
+        setPendingType(null)
+        setConfirmTypeChange(false)
+    }
 
     const wrap = (wrapWith: string) => {
         const activeElement = document.getElementById(focusedInput) as HTMLInputElement | null
@@ -176,7 +228,6 @@ export default function EditQuestionModal(props: Props) {
         props.set_items?.((props.items || []).filter((_, i) => i !== index))
     }
 
-    const questionType = props.question_type || FREEFORM
     const correctIndex = (props.choices || []).findIndex(choice => choice.is_correct)
 
     const freeformView = <div>
@@ -327,6 +378,94 @@ export default function EditQuestionModal(props: Props) {
             {previewBody()}
         </div>
 
+    // Ticket #166: the three-step flow. Step 1 = basic info, step 2 = question
+    // editor (question box, editor tools, answer box), step 3 = preview. The
+    // Submit button only appears on the last step (see EditQuestionController's
+    // footer).
+    const step = props.step ?? STEP_BASIC
+    const typeRadio = (
+        <Radio.Group buttonStyle="solid" size="small"
+                     value={questionType}
+                     onChange={(event) => props.steps ? requestTypeChange(event.target.value) : props.set_question_type?.(event.target.value)}
+                     style={{marginBottom: 10}} disabled={props.disabled}>
+            <Radio.Button value={FREEFORM}> Freeform </Radio.Button>
+            <Radio.Button value={MULTIPLE_CHOICE}> Multiple choice </Radio.Button>
+            <Radio.Button value={MATCHING}> Matching </Radio.Button>
+            <Radio.Button value={BUCKETING}> Bucketing </Radio.Button>
+        </Radio.Group>
+    )
+
+    const basicStep = <div>
+        <span style={{display: "flex", marginBottom: 10}}>
+            <Input autoFocus={step === STEP_BASIC && !props.category} placeholder="Category" value={props.category}
+                   onClick={(event) => setFocusedInput(event as unknown as string)} id={CATEGORY}
+                   onChange={(event) => props.set_category(event.target.value)} onPressEnter={null as any}/>
+            <ScoringNote scoring_note={props.scoring_note}
+                         set_scoring_note={props.set_scoring_note}
+                         set_scoring_note_was_cleared={props.set_scoring_note_was_cleared}
+            />
+        </span>
+        <div style={{fontWeight: 600, marginBottom: 4}}>Question type</div>
+        {props.steps ? (
+            <Popconfirm open={confirmTypeChange}
+                        title="Changing the question type clears the question and answer. Are you sure?"
+                        okText="Change" cancelText="Cancel"
+                        onConfirm={applyTypeChange} onCancel={() => {setConfirmTypeChange(false); setPendingType(null)}}>
+                {typeRadio}
+            </Popconfirm>
+        ) : typeRadio}
+    </div>
+
+    const stepsView = (
+        <div style={{display: "flex", flexDirection: "column"}}>
+            <Steps size="small" current={step} style={{marginBottom: 20}}
+                   items={[{title: "Basic info"}, {title: "Question"}, {title: "Preview"}]}/>
+            {step === STEP_BASIC ? basicStep :
+                step === STEP_EDITOR ? (
+                    <div style={{display: "flex", flexDirection: "column"}}>
+                        <span style={{display: "flex", justifyContent: "flex-end", marginBottom: 10}}>
+                            <EditorToolbar wrap={wrap} wrap_line={wrap_line} insert={insert}/>
+                        </span>
+                        {editView}
+                    </div>
+                ) : (
+                    <div style={{border: '1px solid #d9d9d9', borderRadius: 2, padding: 10}}>
+                        {previewBody()}
+                    </div>
+                )}
+        </div>
+    )
+
+    const body = props.steps ? stepsView : (
+        <div style={{display: "flex", flexDirection: "column"}}>
+            <span style={{display: "flex", marginBottom: 10}}>
+                <Input autoFocus={!props.category} placeholder="Category" value={props.category}
+                       onClick={(event) => setFocusedInput(event as unknown as string)} id={CATEGORY}
+                       onChange={(event) => props.set_category(event.target.value)} onPressEnter={null as any}/>
+                <ScoringNote scoring_note={props.scoring_note}
+                             set_scoring_note={props.set_scoring_note}
+                             set_scoring_note_was_cleared={props.set_scoring_note_was_cleared}
+                />
+            </span>
+
+            {typeRadio}
+
+            <span style={{display: "flex", justifyContent: "space-between", alignItems: "center"}}>
+
+                        <Radio.Group buttonStyle="solid" onChange={(event) => setSelectedTab(event.target.value)}
+                                     value={selectedTab}
+                                     defaultValue={EDIT} size="small">
+                            <Radio.Button key={EDIT} value={EDIT}> {EDIT} </Radio.Button>
+                            <Radio.Button key={PREVIEW} value={PREVIEW}> {PREVIEW} </Radio.Button>
+                        </Radio.Group>
+
+                        <EditorToolbar wrap={wrap} wrap_line={wrap_line} insert={insert}/>
+                    </span>
+
+            {view}
+        </div>
+    )
+
     return (
         <Modal
             open={props.visible}
@@ -335,42 +474,7 @@ export default function EditQuestionModal(props: Props) {
             onCancel={props.cancel}
             footer={props.footer}
             width="500px">
-
-            <div style={{display: "flex", flexDirection: "column"}}>
-                <span style={{display: "flex", marginBottom: 10}}>
-    <Input autoFocus={!props.category} placeholder="Category" value={props.category}
-           onClick={(event) => setFocusedInput(event as unknown as string)} id={CATEGORY}
-           onChange={(event) => props.set_category(event.target.value)} onPressEnter={null as any}/>
-                <ScoringNote scoring_note={props.scoring_note}
-                             set_scoring_note={props.set_scoring_note}
-                             set_scoring_note_was_cleared={props.set_scoring_note_was_cleared}
-                />
-                </span>
-
-                <Radio.Group buttonStyle="solid" size="small"
-                             value={questionType}
-                             onChange={(event) => props.set_question_type?.(event.target.value)}
-                             style={{marginBottom: 10}} disabled={props.disabled}>
-                    <Radio.Button value={FREEFORM}> Freeform </Radio.Button>
-                    <Radio.Button value={MULTIPLE_CHOICE}> Multiple choice </Radio.Button>
-                    <Radio.Button value={MATCHING}> Matching </Radio.Button>
-                    <Radio.Button value={BUCKETING}> Bucketing </Radio.Button>
-                </Radio.Group>
-
-                <span style={{display: "flex", justifyContent: "space-between", alignItems: "center"}}>
-
-                            <Radio.Group buttonStyle="solid" onChange={(event) => setSelectedTab(event.target.value)}
-                                         value={selectedTab}
-                                         defaultValue={EDIT} size="small">
-                                <Radio.Button key={EDIT} value={EDIT}> {EDIT} </Radio.Button>
-                                <Radio.Button key={PREVIEW} value={PREVIEW}> {PREVIEW} </Radio.Button>
-                            </Radio.Group>
-
-                            <EditorToolbar wrap={wrap} wrap_line={wrap_line} insert={insert}/>
-                        </span>
-
-                {view}
-            </div>
+            {body}
         </Modal>
     );
 

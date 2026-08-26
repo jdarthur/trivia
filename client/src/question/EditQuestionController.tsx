@@ -2,7 +2,7 @@ import React, {useEffect, useState} from 'react';
 import './Question.css';
 
 import {Button} from 'antd';
-import EditQuestionModal from "./EditQuestionModal";
+import EditQuestionModal, {STEP_COUNT} from "./EditQuestionModal";
 import {useCreateQuestionMutation, useDeleteQuestionMutation, useUpdateQuestionMutation} from "../api/main";
 import notify, {errorMessage} from "../common/notify";
 import type {Question, QuestionBucket, QuestionBucketItem, QuestionChoice, QuestionPair} from "../types/models";
@@ -31,6 +31,8 @@ export default function EditQuestionController(props: Props) {
     const [pairs, setPairs] = useState<QuestionPair[]>([])
     const [buckets, setBuckets] = useState<QuestionBucket[]>([])
     const [items, setItems] = useState<QuestionBucketItem[]>([])
+    // Ticket #166: the current step of the multi-step question editor.
+    const [step, setStep] = useState(0)
 
     useEffect(() => {
         console.log("useEffect: ", props.selected)
@@ -42,6 +44,8 @@ export default function EditQuestionController(props: Props) {
         setPairs(props.selected?.pairs || [])
         setBuckets(props.selected?.buckets || [])
         setItems(props.selected?.items || [])
+        // Ticket #166: always re-enter the editor at the first step.
+        setStep(0)
 
         if (props.scoringNoteWasCleared === false) {
             setScoringNote(props.selected?.scoring_note || "")
@@ -105,9 +109,28 @@ export default function EditQuestionController(props: Props) {
     const save_text = !id ? "Add" : "Update"
     const cancel_action = is_empty() ? props.close : save_self
 
+    // Ticket #166: step-aware footer. The Submit button only appears on the
+    // last step of the <Steps /> flow; Back/Next navigate between steps. Delete
+    // stays available wherever the question already exists.
+    const lastStep = STEP_COUNT - 1
+    const backButton = step > 0 ?
+        <Button className="button" onClick={() => setStep(step - 1)}> Back </Button> : null
+    const nextButton = step < lastStep ?
+        <Button className="button" type="primary" onClick={() => setStep(step + 1)}> Next </Button> : null
+    const submitButton = step === lastStep ?
+        <Button className="button" type="primary" onClick={save_self}> {save_text} </Button> : null
+    const deleteButton = id ?
+        <Button danger className="button" onClick={delete_self}> Delete</Button> : null
+
     const footer = <div className="save-delete">
-        <Button danger className="button" onClick={delete_self}> Delete</Button>
-        <Button className="button" type="primary" onClick={save_self}> {save_text} </Button>
+        <div style={{display: "flex"}}>
+            {backButton}
+            {deleteButton}
+        </div>
+        <div style={{display: "flex"}}>
+            {nextButton}
+            {submitButton}
+        </div>
     </div>
 
 
@@ -125,6 +148,7 @@ export default function EditQuestionController(props: Props) {
                            pairs={pairs} set_pairs={setPairs}
                            buckets={buckets} set_buckets={setBuckets}
                            items={items} set_items={setItems}
+                           steps step={step}
                            visible={props.visible}/>
     );
 }
