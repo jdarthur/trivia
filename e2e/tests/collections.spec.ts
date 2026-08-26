@@ -26,6 +26,18 @@ function buildMockToken(name: string): string {
 }
 const token = buildMockToken(DEV_USER);
 
+// Categories are a root model (ticket #179): the editor question API takes a
+// category ID, so seed a category first.
+async function createCategory(request: APIRequestContext, name: string): Promise<string> {
+  const res = await request.post('/editor/category', {
+    headers: { 'borttrivia-token': token },
+    data: { name },
+  });
+  expect(res.ok()).toBeTruthy();
+  const json = await res.json();
+  return json.id;
+}
+
 // Seed a question via the API (the create/import/transfer flows need questions).
 // Returns the created question's id.
 async function createQuestion(
@@ -34,9 +46,10 @@ async function createQuestion(
   question: string,
   answer: string,
 ): Promise<string> {
+  const categoryId = await createCategory(request, category);
   const res = await request.post('/editor/question', {
     headers: { 'borttrivia-token': token },
-    data: { category, question, answer, scoring_note: '' },
+    data: { category: categoryId, question, answer },
   });
   expect(res.ok()).toBeTruthy();
   const json = await res.json();

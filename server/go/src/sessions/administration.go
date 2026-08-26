@@ -88,19 +88,33 @@ func _setCurrentQuestion(e *Env, session *models.Session, roundIndex int, questi
 		return InvalidQuestionIndexError{QuestionIndex: questionIndex}
 	}
 
+	// question.Category is now the category's ID (ticket #179); the snapshot
+	// carries the category name and the scoring note resolved through the
+	// category (a question no longer has its own note).
+	categoryName := ""
+	scoringNoteId := ""
 	scoringNote := ""
-	if questionObject.ScoringNote != "" {
-		var note models.ScoringNote
-		err := common.GetOne((*common.Env)(e), common.ScoringNoteTable, questionObject.ScoringNote, &note)
+	if questionObject.Category != "" {
+		var category models.Category
+		err := common.GetOne((*common.Env)(e), common.CategoryTable, questionObject.Category, &category)
 		if err != nil {
 			return InvalidQuestionIndexError{QuestionIndex: questionIndex}
 		}
-		scoringNote = note.Description
+		categoryName = category.Name
+		if category.ScoringNote != "" {
+			var note models.ScoringNote
+			err := common.GetOne((*common.Env)(e), common.ScoringNoteTable, category.ScoringNote, &note)
+			if err != nil {
+				return InvalidQuestionIndexError{QuestionIndex: questionIndex}
+			}
+			scoringNoteId = category.ScoringNote
+			scoringNote = note.Description
+		}
 	}
 
 	err = upsertSessionQuestion(e, session.ID, roundIndex, questionIndex, questionId,
-		questionObject.Category, questionObject.Question, questionObject.Answer,
-		questionObject.ScoringNote, scoringNote, questionObject.QuestionType)
+		categoryName, questionObject.Question, questionObject.Answer,
+		scoringNoteId, scoringNote, questionObject.QuestionType)
 	if err != nil {
 		return err
 	}

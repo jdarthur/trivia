@@ -8,13 +8,18 @@ const unique = () => String(Date.now());
 
 // Open the "Add question" modal, walk the three-step flow, save, and wait for
 // the new row to appear in the list. (Ticket #166: multi-step form.)
-async function createQuestion(page: Page, category: string, question: string, answer: string) {
+//
+// Stopgap while the UI ships the category selector (ticket #180): the editor
+// still sends a free-text category, which the API now rejects (category is a
+// root model with an ID, ticket #179), so these flows create questions
+// without a category. The category selector and its e2e coverage land in
+// #180; question text is the unique row key here.
+async function createQuestion(page: Page, question: string, answer: string) {
   await page.getByRole('button', { name: /New/ }).first().click();
   const modal = page.locator('.ant-modal:has(.ant-modal-title)');
   await expect(modal).toBeVisible();
 
-  // Step 1: Basic info — fill the category, then advance.
-  await modal.locator('#category').fill(category);
+  // Step 1: Basic info — no category yet (see the stopgap comment above).
   await modal.getByRole('button', { name: 'Next', exact: true }).click();
 
   // Step 2: Question editor — fill question + answer, then advance.
@@ -25,12 +30,12 @@ async function createQuestion(page: Page, category: string, question: string, an
   // Step 3: Preview — submit.
   await modal.getByRole('button', { name: 'Add', exact: true }).click();
   await expect(modal).toBeHidden();
-  await expect(page.locator('.ant-table-tbody tr').filter({ hasText: category })).toBeVisible();
+  await expect(page.locator('.ant-table-tbody tr').filter({ hasText: question })).toBeVisible();
 }
 
-// Delete the row whose text matches `category` via its delete-confirm control.
-async function deleteQuestion(page: Page, category: string) {
-  const row = page.locator('.ant-table-tbody tr').filter({ hasText: category });
+// Delete the row whose text matches `question` via its delete-confirm control.
+async function deleteQuestion(page: Page, question: string) {
+  const row = page.locator('.ant-table-tbody tr').filter({ hasText: question });
   await row.locator('.anticon-delete').click();
   const popover = page.locator('.ant-popover:visible');
   await popover.getByRole('button', { name: 'Delete', exact: true }).click();
@@ -46,20 +51,21 @@ editorTest.describe('questions CRUD', () => {
   });
 
   editorTest('creates a question', async ({ editorPage }) => {
-    const cat = `e2e-create-${unique()}`;
-    await createQuestion(editorPage, cat, 'What is 2+2?', 'Four');
-    const row = editorPage.locator('.ant-table-tbody tr').filter({ hasText: cat });
+    const question = `What is 2+2? ${unique()}`;
+    await createQuestion(editorPage, question, 'Four');
+    const row = editorPage.locator('.ant-table-tbody tr').filter({ hasText: question });
     await expect(row).toContainText('What is 2+2?');
     await expect(row).toContainText('Four');
 
-    await deleteQuestion(editorPage, cat);
+    await deleteQuestion(editorPage, question);
   });
 
   editorTest('edits a question', async ({ editorPage }) => {
-    const cat = `e2e-edit-${unique()}`;
-    await createQuestion(editorPage, cat, 'Original question', 'Original answer');
+    const question = `Original question ${unique()}`;
+    const updated = `Updated question ${unique()}`;
+    await createQuestion(editorPage, question, 'Original answer');
 
-    const row = editorPage.locator('.ant-table-tbody tr').filter({ hasText: cat });
+    const row = editorPage.locator('.ant-table-tbody tr').filter({ hasText: question });
     await row.locator('.anticon-edit').click();
 
     const modal = editorPage.locator('.ant-modal:has(.ant-modal-title)');
@@ -68,24 +74,24 @@ editorTest.describe('questions CRUD', () => {
 
     // Editing an existing question opens on step 2 (Question editor) directly.
     await expect(modal.locator('#question')).toBeVisible();
-    await modal.locator('#question').fill('Updated question');
+    await modal.locator('#question').fill(updated);
 
     // Advance to step 3 (Preview) and submit.
     await modal.getByRole('button', { name: 'Next', exact: true }).click();
     await modal.getByRole('button', { name: 'Update', exact: true }).click();
     await expect(modal).toBeHidden();
 
-    await expect(editorPage.locator('.ant-table-tbody tr').filter({ hasText: cat })).toContainText('Updated question');
+    await expect(editorPage.locator('.ant-table-tbody tr').filter({ hasText: updated })).toContainText(updated);
 
-    await deleteQuestion(editorPage, cat);
+    await deleteQuestion(editorPage, updated);
   });
 
   editorTest('deletes a question', async ({ editorPage }) => {
-    const cat = `e2e-delete-${unique()}`;
-    await createQuestion(editorPage, cat, 'Question to delete', 'Answer');
-    await expect(editorPage.locator('.ant-table-tbody tr').filter({ hasText: cat })).toBeVisible();
+    const question = `Question to delete ${unique()}`;
+    await createQuestion(editorPage, question, 'Answer');
+    await expect(editorPage.locator('.ant-table-tbody tr').filter({ hasText: question })).toBeVisible();
 
-    await deleteQuestion(editorPage, cat);
+    await deleteQuestion(editorPage, question);
   });
 });
 
@@ -93,10 +99,10 @@ editorTest.describe('questions CRUD', () => {
 // and clears the question + answer values on confirm.
 editorTest.describe('question type change (ticket #166)', () => {
   editorTest('changing the type clears question + answer after confirmation', async ({ editorPage }) => {
-    const cat = `e2e-type-${unique()}`;
-    await createQuestion(editorPage, cat, 'Original question', 'Original answer');
+    const question = `Original question ${unique()}`;
+    await createQuestion(editorPage, question, 'Original answer');
 
-    const row = editorPage.locator('.ant-table-tbody tr').filter({ hasText: cat });
+    const row = editorPage.locator('.ant-table-tbody tr').filter({ hasText: question });
     await row.locator('.anticon-edit').click();
 
     const modal = editorPage.locator('.ant-modal:has(.ant-modal-title)');
@@ -122,21 +128,20 @@ editorTest.describe('question type change (ticket #166)', () => {
     await expect(modal.locator('#answer')).toHaveCount(0);
     await expect(modal.getByRole('button', { name: /Add choice/ })).toBeVisible();
 
-    // Dismiss without saving: go back to step 1 and clear the category so the
-    // form is empty (the modal's X button saves when any field is filled).
+    // Dismiss without saving: go back to step 1 — the form is empty (no
+    // category, cleared question/answer), so the modal's X button just closes.
     await modal.getByRole('button', { name: 'Back', exact: true }).click();
-    await modal.locator('#category').fill('');
     await modal.locator('.ant-modal-close').click();
     await expect(modal).toBeHidden();
 
-    await deleteQuestion(editorPage, cat);
+    await deleteQuestion(editorPage, question);
   });
 
   editorTest('canceling the type-change confirmation keeps the original type', async ({ editorPage }) => {
-    const cat = `e2e-type-cancel-${unique()}`;
-    await createQuestion(editorPage, cat, 'Original question', 'Original answer');
+    const question = `Original question ${unique()}`;
+    await createQuestion(editorPage, question, 'Original answer');
 
-    const row = editorPage.locator('.ant-table-tbody tr').filter({ hasText: cat });
+    const row = editorPage.locator('.ant-table-tbody tr').filter({ hasText: question });
     await row.locator('.anticon-edit').click();
 
     const modal = editorPage.locator('.ant-modal:has(.ant-modal-title)');
@@ -155,13 +160,13 @@ editorTest.describe('question type change (ticket #166)', () => {
     // Advance to step 2: the type is still freeform, so the answer box is present.
     await modal.getByRole('button', { name: 'Next', exact: true }).click();
     await expect(modal.locator('#answer')).toBeVisible();
-    await expect(modal.locator('#question')).toHaveValue('Original question');
+    await expect(modal.locator('#question')).toHaveValue(question);
 
     // Dismiss the modal without saving.
     await modal.locator('.ant-modal-close').click();
     await expect(modal).toBeHidden();
 
-    await deleteQuestion(editorPage, cat);
+    await deleteQuestion(editorPage, question);
   });
 
   editorTest('no confirmation when the question has no content yet', async ({ editorPage }) => {

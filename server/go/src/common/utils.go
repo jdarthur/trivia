@@ -31,6 +31,7 @@ var AnswerReactionTable = "answer_reaction"
 var SessionStateTable = "session_state"
 var CollectionTable = "collection"
 var ScoringNoteTable = "scoring_note"
+var CategoryTable = "category"
 
 type Env struct {
 	Db *sql.DB
@@ -160,9 +161,9 @@ func stringValue(v interface{}) string {
 	return fmt.Sprintf("%v", v)
 }
 
-// nilIfEmpty maps an empty string to NULL. question.scoring_note_id is a
-// nullable FK column (ticket #85) where NULL — not '' — is the "no note"
-// sentinel; the API wire format keeps the historical empty string.
+// nilIfEmpty maps an empty string to NULL. question.category_id and
+// category.scoring_note_id are nullable FK columns where NULL — not '' — is
+// the "unset" sentinel; the API wire format keeps the historical empty string.
 func nilIfEmpty(s string) interface{} {
 	if s == "" {
 		return nil
@@ -211,6 +212,8 @@ func GetOne(e *Env, objectType string, objectId string, model models.Object) err
 		return getCollection(e.Db, objectId, m)
 	case *models.ScoringNote:
 		return getScoringNote(e.Db, objectId, m)
+	case *models.Category:
+		return getCategory(e.Db, objectId, m)
 	default:
 		return errors.New("invalid get one type: " + objectType)
 	}
@@ -219,17 +222,17 @@ func GetOne(e *Env, objectType string, objectId string, model models.Object) err
 func scanQuestion(s rowScanner) (models.Question, error) {
 	var m models.Question
 	var createDate string
-	var scoringNoteId sql.NullString
-	err := s.Scan(&m.ID, &createDate, &m.Category, &m.Question, &m.Answer, &m.UserId, &scoringNoteId, &m.QuestionType)
+	var categoryId sql.NullString
+	err := s.Scan(&m.ID, &createDate, &categoryId, &m.Question, &m.Answer, &m.UserId, &m.QuestionType)
 	if err != nil {
 		return m, err
 	}
 	m.CreateDate = ParseTime(createDate)
 	m.RoundsUsed = make([]string, 0)
-	// scoring_note_id is a nullable FK column; NULL surfaces as the
-	// wire-format empty string.
-	if scoringNoteId.Valid {
-		m.ScoringNote = scoringNoteId.String
+	// category_id is a nullable FK column (tickets #178/#179); NULL surfaces
+	// as the wire-format empty string.
+	if categoryId.Valid {
+		m.Category = categoryId.String
 	}
 	// Old rows (pre-migration 8) read back as freeform.
 	if m.QuestionType == "" {
@@ -260,7 +263,7 @@ func loadQuestionRoundsUsed(db *sql.DB, m *models.Question) error {
 }
 
 func getQuestion(db *sql.DB, id string, m *models.Question) error {
-	row := db.QueryRow(`SELECT id, create_date, category, question, answer, user_id, scoring_note_id, question_type
+	row := db.QueryRow(`SELECT id, create_date, category_id, question, answer, user_id, question_type
 		FROM question WHERE id = ?`, id)
 	got, err := scanQuestion(row)
 	if errors.Is(err, sql.ErrNoRows) {
@@ -906,6 +909,8 @@ func Create(e *Env, objectType string, data models.Object) (string, time.Time, e
 		err = insertCollection(e.Db, m)
 	case models.ScoringNote:
 		err = insertScoringNote(e.Db, m)
+	case models.Category:
+		err = insertCategory(e.Db, m)
 	default:
 		err = errors.New("invalid create type: " + objectType)
 	}
@@ -922,9 +927,9 @@ func insertQuestion(db *sql.DB, m models.Question) error {
 	if questionType == "" {
 		questionType = "freeform"
 	}
-	_, err := db.Exec(`INSERT INTO question (id, create_date, category, question, answer, user_id, scoring_note_id, question_type)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-		m.ID, formatTime(m.CreateDate), m.Category, m.Question, m.Answer, m.UserId, nilIfEmpty(m.ScoringNote), questionType)
+	_, err := db.Exec(`INSERT INTO question (id, create_date, category_id, question, answer, user_id, question_type)
+		VALUES (?, ?, ?, ?, ?, ?, ?)`,
+		m.ID, formatTime(m.CreateDate), nilIfEmpty(m.Category), m.Question, m.Answer, m.UserId, questionType)
 	return err
 }
 
@@ -1056,6 +1061,8 @@ func Set(e *Env, objectType string, objectId string, data interface{}) error {
 		err = updateCollection(e.Db, objectId, m)
 	case models.ScoringNote:
 		err = updateScoringNote(e.Db, objectId, m)
+	case models.Category:
+		err = updateCategory(e.Db, objectId, m)
 	default:
 		err = errors.New("invalid set type: " + objectType)
 	}
@@ -1083,9 +1090,9 @@ func updateQuestion(db *sql.DB, id string, m models.Question) error {
 	if questionType == "" {
 		questionType = "freeform"
 	}
-	res, err := db.Exec(`UPDATE question SET category = ?, question = ?, answer = ?, user_id = ?,
-		scoring_note_id = ?, question_type = ? WHERE id = ?`,
-		m.Category, m.Question, m.Answer, m.UserId, nilIfEmpty(m.ScoringNote), questionType, id)
+	res, err := db.Exec(`UPDATE question SET category_id = ?, question = ?, answer = ?, user_id = ?,
+		question_type = ? WHERE id = ?`,
+		nilIfEmpty(m.Category), m.Question, m.Answer, m.UserId, questionType, id)
 	return rowsAffected(res, err, QuestionTable, id)
 }
 
@@ -1211,6 +1218,40 @@ func updateScoringNote(db *sql.DB, id string, m models.ScoringNote) error {
 	res, err := db.Exec(`UPDATE scoring_note SET user_id = ?, last_used = ?, name = ?, description = ? WHERE id = ?`,
 		m.UserId, formatTime(m.LastUsed), m.Name, m.Description, id)
 	return rowsAffected(res, err, ScoringNoteTable, id)
+}
+
+func getCategory(db *sql.DB, id string, m *models.Category) error {
+	var createDate string
+	var scoringNoteId sql.NullString
+	err := db.QueryRow(`SELECT id, user_id, create_date, name, scoring_note_id
+		FROM category WHERE id = ?`, id).
+		Scan(&m.ID, &m.UserId, &createDate, &m.Name, &scoringNoteId)
+	if errors.Is(err, sql.ErrNoRows) {
+		return NonexistentIdError{RecordType: CategoryTable, ID: id}
+	}
+	if err != nil {
+		return err
+	}
+	m.CreateDate = ParseTime(createDate)
+	// scoring_note_id is a nullable FK column; NULL surfaces as the
+	// wire-format empty string.
+	if scoringNoteId.Valid {
+		m.ScoringNote = scoringNoteId.String
+	}
+	return nil
+}
+
+func insertCategory(db *sql.DB, m models.Category) error {
+	_, err := db.Exec(`INSERT INTO category (id, user_id, create_date, name, scoring_note_id)
+		VALUES (?, ?, ?, ?, ?)`,
+		m.ID, m.UserId, formatTime(m.CreateDate), m.Name, nilIfEmpty(m.ScoringNote))
+	return err
+}
+
+func updateCategory(db *sql.DB, id string, m models.Category) error {
+	res, err := db.Exec(`UPDATE category SET name = ?, scoring_note_id = ? WHERE id = ?`,
+		m.Name, nilIfEmpty(m.ScoringNote), id)
+	return rowsAffected(res, err, CategoryTable, id)
 }
 
 // insertJoin appends childId to a parent's list in a (parent, child, position)
@@ -1350,7 +1391,7 @@ func GetAll(e *Env, objectType string, filters interface{}) (interface{}, error)
 
 	switch objectType {
 	case QuestionTable:
-		rows, err := e.Db.Query(`SELECT id, create_date, category, question, answer, user_id, scoring_note_id, question_type
+		rows, err := e.Db.Query(`SELECT id, create_date, category_id, question, answer, user_id, question_type
 			FROM question`+where+` ORDER BY create_date`, args...)
 		if err != nil {
 			return nil, err
@@ -1476,6 +1517,29 @@ func GetAll(e *Env, objectType string, filters interface{}) (interface{}, error)
 		}
 		return slice, rows.Err()
 
+	case CategoryTable:
+		rows, err := e.Db.Query(`SELECT id, user_id, create_date, name, scoring_note_id
+			FROM category`+where+` ORDER BY create_date`, args...)
+		if err != nil {
+			return nil, err
+		}
+		defer rows.Close()
+		slice := make([]*models.Category, 0)
+		for rows.Next() {
+			var m models.Category
+			var createDate string
+			var scoringNoteId sql.NullString
+			if err := rows.Scan(&m.ID, &m.UserId, &createDate, &m.Name, &scoringNoteId); err != nil {
+				return nil, err
+			}
+			m.CreateDate = ParseTime(createDate)
+			if scoringNoteId.Valid {
+				m.ScoringNote = scoringNoteId.String
+			}
+			slice = append(slice, &m)
+		}
+		return slice, rows.Err()
+
 	default:
 		return nil, errors.New("invalid get all table: " + objectType)
 	}
@@ -1586,6 +1650,15 @@ func buildWhere(table string, filters interface{}) (string, []interface{}) {
 					for col, cond := range or {
 						if m, ok := cond.(M); ok {
 							if re, ok := m["$regex"].(RegEx); ok {
+								if col == "category" {
+									// ticket #179: question.category is now
+									// category_id (the legacy text column is
+									// dropped), so a text search over the
+									// category matches the category row's name.
+									subs = append(subs, "EXISTS (SELECT 1 FROM category WHERE category.id = question.category_id AND REGEXP_LIKE(category.name, ?))")
+									args = append(args, regexPattern(re))
+									continue
+								}
 								subs = append(subs, "REGEXP_LIKE("+col+", ?)")
 								args = append(args, regexPattern(re))
 							}

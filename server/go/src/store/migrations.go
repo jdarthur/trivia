@@ -530,6 +530,20 @@ var migrations = []migration{
 			) WHERE category != ''`,
 		},
 	},
+	{
+		version: 14,
+		name:    "drop legacy question category columns",
+		// ticket #179 (part of #167): question writes now carry category_id
+		// (the category's ID, wired through as the historical `category` field)
+		// and the per-question scoring note is gone — a question's note comes
+		// from its category. The legacy question.category text column
+		// (superseded by category_id in migration 13) and question.scoring_note_id
+		// (moved to category.scoring_note_id) are dropped.
+		statements: []string{
+			`ALTER TABLE question DROP COLUMN category`,
+			`ALTER TABLE question DROP COLUMN scoring_note_id`,
+		},
+	},
 }
 
 // Migrate brings db up to the latest schema version, applying each pending

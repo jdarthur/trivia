@@ -113,8 +113,6 @@ func merge(update *models.Question, original *models.Question) {
 		original.Answer = update.Answer
 	}
 
-	original.ScoringNote = update.ScoringNote
-
 	// question_type defaults to freeform on input; children are replaced
 	// wholesale from the update body (changing type drops the other table's
 	// rows via the replace-wholesale write below).
@@ -649,9 +647,9 @@ func derivedAnswer(data models.Question) string {
 	}
 }
 
-// nilOrEmpty maps an empty scoring note to NULL, the "no note" sentinel for the
-// nullable question.scoring_note_id FK column (ticket #85). Mirrors
-// common's nilIfEmpty for handlers that write the question row themselves.
+// nilOrEmpty maps an empty category to NULL, the "no category" sentinel for
+// the nullable question.category_id FK column (ticket #178). Mirrors common's
+// nilIfEmpty for handlers that write the question row themselves.
 func nilOrEmpty(s string) interface{} {
 	if s == "" {
 		return nil
@@ -811,11 +809,11 @@ func CreateOneQuestion(e *Env, userId string, data models.Question) (models.Ques
 		return models.Question{}, err
 	}
 
-	// scoring_note must reference a note this user owns; the FK on
-	// question.scoring_note_id enforces existence, this check keeps the
-	// ownership rule and surfaces a clean NonexistentIdError (same as update).
-	if data.ScoringNote != "" {
-		_, err := GetOneScoringNote(e, userId, data.ScoringNote)
+	// category must reference a category this user owns; the FK on
+	// question.category_id enforces existence, this check keeps the ownership
+	// rule and surfaces a clean NonexistentIdError (same as update).
+	if data.Category != "" {
+		_, err := GetOneCategory(e, userId, data.Category)
 		if err != nil {
 			return models.Question{}, err
 		}
@@ -831,10 +829,10 @@ func CreateOneQuestion(e *Env, userId string, data models.Question) (models.Ques
 	err := common.WithWriteTx(e.Db, func(q common.Queryer) error {
 		ctx := context.Background()
 		if _, err := q.ExecContext(ctx,
-			`INSERT INTO question (id, create_date, category, question, answer, user_id, scoring_note_id, question_type)
-			VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-			id, common.FormatTime(createDate), data.Category, data.Question, derivedAnswer(data),
-			data.UserId, nilOrEmpty(data.ScoringNote), data.QuestionType); err != nil {
+			`INSERT INTO question (id, create_date, category_id, question, answer, user_id, question_type)
+			VALUES (?, ?, ?, ?, ?, ?, ?)`,
+			id, common.FormatTime(createDate), nilOrEmpty(data.Category), data.Question, derivedAnswer(data),
+			data.UserId, data.QuestionType); err != nil {
 			return err
 		}
 		return replaceQuestionChildren(q, ctx, data)
@@ -843,8 +841,17 @@ func CreateOneQuestion(e *Env, userId string, data models.Question) (models.Ques
 		return models.Question{}, err
 	}
 
-	if data.ScoringNote != "" {
-		err = UpdateLastUsedForScoringNote(e, userId, data.ScoringNote)
+	// The category carries the scoring note now (ticket #179): using a
+	// category bumps its note's last_used so recently-used notes float to
+	// the top of the picker.
+	if data.Category != "" {
+		category, err := GetOneCategory(e, userId, data.Category)
+		if err != nil {
+			return models.Question{}, err
+		}
+		if category.ScoringNote != "" {
+			err = UpdateLastUsedForScoringNote(e, userId, category.ScoringNote)
+		}
 	}
 
 	return data, err
@@ -859,19 +866,22 @@ func UpdateOneQuestion(e *Env, userId, questionId string, data models.Question) 
 		return models.Question{}, AttemptedToSetRoundsUsedError{RoundsUsed: data.RoundsUsed}
 	}
 
-	if data.ScoringNote != "" {
-		_, err := GetOneScoringNote(e, userId, data.ScoringNote)
-		if err != nil {
-			return models.Question{}, err
-		}
-	}
-
 	question, err := GetOneQuestion(e, userId, questionId)
 	if err != nil {
 		return models.Question{}, err
 	}
 
 	merge(&data, &question)
+
+	// category must reference a category this user owns (empty = unchanged);
+	// the FK on question.category_id enforces existence, this check keeps the
+	// ownership rule and surfaces a clean NonexistentIdError.
+	if question.Category != "" {
+		_, err := GetOneCategory(e, userId, question.Category)
+		if err != nil {
+			return models.Question{}, err
+		}
+	}
 
 	// validate the merged question per type before writing
 	if err := validateQuestionType(question); err != nil {
@@ -883,10 +893,10 @@ func UpdateOneQuestion(e *Env, userId, questionId string, data models.Question) 
 	err = common.WithWriteTx(e.Db, func(q common.Queryer) error {
 		ctx := context.Background()
 		if _, err := q.ExecContext(ctx,
-			`UPDATE question SET category = ?, question = ?, answer = ?, user_id = ?,
-				scoring_note_id = ?, question_type = ? WHERE id = ?`,
-			question.Category, question.Question, derivedAnswer(question), question.UserId,
-			nilOrEmpty(question.ScoringNote), question.QuestionType, questionId); err != nil {
+			`UPDATE question SET category_id = ?, question = ?, answer = ?, user_id = ?,
+				question_type = ? WHERE id = ?`,
+			nilOrEmpty(question.Category), question.Question, derivedAnswer(question), question.UserId,
+			question.QuestionType, questionId); err != nil {
 			return err
 		}
 		return replaceQuestionChildren(q, ctx, question)
@@ -895,8 +905,17 @@ func UpdateOneQuestion(e *Env, userId, questionId string, data models.Question) 
 		return models.Question{}, err
 	}
 
-	if data.ScoringNote != "" {
-		err = UpdateLastUsedForScoringNote(e, userId, data.ScoringNote)
+	// The category carries the scoring note now (ticket #179): using a
+	// category bumps its note's last_used so recently-used notes float to
+	// the top of the picker.
+	if question.Category != "" {
+		category, err := GetOneCategory(e, userId, question.Category)
+		if err != nil {
+			return models.Question{}, err
+		}
+		if category.ScoringNote != "" {
+			err = UpdateLastUsedForScoringNote(e, userId, category.ScoringNote)
+		}
 	}
 
 	return data, err

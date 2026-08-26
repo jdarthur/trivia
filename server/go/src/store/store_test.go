@@ -36,8 +36,8 @@ func TestMigrateCreatesBaselineSchema(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Version: %v", err)
 	}
-	if v != 13 {
-		t.Fatalf("user_version = %d, want 13", v)
+	if v != 14 {
+		t.Fatalf("user_version = %d, want 14", v)
 	}
 
 	tables := []string{
@@ -300,8 +300,8 @@ func TestMigrateIsIdempotent(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Version: %v", err)
 	}
-	if v != 13 {
-		t.Fatalf("user_version = %d after re-migrate, want 13", v)
+	if v != 14 {
+		t.Fatalf("user_version = %d after re-migrate, want 14", v)
 	}
 }
 
@@ -543,8 +543,17 @@ func TestMigrateAddsCategoryBackfill(t *testing.T) {
 	mustExec(t, db, `INSERT INTO session_question (session_id, round_index, question_index, category)
 		VALUES ('s1', 0, 0, 'History')`)
 
-	if err := Migrate(db); err != nil {
-		t.Fatalf("Migrate to 13: %v", err)
+	// forward-only Migrate can't stop at 13, so apply migration 13 directly
+	// (the test is in the store package and can see the list).
+	var m13 migration
+	for _, m := range migrations {
+		if m.version == 13 {
+			m13 = m
+			break
+		}
+	}
+	if err := apply(db, m13); err != nil {
+		t.Fatalf("apply migration 13: %v", err)
 	}
 
 	// one category row per distinct (category, user)
@@ -659,6 +668,93 @@ func TestMigrateAddsCategoryBackfill(t *testing.T) {
 	}
 	if cat != "History" {
 		t.Errorf("session_question category = %q, want 'History'", cat)
+	}
+}
+
+// TestMigrateDropsLegacyQuestionColumns verifies migration 14 (ticket #179):
+// once question writes carry category_id and the scoring note lives on the
+// category, the legacy question.category text column and question.scoring_note_id
+// are dropped — category_id and the question data survive, and the
+// session_question snapshot columns are untouched.
+func TestMigrateDropsLegacyQuestionColumns(t *testing.T) {
+	db, err := Open(filepath.Join(t.TempDir(), "trivia.db"))
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+	t.Cleanup(func() { db.Close() })
+
+	// forward-only Migrate can't stop at 13, so apply migrations 1..13
+	// directly (the test is in the store package and can see the list).
+	for _, m := range migrations {
+		if m.version > 13 {
+			break
+		}
+		if err := apply(db, m); err != nil {
+			t.Fatalf("apply migration %d: %v", m.version, err)
+		}
+	}
+
+	// a v13-era question still carrying the legacy columns, plus a session
+	// snapshot that must pass through untouched
+	mustExec(t, db, `INSERT INTO scoring_note (id, user_id, create_date, last_used, name, description)
+		VALUES ('n1', 'u1', '2026-01-01T00:00:00.000000', '', 'name', 'desc')`)
+	mustExec(t, db, `INSERT INTO category (id, user_id, create_date, name, scoring_note_id)
+		VALUES ('c1', 'u1', '2026-01-01T00:00:00.000000', 'History', 'n1')`)
+	mustExec(t, db, `INSERT INTO question (id, create_date, category, question, answer, user_id, scoring_note_id, category_id)
+		VALUES ('q1', '2026-01-01T00:00:00.000000', 'History', 'q?', 'a', 'u1', 'n1', 'c1')`)
+	mustExec(t, db, `INSERT INTO session (id, create_date) VALUES ('s1', '2026-01-01T00:00:00.000000')`)
+	mustExec(t, db, `INSERT INTO session_question (session_id, round_index, question_index, category, scoring_note_id, scoring_note)
+		VALUES ('s1', 0, 0, 'History', 'n1', 'desc')`)
+
+	if err := Migrate(db); err != nil {
+		t.Fatalf("Migrate to 14: %v", err)
+	}
+
+	rows, err := db.Query("PRAGMA table_info(question)")
+	if err != nil {
+		t.Fatalf("query table_info: %v", err)
+	}
+	defer rows.Close()
+	cols := map[string]bool{}
+	for rows.Next() {
+		var cid int
+		var name, typ string
+		var notnull, pk int
+		var dflt interface{}
+		if err := rows.Scan(&cid, &name, &typ, &notnull, &dflt, &pk); err != nil {
+			t.Fatalf("scan table_info row: %v", err)
+		}
+		cols[name] = true
+	}
+	if err := rows.Err(); err != nil {
+		t.Fatalf("iterate table_info: %v", err)
+	}
+	if cols["category"] {
+		t.Error("question.category column still present after migration 14")
+	}
+	if cols["scoring_note_id"] {
+		t.Error("question.scoring_note_id column still present after migration 14")
+	}
+	if !cols["category_id"] {
+		t.Error("question.category_id column missing after migration 14")
+	}
+
+	// question data (and its category link) survive
+	var got sql.NullString
+	if err := db.QueryRow("SELECT category_id FROM question WHERE id = 'q1'").Scan(&got); err != nil {
+		t.Fatal(err)
+	}
+	if !got.Valid || got.String != "c1" {
+		t.Errorf("q1 category_id = %+v, want 'c1'", got)
+	}
+
+	// session snapshot untouched
+	var cat, noteID, note string
+	if err := db.QueryRow("SELECT category, scoring_note_id, scoring_note FROM session_question WHERE session_id = 's1'").Scan(&cat, &noteID, &note); err != nil {
+		t.Fatal(err)
+	}
+	if cat != "History" || noteID != "n1" || note != "desc" {
+		t.Errorf("session_question snapshot = %q / %q / %q, want History / n1 / desc", cat, noteID, note)
 	}
 }
 

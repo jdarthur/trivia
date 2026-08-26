@@ -486,8 +486,8 @@ func TestOldQuestionReadsBackAsFreeform(t *testing.T) {
 	userId := "user-1"
 
 	if _, err := env.Db.Exec(
-		`INSERT INTO question (id, create_date, category, question, answer, user_id)
-		 VALUES ('old-1', '2026-01-01T00:00:00.000000', 'cat', 'old?', 'a', ?)`, userId); err != nil {
+		`INSERT INTO question (id, create_date, question, answer, user_id)
+		 VALUES ('old-1', '2026-01-01T00:00:00.000000', 'old?', 'a', ?)`, userId); err != nil {
 		t.Fatal(err)
 	}
 

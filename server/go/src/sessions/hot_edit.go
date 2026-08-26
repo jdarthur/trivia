@@ -37,22 +37,34 @@ func (e *Env) HotEditQuestion(c *gin.Context) {
 		questionInRound := session.Rounds[request.RoundIndex].Questions[request.QuestionIndex]
 		questionId := questionInRound.QuestionId
 
+		// request.Question.Category is the category's ID (ticket #179); the
+		// snapshot carries the category name and the scoring note resolved
+		// through the category (a question no longer has its own note).
+		categoryName := ""
 		scoringNoteId := ""
 		scoringNote := ""
-		if request.Question.ScoringNote != "" {
-			var note models.ScoringNote
-			err := common.GetOne((*common.Env)(e), common.ScoringNoteTable, request.Question.ScoringNote, &note)
+		if request.Question.Category != "" {
+			var category models.Category
+			err := common.GetOne((*common.Env)(e), common.CategoryTable, request.Question.Category, &category)
 			if err != nil {
-				common.Respond(c, request, errors.New("unable to get scoring note by ID"))
+				common.Respond(c, request, errors.New("unable to get category by ID"))
 				return
 			}
-
-			scoringNoteId = request.Question.ScoringNote
-			scoringNote = note.Description
+			categoryName = category.Name
+			if category.ScoringNote != "" {
+				var note models.ScoringNote
+				err := common.GetOne((*common.Env)(e), common.ScoringNoteTable, category.ScoringNote, &note)
+				if err != nil {
+					common.Respond(c, request, errors.New("unable to get scoring note by ID"))
+					return
+				}
+				scoringNoteId = category.ScoringNote
+				scoringNote = note.Description
+			}
 		}
 
 		err = updateSessionQuestionSnapshot(e, sessionId, request.RoundIndex, request.QuestionIndex,
-			questionId, request.Question.Category, request.Question.Question, request.Question.Answer,
+			questionId, categoryName, request.Question.Question, request.Question.Answer,
 			scoringNoteId, scoringNote, request.Question.QuestionType)
 		if err != nil {
 			common.Respond(c, request, err)
@@ -70,7 +82,6 @@ func (e *Env) HotEditQuestion(c *gin.Context) {
 		question.Question = request.Question.Question
 		question.Answer = request.Question.Answer
 		question.Category = request.Question.Category
-		question.ScoringNote = request.Question.ScoringNote
 
 		err = common.Set((*common.Env)(e), common.QuestionTable, questionId, &question)
 		if err != nil {
