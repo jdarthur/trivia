@@ -37,8 +37,19 @@ func openSessionTestDB(t *testing.T) *Env {
 
 func createQuestion(t *testing.T, env *Env, text, answer, category string) string {
 	t.Helper()
+	// categories are a root model now (ticket #179); a question's category
+	// field carries the category's ID
+	var categoryId string
+	if category != "" {
+		id, _, err := common.Create((*common.Env)(env), common.CategoryTable,
+			&models.Category{Name: category})
+		if err != nil {
+			t.Fatal(err)
+		}
+		categoryId = id
+	}
 	id, _, err := common.Create((*common.Env)(env), common.QuestionTable,
-		&models.Question{Question: text, Answer: answer, Category: category})
+		&models.Question{Question: text, Answer: answer, Category: categoryId})
 	if err != nil {
 		t.Fatal(err)
 	}

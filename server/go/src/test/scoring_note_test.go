@@ -163,12 +163,22 @@ func TestUpdateLastUsed(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	question := models.Question{
-		Category:    "test category",
-		Question:    "test question",
-		Answer:      "answer111",
+	// The note rides on the category now (ticket #179): creating a question
+	// in a category that carries a note bumps the note's last_used.
+	category, err := questions.CreateCategory(env, models.Category{
 		UserId:      userId,
+		Name:        "test category",
 		ScoringNote: note.ID,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	question := models.Question{
+		Category: category.ID,
+		Question: "test question",
+		Answer:   "answer111",
+		UserId:   userId,
 	}
 
 	question, err = questions.CreateOneQuestion(env, userId, question)
@@ -182,10 +192,14 @@ func TestUpdateLastUsed(t *testing.T) {
 	}
 
 	if noteAfter.LastUsed.Equal(note.LastUsed) {
-		t.Error("Expected 'Last used' field to be updated after setting on question")
+		t.Error("Expected 'Last used' field to be updated after creating a question in the category")
 	}
 
 	_, err = questions.DeleteOneQuestion(env, userId, question.ID)
+	if err != nil {
+		t.Error(err)
+	}
+	_, err = questions.DeleteCategory(env, userId, category.ID)
 	if err != nil {
 		t.Error(err)
 	}
@@ -208,8 +222,17 @@ func TestUpdateLastUsedOnUpdate(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	category, err := questions.CreateCategory(env, models.Category{
+		UserId:      userId,
+		Name:        "test category",
+		ScoringNote: note.ID,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	question := models.Question{
-		Category: "test category",
+		Category: category.ID,
 		Question: "test question",
 		Answer:   "answer111",
 		UserId:   userId,
@@ -220,8 +243,15 @@ func TestUpdateLastUsedOnUpdate(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// distinct timestamps so the bump from the update below is observable
+	time.Sleep(time.Millisecond)
+	noteAfterCreate, err := questions.GetOneScoringNote(env, userId, note.ID)
+	if err != nil {
+		t.Error(err)
+	}
+
 	questionUpdate := models.Question{
-		ScoringNote: note.ID,
+		Question: "updated question",
 	}
 
 	_, err = questions.UpdateOneQuestion(env, userId, question.ID, questionUpdate)
@@ -234,11 +264,15 @@ func TestUpdateLastUsedOnUpdate(t *testing.T) {
 		t.Error(err)
 	}
 
-	if noteAfter.LastUsed.Equal(note.LastUsed) {
-		t.Error("Expected 'Last used' field to be updated after setting on question")
+	if noteAfter.LastUsed.Equal(noteAfterCreate.LastUsed) {
+		t.Error("Expected 'Last used' field to be updated after updating a question in the category")
 	}
 
 	_, err = questions.DeleteOneQuestion(env, userId, question.ID)
+	if err != nil {
+		t.Error(err)
+	}
+	_, err = questions.DeleteCategory(env, userId, category.ID)
 	if err != nil {
 		t.Error(err)
 	}
@@ -261,12 +295,20 @@ func TestClearScoringNoteOnDelete(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	question := models.Question{
-		Category:    "test category",
-		Question:    "test question",
-		Answer:      "answer111",
+	category, err := questions.CreateCategory(env, models.Category{
 		UserId:      userId,
+		Name:        "test category",
 		ScoringNote: note.ID,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	question := models.Question{
+		Category: category.ID,
+		Question: "test question",
+		Answer:   "answer111",
+		UserId:   userId,
 	}
 
 	question, err = questions.CreateOneQuestion(env, userId, question)
@@ -279,39 +321,61 @@ func TestClearScoringNoteOnDelete(t *testing.T) {
 		t.Error(err)
 	}
 
-	question, err = questions.GetOneQuestion(env, userId, question.ID)
+	category, err = questions.GetOneCategory(env, userId, category.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if question.ScoringNote != "" {
-		t.Error("Expected scoring note field to be cleared out on question after deleting scoring note")
+	if category.ScoringNote != "" {
+		t.Error("Expected scoring note field to be cleared out on category after deleting scoring note")
 	}
 
 	_, err = questions.DeleteOneQuestion(env, userId, question.ID)
 	if err != nil {
 		t.Error(err)
 	}
+	_, err = questions.DeleteCategory(env, userId, category.ID)
+	if err != nil {
+		t.Error(err)
+	}
 }
 
-func TestCreateQuestionWithUnknownScoringNoteFails(t *testing.T) {
+func TestCreateCategoryWithUnknownScoringNoteFails(t *testing.T) {
 	conn := GetDb()
 	env := &questions.Env{Db: conn}
 
 	userId := "test"
 
-	// question.scoring_note_id is a real FK (ticket #85): referencing a note
-	// that does not exist must fail on create.
-	question := models.Question{
-		Category:    "test category",
-		Question:    "test question",
-		Answer:      "answer111",
+	// category.scoring_note_id is a real FK (ticket #85 pattern): referencing
+	// a note that does not exist must fail on create.
+	category := models.Category{
 		UserId:      userId,
+		Name:        "test category",
 		ScoringNote: "missing-note-id",
 	}
 
+	if _, err := questions.CreateCategory(env, category); err == nil {
+		t.Error("Expected error when creating a category with an unknown scoring note ID")
+	}
+}
+
+func TestCreateQuestionWithUnknownCategoryFails(t *testing.T) {
+	conn := GetDb()
+	env := &questions.Env{Db: conn}
+
+	userId := "test"
+
+	// question.category_id is a real FK (ticket #178): referencing a category
+	// that does not exist must fail on create.
+	question := models.Question{
+		Category: "missing-category-id",
+		Question: "test question",
+		Answer:   "answer111",
+		UserId:   userId,
+	}
+
 	if _, err := questions.CreateOneQuestion(env, userId, question); err == nil {
-		t.Error("Expected error when creating a question with an unknown scoring note ID")
+		t.Error("Expected error when creating a question with an unknown category ID")
 	}
 }
 

@@ -37,8 +37,18 @@ func TestQuestionCrud(t *testing.T) {
 	env := &questions.Env{Db: GetDb()}
 	userId := "user-1"
 
+	// categories are a root model now (ticket #179); a question's category
+	// field carries the category's ID
+	category, err := questions.CreateCategory(env, models.Category{
+		UserId: userId,
+		Name:   "cat",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	created, err := questions.CreateOneQuestion(env, userId, models.Question{
-		Category: "cat", Question: "q?", Answer: "a", UserId: userId,
+		Category: category.ID, Question: "q?", Answer: "a", UserId: userId,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -51,7 +61,7 @@ func TestQuestionCrud(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got.Category != "cat" || got.Question != "q?" || got.Answer != "a" {
+	if got.Category != category.ID || got.Question != "q?" || got.Answer != "a" {
 		t.Fatalf("got %+v", got)
 	}
 	if got.CreateDate.IsZero() {
@@ -67,11 +77,14 @@ func TestQuestionCrud(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got.Question != "q2" || got.Answer != "a2" || got.Category != "cat" {
+	if got.Question != "q2" || got.Answer != "a2" || got.Category != category.ID {
 		t.Fatalf("question not merged on update: %+v", got)
 	}
 
 	if _, err := questions.DeleteOneQuestion(env, userId, created.ID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := questions.DeleteCategory(env, userId, category.ID); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := questions.GetOneQuestion(env, userId, created.ID); err == nil {
@@ -238,7 +251,11 @@ func TestSessionRelationalState(t *testing.T) {
 	env := &common.Env{Db: db}
 	userId := "user-1"
 
-	question, err := questions.CreateOneQuestion(&questions.Env{Db: db}, userId, models.Question{Question: "q", Answer: "a", Category: "cat"})
+	category, err := questions.CreateCategory(&questions.Env{Db: db}, models.Category{UserId: userId, Name: "cat"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	question, err := questions.CreateOneQuestion(&questions.Env{Db: db}, userId, models.Question{Question: "q", Answer: "a", Category: category.ID})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -314,7 +331,7 @@ func TestSessionRelationalState(t *testing.T) {
 	if len(got.Rounds[0].Wagers) != 1 || got.Rounds[0].Wagers[0] != 100 {
 		t.Fatalf("session round wagers = %v", got.Rounds[0].Wagers)
 	}
-	if len(got.Rounds[0].Questions) != 1 || got.Rounds[0].Questions[0].Category != "cat" {
+	if len(got.Rounds[0].Questions) != 1 || got.Rounds[0].Questions[0].Category != category.ID {
 		t.Fatalf("session round questions = %+v", got.Rounds[0].Questions)
 	}
 	// the question id must survive the relational round-trip

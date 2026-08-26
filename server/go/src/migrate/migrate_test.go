@@ -53,9 +53,11 @@ func rawDoc(t *testing.T, v interface{}) bson.Raw {
 
 func newImporter() *importer {
 	return &importer{
-		summary:     Summary{Skipped: map[string]int{}},
-		placement:   map[string]answerPlacement{},
-		roundPoints: map[string]map[string]map[int]float64{},
+		summary:       Summary{Skipped: map[string]int{}},
+		placement:     map[string]answerPlacement{},
+		roundPoints:   map[string]map[string]map[int]float64{},
+		categories:    map[string]string{},
+		categoryNotes: map[string]map[string]int{},
 	}
 }
 
@@ -145,20 +147,25 @@ func TestImportEditorData(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// categories inherit their scoring note only after every question lands
+	if err := im.importCategoryNotes(ctx, tx); err != nil {
+		t.Fatal(err)
+	}
+
 	if err := tx.Commit(); err != nil {
 		t.Fatal(err)
 	}
 
-	// question rows: fields, the scoring note reference, and create_date in
-	// the historical wire format
-	var qid, category string
-	var noteRef sql.NullString
-	if err := db.QueryRow(`SELECT id, category, scoring_note_id FROM question WHERE id = ?`, q1ID).
-		Scan(&qid, &category, &noteRef); err != nil {
+	// question rows link to their category; create_date in the historical
+	// wire format
+	var qid string
+	var catRef sql.NullString
+	if err := db.QueryRow(`SELECT id, category_id FROM question WHERE id = ?`, q1ID).
+		Scan(&qid, &catRef); err != nil {
 		t.Fatal(err)
 	}
-	if qid != q1ID || category != "History" || !noteRef.Valid || noteRef.String != noteID {
-		t.Fatalf("question %s = category %q scoring_note %v", qid, category, noteRef)
+	if qid != q1ID || !catRef.Valid {
+		t.Fatalf("question %s = category %v", qid, catRef)
 	}
 	var createdStr string
 	if err := db.QueryRow(`SELECT create_date FROM question WHERE id = ?`, q1ID).Scan(&createdStr); err != nil {
@@ -167,12 +174,36 @@ func TestImportEditorData(t *testing.T) {
 	if createdStr != "2024-01-02T03:04:05.000000" {
 		t.Fatalf("create_date = %q, want the historical wire format", createdStr)
 	}
-	var note2 sql.NullString
-	if err := db.QueryRow(`SELECT scoring_note_id FROM question WHERE id = ?`, q2ID).Scan(&note2); err != nil {
+
+	// categories: one row per distinct (user, category); History inherits the
+	// scoring note shared by its questions, Science (no notes) stays NULL
+	var historyID string
+	if err := db.QueryRow(`SELECT id FROM category WHERE name = 'History' AND user_id = 'user1'`).Scan(&historyID); err != nil {
 		t.Fatal(err)
 	}
-	if note2.Valid {
-		t.Fatalf("q2 scoring_note_id = %q, want NULL", note2.String)
+	if catRef.String != historyID {
+		t.Fatalf("q1 category_id = %q, want %q", catRef.String, historyID)
+	}
+	var catNote sql.NullString
+	if err := db.QueryRow(`SELECT scoring_note_id FROM category WHERE id = ?`, historyID).Scan(&catNote); err != nil {
+		t.Fatal(err)
+	}
+	if !catNote.Valid || catNote.String != noteID {
+		t.Fatalf("History scoring_note_id = %v, want %s", catNote, noteID)
+	}
+	var cat2 sql.NullString
+	if err := db.QueryRow(`SELECT category_id FROM question WHERE id = ?`, q2ID).Scan(&cat2); err != nil {
+		t.Fatal(err)
+	}
+	if !cat2.Valid {
+		t.Fatalf("q2 category_id = %v, want the Science category", cat2)
+	}
+	var scienceNote sql.NullString
+	if err := db.QueryRow(`SELECT scoring_note_id FROM category WHERE id = ?`, cat2.String).Scan(&scienceNote); err != nil {
+		t.Fatal(err)
+	}
+	if scienceNote.Valid {
+		t.Fatalf("Science scoring_note_id = %q, want NULL", scienceNote.String)
 	}
 
 	// round + joins
@@ -191,7 +222,7 @@ func TestImportEditorData(t *testing.T) {
 	assertRows(t, db, []interface{}{"desc"}, `SELECT description FROM scoring_note WHERE id = ?`, noteID)
 
 	// summary counts
-	if im.summary.Questions != 2 || im.summary.Rounds != 1 || im.summary.Games != 1 ||
+	if im.summary.Questions != 2 || im.summary.Categories != 2 || im.summary.Rounds != 1 || im.summary.Games != 1 ||
 		im.summary.Collections != 1 || im.summary.ScoringNotes != 1 {
 		t.Fatalf("summary = %+v", im.summary)
 	}
@@ -474,14 +505,15 @@ func TestImportDanglingReferences(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// the question imported with a NULL note reference
-	var note sql.NullString
-	if err := db.QueryRow(`SELECT scoring_note_id FROM question WHERE id = ?`, "20000000-0000-0000-0000-000000000001").
-		Scan(&note); err != nil {
+	// the question imported with no category (its dangling scoring note is
+	// simply dropped — the note lives on the category now)
+	var cat sql.NullString
+	if err := db.QueryRow(`SELECT category_id FROM question WHERE id = ?`, "20000000-0000-0000-0000-000000000001").
+		Scan(&cat); err != nil {
 		t.Fatal(err)
 	}
-	if note.Valid {
-		t.Fatalf("question scoring_note_id = %q, want NULL", note.String)
+	if cat.Valid {
+		t.Fatalf("question category_id = %q, want NULL", cat.String)
 	}
 
 	// the round imported with no join rows
@@ -515,7 +547,7 @@ func TestImportDanglingReferences(t *testing.T) {
 		t.Fatalf("session_state rows = %d, want 0", n)
 	}
 
-	if im.summary.ClearedNoteRefs != 1 || im.summary.OrphanAnswers != 1 {
+	if im.summary.OrphanAnswers != 1 {
 		t.Fatalf("summary = %+v", im.summary)
 	}
 	if im.summary.Skipped["round_question"] != 1 ||

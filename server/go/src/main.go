@@ -171,6 +171,12 @@ func main() {
 	router.POST("/editor/scoring_notes", auth.AsUser, q.CreateScoringNote)
 	router.DELETE("/editor/scoring_notes/:id", auth.AsUser, q.DeleteScoringNote)
 
+	router.GET("/editor/categories", auth.AsUser, q.GetAllCategories)
+	router.GET("/editor/category/:id", auth.AsUser, q.GetOneCategory)
+	router.POST("/editor/category", auth.AsUser, q.CreateCategory)
+	router.PUT("/editor/category/:id", auth.AsUser, q.UpdateCategory)
+	router.DELETE("/editor/category/:id", auth.AsUser, q.DeleteCategory)
+
 	// Registered last because it claims everything the routes above did not.
 	// CLIENT_DIR is relative to the working directory, which is /go/src in the
 	// image, and docker-compose mounts the client build there.

@@ -16,9 +16,10 @@
 // thing back, so the target database is never left half-populated. Rows whose
 // parent is missing (dangling references that Mongo tolerated but the SQLite
 // foreign keys forbid) are skipped and counted in the Summary instead of
-// failing the run; a question pointing at a missing scoring note is imported
-// with the reference cleared, exactly as migration 6 does for pre-existing
-// data.
+// failing the run. Question categories become category rows — one per
+// distinct (user, category text) — and a category inherits a scoring note
+// only when all of its questions reference the same one, mirroring migration
+// 13's backfill rule (ticket #178).
 //
 // The command lives at cmd/migrate; this package exists so the SQLite write
 // side can be tested without a live MongoDB (the importers take a raw BSON
@@ -188,6 +189,7 @@ type mongoSessionState struct {
 // tolerated but the SQLite foreign keys forbid).
 type Summary struct {
 	Questions        int
+	Categories       int
 	Rounds           int
 	Games            int
 	Collections      int
@@ -200,9 +202,6 @@ type Summary struct {
 	Answers          int
 	SessionStates    int
 
-	// ClearedNoteRefs counts question rows whose scoring_note pointed at a
-	// missing note; the reference was imported as NULL (migration 6 behavior).
-	ClearedNoteRefs int
 	// OrphanAnswers counts answer documents not referenced by any session
 	// document; they have no (session, round, question) to attach to.
 	OrphanAnswers int
@@ -214,13 +213,10 @@ type Summary struct {
 // String renders the summary for the command's output.
 func (s Summary) String() string {
 	var b strings.Builder
-	fmt.Fprintf(&b, "imported %d questions, %d rounds, %d games, %d collections, %d scoring notes\n",
-		s.Questions, s.Rounds, s.Games, s.Collections, s.ScoringNotes)
+	fmt.Fprintf(&b, "imported %d questions (%d categories), %d rounds, %d games, %d collections, %d scoring notes\n",
+		s.Questions, s.Categories, s.Rounds, s.Games, s.Collections, s.ScoringNotes)
 	fmt.Fprintf(&b, "         %d players, %d sessions (%d session_players, %d session_questions, %d session_scores), %d answers, %d session states\n",
 		s.Players, s.Sessions, s.SessionPlayers, s.SessionQuestions, s.SessionScores, s.Answers, s.SessionStates)
-	if s.ClearedNoteRefs > 0 {
-		fmt.Fprintf(&b, "cleared %d question->scoring_note reference(s) pointing at missing notes\n", s.ClearedNoteRefs)
-	}
 	if s.OrphanAnswers > 0 {
 		fmt.Fprintf(&b, "skipped %d answer(s) not referenced by any session document\n", s.OrphanAnswers)
 	}
@@ -272,12 +268,17 @@ type answerPlacement struct {
 
 // importer carries the per-run state: the running Summary, the answer
 // placement map built while flattening sessions (answers import after
-// sessions so the map is complete), and the per-round point totals derived
-// from the scored answers (written after all answers are imported).
+// sessions so the map is complete), the per-round point totals derived from
+// the scored answers (written after all answers are imported), and the
+// category rows created while importing questions (one per distinct (user,
+// category text)) plus the per-category scoring-note tallies used by the
+// end-of-import note inheritance pass.
 type importer struct {
-	summary     Summary
-	placement   map[string]answerPlacement
-	roundPoints map[string]map[string]map[int]float64 // sessionID -> playerID -> round -> points
+	summary       Summary
+	placement     map[string]answerPlacement
+	roundPoints   map[string]map[string]map[int]float64 // sessionID -> playerID -> round -> points
+	categories    map[string]string                     // userID+"\x00"+category -> category ID
+	categoryNotes map[string]map[string]int             // category key -> scoring_note ID -> count
 }
 
 // importFn imports one raw document.
@@ -346,9 +347,11 @@ func Import(ctx context.Context, db *sql.DB, src *mongo.Database) (Summary, erro
 	defer tx.Rollback() //nolint:errcheck // no-op after a successful Commit
 
 	im := &importer{
-		summary:     Summary{Skipped: map[string]int{}},
-		placement:   map[string]answerPlacement{},
-		roundPoints: map[string]map[string]map[int]float64{},
+		summary:       Summary{Skipped: map[string]int{}},
+		placement:     map[string]answerPlacement{},
+		roundPoints:   map[string]map[string]map[int]float64{},
+		categories:    map[string]string{},
+		categoryNotes: map[string]map[string]int{},
 	}
 
 	for _, step := range []struct {
@@ -374,6 +377,12 @@ func Import(ctx context.Context, db *sql.DB, src *mongo.Database) (Summary, erro
 	// answers' points_awarded, so they are written after every answer lands.
 	if err := im.importSessionScores(ctx, tx); err != nil {
 		return im.summary, fmt.Errorf("import session_score: %w", err)
+	}
+
+	// categories can't inherit a scoring note until every question is
+	// imported (the shared-note rule needs the full tally).
+	if err := im.importCategoryNotes(ctx, tx); err != nil {
+		return im.summary, fmt.Errorf("import category scoring notes: %w", err)
 	}
 
 	if err := tx.Commit(); err != nil {
@@ -414,29 +423,66 @@ func (im *importer) importQuestion(ctx context.Context, q execer, raw bson.Raw) 
 		return fmt.Errorf("question: %w", err)
 	}
 
-	// scoring_note_id is a nullable FK column where NULL — not '' — is the
-	// "no note" sentinel. If the note is missing (dangling reference the old
-	// Mongo tolerated), import the question with the reference cleared —
-	// exactly what migration 6 does for pre-existing SQLite data.
-	note := interface{}(nil)
-	if d.ScoringNote != "" {
-		note = d.ScoringNote
-	}
-	_, err = q.ExecContext(ctx, `INSERT INTO question (id, create_date, category, question, answer, user_id, scoring_note_id)
-		VALUES (?, ?, ?, ?, ?, ?, ?)`,
-		id, formatTime(d.CreateDate), d.Category, d.Question, d.Answer, d.UserId, note)
+	_, err = q.ExecContext(ctx, `INSERT INTO question (id, create_date, question, answer, user_id)
+		VALUES (?, ?, ?, ?, ?)`,
+		id, formatTime(d.CreateDate), d.Question, d.Answer, d.UserId)
 	if err != nil {
-		if !isFKViolation(err) {
-			return err
-		}
-		if _, err := q.ExecContext(ctx, `INSERT INTO question (id, create_date, category, question, answer, user_id, scoring_note_id)
-			VALUES (?, ?, ?, ?, ?, ?, NULL)`,
-			id, formatTime(d.CreateDate), d.Category, d.Question, d.Answer, d.UserId); err != nil {
-			return err
-		}
-		im.summary.ClearedNoteRefs++
+		return err
 	}
+
+	// Categories are a root model now (ticket #179): create one category row
+	// per distinct (user, category text) and link the question to it. The
+	// category's scoring note is decided after every question is imported
+	// (importCategoryNotes) — a category inherits a note only when all of its
+	// questions reference the same one, matching migration 13's backfill.
+	if d.Category != "" {
+		key := d.UserId + "\x00" + d.Category
+		categoryId, ok := im.categories[key]
+		if !ok {
+			categoryId = uuid.New().String()
+			if _, err := q.ExecContext(ctx, `INSERT INTO category (id, user_id, create_date, name)
+				VALUES (?, ?, ?, ?)`,
+				categoryId, d.UserId, formatTime(d.CreateDate), d.Category); err != nil {
+				return err
+			}
+			im.categories[key] = categoryId
+			im.summary.Categories++
+		}
+		if d.ScoringNote != "" {
+			if im.categoryNotes[key] == nil {
+				im.categoryNotes[key] = map[string]int{}
+			}
+			im.categoryNotes[key][d.ScoringNote]++
+		}
+		if _, err := q.ExecContext(ctx, `UPDATE question SET category_id = ? WHERE id = ?`, categoryId, id); err != nil {
+			return err
+		}
+	}
+
 	im.summary.Questions++
+	return nil
+}
+
+// importCategoryNotes runs after every question is imported: a category
+// inherits a scoring note only when all of its questions reference the same
+// note; mixed or absent notes leave it NULL (mirrors migration 13's backfill
+// rule, ticket #178). The subquery resolves to NULL when the note is missing,
+// so a dangling reference never fails the FK.
+func (im *importer) importCategoryNotes(ctx context.Context, tx *sql.Tx) error {
+	for key, id := range im.categories {
+		if len(im.categoryNotes[key]) != 1 {
+			continue
+		}
+		var noteID string
+		for n := range im.categoryNotes[key] {
+			noteID = n
+		}
+		if _, err := tx.ExecContext(ctx,
+			`UPDATE category SET scoring_note_id = (SELECT id FROM scoring_note WHERE id = ?) WHERE id = ?`,
+			noteID, id); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
