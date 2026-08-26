@@ -451,7 +451,7 @@ export default function EditQuestionModal(props: Props) {
             {step === STEP_BASIC ? basicStep :
                 step === STEP_EDITOR ? (
                     <div style={{display: "flex", flexDirection: "column"}}>
-                        <span style={{display: "flex", justifyContent: "flex-end", marginBottom: 10}}>
+                        <span style={{display: "flex", justifyContent: "flex-start", marginBottom: 10}}>
                             <EditorToolbar wrap={wrap} wrap_line={wrap_line} insert={insert}/>
                         </span>
                         {editView}
