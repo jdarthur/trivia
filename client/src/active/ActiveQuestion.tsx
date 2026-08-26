@@ -70,7 +70,6 @@ class ActiveQuestion extends React.Component<Props, State> {
                              close={this.close_question_editor} session_id={this.props.session_id}
                              player_id={this.props.player_id}
                              round_index={this.props.round_index}
-                             scoring_note={this.props.scoring_note_id}
                              question_index={this.props.question_index}
                              question_type={this.props.question_type}
                              choices={this.props.choices}

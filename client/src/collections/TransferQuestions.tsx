@@ -1,6 +1,7 @@
 import React from "react";
 import {Transfer} from "antd";
 import type {Question} from "../types/models";
+import CategoryName from "../category/CategoryName";
 
 interface Props {
     data?: Question[]
@@ -41,7 +42,7 @@ function normalizeData(data: Question[] | undefined) {
 
 function renderQuestion(item: any) {
     return <span>
-        <b>{item.category}</b>:
+        <b><CategoryName id={item.category}/></b>:
         <span> {item.question} </span>
         <i>({item.answer? item.answer : "no answer"})</i>
     </span>

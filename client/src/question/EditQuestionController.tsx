@@ -16,8 +16,6 @@ interface Props {
     visible: boolean
     delete?: (() => void) | null
     close: () => void
-    scoringNoteWasCleared: boolean
-    setScoringNoteWasCleared: (value: boolean) => void
 }
 
 export default function EditQuestionController(props: Props) {
@@ -25,7 +23,6 @@ export default function EditQuestionController(props: Props) {
     const [category, setCategory] = useState("")
     const [question, setQuestion] = useState("")
     const [answer, setAnswer] = useState("")
-    const [scoringNote, setScoringNote] = useState("")
     const [question_type, setQuestionType] = useState("freeform")
     const [choices, setChoices] = useState<QuestionChoice[]>([])
     const [pairs, setPairs] = useState<QuestionPair[]>([])
@@ -53,13 +50,7 @@ export default function EditQuestionController(props: Props) {
         // the question text rather than the type/category info.
         setStep(props.selected?.id ? STEP_EDITOR : 0)
         setNextAttempted(false)
-
-        if (props.scoringNoteWasCleared === false) {
-            setScoringNote(props.selected?.scoring_note || "")
-        } else {
-            setScoringNote("")
-        }
-    }, [props.selected, props.scoringNoteWasCleared])
+    }, [props.selected])
 
     const [createQuestion] = useCreateQuestionMutation()
     const [updateQuestion] = useUpdateQuestionMutation()
@@ -83,7 +74,6 @@ export default function EditQuestionController(props: Props) {
             category: category,
             question: question,
             answer: question_type === "freeform" ? answer : "",
-            scoring_note: scoringNote,
             question_type: question_type,
             choices: choices,
             pairs: pairs,
@@ -105,7 +95,6 @@ export default function EditQuestionController(props: Props) {
 
         console.log("save question", body)
         props.close()
-        props.setScoringNoteWasCleared(false)
     }
 
     const is_empty = () => {
@@ -174,8 +163,6 @@ export default function EditQuestionController(props: Props) {
                            set_category={setCategory} category={category}
                            set_question={setQuestion} question={question}
                            set_answer={setAnswer} answer={answer}
-                           set_scoring_note={setScoringNote} scoring_note={scoringNote}
-                           set_scoring_note_was_cleared={props.setScoringNoteWasCleared}
                            question_type={question_type} set_question_type={setQuestionType}
                            choices={choices} set_choices={setChoices}
                            pairs={pairs} set_pairs={setPairs}

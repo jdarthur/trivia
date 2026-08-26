@@ -4,6 +4,7 @@ import '../modal/Modal.css';
 import {Button, Modal, Space, Table} from 'antd';
 import EditorFilter from "../editor/EditorFilter";
 import {useGetQuestionsQuery} from "../api/main";
+import CategoryName from "../category/CategoryName";
 import type {Question} from "../types/models";
 
 interface Props {
@@ -14,7 +15,9 @@ interface Props {
 }
 
 const columns = [
-    {title: 'Category', dataIndex: 'category', ellipsis: {showTitle: false}},
+    // category is the category's ID (ticket #180); resolve it to the name.
+    {title: 'Category', dataIndex: 'category', ellipsis: {showTitle: false},
+     render: (id: string) => <CategoryName id={id}/>},
     {title: 'Question', dataIndex: 'question', ellipsis: {showTitle: false}, width: '50%'},
     {title: 'Answer', dataIndex: 'answer', ellipsis: {showTitle: false}}
 ]

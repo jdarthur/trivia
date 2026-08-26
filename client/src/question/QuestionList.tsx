@@ -13,24 +13,11 @@ import {EditOutlined} from '@ant-design/icons';
 import PageHeader from "../common/PageHeader";
 import {useDeleteQuestionMutation, useGetQuestionsQuery} from "../api/main";
 import notify, {errorMessage} from "../common/notify";
-import ScoringNoteRenderInList from "./ScoringNoteRenderInList";
+import CategoryName from "../category/CategoryName";
 import type {Question} from "../types/models";
 
 interface Props {
     token?: string
-}
-
-function renderCategory(text: any, element: any) {
-
-    let note = null
-    if (element.scoring_note) {
-        note = <ScoringNoteRenderInList id={element.scoring_note}/>
-    }
-
-    return <span style={{display: "flex", alignItems: "center"}}>
-        {text}
-        {note}
-    </span>
 }
 
 export default function QuestionList(props: Props) {
@@ -39,7 +26,6 @@ export default function QuestionList(props: Props) {
     const [textFilter, setTextFilter] = useState("")
     const [showModal, setShowModal] = useState(false)
     const [selected, setSelected] = useState<Partial<Question>>({})
-    const [scoringNoteWasCleared, setScoringNoteWasCleared] = useState(false)
 
     let query = ""
     if (unusedOnly) {
@@ -88,7 +74,10 @@ export default function QuestionList(props: Props) {
             title: 'Category',
             dataIndex: 'category',
             ellipsis: {showTitle: false},
-            render: renderCategory
+            // category is the category's ID (ticket #180); resolve it to the
+            // name and show the category's scoring note (which now lives on
+            // the category, D2) as an info icon.
+            render: (id: string) => <CategoryName id={id} show_note/>
         },
         {title: 'Question', dataIndex: 'question', ellipsis: {showTitle: false}, width: '50%'},
         {title: 'Answer', dataIndex: 'answer', ellipsis: {showTitle: false}}
@@ -99,8 +88,6 @@ export default function QuestionList(props: Props) {
     let question_editor = <EditQuestionController
         selected={selected} visible={showModal}
         delete={null} close={() => setShowModal(false)}
-        scoringNoteWasCleared={scoringNoteWasCleared}
-        setScoringNoteWasCleared={setScoringNoteWasCleared}
     />
 
     const nqb = <NewButton on_click={newQuestion}/>
