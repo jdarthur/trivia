@@ -1,8 +1,8 @@
 import React, {useEffect, useState} from 'react';
 import './Question.css';
 
-import {Input, Modal, Radio, Button, Select, Steps, Popconfirm} from 'antd';
-import {MinusCircleOutlined} from '@ant-design/icons';
+import {Input, Modal, Radio, Button, Select, Steps, Popconfirm, Tooltip} from 'antd';
+import {CheckSquareOutlined, ContainerOutlined, EditOutlined, MinusCircleOutlined, SwapOutlined} from '@ant-design/icons';
 import FormattedQuestion from "./FormattedQuestion"
 import EditorToolbar from "./EditorToolbar";
 import {ANSWER, CATEGORY, QUESTION} from "./EditQuestionController";
@@ -24,6 +24,18 @@ const STEP_BASIC = 0
 const STEP_EDITOR = 1
 const STEP_PREVIEW = 2
 export const STEP_COUNT = 3
+
+// Per-type icon + short description used by the question-type selector.
+const QUESTION_TYPES = [
+    {value: FREEFORM, icon: <EditOutlined/>, label: "Freeform",
+     description: "Players type their own answer, which is compared against your answer."},
+    {value: MULTIPLE_CHOICE, icon: <CheckSquareOutlined/>, label: "Multiple choice",
+     description: "Players pick one answer from a list of options; you mark the correct one."},
+    {value: MATCHING, icon: <SwapOutlined/>, label: "Matching",
+     description: "Players match each item on the left with its correct partner on the right."},
+    {value: BUCKETING, icon: <ContainerOutlined/>, label: "Bucketing",
+     description: "Players sort each item into the bucket it belongs to."},
+]
 
 interface Props {
     title: string
@@ -397,14 +409,16 @@ export default function EditQuestionModal(props: Props) {
     // footer).
     const step = props.step ?? STEP_BASIC
     const typeRadio = (
-        <Radio.Group buttonStyle="solid" size="small"
-                     value={questionType}
+        <Radio.Group value={questionType}
                      onChange={(event) => props.steps ? requestTypeChange(event.target.value) : props.set_question_type?.(event.target.value)}
                      style={{marginBottom: 10}} disabled={props.disabled}>
-            <Radio.Button value={FREEFORM}> Freeform </Radio.Button>
-            <Radio.Button value={MULTIPLE_CHOICE}> Multiple choice </Radio.Button>
-            <Radio.Button value={MATCHING}> Matching </Radio.Button>
-            <Radio.Button value={BUCKETING}> Bucketing </Radio.Button>
+            {QUESTION_TYPES.map(type => (
+                <Tooltip key={type.value} title={type.description}>
+                    <Radio value={type.value} style={{marginRight: 16}}>
+                        {type.icon} <span style={{marginLeft: 6}}>{type.label}</span>
+                    </Radio>
+                </Tooltip>
+            ))}
         </Radio.Group>
     )
 

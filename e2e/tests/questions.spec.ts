@@ -104,7 +104,7 @@ editorTest.describe('question type change (ticket #166)', () => {
     await expect(modal.locator('.ant-modal-title')).toHaveText('Edit question');
 
     // Step 1 (Basic info): switch the type to "Multiple choice".
-    await modal.locator('.ant-radio-button-wrapper', { hasText: 'Multiple choice' }).click();
+    await modal.locator('.ant-radio-wrapper', { hasText: 'Multiple choice' }).click();
 
     // The confirmation tooltip appears.
     const confirm = editorPage.locator('.ant-popover:visible');
@@ -139,7 +139,7 @@ editorTest.describe('question type change (ticket #166)', () => {
     await expect(modal).toBeVisible();
 
     // Step 1: attempt to switch to "Multiple choice", then cancel.
-    await modal.locator('.ant-radio-button-wrapper', { hasText: 'Multiple choice' }).click();
+    await modal.locator('.ant-radio-wrapper', { hasText: 'Multiple choice' }).click();
     const confirm = editorPage.locator('.ant-popover:visible');
     await expect(confirm).toBeVisible();
     await confirm.getByRole('button', { name: 'Cancel', exact: true }).click();
@@ -165,7 +165,7 @@ editorTest.describe('question type change (ticket #166)', () => {
     await expect(modal.locator('.ant-modal-title')).toHaveText('Add question');
 
     // Step 1 (Basic info): switch the type to "Multiple choice".
-    await modal.locator('.ant-radio-button-wrapper', { hasText: 'Multiple choice' }).click();
+    await modal.locator('.ant-radio-wrapper', { hasText: 'Multiple choice' }).click();
 
     // No confirmation tooltip appears.
     await expect(editorPage.locator('.ant-popover:visible')).toHaveCount(0);
