@@ -1,11 +1,14 @@
-import React from 'react';
+import React, {useEffect, useState} from 'react';
 import '../question/Question.css';
 
 import {Button} from 'antd';
 import EditQuestionModal from "../question/EditQuestionModal";
-import type {QuestionBucket, QuestionBucketItem, QuestionChoice, QuestionPair} from "../types/models";
+import {useGetCategoriesQuery} from "../api/main";
+import type {QuestionBucket, QuestionBucketItem, QuestionPair} from "../types/models";
 
 interface Props {
+    // The snapshot carries the category NAME (resolved server-side); the
+    // selector maps it back to the category ID for the save payload.
     category: string
     question: string
     answer: string
@@ -13,7 +16,6 @@ interface Props {
     session_id: string
     player_id: string
     round_index: number | string
-    scoring_note?: string
     question_index: number | string
     question_type?: string
     choices?: string[]
@@ -22,105 +24,108 @@ interface Props {
     items?: QuestionBucketItem[]
 }
 
-interface State {
-    category: string
-    question: string
-    answer: string
-    scoring_note?: string
-    saving: boolean
-}
+export default function HotEditQuestion(props: Props) {
 
-class HotEditQuestion extends React.Component<Props, State> {
+    const {data: categories} = useGetCategoriesQuery()
 
-    state: State = {
-        category: this.props.category,
-        question: this.props.question,
-        answer: this.props.answer,
-        scoring_note: this.props.scoring_note,
-        saving: false,
+    // The question stores the category ID now (ticket #180), but the session
+    // snapshot only carries the resolved name. Find the category that name
+    // belongs to once the user's categories load; fall back to "" (no
+    // category) if it no longer exists. `touched` stops the sync from
+    // overriding a selection the user already made.
+    const [category, setCategory] = useState("")
+    const [touched, setTouched] = useState(false)
+
+    useEffect(() => {
+        if (!touched && props.category) {
+            const match = (categories || []).find(c => c.name === props.category)
+            if (match) {
+                setCategory(match.id)
+            }
+        }
+    }, [categories, props.category, touched])
+
+    const selectCategory = (value: string) => {
+        setTouched(true)
+        setCategory(value)
     }
 
-    set_value = (key: string, value: string) => {
-        console.log("set ", key, " to ", value)
-        this.setState({[key]: value} as unknown as State)
+    const [question, setQuestion] = useState(props.question)
+    const [answer, setAnswer] = useState(props.answer)
+    const [saving, setSaving] = useState(false)
+
+    const structured = () => {
+        return props.question_type === "multiple_choice"
+            || props.question_type === "matching"
+            || props.question_type === "bucketing"
     }
 
-    structured = () => {
-        return this.props.question_type === "multiple_choice"
-            || this.props.question_type === "matching"
-            || this.props.question_type === "bucketing"
-    }
-
-    save_self = () => {
-        if (this.state.saving) {
+    const save_self = async () => {
+        if (saving) {
             return
         }
         console.log("save")
 
-        const question = {
-            round_index: this.props.round_index,
-            question_index: this.props.question_index,
+        // The scoring note is no longer sent (ticket #180): it rides on the
+        // category, which the server re-resolves on save.
+        const questionData = {
+            round_index: props.round_index,
+            question_index: props.question_index,
             question: {
-                category: this.state.category,
-                question: this.state.question,
-                answer: this.structured() ? this.props.answer : this.state.answer,
-                scoring_note: this.state.scoring_note,
-                question_type: this.props.question_type
+                category: category,
+                question: question,
+                answer: structured() ? props.answer : answer,
+                question_type: props.question_type
             }
         }
 
         // Guard double-clicks on Update (ticket #147).
-        this.setState({saving: true})
-        save(this.props.session_id, this.props.player_id, question)
-            .then((data: any) => {
-                this.props.close()
+        setSaving(true)
+        save(props.session_id, props.player_id, questionData)
+            .then(() => {
+                props.close()
             })
             .catch((error: any) => {
                 console.log(error)
             })
             .finally(() => {
-                this.setState({saving: false})
+                setSaving(false)
             })
     }
 
-    disabled = () => {
-        if (this.state.saving) {
+    const disabled = () => {
+        if (saving) {
             return true
         }
-        if (this.structured()) {
-            return this.props.category === "" || this.props.question === ""
+        if (structured()) {
+            return category === "" || question === ""
         }
-        return this.props.category === "" || this.props.question === "" || this.props.answer === ""
+        return category === "" || question === "" || answer === ""
     }
 
-    render() {
-        const footer = <div className="save-delete">
-            <Button className="button" type="primary" disabled={this.disabled()}
-                    onClick={this.save_self}> Update </Button>
-        </div>
+    const footer = <div className="save-delete">
+        <Button className="button" type="primary" disabled={disabled()}
+                onClick={save_self}> Update </Button>
+    </div>
 
-
-        return (
-            <EditQuestionModal title="Edit Question" cancel={this.props.close}
-                               save_text="Update" save_action={this.save_self}
-                               question={this.state.question} answer={this.state.answer}
-                               category={this.state.category} footer={footer}
-                               set_question={(value) => this.set_value("question", value)}
-                               set_category={(value) => this.set_value("category", value)}
-                               set_answer={(value) => this.set_value("answer", value)}
-                               scoring_note={this.state.scoring_note as string}
-                               set_scoring_note={(value) => this.set_value("scoring_note", value)}
-                               question_type={this.props.question_type}
-                               choices={(this.props.choices || []).map((text, index) => ({
-                                   text: text, is_correct: false
-                               }))}
-                               pairs={this.props.pairs}
-                               buckets={this.props.buckets}
-                               items={this.props.items}
-                               disabled={this.structured()}
-                               visible={true}/>
-        );
-    }
+    return (
+        <EditQuestionModal title="Edit Question" cancel={props.close}
+                           save_text="Update" save_action={save_self}
+                           question={question} answer={answer}
+                           category={category} footer={footer}
+                           set_question={setQuestion}
+                           set_category={selectCategory}
+                           set_answer={setAnswer}
+                           question_type={props.question_type}
+                           choices={(props.choices || []).map((text, index) => ({
+                               text: text, is_correct: false
+                           }))}
+                           pairs={props.pairs}
+                           buckets={props.buckets}
+                           items={props.items}
+                           disabled={structured()}
+                           visible={true}/>
+    );
 }
 
 async function save(session_id: string, player_id: string, question_data: any): Promise<any> {
@@ -132,5 +137,3 @@ async function save(session_id: string, player_id: string, question_data: any): 
     })
     return response.json()
 }
-
-export default HotEditQuestion

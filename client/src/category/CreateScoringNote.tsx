@@ -25,7 +25,7 @@ export default function CreateScoringNote(props: Props) {
     }
 
     return <Modal
-        visible={props.visible}
+        open={props.visible}
         onOk={() => createScoringNote()}
         title={"New scoring note"}
         onCancel={() => props.setVisible(false)}

@@ -2,6 +2,7 @@ import React from 'react';
 import { Card } from 'antd';
 
 import FormattedQuestion from "./FormattedQuestion";
+import CategoryName from "../category/CategoryName";
 
 import {
     EditOutlined,
@@ -45,7 +46,9 @@ class ReadOnlyQuestion extends React.Component<Props> {
             <EditOutlined onClick={this.select_self} className="delete-edit-mini" />
         </div>
         return (
-            <Card title={this.props.category} size="small" extra={edit}
+            // category is the category's ID on the question wire format
+            // (ticket #180); the card title resolves it to the name.
+            <Card title={<CategoryName id={this.props.category}/>} size="small" extra={edit}
                 style={{ width: 225, margin: 5, background: background, cursor: cursor }}>
                 <FormattedQuestion question={this.props.question}
                     answer={this.props.answer} max_width={200} />

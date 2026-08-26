@@ -6,20 +6,41 @@ import type { Page } from '@playwright/test';
 // the shared dev DB, so tests don't collide with each other or with leftovers.
 const unique = () => String(Date.now());
 
+// Create a category through the categories editor UI, then return to the
+// questions editor. Ticket #180: the question editor no longer has a
+// free-text category input — the question stores the selected category's ID.
+async function createCategory(page: Page, name: string) {
+  await page.goto('/categories?mockUser=alice');
+  await page.getByRole('button', { name: /New/ }).first().click();
+  const modal = page.locator('.ant-modal:has(.ant-modal-title)');
+  await expect(modal).toBeVisible();
+  await modal.locator('input[placeholder="Name"]').fill(name);
+  await modal.getByRole('button', { name: 'Create', exact: true }).click();
+  await expect(modal).toBeHidden();
+
+  await page.goto('/questions?mockUser=alice');
+  await expect(page.locator('.question-list')).toBeVisible();
+}
+
 // Open the "Add question" modal, walk the three-step flow, save, and wait for
-// the new row to appear in the list. (Ticket #166: multi-step form.)
-//
-// Stopgap while the UI ships the category selector (ticket #180): the editor
-// still sends a free-text category, which the API now rejects (category is a
-// root model with an ID, ticket #179), so these flows create questions
-// without a category. The category selector and its e2e coverage land in
-// #180; question text is the unique row key here.
-async function createQuestion(page: Page, question: string, answer: string) {
+// the new row to appear in the list. (Ticket #166: multi-step form.) When a
+// category name is given, create it first and select it on step 1 (Basic
+// info); otherwise the question is created without a category.
+async function createQuestion(page: Page, question: string, answer: string, category?: string) {
+  if (category) {
+    await createCategory(page, category);
+  }
+
   await page.getByRole('button', { name: /New/ }).first().click();
   const modal = page.locator('.ant-modal:has(.ant-modal-title)');
   await expect(modal).toBeVisible();
 
-  // Step 1: Basic info — no category yet (see the stopgap comment above).
+  // Step 1: Basic info — pick the category (selector of the user's
+  // categories), then advance.
+  if (category) {
+    await modal.locator('.ant-select').click();
+    await page.locator('.ant-select-dropdown:visible').getByText(category, { exact: true }).click();
+  }
   await modal.getByRole('button', { name: 'Next', exact: true }).click();
 
   // Step 2: Question editor — fill question + answer, then advance.
@@ -52,20 +73,26 @@ editorTest.describe('questions CRUD', () => {
 
   editorTest('creates a question', async ({ editorPage }) => {
     const question = `What is 2+2? ${unique()}`;
-    await createQuestion(editorPage, question, 'Four');
+    const category = `General ${unique()}`;
+    await createQuestion(editorPage, question, 'Four', category);
     const row = editorPage.locator('.ant-table-tbody tr').filter({ hasText: question });
     await expect(row).toContainText('What is 2+2?');
     await expect(row).toContainText('Four');
+    // The category column shows the category's name, resolved from its ID
+    // (ticket #180).
+    await expect(row).toContainText(category);
 
     await deleteQuestion(editorPage, question);
   });
 
   editorTest('edits a question', async ({ editorPage }) => {
     const question = `Original question ${unique()}`;
+    const category = `Editable ${unique()}`;
     const updated = `Updated question ${unique()}`;
-    await createQuestion(editorPage, question, 'Original answer');
+    await createQuestion(editorPage, question, 'Original answer', category);
 
     const row = editorPage.locator('.ant-table-tbody tr').filter({ hasText: question });
+    await expect(row).toContainText(category);
     await row.locator('.anticon-edit').click();
 
     const modal = editorPage.locator('.ant-modal:has(.ant-modal-title)');

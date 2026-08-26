@@ -19,7 +19,6 @@ export interface Question {
   answer: string;
   rounds_used: string[];
   user_id: string;
-  scoring_note: string;
   question_type?: string;
   choices?: QuestionChoice[];
   pairs?: QuestionPair[];
@@ -86,6 +85,14 @@ export interface ScoringNote {
   last_used: WireTimestamp;
   name: string;
   description: string;
+}
+
+/** models.Category (user_id is `json:"-"`, never serialized) */
+export interface Category {
+  id: string;
+  create_date: WireTimestamp;
+  name: string;
+  scoring_note: string;
 }
 
 /** models.PlayerId — a branded string used as a map key (e.g. scoreboard). */

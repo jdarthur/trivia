@@ -75,3 +75,11 @@ export const collectionsTest = base.extend<{ collectionsPage: Page }>({
     await use(page);
   },
 });
+
+// categoriesTest / categoriesPage land on the Categories editor (ticket #180).
+export const categoriesTest = base.extend<{ categoriesPage: Page }>({
+  categoriesPage: async ({ page }, use) => {
+    await loginToEditor(page, 'categories', '.category-list');
+    await use(page);
+  },
+});

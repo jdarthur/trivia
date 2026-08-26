@@ -6,7 +6,8 @@ import {ContainerOutlined, EditOutlined, ExclamationCircleOutlined, MinusCircleO
 import FormattedQuestion from "./FormattedQuestion"
 import EditorToolbar from "./EditorToolbar";
 import {ANSWER, CATEGORY, QUESTION} from "./EditQuestionController";
-import ScoringNote from "./ScoringNote";
+import CategorySelect from "../category/CategorySelect";
+import CategoryNote from "../category/CategoryNote";
 import type {QuestionBucket, QuestionBucketItem, QuestionChoice, QuestionPair} from "../types/models";
 
 const {TextArea} = Input;
@@ -47,13 +48,10 @@ interface Props {
     category: string
     question: string
     answer: string
-    scoring_note: string
     footer: React.ReactNode
     set_category: (value: string) => void
     set_question: (value: string) => void
     set_answer: (value: string) => void
-    set_scoring_note: (value: string) => void
-    set_scoring_note_was_cleared?: (value: boolean) => void
     initialValues?: any
     question_type?: string
     set_question_type?: (value: string) => void
@@ -428,14 +426,9 @@ export default function EditQuestionModal(props: Props) {
 
     const basicStep = <div>
         <span style={{display: "flex", marginBottom: 10}}>
-            <Input autoFocus={step === STEP_BASIC && !props.category} placeholder="Category" value={props.category}
-                   onClick={(event) => setFocusedInput(event as unknown as string)} id={CATEGORY}
-                   onChange={(event) => props.set_category(event.target.value)} onPressEnter={null as any}/>
-            <ScoringNote scoring_note={props.scoring_note}
-                         set_scoring_note={props.set_scoring_note}
-                         set_scoring_note_was_cleared={props.set_scoring_note_was_cleared}
-            />
+            <CategorySelect category={props.category} set_category={props.set_category}/>
         </span>
+        <CategoryNote id={props.category}/>
         <div style={{fontWeight: 600, marginBottom: 4}}>Question type</div>
         {props.steps ? (
             <Popconfirm open={confirmTypeChange}
@@ -476,14 +469,9 @@ export default function EditQuestionModal(props: Props) {
     const body = props.steps ? stepsView : (
         <div style={{display: "flex", flexDirection: "column"}}>
             <span style={{display: "flex", marginBottom: 10}}>
-                <Input autoFocus={!props.category} placeholder="Category" value={props.category}
-                       onClick={(event) => setFocusedInput(event as unknown as string)} id={CATEGORY}
-                       onChange={(event) => props.set_category(event.target.value)} onPressEnter={null as any}/>
-                <ScoringNote scoring_note={props.scoring_note}
-                             set_scoring_note={props.set_scoring_note}
-                             set_scoring_note_was_cleared={props.set_scoring_note_was_cleared}
-                />
+                <CategorySelect category={props.category} set_category={props.set_category}/>
             </span>
+            <CategoryNote id={props.category}/>
 
             {typeRadio}
 

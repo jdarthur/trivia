@@ -184,11 +184,14 @@ async function cleanup(
 
 // --- Actor helpers ---------------------------------------------------------
 
-// Open the mod's lobby from the invite URL plus its own player_id.
-async function openModLobby(browser: { newContext: (o?: object) => Promise<BrowserContext> }, sessionId: string, modId: string) {
+// Open the mod's lobby from the invite URL plus its own player_id. Pass
+// mockUser to also log the mod page into the editor (dev-mode mock token), which
+// the hot-edit modal needs to load the user's categories (ticket #180).
+async function openModLobby(browser: { newContext: (o?: object) => Promise<BrowserContext> }, sessionId: string, modId: string, mockUser?: string) {
   const context = await browser.newContext({ baseURL: BASE_URL });
   const page = await context.newPage();
-  await page.goto(`/?session_id=${sessionId}&player_id=${modId}`);
+  const params = `session_id=${sessionId}&player_id=${modId}${mockUser ? `&mockUser=${mockUser}` : ''}`;
+  await page.goto(`/?${params}`);
   await expect(page.locator('.invite-link')).toBeVisible();
   return { context, page };
 }
@@ -520,7 +523,9 @@ async function setupActiveGame(
 ) {
   const seeded = await seedStartableGame(request, prefix);
   const { sessionId, modId } = await createSession(request, `e2e-session-${prefix}`, seeded.gameId);
-  const { context: modContext, page: modPage } = await openModLobby(browser, sessionId, modId);
+  // The mod page logs into the editor (dev-mode mock token) so the hot-edit
+  // modal can load the user's categories (ticket #180).
+  const { context: modContext, page: modPage } = await openModLobby(browser, sessionId, modId, DEV_USER);
   const { context: playerContext, page: playerPage, playerId } = await joinPlayer(
     browser,
     sessionId,
@@ -785,10 +790,10 @@ test.describe('gameplay navigation, hot-edit, spectator & edge cases', () => {
     await cleanup(request, seeded, { sessionId, modId });
   });
 
-  // Skipped while the hot-edit modal still sends a free-text category, which
-  // the API now rejects (category is a root model with an ID, ticket #179).
-  // The category selector lands in #180 and restores this test.
-  test.skip('mod hot-edits the question text and round name mid-session and players see the change', async ({
+  // The hot-edit modal rewrites the session snapshot mid-game. It needs the
+  // category selector (ticket #180), so the mod page is logged into the
+  // editor (dev-mode mock token) to load the user's categories.
+  test('mod hot-edits the question text and round name mid-session and players see the change', async ({
     browser,
     request,
   }) => {

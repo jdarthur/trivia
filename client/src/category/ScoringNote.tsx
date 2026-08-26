@@ -9,7 +9,6 @@ import ScoringNoteRender from "./ScoringNoteRender";
 interface Props {
     scoring_note: string
     set_scoring_note: (value: string) => void
-    set_scoring_note_was_cleared?: (value: boolean) => void
 }
 
 export default function ScoringNote(props: Props) {
@@ -24,11 +23,11 @@ export default function ScoringNote(props: Props) {
         </Select.Option>
     ]
 
+    // The note rides on the category now (ticket #180): if the note selected
+    // here is deleted, clear the selection rather than keep a dangling ID.
     const onDeleteScoringNote = (noteId: string) => {
-        console.log("note ID: ", noteId, props.scoring_note)
         if (noteId === props.scoring_note) {
-            console.log("ok")
-            props.set_scoring_note_was_cleared?.(true)
+            props.set_scoring_note("")
         }
     }
 
@@ -63,7 +62,7 @@ export default function ScoringNote(props: Props) {
         <span style={{display: "flex", alignItems: "center"}}>
             {newNoteModal}
             <span style={{marginLeft: 10}}>Note: </span>
-            <Select style={{marginLeft: 5, width: 125}} value={[props.scoring_note]}
+            <Select style={{marginLeft: 5, width: 125}} value={props.scoring_note}
                     onSelect={props.set_scoring_note}
                     dropdownRender={menu => newButton(menu)}>
 

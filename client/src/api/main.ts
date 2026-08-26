@@ -1,5 +1,5 @@
 import {createApi, fetchBaseQuery, retry} from '@reduxjs/toolkit/query/react';
-import type {Collection, Question, ScoringNote} from '../types/models';
+import type {Category, Collection, Question, ScoringNote} from '../types/models';
 
 export const baseQuery = retry(fetchBaseQuery({
     baseUrl: '/',
@@ -47,7 +47,7 @@ export const baseQuery = retry(fetchBaseQuery({
 export const mainApi = createApi({
     reducerPath: 'mainApi',
     baseQuery: baseQuery,
-    tagTypes: ['collections', 'questions', 'scoring_notes'],
+    tagTypes: ['collections', 'questions', 'scoring_notes', 'categories'],
     endpoints: (builder) => ({
         getCollections: builder.query<{collections: Collection[]}, void>({
             query: () => ({url: `editor/collections`}),
@@ -132,6 +132,44 @@ export const mainApi = createApi({
             }),
             invalidatesTags: ["scoring_notes", "questions"]
         }),
+        getCategories: builder.query<Category[], void>({
+            query: () => ({
+                url: `editor/categories`,
+            }),
+            providesTags: ["categories"]
+        }),
+        getOneCategory: builder.query<Category, string>({
+            query: (id) => ({
+                url: `editor/category/${id}`,
+            }),
+        }),
+        createCategory: builder.mutation<Category, Partial<Category>>({
+            query: (body) => ({
+                url: `editor/category`,
+                method: "POST",
+                body: body
+            }),
+            invalidatesTags: ["categories"]
+        }),
+        updateCategory: builder.mutation<Category, {id: string; body: Partial<Category>}>({
+            query: (args) => ({
+                url: `editor/category/${args.id}`,
+                method: "PUT",
+                body: args.body
+            }),
+            // A renamed category (or a changed note) shows up in every place
+            // questions are listed, so refresh questions too.
+            invalidatesTags: ["categories", "questions"]
+        }),
+        deleteCategory: builder.mutation<Category, string>({
+            query: (id) => ({
+                url: `editor/category/${id}`,
+                method: "DELETE",
+            }),
+            // Deleting a category nulls referencing questions' category_id
+            // server-side, so the question list must refetch.
+            invalidatesTags: ["categories", "questions"]
+        }),
     })
 })
 
@@ -149,4 +187,9 @@ export const {
     useGetOneScoringNoteQuery,
     useCreateScoringNoteMutation,
     useDeleteScoringNoteMutation,
+    useGetCategoriesQuery,
+    useGetOneCategoryQuery,
+    useCreateCategoryMutation,
+    useUpdateCategoryMutation,
+    useDeleteCategoryMutation,
 } = mainApi

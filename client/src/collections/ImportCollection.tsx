@@ -3,6 +3,7 @@ import React, {useState} from 'react';
 import {Button, Card, Modal, Tag} from 'antd';
 import {useGetCollectionQuery, useImportCollectionMutation} from "../api/main";
 import FormattedQuestion from "../question/FormattedQuestion";
+import CategoryName from "../category/CategoryName";
 import {Link, useNavigate} from "react-router";
 import notify, {errorMessage} from "../common/notify";
 
@@ -57,7 +58,8 @@ export default function ImportCollection(props: Props) {
     }
 
     const questions = data?.question_data?.map((question) =>
-        <Card title={question.category} style={{margin: 10}} bodyStyle={{padding: 0}}>
+        // question.category is the category's ID (ticket #180); resolve it.
+        <Card title={<CategoryName id={question.category}/>} style={{margin: 10}} bodyStyle={{padding: 0}}>
             <div style={{height: 250, width: 350, overflowY: "auto", padding: 10}}>
                 <FormattedQuestion question={question.question} answer={question.answer}/>
             </div>

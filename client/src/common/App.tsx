@@ -26,6 +26,7 @@ const QUESTION = "Questions"
 const ROUND = "Rounds"
 const GAME = "Games"
 const COLLECTION = "Collections"
+const CATEGORY = "Categories"
 
 // Editor lists are lazy-loaded so anonymous players (who only ever hit "/")
 // don't download the editor bundle. Each is fetched on first navigation to its
@@ -34,6 +35,7 @@ const QuestionList = lazy(() => import("../question/QuestionList"));
 const RoundList = lazy(() => import("../round/RoundList"));
 const GameList = lazy(() => import("../game/GameList"));
 const CollectionList = lazy(() => import("../collections/CollectionList"));
+const CategoryList = lazy(() => import("../category/CategoryList"));
 
 function RouteFallback() {
     return <div style={{display: "flex", justifyContent: "center", padding: "3rem"}}><Spin/></div>;
@@ -133,9 +135,12 @@ export default function App() {
                   <Menu.Item key="5" disabled={!showEditor}>
                       <Link to={"collections"}>{COLLECTION}</Link>
                   </Menu.Item>
+                  <Menu.Item key="6" disabled={!showEditor}>
+                      <Link to={"categories"}>{CATEGORY}</Link>
+                  </Menu.Item>
                 </SubMenu>
 
-                  <Menu.Item key="6" style={{float: "right"}} className="nohover">
+                  <Menu.Item key="7" style={{float: "right"}} className="nohover">
                       <AuthButton loading={authIsLoading}/>
                   </Menu.Item>
 
@@ -169,6 +174,9 @@ export default function App() {
                                 </Route>
                                 <Route path="collections" element={authRequired}>
                                     <Route index element={<AuthRequired token={token} component={<CollectionList/>}/>}/>
+                                </Route>
+                                <Route path="categories" element={authRequired}>
+                                    <Route index element={<AuthRequired token={token} component={<CategoryList/>}/>}/>
                                 </Route>
                                 <Route path="*" element={nothingView}/>
                             </Routes>

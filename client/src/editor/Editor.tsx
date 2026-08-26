@@ -6,11 +6,13 @@ import GameList from "../game/GameList"
 
 import { Breadcrumb } from 'antd';
 import CollectionList from "../collections/CollectionList";
+import CategoryList from "../category/CategoryList";
 
 const QUESTIONS = "Questions"
 const ROUNDS = "Rounds"
 const GAMES = "Games"
 const COLLECTIONS = "Collections"
+const CATEGORIES = "Categories"
 
 interface Props {
     section: string
@@ -34,6 +36,7 @@ class Editor extends React.Component<Props> {
                     {this.props.section === QUESTIONS ? <QuestionList token={this.props.token} /> : null}
                     {this.props.section === GAMES ? <GameList token={this.props.token} /> : null}
                     {this.props.section === COLLECTIONS ? <CollectionList token={this.props.token} /> : null}
+                    {this.props.section === CATEGORIES ? <CategoryList token={this.props.token} /> : null}
                 </div>
             </div>
         );
