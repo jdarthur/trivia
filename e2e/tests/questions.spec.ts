@@ -180,4 +180,40 @@ editorTest.describe('question type change (ticket #166)', () => {
     await modal.locator('.ant-modal-close').click();
     await expect(modal).toBeHidden();
   });
+
+  editorTest('multiple-choice requires a correct answer before advancing to Preview', async ({ editorPage }) => {
+    await editorPage.getByRole('button', { name: /New/ }).first().click();
+    const modal = editorPage.locator('.ant-modal:has(.ant-modal-title)');
+    await expect(modal).toBeVisible();
+    await expect(modal.locator('.ant-modal-title')).toHaveText('Add question');
+
+    // Step 1 (Basic info): switch to Multiple choice, then advance.
+    await modal.locator('.ant-radio-wrapper', { hasText: 'Multiple choice' }).click();
+    await modal.getByRole('button', { name: 'Next', exact: true }).click();
+
+    // Step 2 (Question editor): add two choices.
+    const addChoice = modal.getByRole('button', { name: /Add choice/ });
+    await addChoice.click();
+    await addChoice.click();
+    await modal.locator('input[placeholder="Choice"]').first().fill('Option A');
+    await modal.locator('input[placeholder="Choice"]').nth(1).fill('Option B');
+
+    // No correct answer selected: Next shows the validation error and stays on
+    // the Question step.
+    await modal.getByRole('button', { name: 'Next', exact: true }).click();
+    await expect(modal.getByText('Please select a correct answer')).toBeVisible();
+    await expect(addChoice).toBeVisible();
+
+    // Select the first choice as correct: the error clears.
+    await modal.locator('.ant-radio-wrapper').first().click();
+    await expect(modal.getByText('Please select a correct answer')).toBeHidden();
+
+    // Now Next advances to the Preview step.
+    await modal.getByRole('button', { name: 'Next', exact: true }).click();
+    await expect(modal.getByRole('button', { name: 'Add', exact: true })).toBeVisible();
+
+    // Dismiss without saving (the form is empty, so the X button just closes).
+    await modal.locator('.ant-modal-close').click();
+    await expect(modal).toBeHidden();
+  });
 });

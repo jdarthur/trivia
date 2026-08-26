@@ -2,7 +2,7 @@ import React, {useEffect, useState} from 'react';
 import './Question.css';
 
 import {Input, Modal, Radio, Button, Select, Steps, Popconfirm, Tooltip} from 'antd';
-import {ContainerOutlined, EditOutlined, MinusCircleOutlined, OrderedListOutlined, SwapOutlined} from '@ant-design/icons';
+import {ContainerOutlined, EditOutlined, ExclamationCircleOutlined, MinusCircleOutlined, OrderedListOutlined, SwapOutlined} from '@ant-design/icons';
 import FormattedQuestion from "./FormattedQuestion"
 import EditorToolbar from "./EditorToolbar";
 import {ANSWER, CATEGORY, QUESTION} from "./EditQuestionController";
@@ -21,7 +21,7 @@ const BUCKETING = "bucketing"
 
 // Ticket #166: the three steps of the multi-step question editor.
 const STEP_BASIC = 0
-const STEP_EDITOR = 1
+export const STEP_EDITOR = 1
 const STEP_PREVIEW = 2
 export const STEP_COUNT = 3
 
@@ -70,6 +70,9 @@ interface Props {
     // (e.g. the live in-game hot-edit), the legacy single-view modal renders.
     steps?: boolean
     step?: number
+    // Validation message for the current step (e.g. "Please select a correct
+    // answer"); rendered above the form in the Question step when non-empty.
+    step_error?: string
 }
 
 export default function EditQuestionModal(props: Props) {
@@ -454,6 +457,12 @@ export default function EditQuestionModal(props: Props) {
                         <span style={{display: "flex", justifyContent: "flex-start", marginBottom: 10}}>
                             <EditorToolbar wrap={wrap} wrap_line={wrap_line} insert={insert}/>
                         </span>
+                        {props.step_error ? (
+                            <div style={{display: "flex", alignItems: "center", color: "#ff4d4f", marginBottom: 10}}>
+                                <ExclamationCircleOutlined style={{marginRight: 6}}/>
+                                {props.step_error}
+                            </div>
+                        ) : null}
                         {editView}
                     </div>
                 ) : (
