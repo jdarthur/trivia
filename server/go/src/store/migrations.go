@@ -479,6 +479,57 @@ var migrations = []migration{
 			)`,
 		},
 	},
+	{
+		version: 13,
+		name:    "category table and question category_id",
+		// ticket #178 (part of #167): Category becomes a root model. The new
+		// category table carries the optional scoring note that used to live
+		// per-question, and question gains a category_id FK.
+		//
+		// Deliberately additive: the legacy question.category text column and
+		// question.scoring_note_id stay in place so existing code keeps
+		// working unchanged. The API ticket (#179) switches question writes to
+		// category_id and drops the legacy columns in its own migration. No
+		// table rebuild is needed — ALTER TABLE ADD COLUMN with a REFERENCES
+		// clause is legal because the column is nullable (default NULL).
+		statements: []string{
+			`CREATE TABLE category (
+				id              TEXT PRIMARY KEY,
+				user_id         TEXT NOT NULL DEFAULT '',
+				create_date     TEXT NOT NULL,
+				name            TEXT NOT NULL DEFAULT '',
+				scoring_note_id TEXT REFERENCES scoring_note(id) ON DELETE SET NULL
+			)`,
+
+			// Backfill one category row per distinct (category text, user) in
+			// use today. create_date comes from the oldest question in the
+			// group, so it is already in the API's wire/storage format. IDs
+			// are opaque random hex (nothing parses them).
+			`INSERT INTO category (id, user_id, create_date, name)
+				SELECT lower(hex(randomblob(16))), user_id, MIN(create_date), category
+				FROM question WHERE category != '' GROUP BY category, user_id`,
+
+			// A category inherits a scoring note only when every question
+			// using it references the same note; mixed or absent notes leave
+			// it NULL (the "no note" sentinel).
+			`UPDATE category SET scoring_note_id = (
+				SELECT MIN(q.scoring_note_id) FROM question q
+				WHERE q.category = category.name AND q.user_id = category.user_id
+				  AND q.scoring_note_id IS NOT NULL
+				  AND (SELECT COUNT(DISTINCT q2.scoring_note_id) FROM question q2
+					   WHERE q2.category = category.name AND q2.user_id = category.user_id
+						 AND q2.scoring_note_id IS NOT NULL) = 1
+			)`,
+
+			`ALTER TABLE question ADD COLUMN category_id TEXT REFERENCES category(id) ON DELETE SET NULL`,
+
+			// Point each question at its backfilled category row.
+			`UPDATE question SET category_id = (
+				SELECT c.id FROM category c
+				WHERE c.name = question.category AND c.user_id = question.user_id
+			) WHERE category != ''`,
+		},
+	},
 }
 
 // Migrate brings db up to the latest schema version, applying each pending

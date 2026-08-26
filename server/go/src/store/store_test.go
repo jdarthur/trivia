@@ -36,8 +36,8 @@ func TestMigrateCreatesBaselineSchema(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Version: %v", err)
 	}
-	if v != 12 {
-		t.Fatalf("user_version = %d, want 12", v)
+	if v != 13 {
+		t.Fatalf("user_version = %d, want 13", v)
 	}
 
 	tables := []string{
@@ -52,6 +52,8 @@ func TestMigrateCreatesBaselineSchema(t *testing.T) {
 		// migration 12 (ticket #164): bucketing child tables
 		"question_bucket", "question_bucket_item",
 		"session_question_bucket", "session_question_bucket_item",
+		// migration 13 (ticket #178): category root model
+		"category",
 	}
 	for _, name := range tables {
 		var n int
@@ -298,8 +300,8 @@ func TestMigrateIsIdempotent(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Version: %v", err)
 	}
-	if v != 12 {
-		t.Fatalf("user_version = %d after re-migrate, want 12", v)
+	if v != 13 {
+		t.Fatalf("user_version = %d after re-migrate, want 13", v)
 	}
 }
 
@@ -478,6 +480,185 @@ func TestMigrateRebuildsQuestionTypePreservesData(t *testing.T) {
 	// foreign keys still enforced against the rebuilt tables
 	if _, err := db.Exec(`INSERT INTO round_question (round_id, question_id, position) VALUES ('r1', 'nope', 0)`); err == nil {
 		t.Error("expected FK violation on round_question.question_id after rebuild")
+	}
+}
+
+// TestMigrateAddsCategoryBackfill verifies migration 13 (ticket #178): the
+// category table and question.category_id are added additively, existing
+// free-text categories are backfilled into rows (one per distinct (category,
+// user)), a scoring note shared by every question of a category is preserved
+// onto the category, the legacy columns stay in place, and the new FK is
+// enforced (unknown category_id rejected, category delete nulls references).
+func TestMigrateAddsCategoryBackfill(t *testing.T) {
+	db, err := Open(filepath.Join(t.TempDir(), "trivia.db"))
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+	t.Cleanup(func() { db.Close() })
+
+	// forward-only Migrate can't stop at 12, so apply migrations 1..12
+	// directly (the test is in the store package and can see the list).
+	for _, m := range migrations {
+		if m.version > 12 {
+			break
+		}
+		if err := apply(db, m); err != nil {
+			t.Fatalf("apply migration %d: %v", m.version, err)
+		}
+	}
+
+	// scoring notes referenced by the seeded questions
+	for _, n := range []struct{ id, user string }{
+		{"n1", "u1"}, {"n2", "u1"}, {"n3", "u1"},
+	} {
+		mustExec(t, db, `INSERT INTO scoring_note (id, user_id, create_date, last_used, name, description)
+			VALUES (?, ?, '2026-01-01T00:00:00.000000', '', 'name', 'desc')`, n.id, n.user)
+	}
+
+	// v12-era questions: two categories for u1 (History shares note n1,
+	// Science mixes n2/n3), one category for u2 (categories are per-user),
+	// and one question with no category at all.
+	seed := []struct {
+		id, user, category, note, createDate string
+	}{
+		{"q1", "u1", "History", "n1", "2026-01-01T00:00:00.000000"},
+		{"q2", "u1", "History", "n1", "2026-01-02T00:00:00.000000"},
+		{"q5", "u1", "History", "", "2026-01-03T00:00:00.000000"},
+		{"q3", "u1", "Science", "n2", "2026-01-04T00:00:00.000000"},
+		{"q4", "u1", "Science", "n3", "2026-01-05T00:00:00.000000"},
+		{"q6", "u2", "History", "n1", "2026-01-06T00:00:00.000000"},
+		{"q7", "u1", "", "", "2026-01-07T00:00:00.000000"},
+	}
+	for _, q := range seed {
+		var note interface{}
+		if q.note != "" {
+			note = q.note
+		}
+		mustExec(t, db, `INSERT INTO question (id, create_date, category, question, answer, user_id, scoring_note_id)
+			VALUES (?, ?, ?, '', '', ?, ?)`, q.id, q.createDate, q.category, q.user, note)
+	}
+
+	// a session snapshot row must pass through untouched
+	mustExec(t, db, `INSERT INTO session (id, create_date) VALUES ('s1', '2026-01-01T00:00:00.000000')`)
+	mustExec(t, db, `INSERT INTO session_question (session_id, round_index, question_index, category)
+		VALUES ('s1', 0, 0, 'History')`)
+
+	if err := Migrate(db); err != nil {
+		t.Fatalf("Migrate to 13: %v", err)
+	}
+
+	// one category row per distinct (category, user)
+	var n int
+	if err := db.QueryRow("SELECT count(*) FROM category").Scan(&n); err != nil {
+		t.Fatal(err)
+	}
+	if n != 3 {
+		t.Errorf("category rows = %d, want 3", n)
+	}
+
+	catID := func(name, user string) string {
+		t.Helper()
+		var id string
+		if err := db.QueryRow("SELECT id FROM category WHERE name = ? AND user_id = ?", name, user).Scan(&id); err != nil {
+			t.Fatalf("category %q/%q: %v", name, user, err)
+		}
+		return id
+	}
+	histU1 := catID("History", "u1")
+	sciU1 := catID("Science", "u1")
+	histU2 := catID("History", "u2")
+
+	// create_date is the oldest question's timestamp; a note shared by all of
+	// a category's questions is preserved, mixed notes stay NULL
+	check := func(name, user, wantDate string, wantNote sql.NullString) {
+		t.Helper()
+		var date string
+		var note sql.NullString
+		if err := db.QueryRow("SELECT create_date, scoring_note_id FROM category WHERE name = ? AND user_id = ?", name, user).Scan(&date, &note); err != nil {
+			t.Fatal(err)
+		}
+		if date != wantDate {
+			t.Errorf("category %q/%q create_date = %q, want %q", name, user, date, wantDate)
+		}
+		if !note.Valid != !wantNote.Valid || (note.Valid && note.String != wantNote.String) {
+			t.Errorf("category %q/%q scoring_note_id = %+v, want %+v", name, user, note, wantNote)
+		}
+	}
+	check("History", "u1", "2026-01-01T00:00:00.000000", sql.NullString{String: "n1", Valid: true})
+	check("Science", "u1", "2026-01-04T00:00:00.000000", sql.NullString{})
+	check("History", "u2", "2026-01-06T00:00:00.000000", sql.NullString{String: "n1", Valid: true})
+
+	// questions point at their backfilled category; the uncategorized one is NULL
+	for _, q := range []struct {
+		id   string
+		want string
+	}{
+		{"q1", histU1}, {"q2", histU1}, {"q5", histU1},
+		{"q3", sciU1}, {"q4", sciU1},
+		{"q6", histU2},
+		{"q7", ""},
+	} {
+		var got sql.NullString
+		if err := db.QueryRow("SELECT category_id FROM question WHERE id = ?", q.id).Scan(&got); err != nil {
+			t.Fatal(err)
+		}
+		gotStr := ""
+		if got.Valid {
+			gotStr = got.String
+		}
+		if gotStr != q.want {
+			t.Errorf("question %s category_id = %q, want %q", q.id, gotStr, q.want)
+		}
+	}
+
+	// legacy columns still present alongside category_id
+	rows, err := db.Query("PRAGMA table_info(question)")
+	if err != nil {
+		t.Fatalf("query table_info: %v", err)
+	}
+	defer rows.Close()
+	cols := map[string]bool{}
+	for rows.Next() {
+		var cid int
+		var name, typ string
+		var notnull, pk int
+		var dflt interface{}
+		if err := rows.Scan(&cid, &name, &typ, &notnull, &dflt, &pk); err != nil {
+			t.Fatalf("scan table_info row: %v", err)
+		}
+		cols[name] = true
+	}
+	if err := rows.Err(); err != nil {
+		t.Fatalf("iterate table_info: %v", err)
+	}
+	for _, want := range []string{"category", "scoring_note_id", "category_id"} {
+		if !cols[want] {
+			t.Errorf("question missing column %q after migration 13", want)
+		}
+	}
+
+	// FK enforced: a question referencing an unknown category is rejected
+	if _, err := db.Exec("INSERT INTO question (id, create_date, category_id) VALUES ('qx', '2026-01-01T00:00:00.000000', 'nope')"); err == nil {
+		t.Error("expected FK violation inserting question with unknown category_id")
+	}
+
+	// ON DELETE SET NULL: deleting a category clears referencing questions
+	mustExec(t, db, "DELETE FROM category WHERE id = ?", sciU1)
+	var got sql.NullString
+	if err := db.QueryRow("SELECT category_id FROM question WHERE id = 'q3'").Scan(&got); err != nil {
+		t.Fatal(err)
+	}
+	if got.Valid {
+		t.Errorf("q3 category_id = %q after category delete, want NULL", got.String)
+	}
+
+	// session snapshot untouched
+	var cat string
+	if err := db.QueryRow("SELECT category FROM session_question WHERE session_id = 's1'").Scan(&cat); err != nil {
+		t.Fatal(err)
+	}
+	if cat != "History" {
+		t.Errorf("session_question category = %q, want 'History'", cat)
 	}
 }
 
