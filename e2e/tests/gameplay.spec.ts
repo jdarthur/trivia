@@ -111,6 +111,38 @@ async function seedStartableMCGame(request: APIRequestContext, prefix: string) {
   return { gameId, roundId, qids: [q1, q2] };
 }
 
+// Create a bucketing question (ticket #164): items sorted into buckets, e.g.
+// frog/lion/human into Amphibian/Mammal.
+async function createBucketingQuestion(request: APIRequestContext, category: string, question: string): Promise<string> {
+  const res = await request.post('/editor/question', {
+    headers: { 'borttrivia-token': token },
+    data: {
+      category,
+      question,
+      answer: '',
+      scoring_note: '',
+      question_type: 'bucketing',
+      buckets: [{ text: 'Amphibian' }, { text: 'Mammal' }],
+      items: [
+        { text: 'frog', bucket: 'Amphibian' },
+        { text: 'lion', bucket: 'Mammal' },
+        { text: 'human', bucket: 'Mammal' },
+      ],
+    },
+  });
+  expect(res.ok()).toBeTruthy();
+  return (await res.json()).id;
+}
+
+// Seed a startable game whose first question is bucketing (ticket #164).
+async function seedStartableBucketingGame(request: APIRequestContext, prefix: string) {
+  const q1 = await createBucketingQuestion(request, `e2e-cat-${prefix}`, `Bucketing question ${prefix}`);
+  const q2 = await createQuestion(request, `e2e-cat-${prefix}`, `Second question ${prefix}`, 'Answer two');
+  const roundId = await createRound(request, `e2e-round-${prefix}`, [q1, q2], [100, 200]);
+  const gameId = await createGame(request, `e2e-game-${prefix}`, roundId);
+  return { gameId, roundId, qids: [q1, q2] };
+}
+
 // Create a session for the game; the response carries the mod's player id.
 async function createSession(request: APIRequestContext, name: string, gameId: string) {
   const res = await request.post('/gameplay/session', { data: { name, game_id: gameId } });
@@ -913,6 +945,85 @@ test.describe('gameplay navigation, hot-edit, spectator & edge cases', () => {
       timeout: 30000,
     });
     await expect(playerPage.locator('.active-question-box').locator('p').filter({ hasText: 'Answer C' })).toHaveCount(0);
+
+    await playerContext.close();
+    await modContext.close();
+    await cleanup(request, seeded, { sessionId, modId, playerIds: [playerId] });
+  });
+
+  test('bucketing: a player sorts items into buckets and the answer is auto-scored', async ({
+    browser,
+    request,
+  }) => {
+    test.setTimeout(90000);
+    const prefix = unique();
+    const seeded = await seedStartableBucketingGame(request, prefix);
+    const { sessionId, modId } = await createSession(request, `e2e-session-${prefix}`, seeded.gameId);
+    const { context: modContext, page: modPage } = await openModLobby(browser, sessionId, modId);
+    const { context: playerContext, page: playerPage, playerId } = await joinPlayer(
+      browser,
+      sessionId,
+      `Team ${prefix}`,
+      `Player ${prefix}`,
+    );
+    await modPage.locator('.start-button').click();
+    await expect(modPage.locator('.active-game')).toBeVisible({ timeout: 30000 });
+    await expect(playerPage.locator('.active-game')).toBeVisible({ timeout: 30000 });
+
+    // The mod's question box shows the items and buckets side by side (the
+    // buckets are shuffled for players, canonical for the mod).
+    const modBox = modPage.locator('.active-question-box');
+    await expect(modBox.locator('li').filter({ hasText: 'frog' })).toBeVisible({ timeout: 30000 });
+    await expect(modBox.locator('li').filter({ hasText: 'Amphibian' })).toBeVisible();
+
+    // The player's answer card lists each item with a Bucket select.
+    const card = playerPage.locator('.ant-card').filter({
+      has: playerPage.getByRole('button', { name: 'Answer', exact: true }),
+    });
+    const itemRows = card.locator('.ant-select');
+    await expect(itemRows).toHaveCount(3, { timeout: 30000 });
+
+    // Assign frog -> Amphibian, lion -> Mammal, human -> Mammal. After each
+    // selection wait for the antd dropdown to fully close, so the next
+    // select never opens while a stale dropdown is still overlapping.
+    const pick = async (rowIndex: number, bucket: string) => {
+      await itemRows.nth(rowIndex).click();
+      const option = playerPage
+        .locator('.ant-select-dropdown:visible .ant-select-item-option')
+        .filter({ hasText: bucket });
+      await expect(option.first()).toBeVisible();
+      await option.first().click();
+      await expect(playerPage.locator('.ant-select-dropdown:visible')).toHaveCount(0);
+    };
+    await pick(0, 'Amphibian');
+    await pick(1, 'Mammal');
+    await pick(2, 'Mammal');
+
+    await card.locator('.ant-radio-button-wrapper').filter({ hasText: '100' }).click();
+    const answerButton = card.getByRole('button', { name: 'Answer', exact: true });
+    await expect(answerButton).toBeEnabled();
+    await answerButton.click();
+
+    // The stored answer is the item -> bucket JSON map.
+    await expect
+      .poll(async () => (await playerAnswers(request, sessionId, modId, playerId, 0, 0)).length)
+      .toBe(1);
+    const submitted = (await playerAnswers(request, sessionId, modId, playerId, 0, 0))[0].answer;
+    expect(JSON.parse(submitted)).toEqual({ frog: 'Amphibian', lion: 'Mammal', human: 'Mammal' });
+
+    // Bucketing is auto-scored by the backend, so the mod's scorer has no
+    // manual correct/incorrect buttons — the Score button is all that's needed.
+    const scoreButton = modPage.locator('.player-scorer').getByRole('button', { name: 'Score', exact: true });
+    await expect(scoreButton).toBeEnabled({ timeout: 30000 });
+    await scoreButton.click();
+
+    // The complete correct mapping scores.
+    await expect
+      .poll(async () => {
+        const answers = await playerAnswers(request, sessionId, modId, playerId, 0, 0);
+        return answers[answers.length - 1]?.correct;
+      })
+      .toBe(true);
 
     await playerContext.close();
     await modContext.close();

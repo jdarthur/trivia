@@ -3,7 +3,7 @@ import '../question/Question.css';
 
 import {Button} from 'antd';
 import EditQuestionModal from "../question/EditQuestionModal";
-import type {QuestionChoice, QuestionPair} from "../types/models";
+import type {QuestionBucket, QuestionBucketItem, QuestionChoice, QuestionPair} from "../types/models";
 
 interface Props {
     category: string
@@ -18,6 +18,8 @@ interface Props {
     question_type?: string
     choices?: string[]
     pairs?: QuestionPair[]
+    buckets?: QuestionBucket[]
+    items?: QuestionBucketItem[]
 }
 
 interface State {
@@ -44,7 +46,9 @@ class HotEditQuestion extends React.Component<Props, State> {
     }
 
     structured = () => {
-        return this.props.question_type === "multiple_choice" || this.props.question_type === "matching"
+        return this.props.question_type === "multiple_choice"
+            || this.props.question_type === "matching"
+            || this.props.question_type === "bucketing"
     }
 
     save_self = () => {
@@ -111,6 +115,8 @@ class HotEditQuestion extends React.Component<Props, State> {
                                    text: text, is_correct: false
                                }))}
                                pairs={this.props.pairs}
+                               buckets={this.props.buckets}
+                               items={this.props.items}
                                disabled={this.structured()}
                                visible={true}/>
         );

@@ -75,6 +75,8 @@ type QuestionInRound struct {
 	Choices       []string `json:"choices,omitempty"` // MC: option texts, NO is_correct
 	Lefts         []string `json:"lefts,omitempty"`   // matching: column A
 	Rights        []string `json:"rights,omitempty"`  // matching: column B
+	Buckets       []string `json:"buckets,omitempty"` // bucketing: bucket names
+	Items         []string `json:"items,omitempty"`   // bucketing: item texts
 }
 
 type ScoreRequest struct {

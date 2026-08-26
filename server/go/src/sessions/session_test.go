@@ -1134,6 +1134,17 @@ func createMatchingQuestion(t *testing.T, env *Env, pairs []models.QuestionPair)
 	return q.ID
 }
 
+func createBucketingQuestion(t *testing.T, env *Env, buckets []models.QuestionBucket, items []models.QuestionBucketItem) string {
+	t.Helper()
+	q, err := questions.CreateOneQuestion((*questions.Env)(env), "user-1", models.Question{
+		Question: "B?", QuestionType: "bucketing", Buckets: buckets, Items: items,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return q.ID
+}
+
 // newStructuredSession builds a session around a single given question, two
 // players, and the (0,0) snapshot set.
 func newStructuredSession(t *testing.T, env *Env, questionId string) (session models.Session, p1 models.PlayerId, p2 models.PlayerId) {
@@ -1247,6 +1258,36 @@ func TestSetCurrentQuestionSnapshotsStructuredType(t *testing.T) {
 	}
 	if n != 2 {
 		t.Errorf("snapshot matches = %d, want 2", n)
+	}
+
+	// bucketing snapshot
+	bkID := createBucketingQuestion(t, env,
+		[]models.QuestionBucket{{Text: "B1"}, {Text: "B2"}},
+		[]models.QuestionBucketItem{{Text: "I1", Bucket: "B1"}, {Text: "I2", Bucket: "B2"}})
+	session3, _, _ := newStructuredSession(t, env, bkID)
+	if err := env.Db.QueryRow(
+		`SELECT question_type FROM session_question WHERE session_id = ? AND round_index = 0 AND question_index = 0`,
+		session3.ID).Scan(&typ); err != nil {
+		t.Fatal(err)
+	}
+	if typ != "bucketing" {
+		t.Errorf("session_question question_type = %q, want bucketing", typ)
+	}
+	if err := env.Db.QueryRow(
+		`SELECT count(*) FROM session_question_bucket WHERE session_id = ? AND round_index = 0 AND question_index = 0`,
+		session3.ID).Scan(&n); err != nil {
+		t.Fatal(err)
+	}
+	if n != 2 {
+		t.Errorf("snapshot buckets = %d, want 2", n)
+	}
+	if err := env.Db.QueryRow(
+		`SELECT count(*) FROM session_question_bucket_item WHERE session_id = ? AND round_index = 0 AND question_index = 0`,
+		session3.ID).Scan(&n); err != nil {
+		t.Fatal(err)
+	}
+	if n != 2 {
+		t.Errorf("snapshot bucket items = %d, want 2", n)
 	}
 }
 
@@ -1410,6 +1451,31 @@ func TestStructuredPlayerView(t *testing.T) {
 	if q.Answer != "" {
 		t.Errorf("player saw the matching answer key pre-score: %q", q.Answer)
 	}
+
+	// bucketing: items/buckets present, no mapping revealed pre-score
+	bkID := createBucketingQuestion(t, env,
+		[]models.QuestionBucket{{Text: "Amphibian"}, {Text: "Mammal"}},
+		[]models.QuestionBucketItem{
+			{Text: "frog", Bucket: "Amphibian"},
+			{Text: "lion", Bucket: "Mammal"},
+			{Text: "human", Bucket: "Mammal"},
+		})
+	session3, _, p3 := newStructuredSession(t, env, bkID)
+	recorder = httptest.NewRecorder()
+	c, _ = gin.CreateTestContext(recorder)
+	c.Params = gin.Params{{Key: "id", Value: session3.ID}}
+	c.Request = httptest.NewRequest(http.MethodGet,
+		"/gameplay/session/"+session3.ID+"/current-question?player_id="+string(p3), nil)
+	env.GetCurrentQuestion(c)
+	if err := json.Unmarshal(recorder.Body.Bytes(), &q); err != nil {
+		t.Fatalf("bad current-question response %q: %v", recorder.Body.String(), err)
+	}
+	if len(q.Items) != 3 || len(q.Buckets) != 2 {
+		t.Errorf("player items/buckets = %+v / %+v, want 3 items and 2 buckets", q.Items, q.Buckets)
+	}
+	if q.Answer != "" {
+		t.Errorf("player saw the bucketing answer key pre-score: %q", q.Answer)
+	}
 }
 
 // TestMatchingRightsShuffledForPlayers verifies ticket #161: pre-score, the
@@ -1487,6 +1553,215 @@ func TestMatchingRightsShuffledForPlayers(t *testing.T) {
 	qScored := fetch(p1)
 	if !sameOrder(qScored.Rights, canonical) {
 		t.Errorf("post-score player rights %v, want canonical %v", qScored.Rights, canonical)
+	}
+}
+
+// TestAnswerRejectsInvalidBucketing verifies ticket #164: the API rejects a
+// bucketing answer that isn't a complete item->bucket mapping — unknown item,
+// unknown bucket, missing item, malformed JSON — with a 400 and stores
+// nothing, while a valid many-to-one answer (several items in one bucket) is
+// accepted.
+func TestAnswerRejectsInvalidBucketing(t *testing.T) {
+	env := openSessionTestDB(t)
+	gin.SetMode(gin.TestMode)
+
+	qid := createBucketingQuestion(t, env,
+		[]models.QuestionBucket{{Text: "Amphibian"}, {Text: "Reptile"}, {Text: "Mammal"}},
+		[]models.QuestionBucketItem{
+			{Text: "frog", Bucket: "Amphibian"},
+			{Text: "lion", Bucket: "Mammal"},
+			{Text: "human", Bucket: "Mammal"},
+		})
+	session, p1, _ := newStructuredSession(t, env, qid)
+
+	post := func(answer string) *httptest.ResponseRecorder {
+		t.Helper()
+		recorder := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(recorder)
+		c.Params = gin.Params{{Key: "id", Value: session.ID}}
+		body, err := json.Marshal(map[string]interface{}{
+			"player_id": string(p1), "answer": answer, "wager": 100,
+			"round_id": 0, "question_id": 0,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		c.Request = httptest.NewRequest(http.MethodPost, "/gameplay/session/"+session.ID+"/answer", bytes.NewReader(body))
+		c.Request.Header.Set("Content-Type", "application/json")
+		env.AnswerQuestion(c)
+		return recorder
+	}
+
+	invalid := map[string]string{
+		"unknown item":   `{"frog":"Amphibian","lion":"Mammal","dog":"Mammal"}`,
+		"unknown bucket": `{"frog":"Amphibian","lion":"Mammal","human":"Fish"}`,
+		"missing item":   `{"frog":"Amphibian","lion":"Mammal"}`,
+		"malformed JSON": "frog->Amphibian",
+	}
+	for name, answer := range invalid {
+		rec := post(answer)
+		if rec.Code != http.StatusBadRequest {
+			t.Errorf("%s: status = %d, want 400: %s", name, rec.Code, rec.Body.String())
+		}
+		var resp struct {
+			Errors string `json:"errors"`
+		}
+		if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+			t.Fatalf("%s: bad error response %q: %v", name, rec.Body.String(), err)
+		}
+		if resp.Errors == "" {
+			t.Errorf("%s: expected an error, got %s", name, rec.Body.String())
+		}
+	}
+
+	// none of the rejected answers were stored
+	var n int
+	if err := env.Db.QueryRow(`SELECT count(*) FROM answer
+		WHERE session_id = ? AND player_id = ?`, session.ID, string(p1)).Scan(&n); err != nil {
+		t.Fatal(err)
+	}
+	if n != 0 {
+		t.Fatalf("rejected bucketing answers were stored: %d rows", n)
+	}
+
+	// a valid many-to-one mapping (two items share a bucket) is accepted
+	if rec := post(`{"frog":"Amphibian","lion":"Mammal","human":"Mammal"}`); rec.Code != http.StatusOK {
+		t.Fatalf("valid many-to-one answer status = %d, want 200: %s", rec.Code, rec.Body.String())
+	}
+}
+
+// TestAutoScoreBucketing verifies bucketing auto-scoring: only a complete and
+// correct item->bucket mapping scores; partial, wrong, or malformed-JSON
+// answers are incorrect (not an error). Many items may share a bucket.
+func TestAutoScoreBucketing(t *testing.T) {
+	env := openSessionTestDB(t)
+	qid := createBucketingQuestion(t, env,
+		[]models.QuestionBucket{{Text: "Amphibian"}, {Text: "Mammal"}},
+		[]models.QuestionBucketItem{
+			{Text: "frog", Bucket: "Amphibian"},
+			{Text: "lion", Bucket: "Mammal"},
+			{Text: "human", Bucket: "Mammal"},
+		})
+	session, p1, p2 := newStructuredSession(t, env, qid)
+	p3 := addPlayerToSession(t, env, session.ID, "team-3")
+	p4 := addPlayerToSession(t, env, session.ID, "team-4")
+
+	addAnswer(t, env, session.ID, p1, `{"frog":"Amphibian","lion":"Mammal","human":"Mammal"}`, 100) // complete + correct
+	addAnswer(t, env, session.ID, p2, `{"frog":"Amphibian","lion":"Mammal"}`, 200)                  // partial
+	addAnswer(t, env, session.ID, p3, `{"frog":"Mammal","lion":"Amphibian","human":"Amphibian"}`, 300) // wrong mapping
+	addAnswer(t, env, session.ID, p4, "not-json", 400)                                              // malformed JSON
+
+	req := models.ScoreRequest{RoundIndex: 0, QuestionIndex: 0, Players: map[models.PlayerId]models.CorrectorNot{
+		p1: {Correct: false},
+		p2: {Correct: true},
+		p3: {Correct: true},
+		p4: {Correct: true},
+	}}
+	if err := scoreQuestionTx(env, session, req, 0, 0); err != nil {
+		t.Fatal(err)
+	}
+
+	answers, err := latestAnswersForQuestion(env, session.ID, 0, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := map[models.PlayerId]models.Answer{}
+	for _, a := range answers {
+		got[a.PlayerId] = a
+	}
+	if !got[p1].Correct || got[p1].PointsAwarded != 100 {
+		t.Errorf("p1 = correct:%v points:%v, want correct with 100", got[p1].Correct, got[p1].PointsAwarded)
+	}
+	if got[p2].Correct || got[p2].PointsAwarded != 0 {
+		t.Errorf("p2 = correct:%v points:%v, want incorrect (partial mapping)", got[p2].Correct, got[p2].PointsAwarded)
+	}
+	if got[p3].Correct || got[p3].PointsAwarded != 0 {
+		t.Errorf("p3 = correct:%v points:%v, want incorrect (wrong mapping)", got[p3].Correct, got[p3].PointsAwarded)
+	}
+	if got[p4].Correct || got[p4].PointsAwarded != 0 {
+		t.Errorf("p4 = correct:%v points:%v, want incorrect (malformed JSON)", got[p4].Correct, got[p4].PointsAwarded)
+	}
+}
+
+// TestBucketsShuffledForPlayers verifies ticket #164: pre-score, the
+// player-facing bucket list of a bucketing question is a deterministic
+// permutation of the canonical buckets — the same order for every player and
+// every refetch — while the mod's view stays canonical (it is the answer
+// key). Once scored, the player's view returns to canonical order, revealing
+// the answer the way matching does.
+func TestBucketsShuffledForPlayers(t *testing.T) {
+	env := openSessionTestDB(t)
+	gin.SetMode(gin.TestMode)
+
+	buckets := []models.QuestionBucket{{Text: "Amphibian"}, {Text: "Reptile"}, {Text: "Mammal"}}
+	qid := createBucketingQuestion(t, env, buckets,
+		[]models.QuestionBucketItem{
+			{Text: "frog", Bucket: "Amphibian"},
+			{Text: "snake", Bucket: "Reptile"},
+			{Text: "lion", Bucket: "Mammal"},
+		})
+	session, p1, p2 := newStructuredSession(t, env, qid)
+
+	fetch := func(player models.PlayerId) models.QuestionInRound {
+		t.Helper()
+		recorder := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(recorder)
+		c.Params = gin.Params{{Key: "id", Value: session.ID}}
+		c.Request = httptest.NewRequest(http.MethodGet,
+			"/gameplay/session/"+session.ID+"/current-question?player_id="+string(player), nil)
+		env.GetCurrentQuestion(c)
+		var q models.QuestionInRound
+		if err := json.Unmarshal(recorder.Body.Bytes(), &q); err != nil {
+			t.Fatalf("bad current-question response %q: %v", recorder.Body.String(), err)
+		}
+		return q
+	}
+
+	canonical := make([]string, 0, len(buckets))
+	for _, b := range buckets {
+		canonical = append(canonical, b.Text)
+	}
+
+	// pre-score: players see a permutation of the canonical buckets, identical
+	// across players and across refetches; the items stay canonical
+	q1 := fetch(p1)
+	q1again := fetch(p1)
+	q2 := fetch(p2)
+	if len(q1.Buckets) != len(buckets) {
+		t.Fatalf("player buckets = %v, want %d entries", q1.Buckets, len(buckets))
+	}
+	if !sameStrings(q1.Buckets, canonical) {
+		t.Errorf("player buckets %v are not a permutation of canonical %v", q1.Buckets, canonical)
+	}
+	if !sameOrder(q1.Buckets, q1again.Buckets) {
+		t.Errorf("refetch changed the player's bucket order: %v vs %v", q1.Buckets, q1again.Buckets)
+	}
+	if !sameOrder(q1.Buckets, q2.Buckets) {
+		t.Errorf("players saw different bucket orders: %v vs %v", q1.Buckets, q2.Buckets)
+	}
+	if !sameOrder(q1.Items, []string{"frog", "snake", "lion"}) {
+		t.Errorf("player items %v, want canonical item order", q1.Items)
+	}
+
+	// the mod's view stays canonical — it is the answer key
+	qMod := fetch(session.Moderator)
+	if !sameOrder(qMod.Buckets, canonical) {
+		t.Errorf("mod buckets %v, want canonical %v", qMod.Buckets, canonical)
+	}
+
+	// once scored, the player's view returns to canonical (answer reveal)
+	addAnswer(t, env, session.ID, p1, `{"frog":"Amphibian","snake":"Reptile","lion":"Mammal"}`, 100)
+	addAnswer(t, env, session.ID, p2, `{"frog":"Amphibian","snake":"Reptile","lion":"Mammal"}`, 100)
+	req := models.ScoreRequest{RoundIndex: 0, QuestionIndex: 0, Players: map[models.PlayerId]models.CorrectorNot{
+		p1: {Correct: true},
+		p2: {Correct: true},
+	}}
+	if err := scoreQuestionTx(env, session, req, 0, 0); err != nil {
+		t.Fatal(err)
+	}
+	qScored := fetch(p1)
+	if !sameOrder(qScored.Buckets, canonical) {
+		t.Errorf("post-score player buckets %v, want canonical %v", qScored.Buckets, canonical)
 	}
 }
 

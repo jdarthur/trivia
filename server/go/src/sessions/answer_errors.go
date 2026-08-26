@@ -69,3 +69,24 @@ func (e InvalidMatchingAnswerError) Field() string {
 func (e InvalidMatchingAnswerError) Data() interface{} {
 	return e.Answer
 }
+
+// InvalidBucketingAnswerError is returned when a bucketing answer violates
+// the shape of the question (ticket #164): the answer must be a JSON object
+// with exactly one entry per item, each key must be one of the question's
+// items, and each value must be one of the question's buckets. Unlike
+// matching, a bucket may be reused — bucketing is many-to-one. A malformed
+// or unknown-item/bucket answer is rejected at submit time instead of being
+// stored as a certain miss.
+type InvalidBucketingAnswerError struct {
+	Answer string
+	Reason string
+}
+func (e InvalidBucketingAnswerError) Error() string {
+	return "invalid bucketing answer: " + e.Reason
+}
+func (e InvalidBucketingAnswerError) Field() string {
+	return "answer"
+}
+func (e InvalidBucketingAnswerError) Data() interface{} {
+	return e.Answer
+}

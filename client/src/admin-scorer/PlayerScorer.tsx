@@ -115,9 +115,12 @@ class PlayerScorer extends React.Component<Props, State> {
         }
     }
 
-    // true when the active question is auto-scored (multiple_choice / matching).
+    // true when the active question is auto-scored (multiple_choice /
+    // matching / bucketing).
     auto_scored = () => {
-        return this.props.question_type === "multiple_choice" || this.props.question_type === "matching"
+        return this.props.question_type === "multiple_choice"
+            || this.props.question_type === "matching"
+            || this.props.question_type === "bucketing"
     }
 
     // Players still in the game (active = true on the wire; inactive members are

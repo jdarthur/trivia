@@ -1,6 +1,7 @@
 package store
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 )
@@ -22,6 +23,13 @@ type migration struct {
 	version    int
 	name       string
 	statements []string
+	// disableForeignKeys runs the migration on a dedicated connection with
+	// PRAGMA foreign_keys = OFF (restored afterwards). Needed for table
+	// rebuilds: SQLite's DROP TABLE performs an implicit DELETE whose ON
+	// DELETE CASCADE would wipe referencing child rows, and PRAGMA
+	// foreign_keys is a no-op inside a transaction, so the pragma must be
+	// toggled on the connection outside the BEGIN/COMMIT.
+	disableForeignKeys bool
 }
 
 // migrations is the ordered list of schema migrations. Never edit an applied
@@ -383,6 +391,94 @@ var migrations = []migration{
 			)`,
 		},
 	},
+	{
+		version: 12,
+		name:    "bucketing question type",
+		// ticket #164: questions gain a "bucketing" type — X items sorted
+		// into Y buckets (many-to-one), e.g. "which type of animal is each
+		// of these". The payload lives in two normalized child tables (the
+		// bucket list, and each item with its correct bucket), mirrored into
+		// the session snapshot like choice/match.
+		//
+		// Adding a value to the question_type CHECK requires rebuilding the
+		// question and session_question tables (SQLite cannot alter a CHECK
+		// constraint). The rebuild drops the old table, so it runs with
+		// foreign_keys off — otherwise the implicit DELETE would cascade
+		// through round_question / session_question_choice / _match and
+		// wipe live data. The index on session_question is recreated after
+		// the rename (DROP TABLE removes it with the table).
+		disableForeignKeys: true,
+		statements: []string{
+			`CREATE TABLE question_bucketing_new (
+				id              TEXT PRIMARY KEY,
+				create_date     TEXT NOT NULL,
+				category        TEXT NOT NULL DEFAULT '',
+				question        TEXT NOT NULL DEFAULT '',
+				answer          TEXT NOT NULL DEFAULT '',
+				user_id         TEXT NOT NULL DEFAULT '',
+				scoring_note_id TEXT REFERENCES scoring_note(id) ON DELETE SET NULL,
+				question_type   TEXT NOT NULL DEFAULT 'freeform'
+					CHECK (question_type IN ('freeform', 'multiple_choice', 'matching', 'bucketing'))
+			)`,
+			`INSERT INTO question_bucketing_new (id, create_date, category, question, answer, user_id, scoring_note_id, question_type)
+				SELECT id, create_date, category, question, answer, user_id, scoring_note_id, question_type FROM question`,
+			`DROP TABLE question`,
+			`ALTER TABLE question_bucketing_new RENAME TO question`,
+
+			`CREATE TABLE session_question_bucketing_new (
+				session_id      TEXT NOT NULL REFERENCES session(id) ON DELETE CASCADE,
+				round_index     INTEGER NOT NULL,
+				question_index  INTEGER NOT NULL,
+				question_id     TEXT NOT NULL DEFAULT '',
+				category        TEXT NOT NULL DEFAULT '',
+				question        TEXT NOT NULL DEFAULT '',
+				answer          TEXT NOT NULL DEFAULT '',
+				scoring_note_id TEXT NOT NULL DEFAULT '',
+				scored          INTEGER NOT NULL DEFAULT 0,
+				scoring_note    TEXT NOT NULL DEFAULT '',
+				question_type   TEXT NOT NULL DEFAULT 'freeform'
+					CHECK (question_type IN ('freeform', 'multiple_choice', 'matching', 'bucketing')),
+				PRIMARY KEY (session_id, round_index, question_index)
+			)`,
+			`INSERT INTO session_question_bucketing_new (session_id, round_index, question_index, question_id, category, question, answer, scoring_note_id, scored, scoring_note, question_type)
+				SELECT session_id, round_index, question_index, question_id, category, question, answer, scoring_note_id, scored, scoring_note, question_type FROM session_question`,
+			`DROP TABLE session_question`,
+			`ALTER TABLE session_question_bucketing_new RENAME TO session_question`,
+			`CREATE INDEX idx_session_question_session ON session_question(session_id)`,
+
+			`CREATE TABLE question_bucket (
+				question_id TEXT NOT NULL REFERENCES question(id) ON DELETE CASCADE,
+				position    INTEGER NOT NULL,
+				text        TEXT NOT NULL DEFAULT '',
+				PRIMARY KEY (question_id, position)
+			)`,
+			`CREATE TABLE question_bucket_item (
+				question_id TEXT NOT NULL REFERENCES question(id) ON DELETE CASCADE,
+				position    INTEGER NOT NULL,
+				text        TEXT NOT NULL DEFAULT '',
+				bucket_text TEXT NOT NULL DEFAULT '',
+				PRIMARY KEY (question_id, position)
+			)`,
+
+			`CREATE TABLE session_question_bucket (
+				session_id     TEXT NOT NULL REFERENCES session(id) ON DELETE CASCADE,
+				round_index    INTEGER NOT NULL,
+				question_index INTEGER NOT NULL,
+				position       INTEGER NOT NULL,
+				text           TEXT NOT NULL DEFAULT '',
+				PRIMARY KEY (session_id, round_index, question_index, position)
+			)`,
+			`CREATE TABLE session_question_bucket_item (
+				session_id     TEXT NOT NULL REFERENCES session(id) ON DELETE CASCADE,
+				round_index    INTEGER NOT NULL,
+				question_index INTEGER NOT NULL,
+				position       INTEGER NOT NULL,
+				text           TEXT NOT NULL DEFAULT '',
+				bucket_text    TEXT NOT NULL DEFAULT '',
+				PRIMARY KEY (session_id, round_index, question_index, position)
+			)`,
+		},
+	},
 }
 
 // Migrate brings db up to the latest schema version, applying each pending
@@ -406,6 +502,9 @@ func Migrate(db *sql.DB) error {
 }
 
 func apply(db *sql.DB, m migration) error {
+	if m.disableForeignKeys {
+		return applyWithForeignKeysOff(db, m)
+	}
 	tx, err := db.Begin()
 	if err != nil {
 		return fmt.Errorf("migration %d (%s): begin: %w", m.version, m.name, err)
@@ -420,6 +519,51 @@ func apply(db *sql.DB, m migration) error {
 
 	// user_version lives in the database header, so this bump is committed or
 	// rolled back together with the DDL above.
+	if _, err := tx.Exec(fmt.Sprintf("PRAGMA user_version = %d", m.version)); err != nil {
+		return fmt.Errorf("migration %d (%s): set user_version: %w", m.version, m.name, err)
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("migration %d (%s): commit: %w", m.version, m.name, err)
+	}
+	return nil
+}
+
+// applyWithForeignKeysOff applies a migration whose DDL drops a table other
+// tables still reference. SQLite's DROP TABLE performs an implicit DELETE
+// whose ON DELETE CASCADE actions fire under foreign_keys = 1, so the
+// rebuild would wipe referencing child rows; and PRAGMA foreign_keys is a
+// no-op inside a transaction. A dedicated connection is pinned, the pragma
+// is toggled outside the BEGIN/COMMIT, and the migration runs as a normal
+// transaction in between. The stored child-table FK clauses survive the
+// rebuild (they reference the table by name, which the rename restores), so
+// enforcement is re-established when the pragma is turned back on.
+func applyWithForeignKeysOff(db *sql.DB, m migration) error {
+	ctx := context.Background()
+	conn, err := db.Conn(ctx)
+	if err != nil {
+		return fmt.Errorf("migration %d (%s): conn: %w", m.version, m.name, err)
+	}
+	defer conn.Close()
+
+	if _, err := conn.ExecContext(ctx, "PRAGMA foreign_keys = OFF"); err != nil {
+		return fmt.Errorf("migration %d (%s): disable foreign keys: %w", m.version, m.name, err)
+	}
+	//nolint:errcheck // best-effort restore on the way out; the connection is closed anyway
+	defer conn.ExecContext(ctx, "PRAGMA foreign_keys = ON")
+
+	tx, err := conn.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("migration %d (%s): begin: %w", m.version, m.name, err)
+	}
+	defer tx.Rollback() //nolint:errcheck // no-op after a successful Commit
+
+	for _, stmt := range m.statements {
+		if _, err := tx.Exec(stmt); err != nil {
+			return fmt.Errorf("migration %d (%s): %w", m.version, m.name, err)
+		}
+	}
+
 	if _, err := tx.Exec(fmt.Sprintf("PRAGMA user_version = %d", m.version)); err != nil {
 		return fmt.Errorf("migration %d (%s): set user_version: %w", m.version, m.name, err)
 	}

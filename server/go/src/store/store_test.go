@@ -36,8 +36,8 @@ func TestMigrateCreatesBaselineSchema(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Version: %v", err)
 	}
-	if v != 11 {
-		t.Fatalf("user_version = %d, want 11", v)
+	if v != 12 {
+		t.Fatalf("user_version = %d, want 12", v)
 	}
 
 	tables := []string{
@@ -49,6 +49,9 @@ func TestMigrateCreatesBaselineSchema(t *testing.T) {
 		"user",
 		"question_choice", "question_match",
 		"session_question_choice", "session_question_match",
+		// migration 12 (ticket #164): bucketing child tables
+		"question_bucket", "question_bucket_item",
+		"session_question_bucket", "session_question_bucket_item",
 	}
 	for _, name := range tables {
 		var n int
@@ -295,8 +298,8 @@ func TestMigrateIsIdempotent(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Version: %v", err)
 	}
-	if v != 11 {
-		t.Fatalf("user_version = %d after re-migrate, want 11", v)
+	if v != 12 {
+		t.Fatalf("user_version = %d after re-migrate, want 12", v)
 	}
 }
 
@@ -376,7 +379,8 @@ func TestDBPathUsesEnvOrDefault(t *testing.T) {
 
 // TestQuestionTypeCheckConstraint verifies the CHECK constraint on
 // question.question_type and session_question.question_type rejects values
-// outside freeform / multiple_choice / matching (ticket #99).
+// outside freeform / multiple_choice / matching / bucketing (ticket #99,
+// extended by #164).
 func TestQuestionTypeCheckConstraint(t *testing.T) {
 	db := openTestDB(t)
 
@@ -386,8 +390,8 @@ func TestQuestionTypeCheckConstraint(t *testing.T) {
 	); err == nil {
 		t.Error("expected CHECK violation inserting bad question_type on question")
 	}
-	// the three valid values are accepted
-	for _, typ := range []string{"freeform", "multiple_choice", "matching"} {
+	// the four valid values are accepted
+	for _, typ := range []string{"freeform", "multiple_choice", "matching", "bucketing"} {
 		mustExec(t, db,
 			`INSERT INTO question (id, create_date, question_type) VALUES (?, '2026-01-01T00:00:00.000000', ?)`,
 			"q-"+typ, typ)
@@ -400,6 +404,80 @@ func TestQuestionTypeCheckConstraint(t *testing.T) {
 		 VALUES ('s1', 0, 0, 'bogus')`,
 	); err == nil {
 		t.Error("expected CHECK violation inserting bad question_type on session_question")
+	}
+	// ... and accepts bucketing
+	mustExec(t, db,
+		`INSERT INTO session_question (session_id, round_index, question_index, question_type)
+		 VALUES ('s1', 1, 0, 'bucketing')`)
+}
+
+// TestMigrateRebuildsQuestionTypePreservesData verifies migration 12's table
+// rebuild (widening the question_type CHECK for bucketing) preserves existing
+// question / session_question rows and their referencing children, with
+// foreign keys still enforced afterwards (ticket #164). It migrates a scratch
+// DB to version 11, seeds v11-era data, then migrates to 12.
+func TestMigrateRebuildsQuestionTypePreservesData(t *testing.T) {
+	db, err := Open(filepath.Join(t.TempDir(), "trivia.db"))
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+	t.Cleanup(func() { db.Close() })
+
+	// forward-only Migrate can't stop at 11, so apply migrations 1..11
+	// directly (the test is in the store package and can see the list).
+	for _, m := range migrations {
+		if m.version > 11 {
+			break
+		}
+		if err := apply(db, m); err != nil {
+			t.Fatalf("apply migration %d: %v", m.version, err)
+		}
+	}
+
+	mustExec(t, db, `INSERT INTO question (id, create_date, category, question, answer, user_id, question_type)
+		VALUES ('q1', '2026-01-01T00:00:00.000000', 'cat', 'q?', 'a', 'u1', 'matching')`)
+	mustExec(t, db, `INSERT INTO round (id, create_date, name, user_id)
+		VALUES ('r1', '2026-01-01T00:00:00.000000', 'R', 'u1')`)
+	mustExec(t, db, `INSERT INTO round_question (round_id, question_id, position) VALUES ('r1', 'q1', 0)`)
+	mustExec(t, db, `INSERT INTO question_match (question_id, position, left_text, right_text)
+		VALUES ('q1', 0, 'L', 'R')`)
+	mustExec(t, db, `INSERT INTO session (id, create_date) VALUES ('s1', '2026-01-01T00:00:00.000000')`)
+	mustExec(t, db, `INSERT INTO session_question (session_id, round_index, question_index, question_type)
+		VALUES ('s1', 0, 0, 'matching')`)
+	mustExec(t, db, `INSERT INTO session_question_match (session_id, round_index, question_index, position, left_text, right_text)
+		VALUES ('s1', 0, 0, 0, 'L', 'R')`)
+
+	if err := Migrate(db); err != nil {
+		t.Fatalf("Migrate to 12: %v", err)
+	}
+
+	var n int
+	for _, tc := range []struct {
+		name  string
+		query string
+	}{
+		{"question", `SELECT count(*) FROM question WHERE id = 'q1'`},
+		{"round_question", `SELECT count(*) FROM round_question WHERE question_id = 'q1'`},
+		{"question_match", `SELECT count(*) FROM question_match WHERE question_id = 'q1'`},
+		{"session_question", `SELECT count(*) FROM session_question WHERE session_id = 's1'`},
+		{"session_question_match", `SELECT count(*) FROM session_question_match WHERE session_id = 's1'`},
+	} {
+		if err := db.QueryRow(tc.query).Scan(&n); err != nil {
+			t.Fatal(err)
+		}
+		if n != 1 {
+			t.Errorf("%s rows lost by migration 12 rebuild: %d", tc.name, n)
+		}
+	}
+
+	// the widened CHECK accepts bucketing on the rebuilt tables
+	mustExec(t, db, `INSERT INTO question (id, create_date, question_type) VALUES ('q2', '2026-01-01T00:00:00.000000', 'bucketing')`)
+	mustExec(t, db, `INSERT INTO session_question (session_id, round_index, question_index, question_type)
+		VALUES ('s1', 1, 0, 'bucketing')`)
+
+	// foreign keys still enforced against the rebuilt tables
+	if _, err := db.Exec(`INSERT INTO round_question (round_id, question_id, position) VALUES ('r1', 'nope', 0)`); err == nil {
+		t.Error("expected FK violation on round_question.question_id after rebuild")
 	}
 }
 
@@ -425,7 +503,8 @@ func TestQuestionChoicePartialUniqueIndex(t *testing.T) {
 }
 
 // TestQuestionDeleteCascadesChildren verifies deleting a question removes its
-// normalized question_choice / question_match child rows.
+// normalized question_choice / question_match / question_bucket /
+// question_bucket_item child rows.
 func TestQuestionDeleteCascadesChildren(t *testing.T) {
 	db := openTestDB(t)
 	mustExec(t, db, `INSERT INTO question (id, create_date) VALUES ('q1', '2026-01-01T00:00:00.000000')`)
@@ -433,26 +512,35 @@ func TestQuestionDeleteCascadesChildren(t *testing.T) {
 		`INSERT INTO question_choice (question_id, position, text, is_correct) VALUES ('q1', 0, 'A', 1)`)
 	mustExec(t, db,
 		`INSERT INTO question_match (question_id, position, left_text, right_text) VALUES ('q1', 0, 'L', 'R')`)
+	mustExec(t, db,
+		`INSERT INTO question_bucket (question_id, position, text) VALUES ('q1', 0, 'B')`)
+	mustExec(t, db,
+		`INSERT INTO question_bucket_item (question_id, position, text, bucket_text) VALUES ('q1', 0, 'I', 'B')`)
 
 	mustExec(t, db, `DELETE FROM question WHERE id = 'q1'`)
 
 	var n int
-	if err := db.QueryRow(`SELECT count(*) FROM question_choice WHERE question_id = 'q1'`).Scan(&n); err != nil {
-		t.Fatal(err)
-	}
-	if n != 0 {
-		t.Errorf("question_choice rows survived question delete: %d", n)
-	}
-	if err := db.QueryRow(`SELECT count(*) FROM question_match WHERE question_id = 'q1'`).Scan(&n); err != nil {
-		t.Fatal(err)
-	}
-	if n != 0 {
-		t.Errorf("question_match rows survived question delete: %d", n)
+	for _, tc := range []struct {
+		name  string
+		query string
+	}{
+		{"question_choice", `SELECT count(*) FROM question_choice WHERE question_id = 'q1'`},
+		{"question_match", `SELECT count(*) FROM question_match WHERE question_id = 'q1'`},
+		{"question_bucket", `SELECT count(*) FROM question_bucket WHERE question_id = 'q1'`},
+		{"question_bucket_item", `SELECT count(*) FROM question_bucket_item WHERE question_id = 'q1'`},
+	} {
+		if err := db.QueryRow(tc.query).Scan(&n); err != nil {
+			t.Fatal(err)
+		}
+		if n != 0 {
+			t.Errorf("%s rows survived question delete: %d", tc.name, n)
+		}
 	}
 }
 
 // TestSessionDeleteCascadesSnapshotChildren verifies deleting a session removes
-// its session_question_choice / session_question_match snapshot rows.
+// its session_question_choice / session_question_match / session_question_bucket
+// / session_question_bucket_item snapshot rows.
 func TestSessionDeleteCascadesSnapshotChildren(t *testing.T) {
 	db := openTestDB(t)
 	mustExec(t, db, `INSERT INTO session (id, create_date) VALUES ('s1', '2026-01-01T00:00:00.000000')`)
@@ -464,25 +552,31 @@ func TestSessionDeleteCascadesSnapshotChildren(t *testing.T) {
 	mustExec(t, db,
 		`INSERT INTO session_question_match (session_id, round_index, question_index, position, left_text, right_text)
 		 VALUES ('s1', 0, 0, 0, 'L', 'R')`)
+	mustExec(t, db,
+		`INSERT INTO session_question_bucket (session_id, round_index, question_index, position, text)
+		 VALUES ('s1', 0, 0, 0, 'B')`)
+	mustExec(t, db,
+		`INSERT INTO session_question_bucket_item (session_id, round_index, question_index, position, text, bucket_text)
+		 VALUES ('s1', 0, 0, 0, 'I', 'B')`)
 
 	mustExec(t, db, `DELETE FROM session WHERE id = 's1'`)
 
 	var n int
-	if err := db.QueryRow(
-		`SELECT count(*) FROM session_question_choice WHERE session_id = 's1'`,
-	).Scan(&n); err != nil {
-		t.Fatal(err)
-	}
-	if n != 0 {
-		t.Errorf("session_question_choice rows survived session delete: %d", n)
-	}
-	if err := db.QueryRow(
-		`SELECT count(*) FROM session_question_match WHERE session_id = 's1'`,
-	).Scan(&n); err != nil {
-		t.Fatal(err)
-	}
-	if n != 0 {
-		t.Errorf("session_question_match rows survived session delete: %d", n)
+	for _, tc := range []struct {
+		name  string
+		query string
+	}{
+		{"session_question_choice", `SELECT count(*) FROM session_question_choice WHERE session_id = 's1'`},
+		{"session_question_match", `SELECT count(*) FROM session_question_match WHERE session_id = 's1'`},
+		{"session_question_bucket", `SELECT count(*) FROM session_question_bucket WHERE session_id = 's1'`},
+		{"session_question_bucket_item", `SELECT count(*) FROM session_question_bucket_item WHERE session_id = 's1'`},
+	} {
+		if err := db.QueryRow(tc.query).Scan(&n); err != nil {
+			t.Fatal(err)
+		}
+		if n != 0 {
+			t.Errorf("%s rows survived session delete: %d", tc.name, n)
+		}
 	}
 }
 

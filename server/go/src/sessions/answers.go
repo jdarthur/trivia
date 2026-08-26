@@ -60,11 +60,18 @@ func (e *Env) AnswerQuestion(c *gin.Context) {
 		return
 	}
 
-	// Matching is one-to-one (ticket #163): reject an answer that isn't a
-	// complete, distinct left->right mapping before it is stored.
+	// Matching is one-to-one (ticket #163) and bucketing is many-to-one
+	// (ticket #164): reject an answer that isn't a complete, valid mapping
+	// before it is stored.
 	question := session.Rounds[*answer.RoundIndex].Questions[*answer.QuestionIndex]
 	if question.QuestionType == "matching" {
 		if err := validateMatchingAnswer(question, answer.Answer); err != nil {
+			common.Respond(c, nil, err)
+			return
+		}
+	}
+	if question.QuestionType == "bucketing" {
+		if err := validateBucketingAnswer(question, answer.Answer); err != nil {
 			common.Respond(c, nil, err)
 			return
 		}
@@ -134,6 +141,43 @@ func validateMatchingAnswer(question models.QuestionInRound, answer string) erro
 			return InvalidMatchingAnswerError{Answer: answer, Reason: "each right may be chosen only once"}
 		}
 		rightSeen[right] = true
+	}
+	return nil
+}
+
+// validateBucketingAnswer enforces the many-to-one shape of a bucketing answer
+// (ticket #164): the answer must be a JSON object with exactly one entry per
+// question item, each key must be one of the question's items, and each value
+// must be one of the question's buckets. A bucket may be reused — bucketing
+// is many-to-one, unlike matching. Anything else is rejected with
+// InvalidBucketingAnswerError instead of being stored as a certain miss.
+func validateBucketingAnswer(question models.QuestionInRound, answer string) error {
+	var mapping map[string]string
+	if err := json.Unmarshal([]byte(answer), &mapping); err != nil {
+		return InvalidBucketingAnswerError{Answer: answer, Reason: "answer must be a JSON object mapping each item to a bucket"}
+	}
+
+	items := make(map[string]bool, len(question.Items))
+	for _, item := range question.Items {
+		items[item] = true
+	}
+	buckets := make(map[string]bool, len(question.Buckets))
+	for _, bucket := range question.Buckets {
+		buckets[bucket] = true
+	}
+
+	// JSON object keys are unique, so len(mapping) == len(items) plus every
+	// key being a known item means the mapping covers exactly the items.
+	if len(mapping) != len(question.Items) {
+		return InvalidBucketingAnswerError{Answer: answer, Reason: "answer must map every item to exactly one bucket"}
+	}
+	for item, bucket := range mapping {
+		if !items[item] {
+			return InvalidBucketingAnswerError{Answer: answer, Reason: "answer contains an unknown item: " + item}
+		}
+		if !buckets[bucket] {
+			return InvalidBucketingAnswerError{Answer: answer, Reason: "answer contains an unknown bucket: " + bucket}
+		}
 	}
 	return nil
 }
