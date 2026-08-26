@@ -66,8 +66,8 @@ editorTest.describe('questions CRUD', () => {
     await expect(modal).toBeVisible();
     await expect(modal.locator('.ant-modal-title')).toHaveText('Edit question');
 
-    // Advance to step 2 (Question editor) to edit the question text.
-    await modal.getByRole('button', { name: 'Next', exact: true }).click();
+    // Editing an existing question opens on step 2 (Question editor) directly.
+    await expect(modal.locator('#question')).toBeVisible();
     await modal.locator('#question').fill('Updated question');
 
     // Advance to step 3 (Preview) and submit.
@@ -103,6 +103,10 @@ editorTest.describe('question type change (ticket #166)', () => {
     await expect(modal).toBeVisible();
     await expect(modal.locator('.ant-modal-title')).toHaveText('Edit question');
 
+    // Editing an existing question opens on step 2; go back to step 1 (Basic
+    // info) to change the type.
+    await modal.getByRole('button', { name: 'Back', exact: true }).click();
+
     // Step 1 (Basic info): switch the type to "Multiple choice".
     await modal.locator('.ant-radio-wrapper', { hasText: 'Multiple choice' }).click();
 
@@ -137,6 +141,10 @@ editorTest.describe('question type change (ticket #166)', () => {
 
     const modal = editorPage.locator('.ant-modal:has(.ant-modal-title)');
     await expect(modal).toBeVisible();
+
+    // Editing an existing question opens on step 2; go back to step 1 to
+    // change the type.
+    await modal.getByRole('button', { name: 'Back', exact: true }).click();
 
     // Step 1: attempt to switch to "Multiple choice", then cancel.
     await modal.locator('.ant-radio-wrapper', { hasText: 'Multiple choice' }).click();

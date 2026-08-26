@@ -48,8 +48,10 @@ export default function EditQuestionController(props: Props) {
         setPairs(props.selected?.pairs || [])
         setBuckets(props.selected?.buckets || [])
         setItems(props.selected?.items || [])
-        // Ticket #166: always re-enter the editor at the first step.
-        setStep(0)
+        // Ticket #166: a new question starts at the first step; an existing
+        // one opens on the Question step, since editing usually means changing
+        // the question text rather than the type/category info.
+        setStep(props.selected?.id ? STEP_EDITOR : 0)
         setNextAttempted(false)
 
         if (props.scoringNoteWasCleared === false) {
