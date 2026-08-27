@@ -152,7 +152,7 @@ export default function App() {
     const authRequired = <Outlet/>
 
     return (
-        <Layout className="height-trick" style={{minWidth: 'min(1300px, 100vw)', maxWidth: '100vw'}}>
+        <Layout className="height-trick" style={{width: '100%', minWidth: 'min(1300px, 100vw)', maxWidth: '100vw'}}>
 
             <Layout className="site-layout">
                 <Content style={{display: 'flex', flexDirection: 'column'}}>

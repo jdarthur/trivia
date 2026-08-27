@@ -13,6 +13,13 @@
   margin: 0px;
 }
 
+#root {
+  /* Fill the viewport width so the gray app shell (and the navbar) reach both
+     edges instead of stopping at the content's max width (which left a white
+     strip on the right of wide screens). */
+  width: 100%;
+}
+
 .logo {
   /* height: 32px; */
   float: left;

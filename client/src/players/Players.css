@@ -17,16 +17,60 @@
     background: rgb(247, 205, 205);
 }
 
+/* The horizontal strip of per-player "answered / correct" boxes. It spans the
+ * full width of the window; the boxes grow to fill it when there are few and
+ * scroll horizontally (with a fade edge) when there are many. */
+.player-status-wrap {
+    position: relative;
+    width: 100%;
+}
+
 .player-status-bar {
     display: flex;
     flex-direction: row;
     align-items: stretch;
-    justify-content: flex-start;
+    gap: 8px;
     margin-top: 20px;
-    /* flex-wrap: wrap; */
-    max-width: 100%;
+    width: 100%;
     overflow-x: auto;
-    flex-shrink: 1;
+    /* Leave room for the fade edge so the last box isn't hidden under it. */
+    padding-right: 2px;
+    scrollbar-width: thin;
+}
+
+/* Each player box: grow to fill the window when there's room, but never below
+ * 150px (so many players wrap into horizontal scroll) and not above 340px
+ * (so a couple of players don't become absurdly wide). */
+.player-status-box {
+    flex: 1 1 150px;
+    min-width: 150px;
+    max-width: 340px;
+}
+
+/* Mobile mini boxes stay a fixed narrow width (they don't grow). */
+.player-status-box-mini {
+    flex: 0 0 65px;
+    min-width: 65px;
+    max-width: 65px;
+}
+
+/* Edge fades that hint the strip scrolls. Purely visual (pointer-events none)
+ * and only rendered by PlayerStatus when there is actually more to scroll to. */
+.status-fade {
+    position: absolute;
+    top: 20px;
+    bottom: 0;
+    width: 40px;
+    pointer-events: none;
+    z-index: 1;
+}
+.status-fade-left {
+    left: 0;
+    background: linear-gradient(to right, rgba(245, 245, 245, 0.95), rgba(245, 245, 245, 0));
+}
+.status-fade-right {
+    right: 0;
+    background: linear-gradient(to left, rgba(245, 245, 245, 0.95), rgba(245, 245, 245, 0));
 }
 
 .one-player-status {

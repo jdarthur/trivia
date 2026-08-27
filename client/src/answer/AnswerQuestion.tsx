@@ -337,7 +337,7 @@ class AnswerQuestion extends React.Component<Props, State> {
         }
         if (!this.state.active) {
             return (
-                <Card style={{ width: 'min(400px, 100%)', marginTop: 15}} bodyStyle={{ padding: 15 }}
+                <Card className="answer-card" bodyStyle={{ padding: 15 }}
                       title="You left the game">
                     <p>You are no longer in this game and cannot submit answers.</p>
                     <LeaveGame session_id={this.props.session_id} player_id={this.props.player_id}/>
@@ -345,7 +345,7 @@ class AnswerQuestion extends React.Component<Props, State> {
             )
         }
         return (
-            <Card style={{ width: 'min(400px, 100%)', marginTop: 15}} bodyStyle={{ padding: 15 }}  >
+            <Card className="answer-card" bodyStyle={{ padding: 15 }}  >
                 {answer_input}
 
                 {/* Moneyball opt-in (ticket #3): risk the wager for a 2X payout. */}

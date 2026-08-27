@@ -101,7 +101,7 @@ class ActiveQuestion extends React.Component<Props, State> {
         const mcScored = this.props.scored && this.props.question_type === "multiple_choice"
 
         return (
-            <Card style={{width: 'min(400px, 100%)', marginTop: 10}} bodyStyle={{padding: 20}}>
+            <Card className="question-card" bodyStyle={{padding: 20}}>
                 <span style={{display: "flex", justifyContent: "space-between", alignItems: "center", width: "100%"}}>
                     <Breadcrumb style={{paddingBottom: 10}}>
                         <Breadcrumb.Item>

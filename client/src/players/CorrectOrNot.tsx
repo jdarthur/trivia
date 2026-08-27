@@ -92,7 +92,8 @@ class CorrectOrNot extends React.Component<Props> {
             <div> {last_answer.correct ? <CheckSquareOutlined/> : <CloseSquareOutlined/>} </div>
         </div>
 
-        return (<div style={{display: 'flex', alignItems: 'stretch'}}>
+        return (<div className={this.props.is_mobile ? "player-status-box player-status-box-mini" : "player-status-box"}
+                 style={{display: 'flex', alignItems: 'stretch'}}>
                 {this.props.is_mobile ?
                     // show mini status on mobile
                     <Card style={{width: 65}} bodyStyle={{padding: 0}}>
@@ -104,8 +105,7 @@ class CorrectOrNot extends React.Component<Props> {
                     //show full version with full answers
                     <Card size="small" title={title} extra={icon}
                           style={{
-                              minWidth: 150,
-                              maxWidth: 300,
+                              flex: 1,
                               display: 'flex',
                               flexDirection: 'column',
                               justifyContent: 'space-between'

@@ -31,7 +31,8 @@ class AnsweredOrNot extends React.Component<Props> {
             <ShortTextWithPopover text={this.props.player_name} maxLength={20}/>
         </div>
         return (
-            <div style={{display: 'flex', alignItems: 'stretch'}}>
+            <div className={this.props.is_mobile ? "player-status-box player-status-box-mini" : "player-status-box"}
+                 style={{display: 'flex', alignItems: 'stretch'}}>
                 {this.props.is_mobile ?
                     // show mini status on mobile
                     <Tooltip title={this.props.player_name}>
@@ -47,8 +48,7 @@ class AnsweredOrNot extends React.Component<Props> {
                     //show full version with full answers
                     <Card size="small" title={title} extra={icon}
                           style={{
-                              minWidth: 150,
-                              maxWidth: 300,
+                              flex: 1,
                               display: 'flex',
                               flexDirection: 'column',
                               justifyContent: 'space-between'

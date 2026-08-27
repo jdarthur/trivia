@@ -19,18 +19,27 @@ interface Props {
 interface State {
     answers: any[]
     modal_open: boolean
+    // Whether the status strip has more content to scroll left/right, so we can
+    // show a fade edge hinting the strip is wider than the window.
+    can_scroll_left: boolean
+    can_scroll_right: boolean
 }
 
 class PlayerStatus extends React.Component<Props, State> {
 
     state: State = {
         answers: [],
-        modal_open: false
+        modal_open: false,
+        can_scroll_left: false,
+        can_scroll_right: false
     }
 
     // Ticket #146: a slow response for a previous question/round must not
     // overwrite the current one (WagerManager pattern).
     fetchCounter = 0
+
+    // The scrollable strip; we read its scroll position to drive the fade edges.
+    barRef = React.createRef<HTMLDivElement>()
 
     componentDidMount() {
         const statusStored = JSON.parse(sessionStorage.getItem("status") || "null")
@@ -39,9 +48,14 @@ class PlayerStatus extends React.Component<Props, State> {
         } else {
             this.get_answers()
         }
+        window.addEventListener("resize", this.update_fades)
     }
 
-    componentDidUpdate(prevProps: Props) {
+    componentWillUnmount() {
+        window.removeEventListener("resize", this.update_fades)
+    }
+
+    componentDidUpdate(prevProps: Props, prevState: State) {
         if (this.props.session_state !== prevProps.session_state) {
             this.get_answers()
         } else if (this.props.question_id !== prevProps.question_id) {
@@ -49,6 +63,27 @@ class PlayerStatus extends React.Component<Props, State> {
         } else if (this.props.round_id !== prevProps.round_id) {
             this.get_answers()
         }
+        // Recompute the fade edges whenever the box set or the window changes.
+        if (prevState.answers !== this.state.answers) {
+            this.update_fades()
+        }
+    }
+
+    // Show a fade edge whenever the strip can still scroll in that direction.
+    update_fades = () => {
+        const el = this.barRef.current
+        if (!el) {
+            return
+        }
+        const can_scroll_left = el.scrollLeft > 1
+        const can_scroll_right = el.scrollLeft + el.clientWidth < el.scrollWidth - 1
+        if (can_scroll_left !== this.state.can_scroll_left || can_scroll_right !== this.state.can_scroll_right) {
+            this.setState({can_scroll_left, can_scroll_right})
+        }
+    }
+
+    on_scroll = () => {
+        this.update_fades()
     }
 
     get_answers = () => {
@@ -125,8 +160,13 @@ class PlayerStatus extends React.Component<Props, State> {
 
         return (
             <div>
-                <div className="player-status-bar" onClick={this.open_modal}>
-                    {answers}
+                <div className="player-status-wrap">
+                    {this.state.can_scroll_left ? <div className="status-fade status-fade-left"/> : null}
+                    <div className="player-status-bar" onClick={this.open_modal}
+                         onScroll={this.on_scroll} ref={this.barRef}>
+                        {answers}
+                    </div>
+                    {this.state.can_scroll_right ? <div className="status-fade status-fade-right"/> : null}
                 </div>
                 {(this.props.is_mobile && this.props.scored) ? modal : null}
 
