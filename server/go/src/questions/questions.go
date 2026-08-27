@@ -50,7 +50,7 @@ func (e *Env) CreateQuestion(c *gin.Context) {
 func (e *Env) UpdateQuestion(c *gin.Context) {
 
 	questionId := c.Param("id")
-	var updateBody models.Question
+	var updateBody QuestionUpdate
 
 	err := c.ShouldBind(&updateBody)
 	if err != nil {
@@ -100,11 +100,31 @@ func (e *Env) deleteFromCollections(userId, targetQuestionId string) error {
 	return nil
 }
 
-//Merge update body into existing question
-func merge(update *models.Question, original *models.Question) {
+// QuestionUpdate is the wire shape for PUT /editor/question/:id. It mirrors
+// models.Question's editable fields, except Category is a *string so the
+// editor can distinguish "field absent" (nil = leave the question's category
+// unchanged) from an explicit clear ("" = the "None" option) — ticket #185.
+// The other fields keep their existing merge semantics (empty = no change;
+// child rows are replaced wholesale).
+type QuestionUpdate struct {
+	Category     *string                     `json:"category"`
+	Question     string                      `json:"question"`
+	Answer       string                      `json:"answer"`
+	RoundsUsed   []string                    `json:"rounds_used"`
+	QuestionType string                      `json:"question_type"`
+	Choices      []models.QuestionChoice     `json:"choices"`
+	Pairs        []models.QuestionPair       `json:"pairs"`
+	Buckets      []models.QuestionBucket     `json:"buckets"`
+	Items        []models.QuestionBucketItem `json:"items"`
+}
 
-	if update.Category != "" {
-		original.Category = update.Category
+//Merge update body into existing question
+func merge(update *QuestionUpdate, original *models.Question) {
+
+	// nil = field absent (leave unchanged); "" = the editor's "None" option
+	// (clear the category).
+	if update.Category != nil {
+		original.Category = *update.Category
 	}
 	if update.Question != "" {
 		original.Question = update.Question
@@ -857,9 +877,7 @@ func CreateOneQuestion(e *Env, userId string, data models.Question) (models.Ques
 	return data, err
 }
 
-func UpdateOneQuestion(e *Env, userId, questionId string, data models.Question) (models.Question, error) {
-
-	data.UserId = userId
+func UpdateOneQuestion(e *Env, userId, questionId string, data QuestionUpdate) (models.Question, error) {
 
 	//rounds_used cannot be set by this API (it is set indirectly on a question in the rounds API)
 	if len(data.RoundsUsed) != 0 {
@@ -873,9 +891,9 @@ func UpdateOneQuestion(e *Env, userId, questionId string, data models.Question) 
 
 	merge(&data, &question)
 
-	// category must reference a category this user owns (empty = unchanged);
-	// the FK on question.category_id enforces existence, this check keeps the
-	// ownership rule and surfaces a clean NonexistentIdError.
+	// category must reference a category this user owns (empty = no category,
+	// which is fine); the FK on question.category_id enforces existence, this
+	// check keeps the ownership rule and surfaces a clean NonexistentIdError.
 	if question.Category != "" {
 		_, err := GetOneCategory(e, userId, question.Category)
 		if err != nil {
@@ -918,7 +936,7 @@ func UpdateOneQuestion(e *Env, userId, questionId string, data models.Question) 
 		}
 	}
 
-	return data, err
+	return question, err
 }
 
 func UpdateLastUsedForScoringNote(e *Env, userId, scoringNoteId string) error {

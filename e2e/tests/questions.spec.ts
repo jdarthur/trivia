@@ -113,6 +113,41 @@ editorTest.describe('questions CRUD', () => {
     await deleteQuestion(editorPage, updated);
   });
 
+  editorTest('clears a category on edit (ticket #185)', async ({ editorPage }) => {
+    const question = `Categorized ${unique()}`;
+    const category = `To clear ${unique()}`;
+    await createQuestion(editorPage, question, 'Answer', category);
+
+    const row = editorPage.locator('.ant-table-tbody tr').filter({ hasText: question });
+    await expect(row).toContainText(category);
+    await row.locator('.anticon-edit').click();
+
+    const modal = editorPage.locator('.ant-modal:has(.ant-modal-title)');
+    await expect(modal).toBeVisible();
+
+    // Editing an existing question opens on step 2 (Question editor); go back
+    // to step 1 (Basic info) to change the category.
+    await modal.getByRole('button', { name: 'Back', exact: true }).click();
+
+    // Pick the "None" option — before ticket #185 this silently left the
+    // category in place.
+    await modal.locator('.ant-select').click();
+    await editorPage.locator('.ant-select-dropdown:visible').getByText('None', { exact: true }).click();
+
+    // Advance through step 2 (Question editor) and step 3 (Preview), then submit.
+    await modal.getByRole('button', { name: 'Next', exact: true }).click();
+    await modal.getByRole('button', { name: 'Next', exact: true }).click();
+    await modal.getByRole('button', { name: 'Update', exact: true }).click();
+    await expect(modal).toBeHidden();
+
+    // The category column no longer shows the category's name.
+    const updatedRow = editorPage.locator('.ant-table-tbody tr').filter({ hasText: question });
+    await expect(updatedRow).toContainText(question);
+    await expect(updatedRow).not.toContainText(category);
+
+    await deleteQuestion(editorPage, question);
+  });
+
   editorTest('deletes a question', async ({ editorPage }) => {
     const question = `Question to delete ${unique()}`;
     await createQuestion(editorPage, question, 'Answer');

@@ -68,7 +68,7 @@ func TestQuestionCrud(t *testing.T) {
 		t.Error("expected create date to be set")
 	}
 
-	if _, err := questions.UpdateOneQuestion(env, userId, created.ID, models.Question{
+	if _, err := questions.UpdateOneQuestion(env, userId, created.ID, questions.QuestionUpdate{
 		Question: "q2", Answer: "a2",
 	}); err != nil {
 		t.Fatal(err)
