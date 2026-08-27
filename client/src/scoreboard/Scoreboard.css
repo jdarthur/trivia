@@ -68,6 +68,11 @@
     display: flex;
     align-items: center;
     flex-shrink: 0;
+    /* Drop the .delete-edit-mini side margins so every icon column lines up. */
+    margin: 0;
+}
+.scoreboard-team-icon .delete-edit-mini {
+    margin: 0;
 }
 /* The name (ShortTextWithPopover's span) is the last child; let it truncate. */
 .scoreboard-team > span:last-child {

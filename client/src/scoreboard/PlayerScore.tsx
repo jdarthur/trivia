@@ -22,12 +22,14 @@ class PlayerScore extends React.Component<Props> {
         </div>
         const is_self = this.props.player_id === this.props.current_player
         const inactive = this.props.active === false
-        // A single-line row: the team (self indicator + icon + name) in the
+        // A single-line row: the team (icon + self indicator + name) in the
         // title and the score on the right. No card body, so each player is
-        // one short line rather than a tall block.
+        // one short line rather than a tall block. The self indicator sits
+        // between the icon and the name: the icons line up vertically and
+        // only the current player's name is offset by the dot.
         const title = <div className="scoreboard-team" style={inactive ? {opacity: 0.5} : undefined}>
-            {is_self ? <span className="self-indicator"> • </span> : null}
             <span className="scoreboard-team-icon">{icon}</span>
+            {is_self ? <span className="self-indicator"> • </span> : null}
             <ShortTextWithPopover text={this.props.team_name} maxLength={20}/>
         </div>
         const score = <span className="scoreboard-score" style={inactive ? {textDecoration: 'line-through'} : undefined}>
