@@ -1,9 +1,48 @@
+/*
+ * Gameplay layout.
+ *
+ * Wide screens:  [ game column | scoreboard column ]  (a row)
+ * Narrow screens (<= 1000px): the scoreboard reflows to a horizontal strip
+ * across the top and the game column takes the full width below it. The
+ * breakpoint is mirrored in Scoreboard.css.
+ */
+
+.game-and-scoreboard {
+    display: flex;
+    flex-direction: row;
+    align-items: flex-start;
+    gap: 16px;
+    flex-grow: 1;
+    min-width: 0;
+    max-width: min(95vw, 1400px);
+}
+
+/* The game column (round + question + answer box) takes the remaining width. */
 .active-game {
     display: flex;
     flex-direction: column;
-    justify-content: space-between;
-    /* flex-grow: 1; */
+    gap: 12px;
+    flex: 1;
+    min-width: 0;
+}
 
+/* On wide screens the scoreboard is a compact fixed-width column on the right. */
+.game-and-scoreboard > .scoreboard {
+    width: 240px;
+    flex-shrink: 0;
+}
+
+/* Narrow screens: stack, and pull the scoreboard strip to the top. */
+@media (max-width: 1000px) {
+    .game-and-scoreboard {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 10px;
+    }
+    .game-and-scoreboard > .scoreboard {
+        order: -1;
+        width: auto;
+    }
 }
 
 .active-question-box {
@@ -19,8 +58,13 @@
     align-self: flex-end;
     font-style: italic;
     font-size: 1.2em;
-    /* padding-top: 20px; */
     padding-top: 10px;
+}
+
+/* The question card spans the full width of the game column. */
+.question-card {
+    width: 100%;
+    margin-top: 10px;
 }
 
 .round-category {
@@ -47,17 +91,6 @@
     max-width: calc(95vw - 32px);
 }
 
-.game-and-scoreboard {
-    display: flex;
-    flex-direction: row;
-    justify-content: space-between;
-    flex-grow: 1;
-    max-width: min(95vw, 1400px);
-    /* overflow-x: scroll; */
-    /* max-width: calc(100vw - 32px); */
-
-}
-
 .linebreak {
     min-height: 15px;
 }
@@ -65,6 +98,6 @@
 .round-and-question {
     display: flex;
     flex-direction: column;
-    align-items: flex-start;
-    max-width: 100%;
+    align-items: stretch;
+    width: 100%;
 }

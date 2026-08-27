@@ -3,8 +3,6 @@ import sendData from "../index"
 import PlayerScore from "./PlayerScore"
 import "./Scoreboard.css"
 
-import { Modal, Button } from 'antd';
-
 import {
     FundProjectionScreenOutlined
 } from '@ant-design/icons';
@@ -16,19 +14,20 @@ interface Props {
     round_id: string | number | null
     session_state: any
     question_id?: string | number
+    // Kept for API compatibility. The layout now reflows responsively (a
+    // compact column on wide screens, a horizontal strip across the top on
+    // narrow ones) instead of switching to a modal, so this is unused.
     is_mobile?: boolean
 }
 
 interface State {
     scores: PlayerScoreModel[]
-    open: boolean
 }
 
 class Scoreboard extends React.Component<Props, State> {
 
     state: State = {
-        scores: [],
-        open: false
+        scores: []
     }
 
     // Ticket #146: a slow response for a previous question/round must not
@@ -80,10 +79,6 @@ class Scoreboard extends React.Component<Props, State> {
         }
     }
 
-    open = () => { this.setState({ open: true }) }
-
-    close = () => { this.setState({ open: false }) }
-
     render() {
         const scores_sorted = this.state.scores?.sort((a, b) => {
             const score_a = sum(a.score)
@@ -102,32 +97,18 @@ class Scoreboard extends React.Component<Props, State> {
                 active={player.active} />
         })
 
-        const marginLeft = this.props.is_mobile ? 0 : 100
-        const scoreboard = <div className="scoreboard" style={{ marginLeft: marginLeft }}>
+        // Compact single-line rows. The orientation (column vs. horizontal
+        // strip) is decided by CSS media queries in Scoreboard.css, so the
+        // markup is the same for every screen size.
+        const scoreboard = <div className="scoreboard">
             <div className="scoreboard-title">
-                <span style={{ paddingRight: 10 }}>Scoreboard</span>
+                <span>Scoreboard</span>
                 <FundProjectionScreenOutlined />
             </div>
             {scores}
         </div>
 
-        const openModalButton = this.state.open ? null :
-            <Button onClick={this.open} style={{position: 'absolute', top: 15, right: 0, height: '3em' }}>
-                <FundProjectionScreenOutlined />
-            </Button>
-
-        const modal = <Modal title={null} open={this.state.open}
-            onCancel={this.close} centered={true} width='min(250px, 70vw)' footer={null} >
-            <div> {scoreboard} </div>
-        </Modal>
-
-        return (<div>
-            {this.props.is_mobile ? <div>
-                <div> {openModalButton} </div>
-                {modal}
-            </div> : scoreboard}
-
-        </div>)
+        return scoreboard
     }
 }
 

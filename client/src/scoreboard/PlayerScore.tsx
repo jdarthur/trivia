@@ -22,17 +22,22 @@ class PlayerScore extends React.Component<Props> {
         </div>
         const is_self = this.props.player_id === this.props.current_player
         const inactive = this.props.active === false
-        const team = <div style={{display: 'flex', flexDirection: 'row', alignItems: 'center'}}>
+        // A single-line row: the team (self indicator + icon + name) in the
+        // title and the score on the right. No card body, so each player is
+        // one short line rather than a tall block.
+        const title = <div className="scoreboard-team" style={inactive ? {opacity: 0.5} : undefined}>
             {is_self ? <span className="self-indicator"> • </span> : null}
+            <span className="scoreboard-team-icon">{icon}</span>
             <ShortTextWithPopover text={this.props.team_name} maxLength={20}/>
         </div>
-        const score = <span style={inactive ? {textDecoration: 'line-through'} : undefined}>{this.props.score}</span>
+        const score = <span className="scoreboard-score" style={inactive ? {textDecoration: 'line-through'} : undefined}>
+            {this.props.score}
+        </span>
         return (
-            <Card size="small" title={score} extra={icon}
-                  style={{'width': 150, background: this.props.background, opacity: inactive ? 0.5 : 1}}
-                  headStyle={{fontSize: '1.2em', fontWeight: 'bold'}}>
-                <div style={inactive ? {filter: 'grayscale(1)'} : undefined}> {team} </div>
-            </Card>
+            <Card size="small" title={title} extra={score}
+                  className={"scoreboard-row" + (inactive ? " inactive" : "")}
+                  style={{background: this.props.background}}
+                  headStyle={{fontSize: '1em', fontWeight: 'bold'}}/>
         );
     }
 }

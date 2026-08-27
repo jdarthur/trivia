@@ -1,55 +1,110 @@
+/*
+ * Scoreboard: a compact list of single-line rows (icon + name + score).
+ *
+ * Orientation is responsive:
+ *   - Wide screens  -> a vertical column (the parent .game-and-scoreboard is a
+ *     row, so this sits to the right of the game).
+ *   - Narrow screens -> a horizontal strip across the top (the parent becomes a
+ *     column). The strip scrolls horizontally if there are many players.
+ *
+ * The breakpoint (1000px) is mirrored in ActiveGame.css where the parent
+ * row/column switch lives.
+ */
 .scoreboard {
     display: flex;
     flex-direction: column;
-    align-items: center;
-    justify-content: flex-start;
+    align-items: stretch;
+    gap: 4px;
     max-height: 80vh;
     overflow-y: auto;
+    overflow-x: hidden;
 }
-
-.one-player-score {
-    border-top: 1px solid black;
-    border-bottom: 1px solid black;
-    border-collapse: collapse;
-    display: flex;
-    flex-direction: row;
-    margin-bottom: 5px;
-}
-
-.scoreboard-score {
-    align-items: center;
-    display: flex;
-    justify-content: center;
-    padding: 10px;
-    font-weight: bold;
-    font-size: 1.3em;
-}
-
-.scoreboard-team {
-    align-items: center;
-    display: flex;
-    justify-content: center;
-    border-left: 1px solid black;
-    padding: 10px;
-    background: rgb(228, 228, 228);
-    flex-grow: 1;
-}
-
 
 .scoreboard-title {
     display: flex;
     flex-direction: row;
-    justify-content: space-around;
     align-items: center;
-    padding: 10px;
-    font-size: 1.3em;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 8px 12px;
     font-weight: bold;
     border: 1px solid #d9d9d9;
+    border-radius: 6px;
     background: white;
+    flex-shrink: 0;
+}
+
+/* Each player is one short line: a header-only antd Card (no body). */
+.scoreboard-row {
+    flex-shrink: 0;
+}
+.scoreboard-row .ant-card-head {
+    border-bottom: none;
+    min-height: auto;
+    padding: 0 10px;
+}
+.scoreboard-row .ant-card-head-title {
+    padding: 4px 0;
+    line-height: 1.4;
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+.scoreboard-row .ant-card-head .ant-card-extra {
+    padding: 4px 0;
+    margin-inline-start: 10px;
+    flex-shrink: 0;
+}
+
+.scoreboard-team {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+}
+.scoreboard-team-icon {
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+}
+/* The name (ShortTextWithPopover's span) is the last child; let it truncate. */
+.scoreboard-team > span:last-child {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.scoreboard-score {
+    font-weight: bold;
+    font-size: 1.1em;
 }
 
 .self-indicator {
-    /* font-size: 1.7em; */
     color: #1890ff;
     margin-right: 5px;
+}
+
+/* Narrow screens: a horizontal strip across the top. */
+@media (max-width: 1000px) {
+    .scoreboard {
+        flex-direction: row;
+        align-items: stretch;
+        max-height: none;
+        overflow-x: auto;
+        overflow-y: hidden;
+    }
+    .scoreboard-title {
+        flex-direction: column;
+        justify-content: center;
+        gap: 2px;
+        border-right: 1px solid #d9d9d9;
+        border-left: none;
+        padding: 6px 10px;
+        font-size: 0.85em;
+    }
+    .scoreboard-row {
+        min-width: 140px;
+    }
 }
