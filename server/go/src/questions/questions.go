@@ -889,6 +889,10 @@ func UpdateOneQuestion(e *Env, userId, questionId string, data QuestionUpdate) (
 		return models.Question{}, err
 	}
 
+	// capture the category before the merge so the last_used bump below only
+	// fires when this edit actually changed it (ticket #188)
+	oldCategory := question.Category
+
 	merge(&data, &question)
 
 	// category must reference a category this user owns (empty = no category,
@@ -923,10 +927,12 @@ func UpdateOneQuestion(e *Env, userId, questionId string, data QuestionUpdate) (
 		return models.Question{}, err
 	}
 
-	// The category carries the scoring note now (ticket #179): using a
-	// category bumps its note's last_used so recently-used notes float to
-	// the top of the picker.
-	if question.Category != "" {
+	// The category carries the scoring note now (ticket #179): assigning a
+	// *different* category bumps its note's last_used so recently-used notes
+	// float to the top of the picker. An edit that keeps the category (or
+	// clears it) must not bump the note — pre-#179 only bumped when the note
+	// was actually part of the update (ticket #188).
+	if question.Category != "" && question.Category != oldCategory {
 		category, err := GetOneCategory(e, userId, question.Category)
 		if err != nil {
 			return models.Question{}, err
