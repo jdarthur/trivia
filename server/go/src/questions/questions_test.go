@@ -569,3 +569,95 @@ func TestUpdateQuestionCategoryClear(t *testing.T) {
 		t.Errorf("category after re-set = %q, want %q", got.Category, category.ID)
 	}
 }
+
+// TestUpdateQuestionLastUsedBump covers ticket #188: updating a categorized
+// question must only bump its category note's last_used when the category
+// actually changed — an unrelated text edit (or re-sending the same category)
+// must not float the note to the top of the picker. Creating a question with
+// a categorized note still bumps it (pre-#179 semantics).
+func TestUpdateQuestionLastUsedBump(t *testing.T) {
+	env := openQuestionsTestDB(t)
+	userId := "user-1"
+
+	noteA, err := CreateScoringNote(env, models.ScoringNote{UserId: userId, Name: "note A", Description: "desc A"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	noteB, err := CreateScoringNote(env, models.ScoringNote{UserId: userId, Name: "note B", Description: "desc B"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	catA, err := CreateCategory(env, models.Category{UserId: userId, Name: "cat A", ScoringNote: noteA.ID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	catB, err := CreateCategory(env, models.Category{UserId: userId, Name: "cat B", ScoringNote: noteB.ID})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// creating a question with a categorized note bumps the note
+	q, err := CreateOneQuestion(env, userId, models.Question{
+		Question: "q?", Answer: "a", Category: catA.ID,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	afterCreate, err := GetOneScoringNote(env, userId, noteA.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if afterCreate.LastUsed.IsZero() {
+		t.Fatal("create with a categorized note should have bumped last_used")
+	}
+
+	// an unrelated text edit (category field absent) must not bump
+	if _, err := UpdateOneQuestion(env, userId, q.ID, QuestionUpdate{
+		Question: "q2", Answer: "a2",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	afterUnrelatedEdit, err := GetOneScoringNote(env, userId, noteA.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !afterUnrelatedEdit.LastUsed.Equal(afterCreate.LastUsed) {
+		t.Fatalf("unrelated edit bumped last_used: %v -> %v", afterCreate.LastUsed, afterUnrelatedEdit.LastUsed)
+	}
+
+	// re-sending the same category must not bump either
+	if _, err := UpdateOneQuestion(env, userId, q.ID, QuestionUpdate{
+		Category: &catA.ID,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	afterSameCategory, err := GetOneScoringNote(env, userId, noteA.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !afterSameCategory.LastUsed.Equal(afterCreate.LastUsed) {
+		t.Fatalf("same-category edit bumped last_used: %v -> %v", afterCreate.LastUsed, afterSameCategory.LastUsed)
+	}
+
+	// switching to a category with a different note bumps the new note and
+	// leaves the old one untouched
+	if _, err := UpdateOneQuestion(env, userId, q.ID, QuestionUpdate{
+		Category: &catB.ID,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	afterSwitch, err := GetOneScoringNote(env, userId, noteB.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if afterSwitch.LastUsed.IsZero() {
+		t.Fatal("switching to a categorized category should have bumped last_used")
+	}
+	noteAStill, err := GetOneScoringNote(env, userId, noteA.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !noteAStill.LastUsed.Equal(afterCreate.LastUsed) {
+		t.Fatalf("category switch bumped the old note's last_used: %v -> %v", afterCreate.LastUsed, noteAStill.LastUsed)
+	}
+}

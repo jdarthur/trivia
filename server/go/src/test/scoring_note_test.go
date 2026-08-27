@@ -243,7 +243,8 @@ func TestUpdateLastUsedOnUpdate(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// distinct timestamps so the bump from the update below is observable
+	// an unrelated text edit keeps the category and must NOT bump the note
+	// (ticket #188)
 	time.Sleep(time.Millisecond)
 	noteAfterCreate, err := questions.GetOneScoringNote(env, userId, note.ID)
 	if err != nil {
@@ -264,8 +265,34 @@ func TestUpdateLastUsedOnUpdate(t *testing.T) {
 		t.Error(err)
 	}
 
-	if noteAfter.LastUsed.Equal(noteAfterCreate.LastUsed) {
-		t.Error("Expected 'Last used' field to be updated after updating a question in the category")
+	if !noteAfter.LastUsed.Equal(noteAfterCreate.LastUsed) {
+		t.Error("Expected 'Last used' field NOT to be updated by a question edit that keeps the category")
+	}
+
+	// switching the question to a different category (same note) does bump it
+	otherCategory, err := questions.CreateCategory(env, models.Category{
+		UserId:      userId,
+		Name:        "other category",
+		ScoringNote: note.ID,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	time.Sleep(time.Millisecond)
+	_, err = questions.UpdateOneQuestion(env, userId, question.ID, questions.QuestionUpdate{
+		Category: &otherCategory.ID,
+	})
+	if err != nil {
+		t.Error(err)
+	}
+
+	noteAfterCategoryChange, err := questions.GetOneScoringNote(env, userId, note.ID)
+	if err != nil {
+		t.Error(err)
+	}
+
+	if noteAfterCategoryChange.LastUsed.Equal(noteAfter.LastUsed) {
+		t.Error("Expected 'Last used' field to be updated after changing the question's category")
 	}
 
 	_, err = questions.DeleteOneQuestion(env, userId, question.ID)
@@ -273,6 +300,10 @@ func TestUpdateLastUsedOnUpdate(t *testing.T) {
 		t.Error(err)
 	}
 	_, err = questions.DeleteCategory(env, userId, category.ID)
+	if err != nil {
+		t.Error(err)
+	}
+	_, err = questions.DeleteCategory(env, userId, otherCategory.ID)
 	if err != nil {
 		t.Error(err)
 	}
