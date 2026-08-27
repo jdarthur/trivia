@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -505,8 +506,8 @@ func TestImportDanglingReferences(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// the question imported with no category (its dangling scoring note is
-	// simply dropped — the note lives on the category now)
+	// the question imported with no category (its scoring note — dangling or
+	// not — is dropped: the note lives on the category now) and reported
 	var cat sql.NullString
 	if err := db.QueryRow(`SELECT category_id FROM question WHERE id = ?`, "20000000-0000-0000-0000-000000000001").
 		Scan(&cat); err != nil {
@@ -547,13 +548,88 @@ func TestImportDanglingReferences(t *testing.T) {
 		t.Fatalf("session_state rows = %d, want 0", n)
 	}
 
-	if im.summary.OrphanAnswers != 1 {
+	if im.summary.OrphanAnswers != 1 || im.summary.DroppedNoteRefs != 1 {
 		t.Fatalf("summary = %+v", im.summary)
 	}
 	if im.summary.Skipped["round_question"] != 1 ||
 		im.summary.Skipped["session_player"] != 1 ||
 		im.summary.Skipped["session_state"] != 1 {
 		t.Fatalf("skipped = %+v", im.summary.Skipped)
+	}
+}
+
+// TestImportDropsNoteOnCategoryLessQuestion covers ticket #187: a legacy
+// question that has a scoring note but no category cannot keep it — the note
+// is resolved through the category now — so the reference is dropped and
+// reported in the summary instead of vanishing silently.
+func TestImportDropsNoteOnCategoryLessQuestion(t *testing.T) {
+	db := testDB(t)
+	ctx := context.Background()
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer tx.Rollback() //nolint:errcheck // no-op after Commit
+
+	const (
+		noteID = "10000000-0000-0000-0000-000000000001"
+		q1ID   = "20000000-0000-0000-0000-000000000001"
+		q2ID   = "20000000-0000-0000-0000-000000000002"
+	)
+	created := time.Date(2024, 1, 2, 3, 4, 5, 0, time.UTC)
+
+	im := newImporter()
+
+	// the scoring note itself exists — the drop is about the missing category,
+	// not a dangling reference
+	if err := im.importScoringNote(ctx, tx, rawDoc(t, mongoScoringNote{
+		ID: binID(t, noteID), UserId: "user1", CreateDate: created,
+		LastUsed: created.Add(time.Hour), Name: "note", Description: "desc",
+	})); err != nil {
+		t.Fatal(err)
+	}
+
+	// category-less question with a scoring note
+	if err := im.importQuestion(ctx, tx, rawDoc(t, mongoQuestion{
+		ID: binID(t, q1ID), CreateDate: created, Question: "Q1?", Answer: "A1",
+		UserId: "user1", ScoringNote: noteID,
+	})); err != nil {
+		t.Fatal(err)
+	}
+	// category-less question without a scoring note: nothing to drop
+	if err := im.importQuestion(ctx, tx, rawDoc(t, mongoQuestion{
+		ID: binID(t, q2ID), CreateDate: created, Question: "Q2?", Answer: "A2",
+		UserId: "user1",
+	})); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := tx.Commit(); err != nil {
+		t.Fatal(err)
+	}
+
+	// both questions imported, neither attached to a category
+	var n int
+	if err := db.QueryRow(`SELECT COUNT(*) FROM question`).Scan(&n); err != nil {
+		t.Fatal(err)
+	}
+	if n != 2 {
+		t.Fatalf("question rows = %d, want 2", n)
+	}
+	var cat sql.NullString
+	if err := db.QueryRow(`SELECT category_id FROM question WHERE id = ?`, q1ID).Scan(&cat); err != nil {
+		t.Fatal(err)
+	}
+	if cat.Valid {
+		t.Fatalf("q1 category_id = %q, want NULL", cat.String)
+	}
+
+	// the dropped reference is counted once and shown in the summary output
+	if im.summary.DroppedNoteRefs != 1 {
+		t.Fatalf("DroppedNoteRefs = %d, want 1", im.summary.DroppedNoteRefs)
+	}
+	if got := im.summary.String(); !strings.Contains(got, "dropped 1 question->scoring_note reference(s) on questions without a category") {
+		t.Fatalf("summary output missing the dropped-note line:\n%s", got)
 	}
 }
 

@@ -19,7 +19,10 @@
 // failing the run. Question categories become category rows — one per
 // distinct (user, category text) — and a category inherits a scoring note
 // only when all of its questions reference the same one, mirroring migration
-// 13's backfill rule (ticket #178).
+// 13's backfill rule (ticket #178). A question whose scoring_note has nowhere
+// to go — it has no category, and the note is resolved through the category
+// now — is imported without it and counted in the Summary so the loss is
+// visible (ticket #187).
 //
 // The command lives at cmd/migrate; this package exists so the SQLite write
 // side can be tested without a live MongoDB (the importers take a raw BSON
@@ -205,6 +208,10 @@ type Summary struct {
 	// OrphanAnswers counts answer documents not referenced by any session
 	// document; they have no (session, round, question) to attach to.
 	OrphanAnswers int
+	// DroppedNoteRefs counts question rows whose scoring_note was dropped
+	// because the question has no category: the note lives on the category
+	// now, so a category-less question has nowhere for it to go.
+	DroppedNoteRefs int
 	// Skipped maps a table name to the number of rows dropped because their
 	// FK parent was missing.
 	Skipped map[string]int
@@ -219,6 +226,9 @@ func (s Summary) String() string {
 		s.Players, s.Sessions, s.SessionPlayers, s.SessionQuestions, s.SessionScores, s.Answers, s.SessionStates)
 	if s.OrphanAnswers > 0 {
 		fmt.Fprintf(&b, "skipped %d answer(s) not referenced by any session document\n", s.OrphanAnswers)
+	}
+	if s.DroppedNoteRefs > 0 {
+		fmt.Fprintf(&b, "dropped %d question->scoring_note reference(s) on questions without a category\n", s.DroppedNoteRefs)
 	}
 	if len(s.Skipped) > 0 {
 		tables := make([]string, 0, len(s.Skipped))
@@ -457,6 +467,11 @@ func (im *importer) importQuestion(ctx context.Context, q execer, raw bson.Raw) 
 		if _, err := q.ExecContext(ctx, `UPDATE question SET category_id = ? WHERE id = ?`, categoryId, id); err != nil {
 			return err
 		}
+	} else if d.ScoringNote != "" {
+		// A category-less question has nowhere for its scoring note to live
+		// (the note is resolved through the category now), so the reference
+		// is dropped — report it so the loss isn't silent.
+		im.summary.DroppedNoteRefs++
 	}
 
 	im.summary.Questions++
