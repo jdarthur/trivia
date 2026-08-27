@@ -60,6 +60,17 @@ async function createQuestion(
   return (await res.json()).id;
 }
 
+// A question with NO category (ticket #184: hot-edit must not be blocked for
+// these — the old free-text category was optional).
+async function createNoCategoryQuestion(request: APIRequestContext, question: string, answer: string): Promise<string> {
+  const res = await request.post('/editor/question', {
+    headers: { 'borttrivia-token': token },
+    data: { question, answer },
+  });
+  expect(res.ok()).toBeTruthy();
+  return (await res.json()).id;
+}
+
 async function createRound(
   request: APIRequestContext,
   name: string,
@@ -826,6 +837,80 @@ test.describe('gameplay navigation, hot-edit, spectator & edge cases', () => {
     await g.playerContext.close();
     await g.modContext.close();
     await cleanup(request, g.seeded, { sessionId: g.sessionId, modId: g.modId, playerIds: [g.playerId] });
+  });
+
+  // Ticket #184: the mod page is anonymous, so the hot-edit modal cannot load
+  // the user's categories (/editor/categories 401s). Update must stay enabled
+  // for the text edit, and saving must preserve the category instead of
+  // clearing it.
+  test('mod hot-edits the question text on an anonymous mod page; the category is preserved', async ({
+    browser,
+    request,
+  }) => {
+    test.setTimeout(120000);
+    const prefix = unique();
+    const seeded = await seedStartableGame(request, prefix);
+    const { sessionId, modId } = await createSession(request, `e2e-session-${prefix}`, seeded.gameId);
+
+    // NO mockUser: the mod page is anonymous, so categories never load.
+    const { context: modContext, page: modPage } = await openModLobby(browser, sessionId, modId);
+    await modPage.locator('.start-button').click();
+    await expect(modPage.locator('.active-game')).toBeVisible({ timeout: 30000 });
+    await expect(modPage.locator('.ant-breadcrumb')).toContainText(`e2e-cat-${prefix}`, { timeout: 30000 });
+
+    // The modal explains that the category can't be changed here, but Update
+    // is enabled for the text edit.
+    await modPage.locator('.active-game .ant-card .anticon-edit').last().click();
+    const qModal = modPage.locator('.ant-modal');
+    await expect(qModal).toContainText('unchanged');
+    const updateButton = qModal.getByRole('button', { name: 'Update', exact: true });
+    await expect(updateButton).toBeEnabled();
+
+    const newQuestion = `Hot-edited anonymously ${prefix}`;
+    await qModal.locator('textarea[placeholder="Question"]').fill(newQuestion);
+    await updateButton.click();
+
+    // The edited text shows, and the category name survived the save.
+    await expect(modPage.locator('.active-question-box')).toContainText(newQuestion, { timeout: 30000 });
+    await expect(modPage.locator('.ant-breadcrumb')).toContainText(`e2e-cat-${prefix}`);
+
+    await modContext.close();
+    await cleanup(request, seeded, { sessionId, modId });
+  });
+
+  // Ticket #184: a question with NO category must still be hot-editable —
+  // Update used to be dead because the category never resolves.
+  test('mod hot-edits a question that has no category', async ({ browser, request }) => {
+    test.setTimeout(120000);
+    const prefix = unique();
+    const q1 = await createNoCategoryQuestion(request, `No-category question ${prefix}`, 'Answer one');
+    const q2 = await createNoCategoryQuestion(request, `Second question ${prefix}`, 'Answer two');
+    const roundId = await createRound(request, `e2e-round-${prefix}`, [q1, q2], [100, 200]);
+    const res = await request.post('/editor/game', {
+      headers: { 'borttrivia-token': token },
+      data: { name: `e2e-game-${prefix}`, rounds: [roundId], round_names: { [roundId]: `e2e-round-${prefix}` } },
+    });
+    expect(res.ok()).toBeTruthy();
+    const gameId = (await res.json()).id;
+    const seeded = { gameId, roundId, qids: [q1, q2] };
+
+    const { sessionId, modId } = await createSession(request, `e2e-session-${prefix}`, gameId);
+    const { context: modContext, page: modPage } = await openModLobby(browser, sessionId, modId);
+    await modPage.locator('.start-button').click();
+    await expect(modPage.locator('.active-game')).toBeVisible({ timeout: 30000 });
+
+    await modPage.locator('.active-game .ant-card .anticon-edit').last().click();
+    const qModal = modPage.locator('.ant-modal');
+    const updateButton = qModal.getByRole('button', { name: 'Update', exact: true });
+    await expect(updateButton).toBeEnabled();
+
+    const newQuestion = `Hot-edited no-category ${prefix}`;
+    await qModal.locator('textarea[placeholder="Question"]').fill(newQuestion);
+    await updateButton.click();
+    await expect(modPage.locator('.active-question-box')).toContainText(newQuestion, { timeout: 30000 });
+
+    await modContext.close();
+    await cleanup(request, seeded, { sessionId, modId });
   });
 
   test('a spectator context (no player_id) sees the game without the answer/wager UI', async ({

@@ -26,7 +26,7 @@ interface Props {
 
 export default function HotEditQuestion(props: Props) {
 
-    const {data: categories} = useGetCategoriesQuery()
+    const {data: categories, error: categoriesError, isLoading: categoriesLoading} = useGetCategoriesQuery()
 
     // The question stores the category ID now (ticket #180), but the session
     // snapshot only carries the resolved name. Find the category that name
@@ -60,6 +60,38 @@ export default function HotEditQuestion(props: Props) {
             || props.question_type === "bucketing"
     }
 
+    // Ticket #184: the category can only be changed when the user's categories
+    // have loaded AND the snapshot's category resolved to one of them (or the
+    // question has no category at all). On an anonymous mod page the
+    // /editor/categories fetch 401s; a renamed/deleted category matches
+    // nothing. In both cases the category is left unchanged on save (the
+    // server treats an empty category as "no change"), so text/answer edits
+    // must not be blocked by the category.
+    const canEditCategory = () => {
+        if (categoriesError) {
+            return false
+        }
+        if (categoriesLoading) {
+            return false
+        }
+        if (touched) {
+            return true
+        }
+        return category !== "" || props.category === ""
+    }
+
+    // Read-only note shown in place of the category selector when the category
+    // can't be changed here.
+    const categoryNote = () => {
+        if (categoriesError) {
+            return `Category: ${props.category || "none"} — unchanged (sign in to the editor to change categories)`
+        }
+        if (categoriesLoading) {
+            return `Category: ${props.category || "none"} — unchanged`
+        }
+        return `Category: ${props.category} — unchanged (no matching category; it may have been renamed or deleted)`
+    }
+
     const save_self = async () => {
         if (saving) {
             return
@@ -67,7 +99,8 @@ export default function HotEditQuestion(props: Props) {
         console.log("save")
 
         // The scoring note is no longer sent (ticket #180): it rides on the
-        // category, which the server re-resolves on save.
+        // category, which the server re-resolves on save. An empty category
+        // leaves the current category unchanged (ticket #184).
         const questionData = {
             round_index: props.round_index,
             question_index: props.question_index,
@@ -97,10 +130,12 @@ export default function HotEditQuestion(props: Props) {
         if (saving) {
             return true
         }
+        // The category is never required (ticket #184): a no-category question
+        // or an unresolvable category must not block text/answer edits.
         if (structured()) {
-            return category === "" || question === ""
+            return question === ""
         }
-        return category === "" || question === "" || answer === ""
+        return question === "" || answer === ""
     }
 
     const footer = <div className="save-delete">
@@ -113,6 +148,7 @@ export default function HotEditQuestion(props: Props) {
                            save_text="Update" save_action={save_self}
                            question={question} answer={answer}
                            category={category} footer={footer}
+                           category_note={canEditCategory() ? undefined : categoryNote()}
                            set_question={setQuestion}
                            set_category={selectCategory}
                            set_answer={setAnswer}

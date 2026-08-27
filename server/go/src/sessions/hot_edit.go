@@ -40,9 +40,17 @@ func (e *Env) HotEditQuestion(c *gin.Context) {
 		// request.Question.Category is the category's ID (ticket #179); the
 		// snapshot carries the category name and the scoring note resolved
 		// through the category (a question no longer has its own note).
-		categoryName := ""
-		scoringNoteId := ""
-		scoringNote := ""
+		//
+		// An empty category means "leave the category unchanged" (ticket #184):
+		// the snapshot's name can't always be mapped back to an ID — the mod
+		// page is anonymous, or the category was renamed/deleted since the
+		// game started — so preserve the snapshot's current category/note and
+		// the question row's existing category_id below instead of clearing
+		// them (this mirrors the editor update path, where an empty category
+		// is "no change").
+		categoryName := questionInRound.Category
+		scoringNoteId := questionInRound.ScoringNoteId
+		scoringNote := questionInRound.ScoringNote
 		if request.Question.Category != "" {
 			var category models.Category
 			err := common.GetOne((*common.Env)(e), common.CategoryTable, request.Question.Category, &category)
@@ -81,7 +89,11 @@ func (e *Env) HotEditQuestion(c *gin.Context) {
 
 		question.Question = request.Question.Question
 		question.Answer = request.Question.Answer
-		question.Category = request.Question.Category
+		// empty category = "no change" (ticket #184): keep the row's existing
+		// category_id so an unresolvable category can't clear it.
+		if request.Question.Category != "" {
+			question.Category = request.Question.Category
+		}
 
 		err = common.Set((*common.Env)(e), common.QuestionTable, questionId, &question)
 		if err != nil {

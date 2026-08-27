@@ -71,6 +71,11 @@ interface Props {
     // Validation message for the current step (e.g. "Please select a correct
     // answer"); rendered above the form in the Question step when non-empty.
     step_error?: string
+    // Ticket #184: when set (gameplay hot-edit), replaces the category
+    // selector with this read-only note — the mod page is anonymous or the
+    // snapshot's category no longer matches any of the user's categories, so
+    // the category cannot be changed here (it is preserved on save).
+    category_note?: string
 }
 
 export default function EditQuestionModal(props: Props) {
@@ -469,9 +474,13 @@ export default function EditQuestionModal(props: Props) {
     const body = props.steps ? stepsView : (
         <div style={{display: "flex", flexDirection: "column"}}>
             <span style={{display: "flex", marginBottom: 10}}>
-                <CategorySelect category={props.category} set_category={props.set_category}/>
+                {props.category_note ? (
+                    <span style={{color: "#8c8c8c"}}>{props.category_note}</span>
+                ) : (
+                    <CategorySelect category={props.category} set_category={props.set_category}/>
+                )}
             </span>
-            <CategoryNote id={props.category}/>
+            {props.category_note ? null : <CategoryNote id={props.category}/>}
 
             {typeRadio}
 
