@@ -1650,17 +1650,10 @@ func buildWhere(table string, filters interface{}) (string, []interface{}) {
 					for col, cond := range or {
 						if m, ok := cond.(M); ok {
 							if re, ok := m["$regex"].(RegEx); ok {
-								if col == "category" {
-									// ticket #179: question.category is now
-									// category_id (the legacy text column is
-									// dropped), so a text search over the
-									// category matches the category row's name.
-									subs = append(subs, "EXISTS (SELECT 1 FROM category WHERE category.id = question.category_id AND REGEXP_LIKE(category.name, ?))")
-									args = append(args, regexPattern(re))
-									continue
+								if clause, arg, ok := regexClause(table, col, re); ok {
+									subs = append(subs, clause)
+									args = append(args, arg)
 								}
-								subs = append(subs, "REGEXP_LIKE("+col+", ?)")
-								args = append(args, regexPattern(re))
 							}
 						}
 					}
@@ -1673,7 +1666,9 @@ func buildWhere(table string, filters interface{}) (string, []interface{}) {
 		default:
 			if m, ok := v.(M); ok {
 				if re, ok := m["$regex"].(RegEx); ok {
-					add("REGEXP_LIKE("+k+", ?)", regexPattern(re))
+					if clause, arg, ok := regexClause(table, k, re); ok {
+						add(clause, arg)
+					}
 					continue
 				}
 				if exists, ok := m["$exists"].(bool); ok && !exists {
@@ -1695,6 +1690,23 @@ func buildWhere(table string, filters interface{}) (string, []interface{}) {
 		return "", nil
 	}
 	return " WHERE " + strings.Join(clauses, " AND "), args
+}
+
+// regexClause renders a regex filter on a column as a SQL fragment for
+// buildWhere. A category regex searches the category row's name through the
+// question table's category_id FK — the legacy question.category text column
+// is gone (ticket #181) — so it is only meaningful when the filtered table is
+// question; on any other table the clause is dropped rather than emitting SQL
+// that references a nonexistent column (ticket #186).
+func regexClause(table, col string, re RegEx) (string, interface{}, bool) {
+	if col == "category" {
+		if table != QuestionTable {
+			return "", nil, false
+		}
+		return "EXISTS (SELECT 1 FROM category WHERE category.id = question.category_id AND REGEXP_LIKE(category.name, ?))",
+			regexPattern(re), true
+	}
+	return "REGEXP_LIKE(" + col + ", ?)", regexPattern(re), true
 }
 
 func Delete(e *Env, objectType string, objectId string) error {

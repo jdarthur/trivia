@@ -485,6 +485,69 @@ func TestGetAllFilters(t *testing.T) {
 	if len(allRounds.([]*models.Round)) != 0 {
 		t.Fatalf("expected 0 unused rounds, got %d", len(allRounds.([]*models.Round)))
 	}
+
+	// category regex matches the category row's name (ticket #186): both the
+	// $or shape (used by text_filter) and a bare {"category": {"$regex": ...}}
+	// filter (the default branch, previously emitted REGEXP_LIKE against the
+	// dropped question.category column) must resolve through category_id.
+	categoryId, _, err := common.Create(env, common.CategoryTable, &models.Category{
+		UserId: userId,
+		Name:   "Science",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer common.Delete(env, common.CategoryTable, categoryId)
+	catQ, _, err := common.Create(env, common.QuestionTable, &models.Question{
+		UserId: userId, Question: "what is H2O", Answer: "water", Category: categoryId,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	catTextFilter := map[string]interface{}{
+		"user_id": userId,
+		"$or": []common.M{
+			{"category": common.M{"$regex": common.RegEx{Pattern: ".*SCI.*", Options: "i"}}},
+		},
+	}
+	all, err = common.GetAll(env, common.QuestionTable, catTextFilter)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := all.([]*models.Question); len(got) != 1 || got[0].ID != catQ {
+		t.Fatalf("$or category regex returned %v", got)
+	}
+
+	catBareFilter := map[string]interface{}{
+		"user_id":  userId,
+		"category": common.M{"$regex": common.RegEx{Pattern: ".*SCI.*", Options: "i"}},
+	}
+	all, err = common.GetAll(env, common.QuestionTable, catBareFilter)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := all.([]*models.Question); len(got) != 1 || got[0].ID != catQ {
+		t.Fatalf("bare category regex returned %v", got)
+	}
+
+	// A category regex on a non-question table must not emit SQL that
+	// references question.category_id — the clause is dropped instead
+	// (the legacy question.category column is gone).
+	_, err = common.GetAll(env, common.RoundTable, map[string]interface{}{
+		"$or": []common.M{
+			{"category": common.M{"$regex": common.RegEx{Pattern: ".*SCI.*", Options: "i"}}},
+		},
+	})
+	if err != nil {
+		t.Fatalf("category regex on round table errored: %v", err)
+	}
+	_, err = common.GetAll(env, common.RoundTable, map[string]interface{}{
+		"category": common.M{"$regex": common.RegEx{Pattern: ".*SCI.*", Options: "i"}},
+	})
+	if err != nil {
+		t.Fatalf("bare category regex on round table errored: %v", err)
+	}
 }
 
 func TestNonexistentIdAndCollectionCrud(t *testing.T) {
