@@ -63,6 +63,51 @@ func hotEditFixture(t *testing.T, env *Env) (session models.Session, questionId 
 	return session, questionId, categoryId, noteId
 }
 
+// noCategoryHotEditFixture is hotEditFixture but the question has NO category
+// (ticket #184: hot-edit must not be blocked for these).
+func noCategoryHotEditFixture(t *testing.T, env *Env) (session models.Session, questionId string) {
+	t.Helper()
+	q := createQuestion(t, env, "q?", "a", "")
+	round := models.Round{Name: "R", Questions: []string{q}, Wagers: []int{100}}
+	roundId, _, err := common.Create((*common.Env)(env), common.RoundTable, &round)
+	if err != nil {
+		t.Fatal(err)
+	}
+	game := models.Game{Name: "G", Rounds: []string{roundId}, RoundNames: map[string]string{roundId: "R"}}
+	gameId, _, err := common.Create((*common.Env)(env), common.GameTable, &game)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	gin.SetMode(gin.TestMode)
+	recorder := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(recorder)
+	body, err := json.Marshal(map[string]string{"name": "S", "game_id": gameId})
+	if err != nil {
+		t.Fatal(err)
+	}
+	c.Request = httptest.NewRequest(http.MethodPost, "/gameplay/session", bytes.NewReader(body))
+	c.Request.Header.Set("Content-Type", "application/json")
+	env.CreateSession(c)
+	if c.IsAborted() {
+		t.Fatalf("CreateSession aborted with %d: %s", recorder.Code, recorder.Body.String())
+	}
+	var created struct {
+		ID string `json:"id"`
+	}
+	if err := json.Unmarshal(recorder.Body.Bytes(), &created); err != nil {
+		t.Fatalf("bad create response %q: %v", recorder.Body.String(), err)
+	}
+	if err := common.GetOne((*common.Env)(env), common.SessionTable, created.ID, &session); err != nil {
+		t.Fatal(err)
+	}
+	questionId = session.Rounds[0].Questions[0].QuestionId
+	if err := _setCurrentRound(env, &session, 0, 0); err != nil {
+		t.Fatal(err)
+	}
+	return session, questionId
+}
+
 // hotEditQuestion invokes the HotEditQuestion handler exactly as the route
 // does after the WithValidSession / AsMod middleware have put the session in
 // the context. category is the category's ID (ticket #179); the scoring note
@@ -163,42 +208,74 @@ func TestHotEditQuestionScoringNoteBumpsState(t *testing.T) {
 	}
 }
 
-// Clearing the category in a hot-edit must clear both the snapshot and the
-// question row (NULL in the FK column) — and with it the note resolved through
-// the category — and still bump the state token.
-func TestHotEditQuestionClearsScoringNote(t *testing.T) {
+// Ticket #184: a hot-edit whose category can't be resolved (empty payload —
+// anonymous mod page, renamed/deleted category, or a no-category question)
+// must preserve the current category instead of clearing it: the snapshot
+// keeps its category name + note and the question row keeps its category_id.
+func TestHotEditQuestionPreservesCategoryWhenEmpty(t *testing.T) {
 	env := openSessionTestDB(t)
-	session, questionId, categoryId, _ := hotEditFixture(t, env)
+	session, questionId, categoryId, noteId := hotEditFixture(t, env)
 
 	// attach the category (and its note) first
 	if recorder := hotEditQuestion(t, env, session, categoryId, "q?", "a"); recorder.Code != http.StatusOK {
 		t.Fatalf("HotEditQuestion returned %d: %s", recorder.Code, recorder.Body.String())
 	}
 
-	stateBefore, err := common.GetState((*common.Env)(env), session.ID)
-	if err != nil {
+	// reload the session the way the WithValidSession middleware would, so the
+	// handler sees the snapshot with the category attached
+	if err := common.GetOne((*common.Env)(env), common.SessionTable, session.ID, &session); err != nil {
 		t.Fatal(err)
 	}
 
-	// now clear it by dropping the category
-	if recorder := hotEditQuestion(t, env, session, "", "q?", "a"); recorder.Code != http.StatusOK {
+	// rewrite the text with an empty category (the client couldn't resolve it)
+	if recorder := hotEditQuestion(t, env, session, "", "rewritten q?", "rewritten a"); recorder.Code != http.StatusOK {
 		t.Fatalf("HotEditQuestion returned %d: %s", recorder.Code, recorder.Body.String())
-	}
-
-	stateAfter, err := common.GetState((*common.Env)(env), session.ID)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if stateAfter == stateBefore {
-		t.Error("state token did not change when clearing the category")
 	}
 
 	snapshot, err := sessionQuestionSnapshot(env, session.ID, 0, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
+	if snapshot.Question != "rewritten q?" || snapshot.Answer != "rewritten a" {
+		t.Errorf("snapshot = %q / %q, want rewritten text", snapshot.Question, snapshot.Answer)
+	}
+	if snapshot.Category != "Cat A" {
+		t.Errorf("snapshot category = %q, want %q (preserved)", snapshot.Category, "Cat A")
+	}
+	if snapshot.ScoringNoteId != noteId || snapshot.ScoringNote != "the hint text" {
+		t.Errorf("snapshot scoring note = %q / %q, want preserved %q / %q",
+			snapshot.ScoringNoteId, snapshot.ScoringNote, noteId, "the hint text")
+	}
+
+	var question models.Question
+	if err := common.GetOne((*common.Env)(env), common.QuestionTable, questionId, &question); err != nil {
+		t.Fatal(err)
+	}
+	if question.Category != categoryId {
+		t.Errorf("question category = %q, want %q (preserved)", question.Category, categoryId)
+	}
+}
+
+// A question with no category can be hot-edited at all: the empty category
+// payload must not error and leaves the (empty) category alone.
+func TestHotEditQuestionNoCategory(t *testing.T) {
+	env := openSessionTestDB(t)
+	session, questionId := noCategoryHotEditFixture(t, env)
+
+	if recorder := hotEditQuestion(t, env, session, "", "rewritten q?", "rewritten a"); recorder.Code != http.StatusOK {
+		t.Fatalf("HotEditQuestion returned %d: %s", recorder.Code, recorder.Body.String())
+	}
+
+	snapshot, err := sessionQuestionSnapshot(env, session.ID, 0, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if snapshot.Question != "rewritten q?" || snapshot.Answer != "rewritten a" {
+		t.Errorf("snapshot = %q / %q, want rewritten text", snapshot.Question, snapshot.Answer)
+	}
 	if snapshot.Category != "" || snapshot.ScoringNoteId != "" || snapshot.ScoringNote != "" {
-		t.Errorf("snapshot category / scoring note = %q / %q / %q, want cleared", snapshot.Category, snapshot.ScoringNoteId, snapshot.ScoringNote)
+		t.Errorf("snapshot category / scoring note = %q / %q / %q, want empty",
+			snapshot.Category, snapshot.ScoringNoteId, snapshot.ScoringNote)
 	}
 
 	var question models.Question
@@ -206,6 +283,6 @@ func TestHotEditQuestionClearsScoringNote(t *testing.T) {
 		t.Fatal(err)
 	}
 	if question.Category != "" {
-		t.Errorf("question category = %q, want cleared", question.Category)
+		t.Errorf("question category = %q, want empty", question.Category)
 	}
 }
