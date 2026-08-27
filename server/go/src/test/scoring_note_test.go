@@ -250,7 +250,7 @@ func TestUpdateLastUsedOnUpdate(t *testing.T) {
 		t.Error(err)
 	}
 
-	questionUpdate := models.Question{
+	questionUpdate := questions.QuestionUpdate{
 		Question: "updated question",
 	}
 

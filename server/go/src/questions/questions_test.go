@@ -393,7 +393,7 @@ func TestUpdateQuestionTypeChangeReplacesChildren(t *testing.T) {
 	}
 
 	// freeform -> multiple_choice
-	if _, err := UpdateOneQuestion(env, userId, q.ID, models.Question{
+	if _, err := UpdateOneQuestion(env, userId, q.ID, QuestionUpdate{
 		QuestionType: "multiple_choice",
 		Choices:      []models.QuestionChoice{{Text: "A", IsCorrect: true}, {Text: "B"}},
 	}); err != nil {
@@ -411,7 +411,7 @@ func TestUpdateQuestionTypeChangeReplacesChildren(t *testing.T) {
 	}
 
 	// multiple_choice -> matching: pairs written, choices cleared
-	if _, err := UpdateOneQuestion(env, userId, q.ID, models.Question{
+	if _, err := UpdateOneQuestion(env, userId, q.ID, QuestionUpdate{
 		QuestionType: "matching",
 		Pairs:        []models.QuestionPair{{Left: "1", Right: "A"}, {Left: "2", Right: "B"}},
 	}); err != nil {
@@ -429,7 +429,7 @@ func TestUpdateQuestionTypeChangeReplacesChildren(t *testing.T) {
 	}
 
 	// matching -> freeform: both cleared, answer set
-	if _, err := UpdateOneQuestion(env, userId, q.ID, models.Question{
+	if _, err := UpdateOneQuestion(env, userId, q.ID, QuestionUpdate{
 		QuestionType: "freeform", Question: "q2", Answer: "new answer",
 	}); err != nil {
 		t.Fatal(err)
@@ -452,7 +452,7 @@ func TestUpdateQuestionTypeChangeReplacesChildren(t *testing.T) {
 	}
 
 	// freeform -> bucketing: buckets/items written, choices/pairs cleared
-	if _, err := UpdateOneQuestion(env, userId, q.ID, models.Question{
+	if _, err := UpdateOneQuestion(env, userId, q.ID, QuestionUpdate{
 		QuestionType: "bucketing",
 		Buckets:      []models.QuestionBucket{{Text: "B1"}, {Text: "B2"}},
 		Items: []models.QuestionBucketItem{
@@ -500,5 +500,72 @@ func TestOldQuestionReadsBackAsFreeform(t *testing.T) {
 	}
 	if len(got.Choices) != 0 || len(got.Pairs) != 0 {
 		t.Errorf("old question should have no children: %+v %+v", got.Choices, got.Pairs)
+	}
+}
+
+// TestUpdateQuestionCategoryClear covers ticket #185: the editor's "None"
+// option must be able to clear an existing question's category. The update
+// path distinguishes "field absent" (nil = leave unchanged) from an explicit
+// "" (clear); on create "" already means no category.
+func TestUpdateQuestionCategoryClear(t *testing.T) {
+	env := openQuestionsTestDB(t)
+	userId := "user-1"
+
+	category, err := CreateCategory(env, models.Category{UserId: userId, Name: "cat"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	q, err := CreateOneQuestion(env, userId, models.Question{
+		Question: "q?", Answer: "a", Category: category.ID,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// field absent (nil) leaves the category unchanged
+	if _, err := UpdateOneQuestion(env, userId, q.ID, QuestionUpdate{
+		Question: "q2", Answer: "a2",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	got, err := GetOneQuestion(env, userId, q.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Category != category.ID {
+		t.Errorf("category after absent-field update = %q, want %q (unchanged)", got.Category, category.ID)
+	}
+
+	// explicit "" (the "None" option) clears the category
+	none := ""
+	if _, err := UpdateOneQuestion(env, userId, q.ID, QuestionUpdate{
+		Category: &none, Question: "q3", Answer: "a3",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	got, err = GetOneQuestion(env, userId, q.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Category != "" {
+		t.Errorf("category after clear = %q, want empty", got.Category)
+	}
+	if got.Question != "q3" || got.Answer != "a3" {
+		t.Errorf("text edit lost in clear update: %+v", got)
+	}
+
+	// a cleared category can be set again
+	if _, err := UpdateOneQuestion(env, userId, q.ID, QuestionUpdate{
+		Category: &category.ID,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	got, err = GetOneQuestion(env, userId, q.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Category != category.ID {
+		t.Errorf("category after re-set = %q, want %q", got.Category, category.ID)
 	}
 }
