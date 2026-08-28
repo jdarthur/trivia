@@ -411,8 +411,8 @@ func TestGetAllFilters(t *testing.T) {
 	q2 := createQuestion("beta question")
 	createQuestion("gamma question")
 
-	// user_id equality
-	all, err := common.GetAll(env, common.QuestionTable, map[string]string{"user_id": userId})
+	// owner scope
+	all, err := common.GetAll(env, common.QuestionTable, common.ListQuery{UserId: userId})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -420,25 +420,19 @@ func TestGetAllFilters(t *testing.T) {
 		t.Fatalf("expected 3 questions, got %d", len(all.([]*models.Question)))
 	}
 
-	// text_filter ($or regex)
-	textFilter := map[string]interface{}{
-		"user_id": userId,
-		"$or": []common.M{
-			{"question": common.M{"$regex": common.RegEx{Pattern: ".*BETA.*", Options: "i"}}},
-		},
-	}
-	all, err = common.GetAll(env, common.QuestionTable, textFilter)
+	// text_filter across the default question columns
+	all, err = common.GetAll(env, common.QuestionTable,
+		common.ListQuery{UserId: userId, TextFilter: "BETA"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	questions := all.([]*models.Question)
-	if len(questions) != 1 || questions[0].ID != q2 {
-		t.Fatalf("text filter returned %v", questions)
+	if got := all.([]*models.Question); len(got) != 1 || got[0].ID != q2 {
+		t.Fatalf("text filter returned %v", got)
 	}
 
-	// unused_only (rounds_used.0 $exists:false) — all questions unused
-	unusedFilter := map[string]interface{}{"user_id": userId, models.RoundsUsed + ".0": common.M{"$exists": false}}
-	all, err = common.GetAll(env, common.QuestionTable, unusedFilter)
+	// unused_only — all questions unused
+	unused := common.ListQuery{UserId: userId, UnusedOnly: true}
+	all, err = common.GetAll(env, common.QuestionTable, unused)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -446,13 +440,13 @@ func TestGetAllFilters(t *testing.T) {
 		t.Fatalf("expected 3 unused questions, got %d", len(all.([]*models.Question)))
 	}
 
-	// mark q1 as used (round_question row), then it should drop out of unused_only
+	// mark q1 as used (round_question row), then it drops out of unused_only
 	round := models.Round{Name: "R", UserId: userId, Questions: []string{q1}, Wagers: []int{100}}
 	roundId, _, err := common.Create(env, common.RoundTable, &round)
 	if err != nil {
 		t.Fatal(err)
 	}
-	all, err = common.GetAll(env, common.QuestionTable, unusedFilter)
+	all, err = common.GetAll(env, common.QuestionTable, unused)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -460,9 +454,9 @@ func TestGetAllFilters(t *testing.T) {
 		t.Fatalf("expected 2 unused questions, got %d", len(all.([]*models.Question)))
 	}
 
-	// rounds unused_only (games.0 $exists:false)
-	roundsUnused := map[string]interface{}{"user_id": userId, models.Games + ".0": common.M{"$exists": false}}
-	allRounds, err := common.GetAll(env, common.RoundTable, roundsUnused)
+	// rounds unused_only (no game contains the round)
+	allRounds, err := common.GetAll(env, common.RoundTable,
+		common.ListQuery{UserId: userId, UnusedOnly: true})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -478,7 +472,8 @@ func TestGetAllFilters(t *testing.T) {
 	if err := common.Push(env, common.RoundTable, roundId, models.Games, gameId); err != nil {
 		t.Fatal(err)
 	}
-	allRounds, err = common.GetAll(env, common.RoundTable, roundsUnused)
+	allRounds, err = common.GetAll(env, common.RoundTable,
+		common.ListQuery{UserId: userId, UnusedOnly: true})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -486,10 +481,8 @@ func TestGetAllFilters(t *testing.T) {
 		t.Fatalf("expected 0 unused rounds, got %d", len(allRounds.([]*models.Round)))
 	}
 
-	// category regex matches the category row's name (ticket #186): both the
-	// $or shape (used by text_filter) and a bare {"category": {"$regex": ...}}
-	// filter (the default branch, previously emitted REGEXP_LIKE against the
-	// dropped question.category column) must resolve through category_id.
+	// a category text_filter resolves through category_id to the category row's
+	// name (the legacy question.category column is gone, ticket #181).
 	categoryId, _, err := common.Create(env, common.CategoryTable, &models.Category{
 		UserId: userId,
 		Name:   "Science",
@@ -504,49 +497,13 @@ func TestGetAllFilters(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	catTextFilter := map[string]interface{}{
-		"user_id": userId,
-		"$or": []common.M{
-			{"category": common.M{"$regex": common.RegEx{Pattern: ".*SCI.*", Options: "i"}}},
-		},
-	}
-	all, err = common.GetAll(env, common.QuestionTable, catTextFilter)
+	all, err = common.GetAll(env, common.QuestionTable,
+		common.ListQuery{UserId: userId, TextFilter: "SCI", SearchColumns: []string{"category"}})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if got := all.([]*models.Question); len(got) != 1 || got[0].ID != catQ {
-		t.Fatalf("$or category regex returned %v", got)
-	}
-
-	catBareFilter := map[string]interface{}{
-		"user_id":  userId,
-		"category": common.M{"$regex": common.RegEx{Pattern: ".*SCI.*", Options: "i"}},
-	}
-	all, err = common.GetAll(env, common.QuestionTable, catBareFilter)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if got := all.([]*models.Question); len(got) != 1 || got[0].ID != catQ {
-		t.Fatalf("bare category regex returned %v", got)
-	}
-
-	// A category regex on a non-question table must not emit SQL that
-	// references question.category_id — the clause is dropped instead
-	// (the legacy question.category column is gone).
-	_, err = common.GetAll(env, common.RoundTable, map[string]interface{}{
-		"$or": []common.M{
-			{"category": common.M{"$regex": common.RegEx{Pattern: ".*SCI.*", Options: "i"}}},
-		},
-	})
-	if err != nil {
-		t.Fatalf("category regex on round table errored: %v", err)
-	}
-	_, err = common.GetAll(env, common.RoundTable, map[string]interface{}{
-		"category": common.M{"$regex": common.RegEx{Pattern: ".*SCI.*", Options: "i"}},
-	})
-	if err != nil {
-		t.Fatalf("bare category regex on round table errored: %v", err)
+		t.Fatalf("category text_filter returned %v", got)
 	}
 }
 
@@ -657,13 +614,11 @@ func TestTextFilterRegexpSemantics(t *testing.T) {
 	q3 := createQuestion("alpha_beta")
 
 	search := func(pattern string) []string {
-		filter := map[string]interface{}{
-			"user_id": userId,
-			"$or": []common.M{
-				{"question": common.M{"$regex": common.RegEx{Pattern: ".*" + pattern + ".*", Options: "i"}}},
-			},
-		}
-		all, err := common.GetAll(env, common.QuestionTable, filter)
+		all, err := common.GetAll(env, common.QuestionTable, common.ListQuery{
+			UserId:        userId,
+			TextFilter:    pattern,
+			SearchColumns: []string{"question"},
+		})
 		if err != nil {
 			t.Fatal(err)
 		}

@@ -23,15 +23,25 @@ func (e *Env) GetOneCategory(c *gin.Context) {
 	common.Respond(c, data, err)
 }
 
+// GetAllCategories lists categories, honoring the shared list query params of
+// ticket #195: unused_only (no question references the category), text_filter on
+// name, sort/order, and page/page_size.
 func (e *Env) GetAllCategories(c *gin.Context) {
-	value, ok := c.Get(common.USER_ID)
-	if ok {
-		userId := value.(string)
-		categories, err := GetAllCategories(e, userId)
-		common.Respond(c, categories, err)
-	} else {
+	userId, ok := c.Get(common.USER_ID)
+	if !ok {
 		common.Respond(c, nil, errors.New("missing user ID"))
+		return
 	}
+
+	query, err := common.ParseListQuery(c, common.CategoryTable)
+	if err != nil {
+		common.Respond(c, nil, err)
+		return
+	}
+	query.UserId = userId.(string)
+
+	result, err := common.GetAllPaged((*common.Env)(e), common.CategoryTable, query)
+	common.RespondList(c, "categories", result, err)
 }
 
 func (e *Env) CreateCategory(c *gin.Context) {
@@ -161,9 +171,10 @@ func GetOneCategory(e *Env, userId, categoryId string) (models.Category, error) 
 	return data, nil
 }
 
+// GetAllCategories returns every category a user owns, alphabetically (the
+// editor's category selector wants the full list, not a page).
 func GetAllCategories(e *Env, userId string) ([]*models.Category, error) {
-	filter := map[string]string{"user_id": userId}
-	data, err := common.GetAll((*common.Env)(e), common.CategoryTable, filter)
+	data, err := common.GetAllOwned((*common.Env)(e), common.CategoryTable, userId)
 	if err != nil {
 		return nil, err
 	}

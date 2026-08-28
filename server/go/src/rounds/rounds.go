@@ -5,41 +5,23 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/jdarthur/trivia/common"
 	"github.com/jdarthur/trivia/models"
-	"strings"
 )
 
 type Env common.Env
 
+// GetAllRounds lists rounds, honoring the shared list query params of ticket
+// #195: unused_only (no game contains the round), text_filter on name,
+// sort/order, and page/page_size.
 func (e *Env) GetAllRounds(c *gin.Context) {
-
-	filters := createFilters(c)
-
-	questions, err := common.GetAll((*common.Env)(e), common.RoundTable, filters)
-	common.Respond(c, gin.H{"rounds": questions}, err)
-}
-
-//create unused_only and text_filter mongodb queries from request
-func createFilters(c *gin.Context) map[string]interface{} {
-	filter := make(map[string]interface{})
-	value, ok := c.Get(common.USER_ID)
-	if ok {
-		userId := value.(string)
-		filter["user_id"] = userId
+	query, err := common.ParseListQuery(c, common.RoundTable)
+	if err != nil {
+		common.Respond(c, nil, err)
+		return
 	}
+	query.UserId = common.GetUserId(c)
 
-	//unused_only means that games = []
-	unusedOnly := c.DefaultQuery("unused_only", "false")
-	if strings.ToLower(unusedOnly) == "true" {
-		filter[models.Games+".0"] = common.M{"$exists": false}
-	}
-
-	//text_filter means that the search string appears in name (case-insensitive)
-	textFilter := c.Query("text_filter")
-	if textFilter != "" {
-		search := common.M{"$regex": common.RegEx{Pattern: ".*" + textFilter + ".*", Options: "i"}}
-		filter["name"] = search
-	}
-	return filter
+	result, err := common.GetAllPaged((*common.Env)(e), common.RoundTable, query)
+	common.RespondList(c, "rounds", result, err)
 }
 
 func (e *Env) GetOneRound(c *gin.Context) {
