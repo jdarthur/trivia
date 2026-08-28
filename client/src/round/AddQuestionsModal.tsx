@@ -4,6 +4,7 @@ import '../modal/Modal.css';
 import {Button, Modal, Space, Table} from 'antd';
 import EditorFilter from "../editor/EditorFilter";
 import {useGetQuestionsQuery} from "../api/main";
+import {buildListQuery} from "../api/listParams";
 import CategoryName from "../category/CategoryName";
 import type {Question} from "../types/models";
 
@@ -29,13 +30,10 @@ export default function AddQuestionsModal(props: Props) {
     const [selectedQuestions, setSelectedQuestions] = useState<string[]>([])
     const [isOpen, setIsOpen] = useState(false)
 
-    let query = ""
-    if (unusedOnly) {
-        query += "?unused_only=true"
-    }
-    if (textFilter) {
-        query += unusedOnly ? "&text_filter=" + textFilter : "?text_filter=" + textFilter
-    }
+    // No page/page_size: the picker needs the whole filtered list at once so a
+    // selection can't be lost by paging away from it (ticket #196 calls out that
+    // pagination is not critical here). The table slices it client-side.
+    const query = buildListQuery({unused_only: unusedOnly, text_filter: textFilter})
 
     const {data, isFetching} = useGetQuestionsQuery(query)
     const questions = data?.questions;

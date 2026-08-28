@@ -13,7 +13,8 @@ server/go/src/.env
 # Go build output
 server/go/bin/
 server/go/pkg/
-server/go/src/trivia-server   # binary produced by `make run` / `make server-bin`
+# binary produced by `make run` / `make server-bin`
+server/go/src/trivia-server
 
 # Dependencies vendored into the pre-modules GOPATH layout
 server/go/src/github.com

@@ -10,7 +10,7 @@ import (
 type Env common.Env
 
 func (e *Env) GetAllSessions(c *gin.Context) {
-	sessions, err := common.GetAll((*common.Env)(e), common.SessionTable, nil)
+	sessions, err := common.GetAll((*common.Env)(e), common.SessionTable, common.ListQuery{})
 	common.Respond(c, gin.H{"sessions": sessions}, err)
 }
 

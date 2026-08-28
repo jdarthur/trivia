@@ -1,7 +1,7 @@
 import React, {useState} from 'react';
 
 import {Button, Input, Modal, Typography} from 'antd';
-import {useCreateCollectionMutation, useGetQuestionsQuery} from "../api/main";
+import {useAllQuestions, useCreateCollectionMutation} from "../api/main";
 import TransferQuestions from "./TransferQuestions";
 import notify from "../common/notify";
 
@@ -17,7 +17,7 @@ export default function NewCollection(props: Props) {
 
     const [create] = useCreateCollectionMutation();
 
-    const {data: allQuestions} = useGetQuestionsQuery("");
+    const {data: allQuestions} = useAllQuestions();
 
     const save = async () => {
         const body = {
@@ -54,7 +54,7 @@ export default function NewCollection(props: Props) {
 
             <div className="rem-question-list">
                 <Input placeholder={"Collection name"} value={name} onChange={(event) => setName(event.target.value)}/>
-                <TransferQuestions data={allQuestions?.questions}
+                <TransferQuestions data={allQuestions}
                                    setQuestionIds={setQuestions}
                                    selected={questions} />
             </div>

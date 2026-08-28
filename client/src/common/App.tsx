@@ -123,6 +123,9 @@ export default function App() {
                 </Menu.Item>
 
                 <SubMenu key="sub1" icon={<FormOutlined/>} title="Editor" disabled={!showEditor}>
+                  <Menu.Item key="6" disabled={!showEditor}>
+                      <Link to={"categories"}>{CATEGORY}</Link>
+                  </Menu.Item>
                   <Menu.Item key="2" disabled={!showEditor}>
                     <Link to={"questions"}>{QUESTION}</Link>
                   </Menu.Item>
@@ -134,9 +137,6 @@ export default function App() {
                   </Menu.Item>
                   <Menu.Item key="5" disabled={!showEditor}>
                       <Link to={"collections"}>{COLLECTION}</Link>
-                  </Menu.Item>
-                  <Menu.Item key="6" disabled={!showEditor}>
-                      <Link to={"categories"}>{CATEGORY}</Link>
                   </Menu.Item>
                 </SubMenu>
 

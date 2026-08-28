@@ -61,6 +61,13 @@ func (q Question) SetId(objectId string) Object {
 	return q
 }
 
+// IsRecordInUse reports whether any round contains this question
+// (models.InUse). RoundsUsed is derived from the round_question join table, so
+// this is the same rule the list API applies in SQL (common.unusedClause).
+func (q Question) IsRecordInUse() bool {
+	return len(q.RoundsUsed) > 0
+}
+
 func (q Question) MarshalJSON() ([]byte, error) {
 	type Alias Question
 	return json.Marshal(&struct {

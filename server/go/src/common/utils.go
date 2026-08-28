@@ -14,7 +14,6 @@ import (
 	"net/http"
 	"reflect"
 	"regexp"
-	"sort"
 	"strings"
 	"time"
 
@@ -80,17 +79,6 @@ type InvalidUUIDError struct {
 
 func (e InvalidUUIDError) Error() string {
 	return "Invalid UUID: " + e.ID
-}
-
-// M is a filter map, the SQLite-era replacement for bson.M in handlers.
-type M map[string]interface{}
-
-// RegEx is a case-insensitive substring match, the SQLite-era replacement
-// for bson.RegEx in handlers (evaluated by the regexp_like SQL function,
-// preserving Go regexp semantics).
-type RegEx struct {
-	Pattern string
-	Options string
 }
 
 //=====================================
@@ -187,13 +175,16 @@ type rowScanner interface {
 // GetOne record of a certain type by ID
 //
 // args:
+//
 //	  e: Environment (i.e. SQLite database)
 //	  objectType: table (e.g. 'question' or 'round')
 //	  objectId: id of record in UUID form
 //	  model: struct representing data model e.g. models.Question
 //		    --> this struct must be passed as pointer and is updated in place
+//
 // returns errors (if any):
-//    NonexistentIdError: if record
+//
+//	NonexistentIdError: if record
 func GetOne(e *Env, objectType string, objectId string, model models.Object) error {
 	switch m := model.(type) {
 	case *models.Question:
@@ -875,12 +866,15 @@ func getScoringNote(db *sql.DB, id string, m *models.ScoringNote) error {
 // Create a record
 //
 // args:
+//
 //	  e: Environment (i.e. SQLite database)
 //	  objectType: table (e.g. 'question' or 'round')
 //	  model: struct representing data model e.g. models.Question
 //		    --> this struct must be passed as pointer and is updated in place
+//
 // returns:
-//    newly generated ID, create date, errors (if any)
+//
+//	newly generated ID, create date, errors (if any)
 func Create(e *Env, objectType string, data models.Object) (string, time.Time, error) {
 
 	//create date for this object is rn
@@ -1036,12 +1030,15 @@ func insertScoringNote(db *sql.DB, m models.ScoringNote) error {
 // update a record by ID
 //
 // args:
-//	  e: Environment (i.e. SQLite database)
-//	  objectType: table (e.g. 'question' or 'round')
-//    objectId: ID of record in UUID form
-//    data: struct whose fields to set on record
+//
+//		  e: Environment (i.e. SQLite database)
+//		  objectType: table (e.g. 'question' or 'round')
+//	   objectId: ID of record in UUID form
+//	   data: struct whose fields to set on record
+//
 // returns:
-//    errors (if any)
+//
+//	errors (if any)
 func Set(e *Env, objectType string, objectId string, data interface{}) error {
 	var err error
 	switch m := deref(data).(type) {
@@ -1223,9 +1220,12 @@ func updateScoringNote(db *sql.DB, id string, m models.ScoringNote) error {
 func getCategory(db *sql.DB, id string, m *models.Category) error {
 	var createDate string
 	var scoringNoteId sql.NullString
-	err := db.QueryRow(`SELECT id, user_id, create_date, name, scoring_note_id
+	// questions_used is derived here too, so a single-category read agrees with
+	// the list query (models.InUse).
+	err := db.QueryRow(`SELECT id, user_id, create_date, name, scoring_note_id,
+		(SELECT count(*) FROM question q WHERE q.category_id = category.id)
 		FROM category WHERE id = ?`, id).
-		Scan(&m.ID, &m.UserId, &createDate, &m.Name, &scoringNoteId)
+		Scan(&m.ID, &m.UserId, &createDate, &m.Name, &scoringNoteId, &m.QuestionsUsed)
 	if errors.Is(err, sql.ErrNoRows) {
 		return NonexistentIdError{RecordType: CategoryTable, ID: id}
 	}
@@ -1284,10 +1284,11 @@ func deleteJoin(db *sql.DB, table, parentCol, childCol, parentId, childId string
 }
 
 // Add an item to a list on a specific record
-//	  objectType: table (e.g. 'question' or 'round')
-//    objectId: ID of record in UUID form
-//    array: name of array to append to
-//    value: value to append
+//
+//		  objectType: table (e.g. 'question' or 'round')
+//	   objectId: ID of record in UUID form
+//	   array: name of array to append to
+//	   value: value to append
 func Push(e *Env, objectType string, objectId string, array string, value interface{}) error {
 	valueString := stringValue(value)
 
@@ -1379,177 +1380,218 @@ func WithWriteTx(db *sql.DB, fn func(q Queryer) error) error {
 	return nil
 }
 
-// GetAll records of a certain type
-//
-// args:
-//	  e: Environment (i.e. SQLite database)
-//	  objectType: table (e.g. 'question' or 'round')
-// returns:
-//    slice of type from 'objectType' arg; errors (if any)
-func GetAll(e *Env, objectType string, filters interface{}) (interface{}, error) {
-	where, args := buildWhere(objectType, filters)
-
+// scanTable reports whether GetAllPaged knows how to list a table, and is the
+// single place that pairs a table's SELECT column list with its row scanner.
+func scanTable(objectType string) (string, bool) {
 	switch objectType {
 	case QuestionTable:
-		rows, err := e.Db.Query(`SELECT id, create_date, category_id, question, answer, user_id, question_type
-			FROM question`+where+` ORDER BY create_date`, args...)
+		return `SELECT id, create_date, category_id, question, answer, user_id, question_type
+			FROM question`, true
+	case RoundTable:
+		return `SELECT id, create_date, name, user_id FROM round`, true
+	case GameTable:
+		return `SELECT id, create_date, name, user_id FROM game`, true
+	case SessionTable:
+		return `SELECT id, create_date, name, game_id, moderator_id, started,
+			current_round, current_question FROM session`, true
+	case CollectionTable:
+		return `SELECT id, create_date, name, user_id FROM collection`, true
+	case ScoringNoteTable:
+		return `SELECT id, user_id, create_date, last_used, name, description
+			FROM scoring_note`, true
+	case CategoryTable:
+		// questions_used is derived in the same pass (ticket #195: it backs the
+		// unused_only filter and lets the editor show usage without a second
+		// request per category).
+		return `SELECT id, user_id, create_date, name, scoring_note_id,
+			(SELECT count(*) FROM question q WHERE q.category_id = category.id) AS questions_used
+			FROM category`, true
+	default:
+		return "", false
+	}
+}
+
+// scanRow reads one row of objectType into a fresh model. Derived relations
+// (rounds_used, a round's questions, a session's roster, ...) are loaded per
+// row here, exactly as the per-type GetAll branches used to do.
+func (e *Env) scanRow(objectType string, s rowScanner) (interface{}, error) {
+	switch objectType {
+	case QuestionTable:
+		m, err := scanQuestion(s)
 		if err != nil {
 			return nil, err
 		}
-		defer rows.Close()
-		slice := make([]*models.Question, 0)
-		for rows.Next() {
-			m, err := scanQuestion(rows)
-			if err != nil {
-				return nil, err
-			}
-			if err := loadQuestionRoundsUsed(e.Db, &m); err != nil {
-				return nil, err
-			}
-			if err := loadQuestionChildren(e.Db, &m); err != nil {
-				return nil, err
-			}
-			slice = append(slice, &m)
+		if err := loadQuestionRoundsUsed(e.Db, &m); err != nil {
+			return nil, err
 		}
-		return slice, rows.Err()
+		if err := loadQuestionChildren(e.Db, &m); err != nil {
+			return nil, err
+		}
+		return m, nil
 
 	case RoundTable:
-		rows, err := e.Db.Query(`SELECT id, create_date, name, user_id FROM round`+where+` ORDER BY create_date`, args...)
-		if err != nil {
+		var m models.Round
+		var createDate string
+		if err := s.Scan(&m.ID, &createDate, &m.Name, &m.UserId); err != nil {
 			return nil, err
 		}
-		defer rows.Close()
-		slice := make([]*models.Round, 0)
-		for rows.Next() {
-			var m models.Round
-			var createDate string
-			if err := rows.Scan(&m.ID, &createDate, &m.Name, &m.UserId); err != nil {
-				return nil, err
-			}
-			m.CreateDate = ParseTime(createDate)
-			if err := loadRound(e.Db, &m); err != nil {
-				return nil, err
-			}
-			slice = append(slice, &m)
+		m.CreateDate = ParseTime(createDate)
+		if err := loadRound(e.Db, &m); err != nil {
+			return nil, err
 		}
-		return slice, rows.Err()
+		return m, nil
 
 	case GameTable:
-		rows, err := e.Db.Query(`SELECT id, create_date, name, user_id FROM game`+where+` ORDER BY create_date`, args...)
-		if err != nil {
+		var m models.Game
+		var createDate string
+		if err := s.Scan(&m.ID, &createDate, &m.Name, &m.UserId); err != nil {
 			return nil, err
 		}
-		defer rows.Close()
-		slice := make([]*models.Game, 0)
-		for rows.Next() {
-			var m models.Game
-			var createDate string
-			if err := rows.Scan(&m.ID, &createDate, &m.Name, &m.UserId); err != nil {
-				return nil, err
-			}
-			m.CreateDate = ParseTime(createDate)
-			if err := loadGame(e.Db, &m); err != nil {
-				return nil, err
-			}
-			slice = append(slice, &m)
+		m.CreateDate = ParseTime(createDate)
+		if err := loadGame(e.Db, &m); err != nil {
+			return nil, err
 		}
-		return slice, rows.Err()
+		return m, nil
 
 	case SessionTable:
-		rows, err := e.Db.Query(`SELECT id, create_date, name, game_id, moderator_id, started,
-			current_round, current_question
-			FROM session`+where+` ORDER BY create_date`, args...)
+		m, err := scanSession(s)
 		if err != nil {
 			return nil, err
 		}
-		defer rows.Close()
-		slice := make([]*models.Session, 0)
-		for rows.Next() {
-			m, err := scanSession(rows)
-			if err != nil {
-				return nil, err
-			}
-			if err := loadSessionRelations(e.Db, &m); err != nil {
-				return nil, err
-			}
-			slice = append(slice, &m)
+		if err := loadSessionRelations(e.Db, &m); err != nil {
+			return nil, err
 		}
-		return slice, rows.Err()
+		return m, nil
 
 	case CollectionTable:
-		rows, err := e.Db.Query(`SELECT id, create_date, name, user_id FROM collection`+where+` ORDER BY create_date`, args...)
-		if err != nil {
+		var m models.Collection
+		var createDate string
+		if err := s.Scan(&m.ID, &createDate, &m.Name, &m.UserId); err != nil {
 			return nil, err
 		}
-		defer rows.Close()
-		slice := make([]*models.Collection, 0)
-		for rows.Next() {
-			var m models.Collection
-			var createDate string
-			if err := rows.Scan(&m.ID, &createDate, &m.Name, &m.UserId); err != nil {
-				return nil, err
-			}
-			m.CreateDate = ParseTime(createDate)
-			if err := loadCollection(e.Db, &m); err != nil {
-				return nil, err
-			}
-			slice = append(slice, &m)
+		m.CreateDate = ParseTime(createDate)
+		if err := loadCollection(e.Db, &m); err != nil {
+			return nil, err
 		}
-		return slice, rows.Err()
+		return m, nil
 
 	case ScoringNoteTable:
-		rows, err := e.Db.Query(`SELECT id, user_id, create_date, last_used, name, description
-			FROM scoring_note`+where+` ORDER BY create_date`, args...)
-		if err != nil {
+		var m models.ScoringNote
+		var createDate, lastUsed string
+		if err := s.Scan(&m.ID, &m.UserId, &createDate, &lastUsed, &m.Name, &m.Description); err != nil {
 			return nil, err
 		}
-		defer rows.Close()
-		slice := make([]*models.ScoringNote, 0)
-		for rows.Next() {
-			var m models.ScoringNote
-			var createDate, lastUsed string
-			if err := rows.Scan(&m.ID, &m.UserId, &createDate, &lastUsed, &m.Name, &m.Description); err != nil {
-				return nil, err
-			}
-			m.CreateDate = ParseTime(createDate)
-			m.LastUsed = ParseTime(lastUsed)
-			slice = append(slice, &m)
-		}
-		return slice, rows.Err()
+		m.CreateDate = ParseTime(createDate)
+		m.LastUsed = ParseTime(lastUsed)
+		return m, nil
 
 	case CategoryTable:
-		rows, err := e.Db.Query(`SELECT id, user_id, create_date, name, scoring_note_id
-			FROM category`+where+` ORDER BY create_date`, args...)
-		if err != nil {
+		var m models.Category
+		var createDate string
+		var scoringNoteId sql.NullString
+		if err := s.Scan(&m.ID, &m.UserId, &createDate, &m.Name, &scoringNoteId, &m.QuestionsUsed); err != nil {
 			return nil, err
 		}
-		defer rows.Close()
-		slice := make([]*models.Category, 0)
-		for rows.Next() {
-			var m models.Category
-			var createDate string
-			var scoringNoteId sql.NullString
-			if err := rows.Scan(&m.ID, &m.UserId, &createDate, &m.Name, &scoringNoteId); err != nil {
-				return nil, err
-			}
-			m.CreateDate = ParseTime(createDate)
-			if scoringNoteId.Valid {
-				m.ScoringNote = scoringNoteId.String
-			}
-			slice = append(slice, &m)
+		m.CreateDate = ParseTime(createDate)
+		if scoringNoteId.Valid {
+			m.ScoringNote = scoringNoteId.String
 		}
-		return slice, rows.Err()
+		return m, nil
 
 	default:
 		return nil, errors.New("invalid get all table: " + objectType)
 	}
 }
 
-// regexp_like is a SQLite scalar function mirroring the mgo-era bson regex
-// filters that handlers express as common.RegEx. Using Go's regexp preserves
-// the old semantics exactly: Unicode-aware case folding for the "i" option,
-// and no wildcard interpretation of the search text (LIKE would treat a
-// literal '%' or '_' as a wildcard).
+// fetchAll runs a list query and returns a typed slice of the table's model
+// pointers — []*models.Question, []*models.Round, ... — so callers can keep
+// type-asserting the result as they always have. limit <= 0 means no
+// LIMIT/OFFSET (return everything the WHERE clause matches).
+func fetchAll(e *Env, objectType, where string, args []interface{}, limit, offset int, order string) (interface{}, error) {
+	base, ok := scanTable(objectType)
+	if !ok {
+		return nil, errors.New("invalid get all table: " + objectType)
+	}
+
+	query := base + where + order
+	fetchArgs := append([]interface{}{}, args...)
+	if limit > 0 {
+		query += " LIMIT ? OFFSET ?"
+		fetchArgs = append(fetchArgs, limit, offset)
+	}
+
+	rows, err := e.Db.Query(query, fetchArgs...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	// The list slices hold model pointers ([]*models.Question, ...), which is
+	// what the handlers type-assert; scanRow yields a value, so box each one.
+	slice := reflect.MakeSlice(reflect.SliceOf(reflect.PointerTo(sliceModelType(objectType))), 0, 0)
+	for rows.Next() {
+		m, err := e.scanRow(objectType, rows)
+		if err != nil {
+			return nil, err
+		}
+		ptr := reflect.New(sliceModelType(objectType))
+		ptr.Elem().Set(reflect.ValueOf(m))
+		slice = reflect.Append(slice, ptr)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return slice.Interface(), nil
+}
+
+// sliceModelType is the struct type a table's list slice holds pointers to.
+func sliceModelType(objectType string) reflect.Type {
+	switch objectType {
+	case QuestionTable:
+		return reflect.TypeOf(models.Question{})
+	case RoundTable:
+		return reflect.TypeOf(models.Round{})
+	case GameTable:
+		return reflect.TypeOf(models.Game{})
+	case SessionTable:
+		return reflect.TypeOf(models.Session{})
+	case CollectionTable:
+		return reflect.TypeOf(models.Collection{})
+	case ScoringNoteTable:
+		return reflect.TypeOf(models.ScoringNote{})
+	case CategoryTable:
+		return reflect.TypeOf(models.Category{})
+	default:
+		return reflect.TypeOf(models.Question{})
+	}
+}
+
+// GetAll records of a certain type matching a ListQuery (ticket #195).
+//
+// args:
+//
+//	e: Environment (i.e. SQLite database)
+//	objectType: table (e.g. 'question' or 'round')
+//	q: the parsed list query (owner scope, unused_only, text_filter, sort)
+//
+// Pagination is deliberately not applied here — see GetAllPaged, which returns
+// the page plus the total count. This returns every matching record.
+func GetAll(e *Env, objectType string, q ListQuery) (interface{}, error) {
+	where, args := buildListWhere(objectType, q)
+	return fetchAll(e, objectType, where, args, 0, 0, orderBy(objectType, q))
+}
+
+// GetAllOwned is the common case: every record of objectType belonging to one
+// user, in the table's default order.
+func GetAllOwned(e *Env, objectType, userId string) (interface{}, error) {
+	return GetAll(e, objectType, ListQuery{UserId: userId})
+}
+
+// regexp_like is a SQLite scalar function backing the list text filters:
+// buildListWhere (list.go) renders a ListQuery's TextFilter into a literal,
+// case-insensitive pattern (regexp.QuoteMeta + "(?i)") and this function
+// evaluates it against a column. Using Go's regexp keeps the search text
+// literal — LIKE would treat a '%' or '_' in it as a wildcard.
 func init() {
 	// Registered at package init, before store.Open creates any connection,
 	// so every connection in the pool has the function.
@@ -1591,122 +1633,6 @@ func sqlValueString(args []driver.Value, i int) (string, bool) {
 	default:
 		return "", false
 	}
-}
-
-// regexPattern applies a handler regex's bson options (case-insensitive "i")
-// to the pattern for regexp_like.
-func regexPattern(re RegEx) string {
-	pattern := re.Pattern
-	if strings.Contains(re.Options, "i") && !strings.HasPrefix(pattern, "(?") {
-		pattern = "(?i)" + pattern
-	}
-	return pattern
-}
-
-// buildWhere translates the handler filters (equality maps and the
-// unused_only / text_filter shapes from createFilters) into a SQL WHERE clause.
-// Filters arrive either as map[string]string (user_id equality) or
-// map[string]interface{} with common.M / common.RegEx values.
-func buildWhere(table string, filters interface{}) (string, []interface{}) {
-	clauses := make([]string, 0)
-	args := make([]interface{}, 0)
-	add := func(clause string, arg interface{}) {
-		clauses = append(clauses, clause)
-		args = append(args, arg)
-	}
-
-	var keys []string
-	var lookup func(string) interface{}
-	switch f := filters.(type) {
-	case nil:
-		return "", nil
-	case map[string]string:
-		keys = make([]string, 0, len(f))
-		for k := range f {
-			keys = append(keys, k)
-		}
-		lookup = func(k string) interface{} { return f[k] }
-	case map[string]interface{}:
-		keys = make([]string, 0, len(f))
-		for k := range f {
-			keys = append(keys, k)
-		}
-		lookup = func(k string) interface{} { return f[k] }
-	default:
-		return "", nil
-	}
-
-	sort.Strings(keys)
-	for _, k := range keys {
-		v := lookup(k)
-		switch k {
-		case "user_id":
-			add("user_id = ?", v)
-
-		case "$or":
-			if ors, ok := v.([]M); ok {
-				subs := make([]string, 0)
-				for _, or := range ors {
-					for col, cond := range or {
-						if m, ok := cond.(M); ok {
-							if re, ok := m["$regex"].(RegEx); ok {
-								if clause, arg, ok := regexClause(table, col, re); ok {
-									subs = append(subs, clause)
-									args = append(args, arg)
-								}
-							}
-						}
-					}
-				}
-				if len(subs) > 0 {
-					clauses = append(clauses, "("+strings.Join(subs, " OR ")+")")
-				}
-			}
-
-		default:
-			if m, ok := v.(M); ok {
-				if re, ok := m["$regex"].(RegEx); ok {
-					if clause, arg, ok := regexClause(table, k, re); ok {
-						add(clause, arg)
-					}
-					continue
-				}
-				if exists, ok := m["$exists"].(bool); ok && !exists {
-					// unused_only: membership lives in the join tables, so a
-					// question (or round) is unused when it has no rows there.
-					if k == models.RoundsUsed+".0" {
-						clauses = append(clauses,
-							"NOT EXISTS (SELECT 1 FROM round_question WHERE round_question.question_id = question.id)")
-					} else if k == models.Games+".0" {
-						clauses = append(clauses,
-							"NOT EXISTS (SELECT 1 FROM game_round WHERE game_round.round_id = round.id)")
-					}
-				}
-			}
-		}
-	}
-
-	if len(clauses) == 0 {
-		return "", nil
-	}
-	return " WHERE " + strings.Join(clauses, " AND "), args
-}
-
-// regexClause renders a regex filter on a column as a SQL fragment for
-// buildWhere. A category regex searches the category row's name through the
-// question table's category_id FK — the legacy question.category text column
-// is gone (ticket #181) — so it is only meaningful when the filtered table is
-// question; on any other table the clause is dropped rather than emitting SQL
-// that references a nonexistent column (ticket #186).
-func regexClause(table, col string, re RegEx) (string, interface{}, bool) {
-	if col == "category" {
-		if table != QuestionTable {
-			return "", nil, false
-		}
-		return "EXISTS (SELECT 1 FROM category WHERE category.id = question.category_id AND REGEXP_LIKE(category.name, ?))",
-			regexPattern(re), true
-	}
-	return "REGEXP_LIKE(" + col + ", ?)", regexPattern(re), true
 }
 
 func Delete(e *Env, objectType string, objectId string) error {
@@ -1755,12 +1681,15 @@ func IncrementState(e *Env, sessionId string) error {
 
 // Respond with data or an error
 // args:
-//    c: gin context
-//    data: data from DB calls
-//    err: error from DB calls
+//
+//	c: gin context
+//	data: data from DB calls
+//	err: error from DB calls
+//
 // responds with:
-//    200 and data, if found
-//    404 and error message if not found
+//
+//	200 and data, if found
+//	404 and error message if not found
 func Respond(c *gin.Context, data interface{}, err error) {
 	if err != nil {
 		fmt.Println(err)

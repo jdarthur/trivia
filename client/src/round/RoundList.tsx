@@ -4,9 +4,11 @@ import './RoundList.css';
 import Round from "./Round"
 import OpenRound from "./OpenRound"
 import EditorFilter from "../editor/EditorFilter"
+import ListPagination from "../editor/ListPagination";
 import LoadingOrView from "../editor/LoadingOrView"
 import NewButton from '../editor/NewButton';
 import PageHeader from "../common/PageHeader";
+import {buildListQuery, type ListMeta} from "../api/listParams";
 import {Flex} from "antd";
 
 
@@ -28,6 +30,11 @@ interface State {
     selected: string //selected round ID (1 at a time)
     dirty: string //dirty round ID (can be selected_round or empty if a round is selected but not changed)
     loading: boolean
+    // Pagination (ticket #195/196): the server returns one page plus the totals
+    // for the filtered set. page is zero-based, as the API sees it.
+    meta?: ListMeta
+    page: number
+    page_size: number
 }
 
 class RoundList extends React.Component<Props, State> {
@@ -39,7 +46,9 @@ class RoundList extends React.Component<Props, State> {
             rounds: [],
             selected: "", //selected round ID (1 at a time)
             dirty: "", //dirty round ID (can be selected_round or empty if a round is selected but not changed)
-            loading: false
+            loading: false,
+            page: 0,
+            page_size: 25
         }
     }
 
@@ -48,34 +57,63 @@ class RoundList extends React.Component<Props, State> {
     }
 
     get_rounds = () => {
-        let url = "/editor/rounds?"
-
-        if (this.state.text_filter !== "") {
-            url += "text_filter=" + this.state.text_filter
-        }
-
-        if (this.state.unused_only === true) {
-            url += "&unused_only=true"
-        }
+        // One shared param builder for every editor list (ticket #195).
+        const query = buildListQuery({
+            unused_only: this.state.unused_only,
+            text_filter: this.state.text_filter,
+            page: this.state.page,
+            page_size: this.state.page_size,
+        })
 
         this.setState({loading: true}, () => {
-            fetch(url, {headers: {"borttrivia-token": this.props.token}})
+            fetch("/editor/rounds" + query, {headers: {"borttrivia-token": this.props.token}})
                 .then(response => response.json())
                 .then(state => {
                     console.log(state)
-                    this.setState({rounds: state.rounds, loading: false})
+                    const meta: ListMeta = {
+                        total: state.total,
+                        page: state.page,
+                        page_size: state.page_size,
+                        total_pages: state.total_pages,
+                    }
+                    // Deleting the last records can leave the current page past
+                    // the end of the (smaller) filtered set; fall back to page 1
+                    // so the list is never empty with no way back. The page-0
+                    // rows are a different request, so re-fetch for them.
+                    if (meta.page >= meta.total_pages && this.state.page > 0) {
+                        this.setState({page: 0, loading: false}, () => this.get_rounds())
+                        return
+                    }
+                    this.setState({
+                        rounds: state.rounds,
+                        meta: meta,
+                        loading: false,
+                    })
                 })
         })
     }
 
+    // Any filter change invalidates the current page, so reset to the first one.
     set_unused_only = (value: boolean) => {
-        this.setState({unused_only: value, selected: ""}, () => {
+        this.setState({unused_only: value, selected: "", page: 0}, () => {
             this.get_rounds()
         })
     }
 
     set_text_filter = (value: string) => {
-        this.setState({text_filter: value, selected: ""}, () => {
+        this.setState({text_filter: value, selected: "", page: 0}, () => {
+            this.get_rounds()
+        })
+    }
+
+    set_page = (page: number) => {
+        this.setState({page, selected: ""}, () => {
+            this.get_rounds()
+        })
+    }
+
+    set_page_size = (page_size: number) => {
+        this.setState({page_size, page: 0, selected: ""}, () => {
             this.get_rounds()
         })
     }
@@ -222,6 +260,9 @@ class RoundList extends React.Component<Props, State> {
                 overflowY: "auto"
             }}>
             {rounds}
+            <ListPagination meta={this.state.meta} page={this.state.page}
+                            pageSize={this.state.page_size}
+                            set_page={this.set_page} set_page_size={this.set_page_size}/>
         </div>
 
         return (

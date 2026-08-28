@@ -120,8 +120,7 @@ func GetOneScoringNote(e *Env, userId, noteId string) (models.ScoringNote, error
 }
 
 func GetAllScoringNotes(e *Env, userId string) ([]*models.ScoringNote, error) {
-	filter := map[string]string{"user_id": userId}
-	data, err := common.GetAll((*common.Env)(e), common.ScoringNoteTable, filter)
+	data, err := common.GetAllOwned((*common.Env)(e), common.ScoringNoteTable, userId)
 	if err != nil {
 		return nil, err
 	}

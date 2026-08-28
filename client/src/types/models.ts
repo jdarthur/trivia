@@ -93,6 +93,8 @@ export interface Category {
   create_date: WireTimestamp;
   name: string;
   scoring_note: string;
+  /** Derived server-side: how many questions reference this category (ticket #195). */
+  questions_used: number;
 }
 
 /** models.PlayerId — a branded string used as a map key (e.g. scoreboard). */

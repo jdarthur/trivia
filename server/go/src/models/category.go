@@ -17,6 +17,19 @@ type Category struct {
 	CreateDate  time.Time `json:"create_date"`
 	Name        string    `json:"name"`
 	ScoringNote string    `json:"scoring_note"`
+
+	// QuestionsUsed is derived from question.category_id (never settable): the
+	// number of questions that reference this category. It backs
+	// IsRecordInUse and lets the editor show/filter unused categories without a
+	// second request per category.
+	QuestionsUsed int `json:"questions_used"`
+}
+
+// IsRecordInUse reports whether any question references this category
+// (models.InUse). The list API's unused_only param applies the same rule in SQL
+// (common.unusedClause).
+func (c Category) IsRecordInUse() bool {
+	return c.QuestionsUsed > 0
 }
 
 func (c Category) SetCreateDate(createDate time.Time) Object {

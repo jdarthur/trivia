@@ -29,6 +29,13 @@ func (r Round) SetId(objectId string) Object {
 	return r
 }
 
+// IsRecordInUse reports whether any game contains this round (models.InUse).
+// Games is derived from the game_round join table, so this is the same rule the
+// list API applies in SQL (common.unusedClause).
+func (r Round) IsRecordInUse() bool {
+	return len(r.Games) > 0
+}
+
 func (r Round) MarshalJSON() ([]byte, error) {
 	type Alias Round
 	return json.Marshal(&struct {

@@ -13,10 +13,26 @@ import (
 
 type Env common.Env
 
+// GetAllQuestions lists questions, honoring the shared list query params of
+// ticket #195: unused_only (no round contains the question), text_filter across
+// question/answer/category, sort/order, and page/page_size.
 func (e *Env) GetAllQuestions(c *gin.Context) {
-	filter := createFilters(c)
-	questions, err := common.GetAll((*common.Env)(e), common.QuestionTable, filter)
-	common.Respond(c, gin.H{"questions": questions}, err)
+	query, err := common.ParseListQuery(c, common.QuestionTable)
+	if err != nil {
+		common.Respond(c, nil, err)
+		return
+	}
+	// Assert, don't just read: an unset user would drop the user_id clause and
+	// list every user's records.
+	userId, err := common.AssertHasUserId(c)
+	if err != nil {
+		common.Respond(c, nil, err)
+		return
+	}
+	query.UserId = userId
+
+	result, err := common.GetAllPaged((*common.Env)(e), common.QuestionTable, query)
+	common.RespondList(c, "questions", result, err)
 }
 
 func (e *Env) GetOneQuestion(c *gin.Context) {
@@ -74,9 +90,7 @@ func (e *Env) DeleteQuestion(c *gin.Context) {
 }
 
 func (e *Env) deleteFromCollections(userId, targetQuestionId string) error {
-	filter := map[string]string{"user_id": userId}
-
-	collections, err := common.GetAll((*common.Env)(e), common.CollectionTable, filter)
+	collections, err := common.GetAllOwned((*common.Env)(e), common.CollectionTable, userId)
 	for _, collection := range collections.([]*models.Collection) {
 		for _, questionId := range collection.Questions {
 			if questionId == targetQuestionId {
@@ -734,38 +748,13 @@ func replaceQuestionChildren(q common.Queryer, ctx context.Context, data models.
 }
 
 func GetAllQuestions(e *Env, userId string) ([]*models.Question, error) {
-	filter := map[string]string{"user_id": userId}
-	data, err := common.GetAll((*common.Env)(e), common.QuestionTable, filter)
+	data, err := common.GetAllOwned((*common.Env)(e), common.QuestionTable, userId)
 	if err != nil {
 		return nil, err
 	}
 
 	questions := data.([]*models.Question)
 	return questions, nil
-}
-
-//create unused_only and text_filter mongodb queries from request
-func createFilters(c *gin.Context) map[string]interface{} {
-	filter := make(map[string]interface{})
-	value, ok := c.Get(common.USER_ID)
-	if ok {
-		userId := value.(string)
-		filter["user_id"] = userId
-	}
-
-	//unused_only means that rounds_used = []
-	unusedOnly := c.DefaultQuery("unused_only", "false")
-	if strings.ToLower(unusedOnly) == "true" {
-		filter[models.RoundsUsed+".0"] = common.M{"$exists": false}
-	}
-
-	//text_filter means that the search string appears in category/question/answer (case-insensitive)
-	textFilter := c.Query("text_filter")
-	if textFilter != "" {
-		search := common.M{"$regex": common.RegEx{Pattern: ".*" + textFilter + ".*", Options: "i"}}
-		filter["$or"] = []common.M{{"question": search}, {"answer": search}, {"category": search}}
-	}
-	return filter
 }
 
 func GetOneQuestion(e *Env, userId, questionId string) (models.Question, error) {

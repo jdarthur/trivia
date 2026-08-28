@@ -3,7 +3,7 @@ import '../question/Question.css';
 
 import {Button} from 'antd';
 import EditQuestionModal from "../question/EditQuestionModal";
-import {useGetCategoriesQuery} from "../api/main";
+import {useAllCategories} from "../api/main";
 import type {QuestionBucket, QuestionBucketItem, QuestionPair} from "../types/models";
 
 interface Props {
@@ -26,7 +26,7 @@ interface Props {
 
 export default function HotEditQuestion(props: Props) {
 
-    const {data: categories, error: categoriesError, isLoading: categoriesLoading} = useGetCategoriesQuery()
+    const {data: categories, error: categoriesError, isLoading: categoriesLoading} = useAllCategories()
 
     // The question stores the category ID now (ticket #180), but the session
     // snapshot only carries the resolved name. Find the category that name

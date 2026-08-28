@@ -9,16 +9,24 @@ import (
 
 type Env common.Env
 
+// GetAllCollections lists the caller's collections, honoring the shared list
+// query params of ticket #195 (text_filter on name, sort/order, page/page_size).
 func (e *Env) GetAllCollections(c *gin.Context) {
-	filter := make(map[string]interface{})
 	userId, err := common.AssertHasUserId(c)
 	if err != nil {
 		common.Respond(c, nil, err)
-	} else {
-		filter["user_id"] = userId
-		collections, err := common.GetAll((*common.Env)(e), common.CollectionTable, filter)
-		common.Respond(c, gin.H{"collections": collections}, err)
+		return
 	}
+
+	query, err := common.ParseListQuery(c, common.CollectionTable)
+	if err != nil {
+		common.Respond(c, nil, err)
+		return
+	}
+	query.UserId = userId
+
+	result, err := common.GetAllPaged((*common.Env)(e), common.CollectionTable, query)
+	common.RespondList(c, "collections", result, err)
 }
 
 func (e *Env) GetOneCollection(c *gin.Context) {
