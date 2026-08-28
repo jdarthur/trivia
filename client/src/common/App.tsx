@@ -138,7 +138,6 @@ export default function App() {
                   <Menu.Item key="5" disabled={!showEditor}>
                       <Link to={"collections"}>{COLLECTION}</Link>
                   </Menu.Item>
-
                 </SubMenu>
 
                   <Menu.Item key="7" style={{float: "right"}} className="nohover">

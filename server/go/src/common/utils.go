@@ -150,7 +150,7 @@ func stringValue(v interface{}) string {
 }
 
 // nilIfEmpty maps an empty string to NULL. question.category_id and
-// category.scoring_note_id are nullable FK columns where NULL — not ” — is
+// category.scoring_note_id are nullable FK columns where NULL — not '' — is
 // the "unset" sentinel; the API wire format keeps the historical empty string.
 func nilIfEmpty(s string) interface{} {
 	if s == "" {
@@ -1587,11 +1587,11 @@ func GetAllOwned(e *Env, objectType, userId string) (interface{}, error) {
 	return GetAll(e, objectType, ListQuery{UserId: userId})
 }
 
-// regexp_like is a SQLite scalar function mirroring the mgo-era bson regex
-// filters that handlers express as common.RegEx. Using Go's regexp preserves
-// the old semantics exactly: Unicode-aware case folding for the "i" option,
-// and no wildcard interpretation of the search text (LIKE would treat a
-// literal '%' or '_' as a wildcard).
+// regexp_like is a SQLite scalar function backing the list text filters:
+// buildListWhere (list.go) renders a ListQuery's TextFilter into a literal,
+// case-insensitive pattern (regexp.QuoteMeta + "(?i)") and this function
+// evaluates it against a column. Using Go's regexp keeps the search text
+// literal — LIKE would treat a '%' or '_' in it as a wildcard.
 func init() {
 	// Registered at package init, before store.Open creates any connection,
 	// so every connection in the pool has the function.
