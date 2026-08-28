@@ -18,7 +18,12 @@ func (e *Env) GetAllGames(c *gin.Context) {
 		common.Respond(c, nil, err)
 		return
 	}
-	query.UserId = common.GetUserId(c)
+	userId, err := common.AssertHasUserId(c)
+	if err != nil {
+		common.Respond(c, nil, err)
+		return
+	}
+	query.UserId = userId
 
 	result, err := common.GetAllPaged((*common.Env)(e), common.GameTable, query)
 	common.RespondList(c, "games", result, err)

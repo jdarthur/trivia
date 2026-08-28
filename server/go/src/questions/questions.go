@@ -22,7 +22,14 @@ func (e *Env) GetAllQuestions(c *gin.Context) {
 		common.Respond(c, nil, err)
 		return
 	}
-	query.UserId = common.GetUserId(c)
+	// Assert, don't just read: an unset user would drop the user_id clause and
+	// list every user's records.
+	userId, err := common.AssertHasUserId(c)
+	if err != nil {
+		common.Respond(c, nil, err)
+		return
+	}
+	query.UserId = userId
 
 	result, err := common.GetAllPaged((*common.Env)(e), common.QuestionTable, query)
 	common.RespondList(c, "questions", result, err)

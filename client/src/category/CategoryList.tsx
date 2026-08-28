@@ -9,7 +9,7 @@ import ListPagination from "../editor/ListPagination";
 import PageHeader from "../common/PageHeader";
 import CategoryModal from "./CategoryModal";
 import {useDeleteCategoryMutation, useGetCategoriesQuery, useGetScoringNotesQuery} from "../api/main";
-import {useListFilters} from "../editor/useListFilters";
+import {useClampToFirstPage, useListFilters} from "../editor/useListFilters";
 import notify, {errorMessage} from "../common/notify";
 import type {Category} from "../types/models";
 
@@ -33,9 +33,10 @@ export default function CategoryList(props: Props) {
     const [modalOpen, setModalOpen] = useState(false)
     const [editing, setEditing] = useState<Category | null>(null)
 
-    const filters = useListFilters({page_size: 24})
+    const filters = useListFilters({page_size: 25})
     const {data, isLoading} = useGetCategoriesQuery(filters.query)
     const categories = data?.categories
+    useClampToFirstPage(data, filters.page, filters.setPage)
     const {data: notes} = useGetScoringNotesQuery()
 
     const [deleteCategory] = useDeleteCategoryMutation()

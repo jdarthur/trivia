@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -98,7 +99,18 @@ func TestParseListQueryUnusedOnlyVariants(t *testing.T) {
 			t.Errorf("%s not treated as true", raw)
 		}
 	}
-	for _, raw := range []string{"", "unused_only=false", "unused_only=0"} {
+	// strconv.ParseBool's truthy spellings all mean true (this replaced an older
+	// EqualFold("true") check that validated "1" but left the flag unset).
+	for _, raw := range []string{"unused_only=1", "unused_only=t", "unused_only=T"} {
+		q, err := ParseListQuery(listRequest(t, raw), QuestionTable)
+		if err != nil {
+			t.Fatalf("%s: %v", raw, err)
+		}
+		if !q.UnusedOnly {
+			t.Errorf("%s not treated as true", raw)
+		}
+	}
+	for _, raw := range []string{"", "unused_only=false", "unused_only=0", "unused_only=F"} {
 		q, err := ParseListQuery(listRequest(t, raw), QuestionTable)
 		if err != nil {
 			t.Fatalf("%s: %v", raw, err)
@@ -109,15 +121,26 @@ func TestParseListQueryUnusedOnlyVariants(t *testing.T) {
 	}
 }
 
-func TestParseListQueryPageDefaults(t *testing.T) {
-	// page without page_size still means "give me a page", so it gets the cap
-	// rather than silently returning everything.
-	q, err := ParseListQuery(listRequest(t, "page=1"), QuestionTable)
+func TestParseListQueryPageRequiresPageSize(t *testing.T) {
+	// Pagination is on exactly when page_size is given. A bare page= is
+	// ambiguous — page=0 would mean "unpaginated" while page=1 would silently
+	// mean "a MaxPageSize page" — so it is rejected rather than guessed at.
+	_, err := ParseListQuery(listRequest(t, "page=1"), QuestionTable)
+	if err == nil {
+		t.Fatal("expected page without page_size to be rejected")
+	}
+	var invalid InvalidDataError
+	if !errors.As(err, &invalid) || invalid.Field() != "page_size" {
+		t.Errorf("expected a page_size error, got %v", err)
+	}
+
+	// page=0 alone is still the unpaginated default (no page requested).
+	q, err := ParseListQuery(listRequest(t, "page=0"), QuestionTable)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if q.Page != 1 || q.PageSize != MaxPageSize {
-		t.Errorf("page=1 => %+v, want page 1 with default size %d", q, MaxPageSize)
+	if q.HasPagination() {
+		t.Errorf("page=0 alone should stay unpaginated, got %+v", q)
 	}
 }
 
@@ -316,6 +339,47 @@ func TestOrderBy(t *testing.T) {
 				t.Errorf("orderBy =\n  %q\nwant\n  %q", got, tc.want)
 			}
 		})
+	}
+}
+
+func TestParseListQueryRejectsUnusedOnlyWhereUndefined(t *testing.T) {
+	// Nothing references a game or a collection, so "unused" has no meaning
+	// there. Reject the param rather than returning an unfiltered list whose
+	// total would look filtered.
+	for _, table := range []string{GameTable, CollectionTable, ScoringNoteTable} {
+		_, err := ParseListQuery(listRequest(t, "unused_only=true"), table)
+		if err == nil {
+			t.Errorf("%s: expected unused_only to be rejected", table)
+			continue
+		}
+		var invalid InvalidDataError
+		if !errors.As(err, &invalid) || invalid.Field() != "unused_only" {
+			t.Errorf("%s: expected an unused_only error, got %v", table, err)
+		}
+	}
+	// A table where it IS defined still accepts it.
+	if _, err := ParseListQuery(listRequest(t, "unused_only=true"), QuestionTable); err != nil {
+		t.Errorf("question unused_only rejected: %v", err)
+	}
+}
+
+// text_filter arrives from a search box, so its text is matched literally:
+// regexp metacharacters in a query must describe themselves, not syntax.
+func TestBuildListWhereQuotesRegexpMetacharacters(t *testing.T) {
+	for _, text := range []string{"2+2", "$5", "[best]", "a.b", "(nested"} {
+		_, args := buildListWhere(QuestionTable, ListQuery{TextFilter: text})
+		if len(args) == 0 {
+			t.Fatalf("no args for text_filter %q", text)
+		}
+		pattern, _ := args[0].(string)
+		if !strings.Contains(pattern, regexp.QuoteMeta(text)) {
+			t.Errorf("pattern %q does not match %q literally", pattern, text)
+		}
+		// The assembled pattern must still compile, so a stray metacharacter
+		// cannot degrade into regexp_like's "no matches" fallback.
+		if _, err := regexp.Compile(pattern); err != nil {
+			t.Errorf("pattern %q for %q does not compile: %v", pattern, text, err)
+		}
 	}
 }
 

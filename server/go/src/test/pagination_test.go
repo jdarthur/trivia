@@ -477,6 +477,41 @@ func TestPaginationScopesByOwner(t *testing.T) {
 	}
 }
 
+// An absurd page number must not overflow Page*PageSize into a negative
+// OFFSET — SQLite reads a negative offset as 0, which would hand back page 0's
+// rows under page N's metadata.
+func TestPaginationHugePageDoesNotOverflow(t *testing.T) {
+	db := GetDb()
+	env := &common.Env{Db: db}
+	qenv := &questions.Env{Db: db}
+	userId := "user-1"
+	seedQuestions(t, qenv, userId, 5)
+
+	result, err := common.GetAllPaged(env, common.QuestionTable,
+		common.ListQuery{UserId: userId, Page: 999999999, PageSize: 500})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := questionIds(result.Items); len(got) != 0 {
+		t.Fatalf("huge page returned %d records, want none (offset overflowed to 0)", len(got))
+	}
+}
+
+// An empty result set reports zero pages, so a client can tell there is nothing
+// rather than rendering a single phantom page.
+func TestPaginationEmptySetHasNoPages(t *testing.T) {
+	db := GetDb()
+	env := &common.Env{Db: db}
+
+	result, err := common.GetAllPaged(env, common.QuestionTable, common.ListQuery{UserId: "nobody"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Total != 0 || result.TotalPages != 0 {
+		t.Fatalf("empty metadata = %+v, want total 0 / pages 0", result)
+	}
+}
+
 // models.InUse and common's SQL unused_only clause must agree: filtering the
 // full list in memory with the model method gives exactly what the paged query
 // returns. (This is the guard against the two definitions drifting.)

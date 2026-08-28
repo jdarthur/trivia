@@ -12,7 +12,7 @@ import {Table} from "antd"
 import {EditOutlined} from '@ant-design/icons';
 import PageHeader from "../common/PageHeader";
 import {useDeleteQuestionMutation, useGetQuestionsQuery} from "../api/main";
-import {useListFilters} from "../editor/useListFilters";
+import {useClampToFirstPage, useListFilters} from "../editor/useListFilters";
 import ListPagination from "../editor/ListPagination";
 import notify, {errorMessage} from "../common/notify";
 import CategoryName from "../category/CategoryName";
@@ -34,6 +34,9 @@ export default function QuestionList(props: Props) {
     const {query, unusedOnly, textFilter} = filters
 
     const {data, isFetching} = useGetQuestionsQuery(query)
+    // Deleting the last records on a later page would otherwise leave an empty
+    // list with no page to click back to.
+    useClampToFirstPage(data, filters.page, filters.setPage)
 
     const questions = data?.questions;
 

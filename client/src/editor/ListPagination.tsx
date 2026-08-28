@@ -20,16 +20,20 @@ interface Props {
  * page plus the total for the *filtered* set, so the counts here describe what
  * the user actually filtered on.
  *
- * Hidden for an empty list. It renders even when everything fits on one page:
- * the range readout ("1-12 of 12") is useful, and the page-size chooser has to
- * be reachable before the list outgrows a page — otherwise a user could never
- * ask for a smaller page.
+ * Hidden for an empty list — except when the user is on a later page, where it
+ * stays so they can get back: deleting the last record on page 3 would otherwise
+ * leave an empty list with no control to return to page 1. It also renders when
+ * everything fits on one page, since the range readout ("1-12 of 12") is useful
+ * and the page-size chooser has to be reachable before a list outgrows a page.
  */
 export default function ListPagination(props: Props) {
     const meta = props.meta
-    if (!meta || meta.total === 0) {
+    if (!meta || (meta.total === 0 && props.page === 0)) {
         return null
     }
+
+    const rangeStart = meta.total === 0 ? 0 : meta.page * props.pageSize + 1
+    const rangeEnd = Math.min((meta.page + 1) * props.pageSize, meta.total)
 
     return <div style={{display: "flex", justifyContent: "flex-end", padding: "10px 5px"}}>
         <Pagination
@@ -38,10 +42,10 @@ export default function ListPagination(props: Props) {
             total={meta.total}
             showSizeChanger={!!props.set_page_size}
             pageSizeOptions={[10, 25, 50, 100]}
-            // antd derives the range from current/pageSize, and `total` here is
-            // the filtered count from the server (not dataSource.length), so the
-            // readout describes the whole filtered set.
-            showTotal={(total, range) => `${range[0]}-${range[1]} of ${total}`}
+            // The range comes from the server's page/page_size and the filtered
+            // total, not from dataSource.length, so it describes the whole
+            // filtered set rather than just the rows mounted.
+            showTotal={() => `${rangeStart}-${rangeEnd} of ${meta.total}`}
             onChange={(nextPage, nextSize) => {
                 if (nextSize && nextSize !== props.pageSize && props.set_page_size) {
                     props.set_page_size(nextSize)

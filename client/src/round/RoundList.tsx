@@ -70,14 +70,23 @@ class RoundList extends React.Component<Props, State> {
                 .then(response => response.json())
                 .then(state => {
                     console.log(state)
+                    const meta: ListMeta = {
+                        total: state.total,
+                        page: state.page,
+                        page_size: state.page_size,
+                        total_pages: state.total_pages,
+                    }
+                    // Deleting the last records can leave the current page past
+                    // the end of the (smaller) filtered set; fall back to page 1
+                    // so the list is never empty with no way back. The page-0
+                    // rows are a different request, so re-fetch for them.
+                    if (meta.page >= meta.total_pages && this.state.page > 0) {
+                        this.setState({page: 0, loading: false}, () => this.get_rounds())
+                        return
+                    }
                     this.setState({
                         rounds: state.rounds,
-                        meta: {
-                            total: state.total,
-                            page: state.page,
-                            page_size: state.page_size,
-                            total_pages: state.total_pages,
-                        },
+                        meta: meta,
                         loading: false,
                     })
                 })

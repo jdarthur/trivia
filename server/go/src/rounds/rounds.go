@@ -18,7 +18,12 @@ func (e *Env) GetAllRounds(c *gin.Context) {
 		common.Respond(c, nil, err)
 		return
 	}
-	query.UserId = common.GetUserId(c)
+	userId, err := common.AssertHasUserId(c)
+	if err != nil {
+		common.Respond(c, nil, err)
+		return
+	}
+	query.UserId = userId
 
 	result, err := common.GetAllPaged((*common.Env)(e), common.RoundTable, query)
 	common.RespondList(c, "rounds", result, err)

@@ -3,6 +3,7 @@ package common
 import (
 	"errors"
 	"fmt"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -140,11 +141,27 @@ func (e InvalidQueryError) Data() interface{} { return e.ErrorData }
 func ParseListQuery(c *gin.Context, objectType string) (ListQuery, error) {
 	q := ListQuery{}
 
-	q.UnusedOnly = strings.EqualFold(c.Query("unused_only"), "true")
-	if raw := c.Query("unused_only"); raw != "" && !q.UnusedOnly {
-		if _, err := parseBool("unused_only", raw); err != nil {
+	// One parse so a value cannot validate as a bool yet leave the flag unset:
+	// strconv treats "1"/"t"/"T"/"TRUE" as true, and those all mean true here.
+	if raw := c.Query("unused_only"); raw != "" {
+		value, err := parseBool("unused_only", raw)
+		if err != nil {
 			return q, err
 		}
+		if value {
+			if _, ok := unusedClause(objectType); !ok {
+				// Nothing references this table (games sit at the top of the
+				// reference tree), so the filter has no meaning. Reject it rather
+				// than returning an unfiltered list whose total looks filtered —
+				// the same rule as an unknown sort/search column.
+				return q, InvalidQueryError{
+					ErrorField: "unused_only",
+					ErrorData:  raw,
+					Message:    "unused_only is not supported for " + objectType,
+				}
+			}
+		}
+		q.UnusedOnly = value
 	}
 
 	q.TextFilter = c.Query("text_filter")
@@ -220,10 +237,15 @@ func ParseListQuery(c *gin.Context, objectType string) (ListQuery, error) {
 		q.PageSize = size
 	}
 
-	// page without page_size would otherwise silently mean "page 0 of an
-	// unpaginated list"; treat it as a request for the default page.
+	// Pagination is on exactly when page_size is given. A bare page= would
+	// otherwise mean "page 0 of an unpaginated list" for page=0 and a
+	// MaxPageSize page for page=1 — reject it so the caller says what it means.
 	if q.Page > 0 && q.PageSize == 0 {
-		q.PageSize = MaxPageSize
+		return q, InvalidQueryError{
+			ErrorField: "page_size",
+			ErrorData:  "",
+			Message:    "page_size is required when page is set",
+		}
 	}
 
 	return q, nil
@@ -287,10 +309,6 @@ func sortColumnExpr(objectType, column string) (string, bool) {
 		switch objectType {
 		case CategoryTable, RoundTable, GameTable, CollectionTable:
 			return objectType + ".name", true
-		}
-	case "last_used":
-		if objectType == ScoringNoteTable {
-			return "scoring_note.last_used", true
 		}
 	}
 	return "", false
@@ -368,9 +386,12 @@ func buildListWhere(objectType string, q ListQuery) (string, []interface{}) {
 			columns = defaultSearchColumns(objectType)
 		}
 		subs := make([]string, 0, len(columns))
-		// (?i) keeps text_filter case-insensitive, matching the bson "i" option
-		// the mgo-era filters carried (regexp_like evaluates Go regexp).
-		pattern := "(?i).*" + q.TextFilter + ".*"
+		// QuoteMeta so the search text is literal: it arrives from a search box,
+		// so "2+2" or "$5" must match themselves, not act as regexp syntax (an
+		// unparseable fragment would otherwise compile-fail and regexp_like
+		// swallows that as "no matches", i.e. a silent empty result).
+		// (?i) keeps it case-insensitive, as the bson "i" option used to.
+		pattern := "(?i).*" + regexp.QuoteMeta(q.TextFilter) + ".*"
 		for _, column := range columns {
 			expression, ok := listColumnExpr(objectType, column)
 			if !ok {
@@ -392,7 +413,7 @@ func buildListWhere(objectType string, q ListQuery) (string, []interface{}) {
 
 // ListResult is one page of records plus the metadata a client needs to render
 // pagination controls. PageSize is 0 when the result is the whole (unpaginated)
-// list, in which case TotalPages is 1 if there is anything at all.
+// list. TotalPages is 0 for an empty result set and 1 otherwise.
 type ListResult struct {
 	Items      interface{} `json:"items"`
 	Total      int         `json:"total"`
@@ -419,19 +440,30 @@ func GetAllPaged(e *Env, objectType string, q ListQuery) (*ListResult, error) {
 		return nil, err
 	}
 
+	totalPages := 1
+	if total == 0 {
+		totalPages = 0
+	} else if q.HasPagination() {
+		totalPages = (total + q.PageSize - 1) / q.PageSize
+	}
+
 	limit, offset := 0, 0
 	if q.HasPagination() {
-		limit, offset = q.PageSize, q.Page*q.PageSize
+		limit = q.PageSize
+		// Never multiply Page by PageSize blindly: an absurd page number
+		// overflows to a negative OFFSET, and SQLite reads that as 0 — handing
+		// back page 0's rows under page N's metadata. A page at or past the end
+		// selects nothing, so offset = total says exactly that.
+		if q.Page >= totalPages {
+			offset = total
+		} else {
+			offset = q.Page * q.PageSize
+		}
 	}
 
 	items, err := fetchAll(e, objectType, where, args, limit, offset, orderBy(objectType, q))
 	if err != nil {
 		return nil, err
-	}
-
-	totalPages := 1
-	if q.HasPagination() {
-		totalPages = (total + q.PageSize - 1) / q.PageSize
 	}
 
 	return &ListResult{

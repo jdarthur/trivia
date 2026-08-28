@@ -3,7 +3,6 @@ package questions
 import (
 	"errors"
 	"fmt"
-	"sort"
 
 	"github.com/gin-gonic/gin"
 	"github.com/jdarthur/trivia/common"
@@ -172,21 +171,15 @@ func GetOneCategory(e *Env, userId, categoryId string) (models.Category, error) 
 }
 
 // GetAllCategories returns every category a user owns, alphabetically (the
-// editor's category selector wants the full list, not a page).
+// editor's category selector wants the full list, not a page). The order comes
+// from the table's default ORDER BY, so there is one ordering source.
 func GetAllCategories(e *Env, userId string) ([]*models.Category, error) {
 	data, err := common.GetAllOwned((*common.Env)(e), common.CategoryTable, userId)
 	if err != nil {
 		return nil, err
 	}
 
-	categories := data.([]*models.Category)
-
-	// alphabetical, for the editor's category selector
-	sort.Slice(categories, func(i, j int) bool {
-		return categories[i].Name < categories[j].Name
-	})
-
-	return categories, nil
+	return data.([]*models.Category), nil
 }
 
 func validateCategory(category models.Category) error {
