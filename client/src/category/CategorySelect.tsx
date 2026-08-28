@@ -1,7 +1,7 @@
 import React, {useState} from "react";
 import {Button, Select} from "antd";
 import {PlusSquareOutlined} from '@ant-design/icons';
-import {useGetCategoriesQuery} from "../api/main";
+import {useAllCategories} from "../api/main";
 import CategoryModal from "./CategoryModal";
 
 interface Props {
@@ -18,7 +18,7 @@ export default function CategorySelect(props: Props) {
 
     const [showNewCategory, setShowNewCategory] = useState(false)
 
-    const {data: categories} = useGetCategoriesQuery()
+    const {data: categories} = useAllCategories()
 
     const options = [
         <Select.Option value={""} label={"None"} key={"none"}>

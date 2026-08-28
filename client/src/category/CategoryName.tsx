@@ -1,5 +1,5 @@
 import React from 'react';
-import {useGetCategoriesQuery} from "../api/main";
+import {useAllCategories} from "../api/main";
 import ScoringNoteRenderInList from "../question/ScoringNoteRenderInList";
 
 interface Props {
@@ -15,7 +15,7 @@ interface Props {
  * question was fetched) so nothing renders as a blank.
  */
 export default function CategoryName({id, show_note}: Props) {
-    const {data: categories} = useGetCategoriesQuery()
+    const {data: categories} = useAllCategories()
     const category = (categories || []).find(c => c.id === id)
 
     if (!category) {

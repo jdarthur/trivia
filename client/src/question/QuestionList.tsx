@@ -12,6 +12,8 @@ import {Table} from "antd"
 import {EditOutlined} from '@ant-design/icons';
 import PageHeader from "../common/PageHeader";
 import {useDeleteQuestionMutation, useGetQuestionsQuery} from "../api/main";
+import {useListFilters} from "../editor/useListFilters";
+import ListPagination from "../editor/ListPagination";
 import notify, {errorMessage} from "../common/notify";
 import CategoryName from "../category/CategoryName";
 import type {Question} from "../types/models";
@@ -22,18 +24,14 @@ interface Props {
 
 export default function QuestionList(props: Props) {
 
-    const [unusedOnly, setUnusedOnly] = useState(true)
-    const [textFilter, setTextFilter] = useState("")
     const [showModal, setShowModal] = useState(false)
     const [selected, setSelected] = useState<Partial<Question>>({})
 
-    let query = ""
-    if (unusedOnly) {
-        query += "?unused_only=true"
-    }
-    if (textFilter) {
-        query += unusedOnly ? "&text_filter=" + textFilter : "?text_filter=" + textFilter
-    }
+    // Filter + pagination state (ticket #196): the server filters and slices the
+    // list, so `questions` is one page and `meta.total` counts the whole
+    // filtered set. Unused-only is on by default, as it was before.
+    const filters = useListFilters({unused_only: true})
+    const {query, unusedOnly, textFilter} = filters
 
     const {data, isFetching} = useGetQuestionsQuery(query)
 
@@ -91,11 +89,9 @@ export default function QuestionList(props: Props) {
     />
 
     const nqb = <NewButton on_click={newQuestion}/>
-    const pagination = {
-        total: questions?.length || 0,
-        showTotal: (total: number, range: [number, number]) => `${range[0]}-${range[1]} of ${total}`
-    }
 
+    // Server-side paging: the table shows the current page as-is (antd's own
+    // pagination would slice it again).
     const scroll = {
         x: 500,
         y: false as any
@@ -103,11 +99,13 @@ export default function QuestionList(props: Props) {
 
     const table_and_modal = <div>
 
-        <Table columns={columns} dataSource={questions} pagination={pagination}
+        <Table columns={columns} dataSource={questions} pagination={false}
                scroll={scroll} size="small" style={{maxWidth: 1500}} rowKey={"id"}/>
+        <ListPagination meta={data} page={filters.page} pageSize={filters.pageSize}
+                        set_page={filters.setPage} set_page_size={filters.setPageSize}/>
     </div>
 
-    const header = <EditorFilter set_text_filter={setTextFilter} set_unused_only={setUnusedOnly}
+    const header = <EditorFilter set_text_filter={filters.setTextFilter} set_unused_only={filters.setUnusedOnly}
                                  data_type="questions" text_filter={textFilter} unused_only={unusedOnly}
                                  add_button={nqb}/>
 

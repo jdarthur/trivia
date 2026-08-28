@@ -1,5 +1,6 @@
 import {createApi, fetchBaseQuery, retry} from '@reduxjs/toolkit/query/react';
 import type {Category, Collection, Question, ScoringNote} from '../types/models';
+import type {ListMeta} from './listParams';
 
 export const baseQuery = retry(fetchBaseQuery({
     baseUrl: '/',
@@ -44,13 +45,20 @@ export const baseQuery = retry(fetchBaseQuery({
     },
 })
 
+/**
+ * The envelope an editor list endpoint returns (ticket #195): the records under
+ * the endpoint's domain key, plus the pagination metadata. K names that key, so
+ * one type covers questions / rounds / categories / collections.
+ */
+export type ListResponse<T, K extends string> = ListMeta & Record<K, T[]>
+
 export const mainApi = createApi({
     reducerPath: 'mainApi',
     baseQuery: baseQuery,
     tagTypes: ['collections', 'questions', 'scoring_notes', 'categories'],
     endpoints: (builder) => ({
-        getCollections: builder.query<{collections: Collection[]}, void>({
-            query: () => ({url: `editor/collections`}),
+        getCollections: builder.query<ListResponse<Collection, "collections">, string>({
+            query: (queryParams) => ({url: `editor/collections${queryParams ? queryParams : ""}`}),
             providesTags: ['collections']
         }),
         getCollection: builder.query<Collection, string>({
@@ -77,7 +85,12 @@ export const mainApi = createApi({
                 method: "POST"
             }),
         }),
-        getQuestions: builder.query<{questions: Question[]}, string>({
+        // List endpoints take the shared filter/pagination params (ticket #195)
+        // and return the records plus pagination metadata. The query arg is the
+        // serialized query string — see buildListQuery — because RTK keys its
+        // cache off that arg, so building it in the caller keeps one entry per
+        // distinct filter/page combination.
+        getQuestions: builder.query<ListResponse<Question, "questions">, string>({
             query: (queryParams) => ({
                 url: `editor/questions${queryParams ? queryParams : ""}`,
             }),
@@ -132,9 +145,9 @@ export const mainApi = createApi({
             }),
             invalidatesTags: ["scoring_notes", "questions"]
         }),
-        getCategories: builder.query<Category[], void>({
-            query: () => ({
-                url: `editor/categories`,
+        getCategories: builder.query<ListResponse<Category, "categories">, string>({
+            query: (queryParams) => ({
+                url: `editor/categories${queryParams ? queryParams : ""}`,
             }),
             providesTags: ["categories"]
         }),
@@ -193,3 +206,21 @@ export const {
     useUpdateCategoryMutation,
     useDeleteCategoryMutation,
 } = mainApi
+
+/**
+ * Convenience wrappers for the consumers that want a whole list rather than a
+ * page — category selectors, category-name resolution, the collection editor's
+ * question picker. They hit the list endpoint with no filters (so the server
+ * returns everything, unpaginated) and unwrap the list envelope, letting these
+ * callers keep reading a plain array. The query arg is the same "" literal in
+ * each place, so every one of them shares a single cache entry.
+ */
+export function useAllCategories() {
+    const result = useGetCategoriesQuery("")
+    return {...result, data: result.data?.categories}
+}
+
+export function useAllQuestions() {
+    const result = useGetQuestionsQuery("")
+    return {...result, data: result.data?.questions}
+}

@@ -1,5 +1,5 @@
 import React from 'react';
-import {useGetCategoriesQuery, useGetScoringNotesQuery} from "../api/main";
+import {useAllCategories, useGetScoringNotesQuery} from "../api/main";
 
 interface Props {
     id: string
@@ -11,7 +11,7 @@ interface Props {
  * description and is no longer editable on the question itself.
  */
 export default function CategoryNote({id}: Props) {
-    const {data: categories} = useGetCategoriesQuery()
+    const {data: categories} = useAllCategories()
     const {data: notes} = useGetScoringNotesQuery()
     const category = (categories || []).find(c => c.id === id)
     const note = (notes || []).find(n => n.id === category?.scoring_note)

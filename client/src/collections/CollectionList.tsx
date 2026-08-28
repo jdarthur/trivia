@@ -19,7 +19,7 @@ export default function CollectionList(props: Props) {
     const [params] = useSearchParams();
     const collectionId = params?.get("import")
 
-    const {data, isLoading} = useGetCollectionsQuery()
+    const {data, isLoading} = useGetCollectionsQuery("")
     const c = data?.collections
 
     const newCollection = <NewCollection open={modalOpen} close={() => setModalOpen(false)}/>
