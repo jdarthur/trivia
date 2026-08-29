@@ -4,7 +4,7 @@ import WagerManager from "./WagerManager"
 import LeaveGame from "../lobby/LeaveGame"
 import sendData from "../index"
 
-import { Card, Input, Button, Radio, Select, Checkbox, Tooltip } from 'antd';
+import { Card, Input, Button, Radio, Select, Checkbox, Popover } from 'antd';
 import { QuestionCircleOutlined } from '@ant-design/icons';
 
 const { TextArea } = Input;
@@ -355,9 +355,21 @@ class AnswerQuestion extends React.Component<Props, State> {
                                   onChange={(event) => this.set_moneyball(event.target.checked)}>
                             🤑 Moneyball
                         </Checkbox>
-                        <Tooltip title="Moneyball: risk your wager for a 2X payout. Correct and alone → 2X points. Correct with one other → normal points. Correct with two or more others → 0 points. Wrong → −1X points.">
+                        <Popover
+                            title="Moneyball rules"
+                            content={
+                                <div style={{maxWidth: 280}}>
+                                    <p style={{marginBottom: 8}}>Risk your wager for a 2× payout</p>
+                                    <ul style={{paddingLeft: 18, marginBottom: 0}}>
+                                        <li>You alone are correct ➡️ 2× wager</li>
+                                        <li>You and one other ➡️ 1× wager</li>
+                                        <li>You and 2+ others ➡️ 0× wager</li>
+                                        <li>Get it wrong ➡️ -1× wager</li>
+                                    </ul>
+                                </div>
+                            }>
                             <QuestionCircleOutlined style={{marginLeft: 4, color: "#999"}}/>
-                        </Tooltip>
+                        </Popover>
                     </div>
                 ) : null}
 
