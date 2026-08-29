@@ -6,6 +6,7 @@ import OpenGame from "./OpenGame"
 import NewButton from '../editor/NewButton';
 import PageHeader from "../common/PageHeader";
 import LoadingOrView from "../editor/LoadingOrView";
+import {TrophyOutlined} from '@ant-design/icons';
 
 //JSON keys
 const NAME = "name"
@@ -198,7 +199,7 @@ class GameList extends React.Component<Props, State> {
         return (
             <div className="round-and-open-question">
                 <div className="ql_and_filter">
-                    <PageHeader breadcrumbs={["Editor", "Games"]} header={ngb} style={{marginBottom: 10}}/>
+                    <PageHeader breadcrumbs={["Editor", <><TrophyOutlined/> Games</>]} header={ngb} style={{marginBottom: 10}}/>
                     <LoadingOrView loading={false} class_name="round_list"
                                    empty={this.state.games?.length === 0} loaded_view={games} />
                 </div>

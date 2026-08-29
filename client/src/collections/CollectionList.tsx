@@ -7,6 +7,7 @@ import {useGetCollectionsQuery} from "../api/main";
 import PageHeader from "../common/PageHeader";
 import {useSearchParams} from "react-router";
 import ImportCollection from "./ImportCollection";
+import {DatabaseOutlined} from '@ant-design/icons';
 
 interface Props {
     token?: string
@@ -32,7 +33,7 @@ export default function CollectionList(props: Props) {
 
     return <div style={{display: "flex", flexWrap: "wrap", margin: 10, alignItems: "center"}}>
         <div className="ql_and_filter">
-            <PageHeader breadcrumbs={["Editor", "Collections"]} header={newButton} style={{marginBottom: 10}}/>
+            <PageHeader breadcrumbs={["Editor", <><DatabaseOutlined/> Collections</>]} header={newButton} style={{marginBottom: 10}}/>
             <LoadingOrView class_name="round_list" loading={isLoading}
                            empty={c?.length === 0} loaded_view={collections}/>
         </div>

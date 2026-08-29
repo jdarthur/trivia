@@ -10,6 +10,7 @@ import NewButton from '../editor/NewButton';
 import PageHeader from "../common/PageHeader";
 import {buildListQuery, type ListMeta} from "../api/listParams";
 import {Flex} from "antd";
+import {OrderedListOutlined} from '@ant-design/icons';
 
 
 //JSON keys
@@ -268,7 +269,7 @@ class RoundList extends React.Component<Props, State> {
         return (
             <div className="round-and-open-question">
                 <div className="ql_and_filter">
-                    <PageHeader breadcrumbs={["Editor", "Rounds"]} header={header} style={{marginBottom: 10}}/>
+                    <PageHeader breadcrumbs={["Editor", <><OrderedListOutlined/> Rounds</>]} header={header} style={{marginBottom: 10}}/>
                     <LoadingOrView loading={this.state.loading} class_name="round_list"
                                    empty={rounds?.length === 0} loaded_view={view}/>
                 </div>
