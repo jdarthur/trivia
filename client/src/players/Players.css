@@ -145,7 +145,8 @@
  * flow leftward (justify-content: flex-end), wrapping onto a new row below
  * if the box is too narrow. The strip straddles the card's top edge —
  * translateY(-50%) keeps it centered on the edge like a sticker stuck
- * half-on/half-off the box. */
+ * half-on/half-off the box. Applies to both the player-status cards and the
+ * moderator scorer cards, so reactions look the same everywhere. */
 .reaction-stickers {
     position: absolute;
     top: 0;
@@ -158,16 +159,6 @@
     align-items: center;
     gap: 4px;
     pointer-events: auto;
-}
-
-/* In the moderator scorer the card head's top-right slot holds the
- * interactive score-override trigger (and the moneyball badge), so the
- * sticker strip sits just below the head there instead of covering it
- * (and stays top-aligned, not straddling). The player-status view keeps
- * the icon-corner straddle. */
-.player-scorer .reaction-stickers {
-    top: 40px;
-    transform: none;
 }
 
 /* The "+" button sits at the right side of the answer, vertically centered;
