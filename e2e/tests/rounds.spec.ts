@@ -38,8 +38,8 @@ async function createCategory(request: APIRequestContext, name: string): Promise
   return json.id;
 }
 
-// Seed a question via the API (the AddQuestionsModal needs questions to exist).
-// Returns the created question's id.
+// Seed a question via the API (the round editor's Transfer needs questions to
+// exist). Returns the created question's id.
 async function createQuestion(
   request: APIRequestContext,
   category: string,
@@ -56,9 +56,9 @@ async function createQuestion(
   return json.id;
 }
 
-// Wait for a round to be persisted server-side. The rounds editor optimistically
-// shows the new card before the create POST completes; a full-page reload before
-// that POST settles would abort it and lose the round, so tests that reload after
+// Wait for a round to be persisted server-side. The rounds editor creates via a
+// mutation and refetches the list, but a full-page reload before that POST
+// settles would abort it and lose the round, so tests that reload after
 // creating must first confirm the round actually exists via the API.
 async function waitForRoundPersisted(request: APIRequestContext, name: string) {
   await expect
@@ -73,53 +73,96 @@ async function waitForRoundPersisted(request: APIRequestContext, name: string) {
     .toBeTruthy();
 }
 
-// Create a round through the UI: click New, type the name into .round-name,
-// click Save, wait for the round card to appear in the list, and confirm it is
-// persisted server-side (see waitForRoundPersisted).
+// Create a round through the UI (ticket #199): click New, type the name on the
+// Details step, advance to the Questions step, and click Add. Wait for the new
+// row to appear in the table and confirm it is persisted server-side (see
+// waitForRoundPersisted).
 async function createRoundViaUI(page: Page, request: APIRequestContext, name: string) {
   await page.getByRole('button', { name: /New/ }).first().click();
+  const modal = page.locator('.ant-modal:has(.ant-modal-title)');
+  await expect(modal).toBeVisible();
+  await expect(modal.locator('.ant-modal-title')).toHaveText('Add round');
   await expect(page.locator('.round-name')).toBeVisible();
   await page.locator('.round-name').fill(name);
-  await page.getByRole('button', { name: 'Save', exact: true }).click();
-  await expect(page.locator('.ant-card').filter({ hasText: name })).toBeVisible();
+  await modal.getByRole('button', { name: 'Next', exact: true }).click();
+  await modal.getByRole('button', { name: 'Add', exact: true }).click();
+  await expect(modal).toBeHidden();
+  await expect(roundRow(page, name)).toBeVisible();
   await waitForRoundPersisted(request, name);
 }
 
-// Reload the rounds editor for a clean state (the create flow leaves the round
-// open/selected; a fresh load drops any transient selection).
+// Reload the rounds editor for a clean state (the create flow leaves the modal
+// closed; a fresh load drops any transient selection).
 async function reloadRounds(page: Page) {
   await page.goto('/rounds?mockUser=alice');
   await expect(page.locator('.round_list')).toBeVisible();
 }
 
-// Open a round's editor by clicking its card's Edit icon.
+// The table row for a round whose row text matches `name`.
+function roundRow(page: Page, name: string) {
+  return page.locator('.round_list .ant-table-row').filter({ hasText: name });
+}
+
+// Open a round's editor modal by clicking its table row's Edit icon. The modal
+// always starts on the Details step.
 async function openRound(page: Page, name: string) {
-  const card = page.locator('.ant-card').filter({ hasText: name });
-  await card.locator('.anticon-edit').click();
-  await expect(page.locator('.open-header')).toHaveText('Edit Round');
+  await expect(roundRow(page, name)).toBeVisible();
+  await roundRow(page, name).locator('.anticon-edit').click();
+  const modal = page.locator('.ant-modal:has(.ant-modal-title)');
+  await expect(modal).toBeVisible();
+  await expect(modal.locator('.ant-modal-title')).toHaveText('Edit round');
   await expect(page.locator('.round-name')).toBeVisible();
 }
 
-// Open the AddQuestionsModal, filter to `filterText` (the unique category
-// prefix) so leftover questions from other tests don't page out our rows, select
-// the rows matching each of `questionTexts`, and click Add.
-async function addQuestions(page: Page, filterText: string, questionTexts: string[]) {
-  await page.getByRole('button', { name: 'Add questions', exact: true }).click();
+// Move a single question (matched by its unique text) from the Transfer's LEFT
+// (source) list into the RIGHT (target) list inside the round modal's Questions
+// step. Leftover questions accumulate in the shared dev DB across the whole run,
+// so the target may not be on page 1: paginate the left list's .ant-pagination
+// (bounded) until the item is visible, then check its checkbox and click the
+// move-right arrow. Selectors target antd v6's Transfer DOM
+// (`.ant-transfer-section`, `.ant-transfer-list-checkbox`, `.ant-transfer-actions`).
+async function moveQuestionToTarget(page: Page, questionText: string) {
   const modal = page.locator('.ant-modal:has(.ant-modal-title)');
-  await expect(modal).toBeVisible();
+  const leftList = modal.locator('.ant-transfer-section').first();
+  const item = (q: string) =>
+    leftList.locator('.ant-transfer-list-content-item').filter({ hasText: q });
 
-  const search = modal.locator('input[placeholder="Search"]');
-  await search.fill(filterText);
-  await search.press('Enter');
-
-  for (const q of questionTexts) {
-    const row = modal.locator('.ant-table-tbody tr').filter({ hasText: q });
-    await expect(row).toBeVisible();
-    await row.locator('.ant-checkbox-wrapper').click();
-    await expect(row.locator('.ant-checkbox-wrapper')).toHaveClass(/ant-checkbox-wrapper-checked/);
+  let found = false;
+  for (let i = 0; i < 10; i++) {
+    if (await item(questionText).isVisible()) {
+      found = true;
+      break;
+    }
+    const next = leftList.locator('.ant-pagination-next button');
+    if (await next.isDisabled()) break;
+    await next.click();
   }
+  expect(found).toBeTruthy();
 
-  await modal.getByRole('button', { name: 'Add', exact: true }).click();
+  const checkbox = item(questionText).locator('.ant-transfer-list-checkbox');
+  await checkbox.click();
+  await expect(checkbox).toHaveClass(/ant-checkbox-wrapper-checked/);
+
+  // Click the move-right arrow in the transfer's actions column.
+  await modal.locator('.ant-transfer-actions button:has(.anticon-right)').click();
+  await expect(
+    modal
+      .locator('.ant-transfer-section')
+      .last()
+      .locator('.ant-transfer-list-content-item')
+      .filter({ hasText: questionText }),
+  ).toBeVisible();
+}
+
+// The round editor opens on the Details step; advance to the Questions step and
+// move each of `questionTexts` into the Transfer's target list, then save.
+async function addQuestions(page: Page, questionTexts: string[]) {
+  const modal = page.locator('.ant-modal:has(.ant-modal-title)');
+  await modal.getByRole('button', { name: 'Next', exact: true }).click();
+  for (const q of questionTexts) {
+    await moveQuestionToTarget(page, q);
+  }
+  await modal.getByRole('button', { name: 'Update', exact: true }).click();
   await expect(modal).toBeHidden();
 }
 
@@ -141,7 +184,7 @@ roundsTest.describe('rounds CRUD', () => {
   roundsTest('creates a round', async ({ roundsPage, request }) => {
     const name = `e2e-round-create-${unique()}`;
     await createRoundViaUI(roundsPage, request, name);
-    await expect(roundsPage.locator('.ant-card').filter({ hasText: name })).toContainText('Questions');
+    await expect(roundRow(roundsPage, name)).toContainText('0 questions');
 
     await deleteRoundByName(request, name);
   });
@@ -159,20 +202,25 @@ roundsTest.describe('rounds CRUD', () => {
     await reloadRounds(roundsPage);
     await openRound(roundsPage, name);
 
-    // Update the round name (the category title).
+    // Update the round name (the category title) and add both questions via the
+    // Transfer on the Questions step.
     await roundsPage.locator('.round-name').fill(name);
-    await addQuestions(roundsPage, category, [q1, q2]);
+    await addQuestions(roundsPage, [q1, q2]);
 
-    // Both questions show under the Questions collapse panel.
-    for (const q of [q1, q2]) {
-      await expect(roundsPage.locator('.actionable-question').filter({ hasText: q })).toBeVisible();
-    }
+    // The row's question count reflects the two added questions.
+    await expect(roundRow(roundsPage, name)).toContainText('2 questions');
 
     // Persist and verify the category title survives a fresh load.
-    await roundsPage.getByRole('button', { name: 'Save', exact: true }).click();
     await reloadRounds(roundsPage);
     await openRound(roundsPage, name);
     await expect(roundsPage.locator('.round-name')).toHaveValue(name);
+
+    // Both questions are still in the Transfer's target list.
+    await roundsPage.getByRole('button', { name: 'Next', exact: true }).click();
+    const rightList = roundsPage.locator('.ant-modal:has(.ant-modal-title) .ant-transfer-section').last();
+    for (const q of [q1, q2]) {
+      await expect(rightList.locator('.ant-transfer-list-content-item').filter({ hasText: q })).toBeVisible();
+    }
 
     await deleteRoundByName(request, name);
   });
@@ -189,16 +237,30 @@ roundsTest.describe('rounds CRUD', () => {
     await createRoundViaUI(roundsPage, request, name);
     await reloadRounds(roundsPage);
     await openRound(roundsPage, name);
-    await addQuestions(roundsPage, category, [q1, q2]);
+    await addQuestions(roundsPage, [q1, q2]);
 
-    // Select one question and remove it.
-    const target = roundsPage.locator('.actionable-question').filter({ hasText: q1 });
+    // Reopen and move q1 back out of the target list on the Questions step.
+    await reloadRounds(roundsPage);
+    await openRound(roundsPage, name);
+    const modal = roundsPage.locator('.ant-modal:has(.ant-modal-title)');
+    await modal.getByRole('button', { name: 'Next', exact: true }).click();
+
+    const rightList = modal.locator('.ant-transfer-section').last();
+    const target = rightList.locator('.ant-transfer-list-content-item').filter({ hasText: q1 });
     await expect(target).toBeVisible();
-    await target.click();
-    await roundsPage.getByRole('button', { name: /Remove selected/ }).click();
+    await target.locator('.ant-transfer-list-checkbox').click();
+    await modal.locator('.ant-transfer-actions button:has(.anticon-left)').click();
+    await expect(
+      rightList.locator('.ant-transfer-list-content-item').filter({ hasText: q1 }),
+    ).toHaveCount(0);
+    await expect(
+      rightList.locator('.ant-transfer-list-content-item').filter({ hasText: q2 }),
+    ).toBeVisible();
 
-    await expect(roundsPage.locator('.actionable-question').filter({ hasText: q1 })).toBeHidden();
-    await expect(roundsPage.locator('.actionable-question').filter({ hasText: q2 })).toBeVisible();
+    // Save and confirm the row now shows one question.
+    await modal.getByRole('button', { name: 'Update', exact: true }).click();
+    await expect(modal).toBeHidden();
+    await expect(roundRow(roundsPage, name)).toContainText('1 question');
 
     await deleteRoundByName(request, name);
   });
@@ -219,7 +281,7 @@ roundsTest.describe('rounds CRUD', () => {
     await reloadRounds(roundsPage);
     await openRound(roundsPage, name);
 
-    await roundsPage.getByRole('button', { name: /Delete round/ }).click();
-    await expect(roundsPage.locator('.ant-card').filter({ hasText: name })).toBeHidden();
+    await roundsPage.getByRole('button', { name: 'Delete', exact: true }).click();
+    await expect(roundRow(roundsPage, name)).toHaveCount(0);
   });
 });

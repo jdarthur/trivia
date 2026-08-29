@@ -1,5 +1,5 @@
 import {createApi, fetchBaseQuery, retry} from '@reduxjs/toolkit/query/react';
-import type {Category, Collection, Question, ScoringNote} from '../types/models';
+import type {Category, Collection, Question, Round, ScoringNote} from '../types/models';
 import type {ListMeta} from './listParams';
 
 export const baseQuery = retry(fetchBaseQuery({
@@ -55,7 +55,7 @@ export type ListResponse<T, K extends string> = ListMeta & Record<K, T[]>
 export const mainApi = createApi({
     reducerPath: 'mainApi',
     baseQuery: baseQuery,
-    tagTypes: ['collections', 'questions', 'scoring_notes', 'categories'],
+    tagTypes: ['collections', 'questions', 'scoring_notes', 'categories', 'rounds'],
     endpoints: (builder) => ({
         getCollections: builder.query<ListResponse<Collection, "collections">, string>({
             query: (queryParams) => ({url: `editor/collections${queryParams ? queryParams : ""}`}),
@@ -118,6 +118,37 @@ export const mainApi = createApi({
                 method: "DELETE",
             }),
             invalidatesTags: ["questions"]
+        }),
+        getRounds: builder.query<ListResponse<Round, "rounds">, string>({
+            query: (queryParams) => ({
+                url: `editor/rounds${queryParams ? queryParams : ""}`,
+            }),
+            providesTags: ["rounds"]
+        }),
+        createRound: builder.mutation<Round, Partial<Round>>({
+            query: (body) => ({
+                url: `editor/round`,
+                method: "POST",
+                body: body
+            }),
+            invalidatesTags: ["rounds", "questions"]
+        }),
+        updateRound: builder.mutation<Round, {id: string; body: Partial<Round>}>({
+            query: (args) => ({
+                url: `editor/round/${args.id}`,
+                method: "PUT",
+                body: args.body
+            }),
+            // Adding/removing questions changes their rounds_used membership,
+            // so the questions list (and its unused-only filter) must refetch.
+            invalidatesTags: ["rounds", "questions"]
+        }),
+        deleteRound: builder.mutation<Round, string>({
+            query: (id) => ({
+                url: `editor/round/${id}`,
+                method: "DELETE",
+            }),
+            invalidatesTags: ["rounds", "questions"]
         }),
         getScoringNotes: builder.query<ScoringNote[], void>({
             query: () => ({
@@ -196,6 +227,10 @@ export const {
     useCreateQuestionMutation,
     useUpdateQuestionMutation,
     useDeleteQuestionMutation,
+    useGetRoundsQuery,
+    useCreateRoundMutation,
+    useUpdateRoundMutation,
+    useDeleteRoundMutation,
     useGetScoringNotesQuery,
     useGetOneScoringNoteQuery,
     useCreateScoringNoteMutation,
