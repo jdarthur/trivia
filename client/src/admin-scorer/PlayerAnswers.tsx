@@ -8,6 +8,7 @@ import {
     CheckOutlined, CloseOutlined, SlidersOutlined,
 } from '@ant-design/icons';
 import ShortTextWithPopover from "../common/ShortTextWithPopover";
+import type {ReactionSummary} from "../types/models";
 
 interface AnswerLike {
     answer: string
@@ -16,7 +17,7 @@ interface AnswerLike {
     correct?: boolean
     points_awarded?: number
     answer_id?: string
-    reactions?: Record<string, number>
+    reactions?: Record<string, ReactionSummary>
     my_reaction?: string
 }
 

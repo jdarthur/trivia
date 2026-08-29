@@ -351,6 +351,16 @@ func TestRemoveReactionGatesMatchSet(t *testing.T) {
 	}
 }
 
+// hasTeam reports whether names contains teamName.
+func hasTeam(names []string, teamName string) bool {
+	for _, n := range names {
+		if n == teamName {
+			return true
+		}
+	}
+	return false
+}
+
 // teamByName finds a scored team by its team name.
 func teamByName(t *testing.T, resp models.AnswersResponseScored, name string) models.ScoredTeam {
 	t.Helper()
@@ -400,8 +410,14 @@ func TestGetAnswersScoredIncludesReactions(t *testing.T) {
 	if a1.AnswerId != p1Answer {
 		t.Errorf("answer_id = %q, want %q", a1.AnswerId, p1Answer)
 	}
-	if a1.Reactions["👍"] != 2 {
-		t.Errorf("👍 count = %d, want 2 (%+v)", a1.Reactions["👍"], a1.Reactions)
+	if a1.Reactions["👍"].Count != 2 {
+		t.Errorf("👍 count = %d, want 2 (%+v)", a1.Reactions["👍"].Count, a1.Reactions)
+	}
+	if len(a1.Reactions["👍"].Players) != 2 {
+		t.Errorf("👍 players = %v, want 2", a1.Reactions["👍"].Players)
+	}
+	if !hasTeam(a1.Reactions["👍"].Players, "team-2") || !hasTeam(a1.Reactions["👍"].Players, "team-3") {
+		t.Errorf("👍 players = %v, want team-2 and team-3", a1.Reactions["👍"].Players)
 	}
 	if a1.MyReaction != "" {
 		t.Errorf("p1 my_reaction on own answer = %q, want empty", a1.MyReaction)
@@ -415,8 +431,11 @@ func TestGetAnswersScoredIncludesReactions(t *testing.T) {
 	if a2.AnswerId != p2Answer {
 		t.Errorf("answer_id = %q, want %q", a2.AnswerId, p2Answer)
 	}
-	if a2.Reactions["😂"] != 1 {
-		t.Errorf("😂 count = %d, want 1 (%+v)", a2.Reactions["😂"], a2.Reactions)
+	if a2.Reactions["😂"].Count != 1 {
+		t.Errorf("😂 count = %d, want 1 (%+v)", a2.Reactions["😂"].Count, a2.Reactions)
+	}
+	if !hasTeam(a2.Reactions["😂"].Players, "team-1") {
+		t.Errorf("😂 players = %v, want team-1", a2.Reactions["😂"].Players)
 	}
 	if a2.MyReaction != "😂" {
 		t.Errorf("p1 my_reaction on p2's answer = %q, want 😂", a2.MyReaction)
@@ -438,6 +457,13 @@ func TestGetAnswersAsModIncludesReactions(t *testing.T) {
 	session, p1, p2 := scoredFixture(t, env)
 	p2Answer := answerIdFor(t, env, session.ID, p2)
 
+	// a second member of team-2 reacts too, so the 😂 count is 2 but the
+	// team name must appear only once (deduped for the hover tooltip)
+	p2b := createPlayer(t, env, "team-2")
+	if err := common.Push((*common.Env)(env), common.SessionTable, session.ID, models.Players, p2b); err != nil {
+		t.Fatal(err)
+	}
+
 	react := func(player models.PlayerId, answerId, emoji string) {
 		t.Helper()
 		rec := reactionRequest(t, env, env.SetReaction, http.MethodPut, session.ID,
@@ -448,6 +474,7 @@ func TestGetAnswersAsModIncludesReactions(t *testing.T) {
 	}
 	react(p1, p2Answer, "👍")
 	react(p2, p2Answer, "😂")
+	react(p2b, p2Answer, "😂")
 	react(session.Moderator, p2Answer, "❤️")
 
 	// viewed as the mod: answer_id on every answer, aggregated counts, and the
@@ -473,8 +500,20 @@ func TestGetAnswersAsModIncludesReactions(t *testing.T) {
 	if a2.AnswerId != p2Answer {
 		t.Errorf("answer_id = %q, want %q", a2.AnswerId, p2Answer)
 	}
-	if a2.Reactions["👍"] != 1 || a2.Reactions["😂"] != 1 || a2.Reactions["❤️"] != 1 {
-		t.Errorf("reactions = %+v, want 👍=1 😂=1 ❤️=1", a2.Reactions)
+	if a2.Reactions["👍"].Count != 1 || a2.Reactions["😂"].Count != 2 || a2.Reactions["❤️"].Count != 1 {
+		t.Errorf("reactions = %+v, want 👍=1 😂=2 ❤️=1", a2.Reactions)
+	}
+	if !hasTeam(a2.Reactions["👍"].Players, "team-1") {
+		t.Errorf("👍 players = %v, want team-1", a2.Reactions["👍"].Players)
+	}
+	// both team-2 members reacted 😂, but the team name shows once
+	if len(a2.Reactions["😂"].Players) != 1 || !hasTeam(a2.Reactions["😂"].Players, "team-2") {
+		t.Errorf("😂 players = %v, want just team-2", a2.Reactions["😂"].Players)
+	}
+	// the moderator reacted too, and has a player row (but no session_player
+	// join row), so their team name still shows up
+	if !hasTeam(a2.Reactions["❤️"].Players, "mod") {
+		t.Errorf("❤️ players = %v, want mod", a2.Reactions["❤️"].Players)
 	}
 	if a2.MyReaction != "❤️" {
 		t.Errorf("mod my_reaction = %q, want ❤️", a2.MyReaction)

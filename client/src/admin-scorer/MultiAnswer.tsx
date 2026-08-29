@@ -4,13 +4,14 @@ import "../players/Players.css"
 import {Empty} from "antd"
 import ShortTextWithPopover from "../common/ShortTextWithPopover";
 import ReactionControl from "../players/ReactionControl";
+import type {ReactionSummary} from "../types/models";
 
 interface AnswerLike {
     id?: string
     answer_id?: string
     answer: string
     wager: number
-    reactions?: Record<string, number>
+    reactions?: Record<string, ReactionSummary>
     my_reaction?: string
 }
 
@@ -88,8 +89,9 @@ class PlayerAnswer extends React.Component<Props> {
 
         // Reactions only exist once the admin has scored the question; the
         // control attaches to the latest answer (the one rendered prominently).
-        const reactions = this.props.scored && this.props.session_id && this.props.current_player
-        && last_answer && last_answer.answer_id ?
+        const hasReactions = this.props.scored && this.props.session_id && this.props.current_player
+        && last_answer && last_answer.answer_id
+        const reactions = hasReactions ?
             <ReactionControl session_id={this.props.session_id} current_player={this.props.current_player}
                              answer_id={last_answer.answer_id} reactions={last_answer.reactions}
                              my_reaction={last_answer.my_reaction}/> : null
@@ -105,7 +107,7 @@ class PlayerAnswer extends React.Component<Props> {
         </div>
 
         return (
-            <div>
+            <div className={hasReactions ? "answer-with-reactions" : undefined}>
                 {old_answers}
                 {real_answer}
                 {reactions}

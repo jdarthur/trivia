@@ -223,20 +223,24 @@ func getReaction(e *Env, answerId string, playerId models.PlayerId) (models.Answ
 	return m, nil
 }
 
-// reactionsByAnswer is the aggregated reaction state of one answer: emoji
-// counts plus the caller's own reaction.
+// reactionsByAnswer is the aggregated reaction state of one answer: per-emoji
+// counts and reacting team names, plus the caller's own reaction.
 type reactionsByAnswer struct {
 	counts     map[string]int
+	players    map[string][]string
 	myReaction string
 }
 
 // reactionsForQuestion loads every reaction on the question's answers, keyed
-// by answer ID, aggregated per emoji, with the caller's own reaction flagged
-// so the UI can highlight their selection without broadcasting who reacted.
+// by answer ID, aggregated per emoji (count + the reacting players' team
+// names, so clients can show who reacted on hover), with the caller's own
+// reaction flagged so the UI can highlight their selection without exposing
+// player ids.
 func reactionsForQuestion(e *Env, sessionId string, roundIndex int, questionIndex int, callerPlayerId models.PlayerId) (map[string]reactionsByAnswer, error) {
-	rows, err := e.Db.Query(`SELECT ar.answer_id, ar.player_id, ar.emoji
+	rows, err := e.Db.Query(`SELECT ar.answer_id, ar.player_id, p.team_name, ar.emoji
 		FROM answer_reaction ar
 		JOIN answer a ON a.id = ar.answer_id
+		JOIN player p ON p.id = ar.player_id
 		WHERE a.session_id = ? AND a.round_index = ? AND a.question_index = ?`,
 		sessionId, roundIndex, questionIndex)
 	if err != nil {
@@ -245,21 +249,54 @@ func reactionsForQuestion(e *Env, sessionId string, roundIndex int, questionInde
 	defer rows.Close()
 	result := make(map[string]reactionsByAnswer)
 	for rows.Next() {
-		var answerId, playerId, emoji string
-		if err := rows.Scan(&answerId, &playerId, &emoji); err != nil {
+		var answerId, playerId, teamName, emoji string
+		if err := rows.Scan(&answerId, &playerId, &teamName, &emoji); err != nil {
 			return nil, err
 		}
 		ra := result[answerId]
 		if ra.counts == nil {
 			ra.counts = make(map[string]int)
+			ra.players = make(map[string][]string)
 		}
 		ra.counts[emoji]++
+		ra.players[emoji] = append(ra.players[emoji], teamName)
 		if playerId == string(callerPlayerId) {
 			ra.myReaction = emoji
 		}
 		result[answerId] = ra
 	}
 	return result, rows.Err()
+}
+
+// summary converts the aggregated state into the wire shape: per-emoji count
+// plus the reacting team names (deduplicated — two players on the same team
+// reacting with the same emoji should list that team once). Returns an empty
+// (non-nil) map when there are no reactions, matching the pre-existing JSON
+// shape.
+func (ra reactionsByAnswer) summary() map[string]models.ReactionSummary {
+	if ra.counts == nil {
+		return make(map[string]models.ReactionSummary)
+	}
+	result := make(map[string]models.ReactionSummary, len(ra.counts))
+	for emoji, count := range ra.counts {
+		result[emoji] = models.ReactionSummary{Count: count, Players: uniqueTeams(ra.players[emoji])}
+	}
+	return result
+}
+
+// uniqueTeams returns teams with duplicates removed, preserving first-seen
+// order.
+func uniqueTeams(teams []string) []string {
+	seen := make(map[string]struct{}, len(teams))
+	out := make([]string, 0, len(teams))
+	for _, t := range teams {
+		if _, ok := seen[t]; ok {
+			continue
+		}
+		seen[t] = struct{}{}
+		out = append(out, t)
+	}
+	return out
 }
 
 // isSingleEmoji reports whether s is exactly one emoji character. Emoji are

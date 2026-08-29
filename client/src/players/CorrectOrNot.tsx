@@ -10,6 +10,7 @@ import {
     CloseSquareOutlined
 } from '@ant-design/icons';
 import ShortTextWithPopover from "../common/ShortTextWithPopover";
+import type {ReactionSummary} from "../types/models";
 
 interface AnswerLike {
     answer: string
@@ -18,7 +19,7 @@ interface AnswerLike {
     points_awarded?: number
     use_moneyball?: boolean
     answer_id?: string
-    reactions?: Record<string, number>
+    reactions?: Record<string, ReactionSummary>
     my_reaction?: string
 }
 
