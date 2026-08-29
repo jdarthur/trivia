@@ -246,8 +246,8 @@ async function createRound(request: APIRequestContext, name: string) {
 }
 
 roundsTest.describe('rounds filtering & pagination', () => {
-  // The rounds page carries the same filter bar; it fetches directly rather than
-  // through RTK Query, so it needs its own coverage.
+  // The rounds page carries the same filter bar and (like questions/categories)
+  // pages server-side, so it needs its own coverage.
   roundsTest('pages through a filtered list of rounds', async ({ roundsPage, request }) => {
     const marker = `e2e-round-page-${unique()}`;
     for (let i = 0; i < 12; i++) {
@@ -259,11 +259,11 @@ roundsTest.describe('rounds filtering & pagination', () => {
 
     await choosePageSize(roundsPage, 10);
     await expect(roundsPage.locator('.ant-pagination')).toContainText('1-10 of 12');
-    await expect(roundsPage.locator('.ant-card')).toHaveCount(10);
+    await expect(roundsPage.locator('.round_list .ant-table-row')).toHaveCount(10);
 
     await roundsPage.locator('.ant-pagination-item', { hasText: '2' }).click();
     await expect(roundsPage.locator('.ant-pagination')).toContainText('11-12 of 12');
-    await expect(roundsPage.locator('.ant-card')).toHaveCount(2);
+    await expect(roundsPage.locator('.round_list .ant-table-row')).toHaveCount(2);
   });
 
   roundsTest('the unused-only filter excludes rounds a game contains', async ({ roundsPage, request }) => {
@@ -278,13 +278,13 @@ roundsTest.describe('rounds filtering & pagination', () => {
     const { rounds } = await usedRes.json();
     const usedId = rounds[0].id;
 
-    // Start with unused_only off so both cards render.
+    // Start with unused_only off so both rows render.
     const unusedOnly = roundsPage.getByText('Unused only');
     if (await unusedOnly.isChecked()) {
       await unusedOnly.click();
     }
     await search(roundsPage, marker);
-    await expect(roundsPage.locator('.ant-card').filter({ hasText: usedName })).toBeVisible();
+    await expect(roundsPage.locator('.round_list .ant-table-row').filter({ hasText: usedName })).toBeVisible();
 
     const game = await request.post('/editor/game', {
       headers: { 'borttrivia-token': token },
@@ -293,7 +293,7 @@ roundsTest.describe('rounds filtering & pagination', () => {
     expect(game.ok()).toBeTruthy();
 
     await unusedOnly.click();
-    await expect(roundsPage.locator('.ant-card').filter({ hasText: `free ${marker}` })).toBeVisible();
-    await expect(roundsPage.locator('.ant-card').filter({ hasText: usedName })).toHaveCount(0);
+    await expect(roundsPage.locator('.round_list .ant-table-row').filter({ hasText: `free ${marker}` })).toBeVisible();
+    await expect(roundsPage.locator('.round_list .ant-table-row').filter({ hasText: usedName })).toHaveCount(0);
   });
 });
