@@ -83,11 +83,7 @@ class ReactionControl extends React.Component<Props, State> {
                         {emoji} {summary.count}
                     </span>
                 )
-                // The caller's own sticker also hints at tap-to-remove; a
-                // native title would double up with the tooltip, so it goes
-                // into the tooltip text instead.
-                const hint = mine ? " — tap to remove your reaction" : ""
-                return who ? <Tooltip key={emoji} title={who + hint}>{chip}</Tooltip> : chip
+                return who ? <Tooltip key={emoji} title={who}>{chip}</Tooltip> : chip
             })
 
         const picker = (

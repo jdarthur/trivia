@@ -33,6 +33,11 @@
     margin-top: 20px;
     width: 100%;
     overflow-x: auto;
+    /* Room for the reaction stickers to straddle the cards' top edge:
+     * translateY(-50%) lifts a sticker ~half its height above its card, and
+     * the bar clips vertical overflow (overflow-y computes to auto), so the
+     * cards start 14px down and the stickers stick up into that space. */
+    padding-top: 14px;
     /* Leave room for the fade edge so the last box isn't hidden under it. */
     padding-right: 2px;
     scrollbar-width: thin;
@@ -55,10 +60,11 @@
 }
 
 /* Edge fades that hint the strip scrolls. Purely visual (pointer-events none)
- * and only rendered by PlayerStatus when there is actually more to scroll to. */
+ * and only rendered by PlayerStatus when there is actually more to scroll to.
+ * top matches the cards' offset: bar margin-top 20 + the 14px sticker room. */
 .status-fade {
     position: absolute;
-    top: 20px;
+    top: 34px;
     bottom: 0;
     width: 40px;
     pointer-events: none;
@@ -137,11 +143,14 @@
 
 /* The sticker strip: first sticker at the top-right corner, further stickers
  * flow leftward (justify-content: flex-end), wrapping onto a new row below
- * if the box is too narrow. */
+ * if the box is too narrow. The strip straddles the card's top edge —
+ * translateY(-50%) keeps it centered on the edge like a sticker stuck
+ * half-on/half-off the box. */
 .reaction-stickers {
     position: absolute;
     top: 0;
     right: 0;
+    transform: translateY(-50%);
     display: flex;
     flex-direction: row;
     flex-wrap: wrap;
@@ -153,10 +162,12 @@
 
 /* In the moderator scorer the card head's top-right slot holds the
  * interactive score-override trigger (and the moneyball badge), so the
- * sticker strip sits just below the head there instead of covering it.
- * The player-status view keeps the icon-corner placement. */
+ * sticker strip sits just below the head there instead of covering it
+ * (and stays top-aligned, not straddling). The player-status view keeps
+ * the icon-corner straddle. */
 .player-scorer .reaction-stickers {
     top: 40px;
+    transform: none;
 }
 
 /* The "+" button sits at the right side of the answer, vertically centered;
