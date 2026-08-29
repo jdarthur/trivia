@@ -24,6 +24,7 @@ export interface Question {
   pairs?: QuestionPair[];
   buckets?: QuestionBucket[];
   items?: QuestionBucketItem[];
+  ordered?: QuestionOrderedItem[];
 }
 
 export interface QuestionChoice {
@@ -45,6 +46,14 @@ export interface QuestionBucket {
 export interface QuestionBucketItem {
   text: string;
   bucket: string;
+}
+
+/**
+ * models.QuestionOrderedItem — one entry in an ordering question. The correct
+ * order is the position of the entry in Question.ordered (index 0 = first).
+ */
+export interface QuestionOrderedItem {
+  text: string;
 }
 
 /** models.Round */
@@ -130,6 +139,7 @@ export interface QuestionInRound {
   rights?: string[];
   buckets?: string[];
   items?: string[];
+  ordered?: string[];
 }
 
 /** models.RoundInGame */

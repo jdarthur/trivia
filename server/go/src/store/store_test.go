@@ -36,8 +36,8 @@ func TestMigrateCreatesBaselineSchema(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Version: %v", err)
 	}
-	if v != 14 {
-		t.Fatalf("user_version = %d, want 14", v)
+	if v != 15 {
+		t.Fatalf("user_version = %d, want 15", v)
 	}
 
 	tables := []string{
@@ -54,6 +54,8 @@ func TestMigrateCreatesBaselineSchema(t *testing.T) {
 		"session_question_bucket", "session_question_bucket_item",
 		// migration 13 (ticket #178): category root model
 		"category",
+		// migration 15 (ticket #207): ordering child tables
+		"question_ordered", "session_question_ordered",
 	}
 	for _, name := range tables {
 		var n int
@@ -300,8 +302,8 @@ func TestMigrateIsIdempotent(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Version: %v", err)
 	}
-	if v != 14 {
-		t.Fatalf("user_version = %d after re-migrate, want 14", v)
+	if v != 15 {
+		t.Fatalf("user_version = %d after re-migrate, want 15", v)
 	}
 }
 
@@ -381,8 +383,8 @@ func TestDBPathUsesEnvOrDefault(t *testing.T) {
 
 // TestQuestionTypeCheckConstraint verifies the CHECK constraint on
 // question.question_type and session_question.question_type rejects values
-// outside freeform / multiple_choice / matching / bucketing (ticket #99,
-// extended by #164).
+// outside freeform / multiple_choice / matching / bucketing / ordering
+// (ticket #99, extended by #164 and #207).
 func TestQuestionTypeCheckConstraint(t *testing.T) {
 	db := openTestDB(t)
 
@@ -392,8 +394,8 @@ func TestQuestionTypeCheckConstraint(t *testing.T) {
 	); err == nil {
 		t.Error("expected CHECK violation inserting bad question_type on question")
 	}
-	// the four valid values are accepted
-	for _, typ := range []string{"freeform", "multiple_choice", "matching", "bucketing"} {
+	// the five valid values are accepted
+	for _, typ := range []string{"freeform", "multiple_choice", "matching", "bucketing", "ordering"} {
 		mustExec(t, db,
 			`INSERT INTO question (id, create_date, question_type) VALUES (?, '2026-01-01T00:00:00.000000', ?)`,
 			"q-"+typ, typ)
@@ -407,10 +409,10 @@ func TestQuestionTypeCheckConstraint(t *testing.T) {
 	); err == nil {
 		t.Error("expected CHECK violation inserting bad question_type on session_question")
 	}
-	// ... and accepts bucketing
+	// ... and accepts ordering
 	mustExec(t, db,
 		`INSERT INTO session_question (session_id, round_index, question_index, question_type)
-		 VALUES ('s1', 1, 0, 'bucketing')`)
+		 VALUES ('s1', 1, 0, 'ordering')`)
 }
 
 // TestMigrateRebuildsQuestionTypePreservesData verifies migration 12's table
@@ -480,6 +482,106 @@ func TestMigrateRebuildsQuestionTypePreservesData(t *testing.T) {
 	// foreign keys still enforced against the rebuilt tables
 	if _, err := db.Exec(`INSERT INTO round_question (round_id, question_id, position) VALUES ('r1', 'nope', 0)`); err == nil {
 		t.Error("expected FK violation on round_question.question_id after rebuild")
+	}
+}
+
+// TestMigrateAddsOrderingQuestionType verifies migration 15 (ticket #207):
+// the table rebuild widening the question_type CHECK for ordering preserves
+// existing question / session_question rows and their referencing children
+// (including the post-migration-14 category_id), the widened CHECK accepts
+// 'ordering' on both tables, the new question_ordered /
+// session_question_ordered child tables accept rows, and foreign keys are
+// still enforced afterwards. It migrates a scratch DB to version 14, seeds
+// v14-era data, then migrates to 15.
+func TestMigrateAddsOrderingQuestionType(t *testing.T) {
+	db, err := Open(filepath.Join(t.TempDir(), "trivia.db"))
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+	t.Cleanup(func() { db.Close() })
+
+	// forward-only Migrate can't stop at 14, so apply migrations 1..14
+	// directly (the test is in the store package and can see the list).
+	for _, m := range migrations {
+		if m.version > 14 {
+			break
+		}
+		if err := apply(db, m); err != nil {
+			t.Fatalf("apply migration %d: %v", m.version, err)
+		}
+	}
+
+	// v14-era data: a category, a question attached to it (category_id is the
+	// post-#178 wiring), its referencing children, and a session snapshot.
+	mustExec(t, db, `INSERT INTO category (id, user_id, create_date, name)
+		VALUES ('c1', 'u1', '2026-01-01T00:00:00.000000', 'Cat')`)
+	mustExec(t, db, `INSERT INTO question (id, create_date, category_id, question, answer, user_id, question_type)
+		VALUES ('q1', '2026-01-01T00:00:00.000000', 'c1', 'q?', 'a', 'u1', 'matching')`)
+	mustExec(t, db, `INSERT INTO round (id, create_date, name, user_id)
+		VALUES ('r1', '2026-01-01T00:00:00.000000', 'R', 'u1')`)
+	mustExec(t, db, `INSERT INTO round_question (round_id, question_id, position) VALUES ('r1', 'q1', 0)`)
+	mustExec(t, db, `INSERT INTO question_choice (question_id, position, text, is_correct)
+		VALUES ('q1', 0, 'A', 1)`)
+	mustExec(t, db, `INSERT INTO question_match (question_id, position, left_text, right_text)
+		VALUES ('q1', 0, 'L', 'R')`)
+	mustExec(t, db, `INSERT INTO session (id, create_date) VALUES ('s1', '2026-01-01T00:00:00.000000')`)
+	mustExec(t, db, `INSERT INTO session_question (session_id, round_index, question_index, question_type)
+		VALUES ('s1', 0, 0, 'matching')`)
+	mustExec(t, db, `INSERT INTO session_question_choice (session_id, round_index, question_index, position, text, is_correct)
+		VALUES ('s1', 0, 0, 0, 'A', 1)`)
+
+	if err := Migrate(db); err != nil {
+		t.Fatalf("Migrate to 15: %v", err)
+	}
+
+	var n int
+	for _, tc := range []struct {
+		name  string
+		query string
+	}{
+		{"question", `SELECT count(*) FROM question WHERE id = 'q1'`},
+		{"round_question", `SELECT count(*) FROM round_question WHERE question_id = 'q1'`},
+		{"question_choice", `SELECT count(*) FROM question_choice WHERE question_id = 'q1'`},
+		{"question_match", `SELECT count(*) FROM question_match WHERE question_id = 'q1'`},
+		{"session_question", `SELECT count(*) FROM session_question WHERE session_id = 's1'`},
+		{"session_question_choice", `SELECT count(*) FROM session_question_choice WHERE session_id = 's1'`},
+	} {
+		if err := db.QueryRow(tc.query).Scan(&n); err != nil {
+			t.Fatal(err)
+		}
+		if n != 1 {
+			t.Errorf("%s rows lost by migration 15 rebuild: %d", tc.name, n)
+		}
+	}
+
+	// the rebuilt question kept its category_id wiring
+	var categoryId sql.NullString
+	if err := db.QueryRow(`SELECT category_id FROM question WHERE id = 'q1'`).Scan(&categoryId); err != nil {
+		t.Fatal(err)
+	}
+	if !categoryId.Valid || categoryId.String != "c1" {
+		t.Errorf("category_id = %v after rebuild, want c1", categoryId)
+	}
+
+	// the widened CHECK accepts ordering on the rebuilt tables
+	mustExec(t, db, `INSERT INTO question (id, create_date, question_type) VALUES ('q2', '2026-01-01T00:00:00.000000', 'ordering')`)
+	mustExec(t, db, `INSERT INTO session_question (session_id, round_index, question_index, question_type)
+		VALUES ('s1', 1, 0, 'ordering')`)
+
+	// the new child tables accept ordering payloads
+	mustExec(t, db, `INSERT INTO question_ordered (question_id, position, text) VALUES ('q2', 0, 'first')`)
+	mustExec(t, db, `INSERT INTO question_ordered (question_id, position, text) VALUES ('q2', 1, 'second')`)
+	mustExec(t, db, `INSERT INTO session_question_ordered (session_id, round_index, question_index, position, text)
+		VALUES ('s1', 1, 0, 0, 'first')`)
+	mustExec(t, db, `INSERT INTO session_question_ordered (session_id, round_index, question_index, position, text)
+		VALUES ('s1', 1, 0, 1, 'second')`)
+
+	// foreign keys still enforced against the rebuilt tables
+	if _, err := db.Exec(`INSERT INTO round_question (round_id, question_id, position) VALUES ('r1', 'nope', 0)`); err == nil {
+		t.Error("expected FK violation on round_question.question_id after rebuild")
+	}
+	if _, err := db.Exec(`INSERT INTO question_ordered (question_id, position, text) VALUES ('nope', 0, 'x')`); err == nil {
+		t.Error("expected FK violation on question_ordered.question_id after rebuild")
 	}
 }
 

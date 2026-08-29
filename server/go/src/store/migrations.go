@@ -544,6 +544,81 @@ var migrations = []migration{
 			`ALTER TABLE question DROP COLUMN scoring_note_id`,
 		},
 	},
+	{
+		version: 15,
+		name:    "ordering question type",
+		// ticket #207: questions gain an "ordering" type — the answer is the
+		// question's items in their correct order (e.g. "rank these states by
+		// population (ascending)"). The payload is a list of item texts whose
+		// position IS the correct order; it lives in a normalized child table
+		// (question_ordered) mirrored into the session snapshot like
+		// choice/match/bucket.
+		//
+		// Adding a value to the question_type CHECK requires rebuilding the
+		// question and session_question tables (SQLite cannot alter a CHECK
+		// constraint). The rebuild drops the old table, so it runs with
+		// foreign_keys off — otherwise the implicit DELETE would cascade
+		// through round_question / session_question_choice / _match / _bucket
+		// and wipe live data. The index on session_question is recreated after
+		// the rename (DROP TABLE removes it with the table).
+		//
+		// The rebuilt question keeps the post-migration-14 columns
+		// (category_id, no legacy category/scoring_note_id text columns).
+		disableForeignKeys: true,
+		statements: []string{
+			`CREATE TABLE question_ordering_new (
+				id              TEXT PRIMARY KEY,
+				create_date     TEXT NOT NULL,
+				category_id     TEXT REFERENCES category(id) ON DELETE SET NULL,
+				question        TEXT NOT NULL DEFAULT '',
+				answer          TEXT NOT NULL DEFAULT '',
+				user_id         TEXT NOT NULL DEFAULT '',
+				question_type   TEXT NOT NULL DEFAULT 'freeform'
+					CHECK (question_type IN ('freeform', 'multiple_choice', 'matching', 'bucketing', 'ordering'))
+			)`,
+			`INSERT INTO question_ordering_new (id, create_date, category_id, question, answer, user_id, question_type)
+				SELECT id, create_date, category_id, question, answer, user_id, question_type FROM question`,
+			`DROP TABLE question`,
+			`ALTER TABLE question_ordering_new RENAME TO question`,
+
+			`CREATE TABLE session_question_ordering_new (
+				session_id      TEXT NOT NULL REFERENCES session(id) ON DELETE CASCADE,
+				round_index     INTEGER NOT NULL,
+				question_index  INTEGER NOT NULL,
+				question_id     TEXT NOT NULL DEFAULT '',
+				category        TEXT NOT NULL DEFAULT '',
+				question        TEXT NOT NULL DEFAULT '',
+				answer          TEXT NOT NULL DEFAULT '',
+				scoring_note_id TEXT NOT NULL DEFAULT '',
+				scored          INTEGER NOT NULL DEFAULT 0,
+				scoring_note    TEXT NOT NULL DEFAULT '',
+				question_type   TEXT NOT NULL DEFAULT 'freeform'
+					CHECK (question_type IN ('freeform', 'multiple_choice', 'matching', 'bucketing', 'ordering')),
+				PRIMARY KEY (session_id, round_index, question_index)
+			)`,
+			`INSERT INTO session_question_ordering_new (session_id, round_index, question_index, question_id, category, question, answer, scoring_note_id, scored, scoring_note, question_type)
+				SELECT session_id, round_index, question_index, question_id, category, question, answer, scoring_note_id, scored, scoring_note, question_type FROM session_question`,
+			`DROP TABLE session_question`,
+			`ALTER TABLE session_question_ordering_new RENAME TO session_question`,
+			`CREATE INDEX idx_session_question_session ON session_question(session_id)`,
+
+			`CREATE TABLE question_ordered (
+				question_id TEXT NOT NULL REFERENCES question(id) ON DELETE CASCADE,
+				position    INTEGER NOT NULL,
+				text        TEXT NOT NULL DEFAULT '',
+				PRIMARY KEY (question_id, position)
+			)`,
+
+			`CREATE TABLE session_question_ordered (
+				session_id     TEXT NOT NULL REFERENCES session(id) ON DELETE CASCADE,
+				round_index    INTEGER NOT NULL,
+				question_index INTEGER NOT NULL,
+				position       INTEGER NOT NULL,
+				text           TEXT NOT NULL DEFAULT '',
+				PRIMARY KEY (session_id, round_index, question_index, position)
+			)`,
+		},
+	},
 }
 
 // Migrate brings db up to the latest schema version, applying each pending
