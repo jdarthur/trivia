@@ -473,10 +473,10 @@ func getAnswersScored(e *Env, session models.Session, roundIndex int, questionIn
 			a.PointsAwarded = answer.PointsAwarded
 			a.AnswerId = answer.ID
 			if ra, ok := reactions[answer.ID]; ok {
-				a.Reactions = ra.counts
+				a.Reactions = ra.summary()
 				a.MyReaction = ra.myReaction
 			} else {
-				a.Reactions = make(map[string]int)
+				a.Reactions = make(map[string]models.ReactionSummary)
 			}
 			team.Answers = append(team.Answers, a)
 		}
@@ -544,7 +544,7 @@ func getAnswersAsMod(e *Env, session models.Session, roundIndex int, questionInd
 			}
 			individualAnswer.AnswerId = individualAnswer.ID
 			if ra, ok := reactions[individualAnswer.ID]; ok {
-				individualAnswer.Reactions = ra.counts
+				individualAnswer.Reactions = ra.summary()
 				individualAnswer.MyReaction = ra.myReaction
 			}
 			teamAnswer.Answers = append(teamAnswer.Answers, individualAnswer)

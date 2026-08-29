@@ -1,8 +1,9 @@
 import React from 'react';
-import {Popover} from "antd";
+import {Popover, Tooltip} from "antd";
 import EmojiPicker, {EmojiStyle} from "emoji-picker-react";
 import sendData from "../index";
 import "./Players.css"
+import type {ReactionSummary} from "../types/models";
 
 interface Props {
     session_id: string
@@ -10,7 +11,7 @@ interface Props {
     // NOT the player the answer card belongs to.
     current_player: string
     answer_id?: string
-    reactions?: Record<string, number>
+    reactions?: Record<string, ReactionSummary>
     my_reaction?: string
 }
 
@@ -19,10 +20,13 @@ interface State {
 }
 
 /**
- * Emoji reactions on one scored answer (ticket #156). Shows the aggregated
- * reaction counts with the caller's own reaction highlighted; a "+" button
- * opens an emoji picker (emoji-picker-react) in a Popover so the small answer
- * cards don't carry the full picker UI.
+ * Emoji reactions on one scored answer (ticket #156). Rendered as stickers
+ * "stuck" across the top of the answer box, starting at the top-right corner
+ * and flowing leftward; the "+" button sits at the right side of the answer.
+ * Hovering a sticker shows the team names of the players who reacted with it.
+ * The caller's own reaction is highlighted; a "+" button opens an emoji
+ * picker (emoji-picker-react) in a Popover so the small answer cards don't
+ * carry the full picker UI.
  *
  * The API allows exactly one emoji per (answer, player): tapping the
  * highlighted chip removes the reaction, picking a different emoji changes it
@@ -64,31 +68,39 @@ class ReactionControl extends React.Component<Props, State> {
         const {answer_id, reactions, my_reaction} = this.props
         if (!answer_id) return null
 
-        const chips = Object.entries(reactions || {})
-            .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
-            .map(([emoji, count]) => {
+        const stickers = Object.entries(reactions || {})
+            .sort((a, b) => b[1].count - a[1].count || a[0].localeCompare(b[0]))
+            .map(([emoji, summary]) => {
                 const mine = emoji === my_reaction
-                return (
+                // Who reacted: the team names the API aggregates per emoji.
+                // Hovering the sticker reveals them (tooltip).
+                const who = summary.players && summary.players.length > 0
+                    ? summary.players.join(', ')
+                    : undefined
+                const chip = (
                     <span key={emoji} className={"reaction-chip" + (mine ? " mine" : "")}
-                          onClick={mine ? this.remove_reaction : undefined}
-                          title={mine ? "Tap to remove your reaction" : undefined}>
-                        {emoji} {count}
+                          onClick={mine ? this.remove_reaction : undefined}>
+                        {emoji} {summary.count}
                     </span>
                 )
+                return who ? <Tooltip key={emoji} title={who}>{chip}</Tooltip> : chip
             })
 
         const picker = (
             <EmojiPicker width={300} height={320} emojiStyle={EmojiStyle.NATIVE}
+                         previewConfig={{showPreview: false}}
                          onEmojiClick={(data) => this.set_reaction(data.emoji)}/>
         )
 
         return (
             <div className="reaction-control">
-                {chips}
-                <Popover content={picker} trigger="click" open={this.state.picker_open}
-                         onOpenChange={(open) => this.setState({picker_open: open})}>
-                    <button type="button" className="reaction-add-button" aria-label="Add reaction">+</button>
-                </Popover>
+                <div className="reaction-stickers">{stickers}</div>
+                <div className="reaction-add">
+                    <Popover content={picker} trigger="click" open={this.state.picker_open}
+                             onOpenChange={(open) => this.setState({picker_open: open})}>
+                        <button type="button" className="reaction-add-button" aria-label="Add reaction">+</button>
+                    </Popover>
+                </div>
             </div>
         )
     }

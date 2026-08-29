@@ -33,6 +33,11 @@
     margin-top: 20px;
     width: 100%;
     overflow-x: auto;
+    /* Room for the reaction stickers to straddle the cards' top edge:
+     * translateY(-50%) lifts a sticker ~half its height above its card, and
+     * the bar clips vertical overflow (overflow-y computes to auto), so the
+     * cards start 14px down and the stickers stick up into that space. */
+    padding-top: 14px;
     /* Leave room for the fade edge so the last box isn't hidden under it. */
     padding-right: 2px;
     scrollbar-width: thin;
@@ -55,10 +60,11 @@
 }
 
 /* Edge fades that hint the strip scrolls. Purely visual (pointer-events none)
- * and only rendered by PlayerStatus when there is actually more to scroll to. */
+ * and only rendered by PlayerStatus when there is actually more to scroll to.
+ * top matches the cards' offset: bar margin-top 20 + the 14px sticker room. */
 .status-fade {
     position: absolute;
-    top: 20px;
+    top: 34px;
     bottom: 0;
     width: 40px;
     pointer-events: none;
@@ -120,25 +126,72 @@
     justify-content: center;
 }
 
-/* Emoji reactions on scored answers (ticket #156). */
+/* Emoji reactions on scored answers (ticket #156). The control overlays the
+ * whole player card (which is position: relative): stickers are "stuck"
+ * across the top of the card starting at the top-right corner — where the
+ * team's icon sits — and flowing leftward, and the "+" button sits at the
+ * right side of the answer. The overlay itself lets clicks pass through; only
+ * the stickers and the "+" button are interactive. */
 .reaction-control {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    pointer-events: none;
+}
+
+/* The sticker strip: first sticker at the top-right corner, further stickers
+ * flow leftward (justify-content: flex-end), wrapping onto a new row below
+ * if the box is too narrow. The strip straddles the card's top edge —
+ * translateY(-50%) keeps it centered on the edge like a sticker stuck
+ * half-on/half-off the box. Applies to both the player-status cards and the
+ * moderator scorer cards, so reactions look the same everywhere. */
+.reaction-stickers {
+    position: absolute;
+    top: 0;
+    right: 0;
+    transform: translateY(-50%);
     display: flex;
     flex-direction: row;
     flex-wrap: wrap;
+    justify-content: flex-end;
     align-items: center;
-    justify-content: center;
     gap: 4px;
-    margin-top: 4px;
+    pointer-events: auto;
 }
 
+/* The "+" button sits at the right side of the answer, vertically centered;
+ * max(50%, 30px) keeps it clear of the sticker strip on very short boxes. */
+.reaction-add {
+    position: absolute;
+    top: max(50%, 30px);
+    right: 0;
+    transform: translateY(-50%);
+    pointer-events: auto;
+}
+
+/* Stickers look like little labels: rounded, slightly tilted, with a soft
+ * shadow. The emoji is ~20% larger than the base chip text so it reads as
+ * the main content. */
 .reaction-chip {
     cursor: default;
     border: 1px solid #d9d9d9;
     border-radius: 10px;
     padding: 0 6px;
-    font-size: 0.85em;
-    line-height: 18px;
+    font-size: 1em;
+    line-height: 20px;
     background: #fff;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
+    white-space: nowrap;
+}
+
+.reaction-stickers .reaction-chip:nth-child(odd) {
+    transform: rotate(-2deg);
+}
+
+.reaction-stickers .reaction-chip:nth-child(even) {
+    transform: rotate(1.5deg);
 }
 
 /* The caller's own reaction is highlighted and tap-to-remove. */
@@ -157,5 +210,6 @@
     font-size: 0.85em;
     line-height: 18px;
     background: #fff;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
 }
 

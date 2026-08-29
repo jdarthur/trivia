@@ -24,15 +24,24 @@ type Answer struct {
 	PointsAwarded float64   `json:"points_awarded,omitempty"`
 	// SessionId is set server-side on create; it is not part of the API.
 	SessionId string `json:"-"`
+
 	// AnswerId mirrors ID for reaction targeting (ticket #156): the
 	// answers-as-mod response carries it (like ScoredAnswer does for the
 	// player scored view) so the moderator's scorer can render the same
-	// reaction controls. Reactions/MyReaction are the aggregated emoji counts
-	// and the caller's own reaction; they are populated only by the
-	// answers-as-mod path and omitted everywhere else.
-	AnswerId   string         `json:"answer_id,omitempty"`
-	Reactions  map[string]int `json:"reactions,omitempty"`
-	MyReaction string         `json:"my_reaction,omitempty"`
+	// reaction controls. Reactions/MyReaction are the aggregated emoji
+	// state (counts + team names) and the caller's own reaction; they are
+	// populated only by the answers-as-mod path and omitted everywhere else.
+	AnswerId   string                     `json:"answer_id,omitempty"`
+	Reactions  map[string]ReactionSummary `json:"reactions,omitempty"`
+	MyReaction string                     `json:"my_reaction,omitempty"`
+}
+
+// ReactionSummary is the aggregated state of one emoji on one answer: how
+// many players reacted with it, plus each reactor's team name so clients can
+// show who reacted (hover tooltips) without exposing player ids.
+type ReactionSummary struct {
+	Count   int      `json:"count"`
+	Players []string `json:"players"`
 }
 
 func (a Answer) SetCreateDate(createDate time.Time) Object {
@@ -90,12 +99,13 @@ type ScoredAnswer struct {
 	Answer        string         `json:"answer"`
 	// AnswerId lets clients target a reaction at a specific answer (a player
 	// may have submitted more than one for a question). Reactions are the
-	// emoji counts on that answer; MyReaction is the caller's own emoji, so
-	// the UI can highlight their selection without broadcasting who reacted
-	// (the scored view only ever exposes the caller's own player_id).
-	AnswerId   string         `json:"answer_id"`
-	Reactions  map[string]int `json:"reactions"`
-	MyReaction string         `json:"my_reaction,omitempty"`
+	// emoji state on that answer (counts + reacting team names); MyReaction is
+	// the caller's own emoji, so the UI can highlight their selection without
+	// broadcasting who reacted (the scored view only ever exposes the caller's
+	// own player_id).
+	AnswerId   string                     `json:"answer_id"`
+	Reactions  map[string]ReactionSummary `json:"reactions"`
+	MyReaction string                     `json:"my_reaction,omitempty"`
 }
 
 // AnswerReaction is one emoji reaction by one player to one answer. The

@@ -200,6 +200,13 @@ export interface ScoredTeam {
   answers: ScoredAnswer[];
 }
 
+/** models.ReactionSummary — aggregated state of one emoji on one answer */
+export interface ReactionSummary {
+  count: number;
+  /** team names of the players who reacted with this emoji */
+  players: string[];
+}
+
 /** models.ScoredAnswer */
 export interface ScoredAnswer {
   wager: number;
@@ -208,7 +215,7 @@ export interface ScoredAnswer {
   points_awarded: number;
   answer: string;
   answer_id: string;
-  reactions: Record<string, number>;
+  reactions: Record<string, ReactionSummary>;
   my_reaction?: string;
 }
 
@@ -233,6 +240,10 @@ export interface Answer {
   use_moneyball?: boolean;
   correct?: boolean;
   points_awarded?: number;
+  /** answers-as-mod view: reaction targeting + aggregated state */
+  answer_id?: string;
+  reactions?: Record<string, ReactionSummary>;
+  my_reaction?: string;
 }
 
 /** sessions.IndividualAnswerAsMod (one entry per player in the mod's AnswersAsMod) */

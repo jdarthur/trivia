@@ -521,6 +521,17 @@ async function scoreCurrentQuestion(modPage: Page, correct: boolean) {
 // to narrow the results to the target, then click its button by unified code.
 async function pickEmoji(page: Page, search: string, unified: string) {
   const popover = page.locator('.ant-popover:visible');
+  // Regression guard (ticket #156): the picker's preview strip (a 70px-tall,
+  // top-bordered bar rendered by emoji-picker-react) must be disabled via
+  // previewConfig.showPreview=false — the top-level showPreview prop is
+  // ignored in v4.19.1, so this catches that silently doing nothing.
+  const previewCount = await popover.evaluate((el) =>
+    Array.from(el.querySelectorAll('div')).filter((d) => {
+      const cs = getComputedStyle(d);
+      return parseFloat(cs.borderTopWidth) > 0 && Math.round(d.getBoundingClientRect().height) === 70;
+    }).length,
+  );
+  expect(previewCount).toBe(0);
   await popover.getByLabel('Type to search for an emoji').fill(search);
   await popover.locator(`button[data-unified="${unified}"]`).click();
 }
