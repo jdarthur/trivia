@@ -8,7 +8,14 @@ import logo from "./borttrivia.png"
 
 import 'antd/dist/reset.css';
 import {Layout, Menu, Spin} from 'antd';
-import {FormOutlined} from '@ant-design/icons';
+import {
+    DatabaseOutlined,
+    FolderOpenOutlined,
+    FormOutlined,
+    OrderedListOutlined,
+    QuestionCircleOutlined,
+    TrophyOutlined,
+} from '@ant-design/icons';
 import {useAuth0} from "@auth0/auth0-react";
 import {useDispatch} from "react-redux";
 import {setToken as setAuthToken, logoutUser} from "../api/auth";
@@ -123,19 +130,19 @@ export default function App() {
                 </Menu.Item>
 
                 <SubMenu key="sub1" icon={<FormOutlined/>} title="Editor" disabled={!showEditor}>
-                  <Menu.Item key="6" disabled={!showEditor}>
+                  <Menu.Item key="6" icon={<FolderOpenOutlined/>} disabled={!showEditor}>
                       <Link to={"categories"}>{CATEGORY}</Link>
                   </Menu.Item>
-                  <Menu.Item key="2" disabled={!showEditor}>
+                  <Menu.Item key="2" icon={<QuestionCircleOutlined/>} disabled={!showEditor}>
                     <Link to={"questions"}>{QUESTION}</Link>
                   </Menu.Item>
-                  <Menu.Item key="3" disabled={!showEditor}>
+                  <Menu.Item key="3" icon={<OrderedListOutlined/>} disabled={!showEditor}>
                       <Link to={"rounds"}>{ROUND}</Link>
                   </Menu.Item>
-                  <Menu.Item key="4" disabled={!showEditor}>
+                  <Menu.Item key="4" icon={<TrophyOutlined/>} disabled={!showEditor}>
                       <Link to={"games"}>{GAME}</Link>
                   </Menu.Item>
-                  <Menu.Item key="5" disabled={!showEditor}>
+                  <Menu.Item key="5" icon={<DatabaseOutlined/>} disabled={!showEditor}>
                       <Link to={"collections"}>{COLLECTION}</Link>
                   </Menu.Item>
                 </SubMenu>

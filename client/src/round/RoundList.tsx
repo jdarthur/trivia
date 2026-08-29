@@ -1,6 +1,6 @@
 import React, {useState} from 'react';
 import {Table, Tag} from "antd";
-import {EditOutlined} from '@ant-design/icons';
+import {EditOutlined, OrderedListOutlined} from '@ant-design/icons';
 import LoadingOrView from "../editor/LoadingOrView";
 import NewButton from "../editor/NewButton";
 import DeleteConfirm from "../editor/DeleteConfirm";
@@ -97,7 +97,7 @@ export default function RoundList(props: Props) {
     </div>
 
     return <div className="ql_and_filter">
-        <PageHeader breadcrumbs={["Editor", "Rounds"]} header={header} style={{marginBottom: 10}}/>
+        <PageHeader breadcrumbs={["Editor", <><OrderedListOutlined/> Rounds</>]} header={header} style={{marginBottom: 10}}/>
         <LoadingOrView class_name="round_list" loading={isLoading}
                        empty={rounds?.length === 0} loaded_view={table_and_pager}/>
         {modal}

@@ -1,6 +1,6 @@
 import React, {useState} from 'react';
 import {Table, Tag} from "antd";
-import {EditOutlined} from '@ant-design/icons';
+import {EditOutlined, FolderOpenOutlined} from '@ant-design/icons';
 import LoadingOrView from "../editor/LoadingOrView";
 import NewButton from "../editor/NewButton";
 import DeleteConfirm from "../editor/DeleteConfirm";
@@ -102,7 +102,7 @@ export default function CategoryList(props: Props) {
     </div>
 
     return <div className="ql_and_filter">
-        <PageHeader breadcrumbs={["Editor", "Categories"]} header={header} style={{marginBottom: 10}}/>
+        <PageHeader breadcrumbs={["Editor", <><FolderOpenOutlined/> Categories</>]} header={header} style={{marginBottom: 10}}/>
         <LoadingOrView class_name="category-list" loading={isLoading}
                        empty={categories?.length === 0}
                        loaded_view={table_and_pager}/>

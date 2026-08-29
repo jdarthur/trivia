@@ -9,7 +9,7 @@ import NewButton from "../editor/NewButton"
 
 import {Table} from "antd"
 
-import {EditOutlined} from '@ant-design/icons';
+import {EditOutlined, QuestionCircleOutlined} from '@ant-design/icons';
 import PageHeader from "../common/PageHeader";
 import {useDeleteQuestionMutation, useGetQuestionsQuery} from "../api/main";
 import {useClampToFirstPage, useListFilters} from "../editor/useListFilters";
@@ -114,7 +114,7 @@ export default function QuestionList(props: Props) {
 
     return (
         <div className="ql_and_filter">
-            <PageHeader breadcrumbs={["Editor", "Questions"]} header={header} style={{marginBottom: 10}}/>
+            <PageHeader breadcrumbs={["Editor", <><QuestionCircleOutlined/> Questions</>]} header={header} style={{marginBottom: 10}}/>
             {question_editor}
             <LoadingOrView loading={isFetching} class_name="question-list"
                            empty={questions?.length === 0} loaded_view={table_and_modal}/>
