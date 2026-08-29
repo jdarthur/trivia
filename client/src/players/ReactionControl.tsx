@@ -88,6 +88,7 @@ class ReactionControl extends React.Component<Props, State> {
 
         const picker = (
             <EmojiPicker width={300} height={320} emojiStyle={EmojiStyle.NATIVE}
+                         showPreview={false}
                          onEmojiClick={(data) => this.set_reaction(data.emoji)}/>
         )
 
