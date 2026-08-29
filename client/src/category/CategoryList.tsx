@@ -1,5 +1,5 @@
 import React, {useState} from 'react';
-import {Card, Tag} from "antd";
+import {Table, Tag} from "antd";
 import {EditOutlined} from '@ant-design/icons';
 import LoadingOrView from "../editor/LoadingOrView";
 import NewButton from "../editor/NewButton";
@@ -18,14 +18,15 @@ interface Props {
 }
 
 /**
- * Category editor page (ticket #180): list the user's categories as cards,
- * with create / edit / delete (with confirmation). Each card shows the
- * category's scoring note, which lives on the category now (D2).
+ * Category editor page (ticket #180): list the user's categories in a table
+ * (ticket #197), with create / edit / delete (with confirmation). Each row
+ * shows the category's scoring note, which lives on the category now (D2),
+ * and its question count.
  *
  * Ticket #196 adds the shared filter/pagination controls: search by name and
  * an unused-only toggle (a category is unused when no question references it —
  * the server computes that, and sends the count as questions_used, which each
- * card shows). Categories default to showing everything, since this page is
+ * row shows). Categories default to showing everything, since this page is
  * where you go to see and tidy up the whole set.
  */
 export default function CategoryList(props: Props) {
@@ -66,23 +67,24 @@ export default function CategoryList(props: Props) {
         return note?.description || ""
     }
 
-    const cards = (categories || []).map((category) => (
-        <Card key={category.id} size="small" title={category.name}
-              extra={<span style={{display: "flex", alignItems: "center", fontSize: "1.2em"}}>
-                  <EditOutlined style={{cursor: "pointer"}} onClick={() => openEdit(category)}/>
-                  <DeleteConfirm delete={() => del(category)}/>
-              </span>}
-              style={{width: 250, margin: 5}}>
-            <div>{noteText(category) || "No scoring note"}</div>
-            {/* questions_used comes from the server (ticket #195): how many
-                questions reference this category. */}
-            <div style={{marginTop: 5}}>
-                <Tag color={category.questions_used ? "blue" : undefined}>
-                    {category.questions_used === 1 ? "1 question" : `${category.questions_used} questions`}
-                </Tag>
-            </div>
-        </Card>
-    ))
+    const delete_edit = (text: any, category: Category) => <span style={{fontSize: '1.2em'}}>
+            <DeleteConfirm delete={() => del(category)} style={{paddingRight: 10}}/>
+            <EditOutlined onClick={() => openEdit(category)}/>
+        </span>
+
+    // questions_used comes from the server (ticket #195): how many questions
+    // reference this category.
+    const questions_tag = (text: any, category: Category) => <Tag color={category.questions_used ? "blue" : undefined}>
+            {category.questions_used === 1 ? "1 question" : `${category.questions_used} questions`}
+        </Tag>
+
+    const columns = [
+        {title: "", render: delete_edit, width: '5em'},
+        {title: 'Name', dataIndex: 'name', ellipsis: {showTitle: false}},
+        {title: 'Scoring note', render: (text: any, category: Category) => noteText(category) || "No scoring note",
+         ellipsis: {showTitle: false}},
+        {title: 'Questions', render: questions_tag}
+    ]
 
     const newButton = <NewButton on_click={openCreate}/>
 
@@ -92,18 +94,18 @@ export default function CategoryList(props: Props) {
 
     const modal = <CategoryModal visible={modalOpen} setVisible={setModalOpen} category={editing}/>
 
-    return <div style={{display: "flex", flexWrap: "wrap", margin: 10, alignItems: "center"}}>
-        <div className="ql_and_filter">
-            <PageHeader breadcrumbs={["Editor", "Categories"]} header={header} style={{marginBottom: 10}}/>
-            <LoadingOrView class_name="category-list" loading={isLoading}
-                           empty={categories?.length === 0}
-                           loaded_view={<div>
-                               <div style={{display: "flex", flexWrap: "wrap"}}>{cards}</div>
-                               <ListPagination meta={data} page={filters.page} pageSize={filters.pageSize}
-                                               set_page={filters.setPage} set_page_size={filters.setPageSize}/>
-                           </div>}/>
-        </div>
+    const table_and_pager = <div>
+        <Table columns={columns} dataSource={categories} pagination={false}
+               size="small" style={{maxWidth: 1500}} rowKey="id"/>
+        <ListPagination meta={data} page={filters.page} pageSize={filters.pageSize}
+                        set_page={filters.setPage} set_page_size={filters.setPageSize}/>
+    </div>
 
+    return <div className="ql_and_filter">
+        <PageHeader breadcrumbs={["Editor", "Categories"]} header={header} style={{marginBottom: 10}}/>
+        <LoadingOrView class_name="category-list" loading={isLoading}
+                       empty={categories?.length === 0}
+                       loaded_view={table_and_pager}/>
         {modal}
     </div>
 }

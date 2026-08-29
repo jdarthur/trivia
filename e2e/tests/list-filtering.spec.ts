@@ -181,7 +181,7 @@ editorTest.describe('questions filtering & pagination', () => {
 });
 
 categoriesTest.describe('categories filtering & pagination', () => {
-  // The categories page gained the same filter bar plus a per-card usage count.
+  // The categories page gained the same filter bar plus a per-row usage count.
   categoriesTest('searches categories by name and pages the results', async ({ categoriesPage, request }) => {
     const marker = `e2e-cat-page-${unique()}`;
     for (let i = 0; i < 4; i++) {
@@ -192,7 +192,7 @@ categoriesTest.describe('categories filtering & pagination', () => {
     // The page-size default is 24, so all four show; shrink it to force a page 2.
     await expect(categoriesPage.locator('.ant-pagination')).toContainText('1-4 of 4');
     await choosePageSize(categoriesPage, 10);
-    await expect(categoriesPage.locator('.category-list .ant-card')).toHaveCount(4);
+    await expect(dataRows(categoriesPage)).toHaveCount(4);
 
     // A narrower search reports the smaller total.
     await search(categoriesPage, `${marker} 1`);
@@ -212,8 +212,8 @@ categoriesTest.describe('categories filtering & pagination', () => {
     expect(created.ok()).toBeTruthy();
 
     await search(categoriesPage, marker);
-    const card = categoriesPage.locator('.category-list .ant-card').filter({ hasText: marker });
-    await expect(card).toContainText('1 question');
+    const row = categoriesPage.locator('.category-list .ant-table-row').filter({ hasText: marker });
+    await expect(row).toContainText('1 question');
   });
 
   categoriesTest('the unused-only filter hides categories a question references', async ({ categoriesPage, request }) => {
@@ -228,12 +228,12 @@ categoriesTest.describe('categories filtering & pagination', () => {
     expect(created.ok()).toBeTruthy();
 
     await search(categoriesPage, marker);
-    await expect(categoriesPage.locator('.category-list .ant-card').filter({ hasText: `free ${marker}` })).toBeVisible();
-    await expect(categoriesPage.locator('.category-list .ant-card').filter({ hasText: `used ${marker}` })).toBeVisible();
+    await expect(categoriesPage.locator('.category-list .ant-table-row').filter({ hasText: `free ${marker}` })).toBeVisible();
+    await expect(categoriesPage.locator('.category-list .ant-table-row').filter({ hasText: `used ${marker}` })).toBeVisible();
 
     await categoriesPage.getByText('Unused only').click();
-    await expect(categoriesPage.locator('.category-list .ant-card').filter({ hasText: `free ${marker}` })).toBeVisible();
-    await expect(categoriesPage.locator('.category-list .ant-card').filter({ hasText: `used ${marker}` })).toHaveCount(0);
+    await expect(categoriesPage.locator('.category-list .ant-table-row').filter({ hasText: `free ${marker}` })).toBeVisible();
+    await expect(categoriesPage.locator('.category-list .ant-table-row').filter({ hasText: `used ${marker}` })).toHaveCount(0);
   });
 });
 

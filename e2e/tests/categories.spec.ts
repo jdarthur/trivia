@@ -7,7 +7,7 @@ const unique = () => String(Date.now());
 
 // Open the New category modal, optionally attach a scoring note (created
 // inline via the note selector's "New" button), and submit. Then assert the
-// category card appears in the list.
+// category row appears in the list.
 async function createCategory(
   page: import('@playwright/test').Page,
   name: string,
@@ -43,21 +43,21 @@ async function createCategory(
   await modal.getByRole('button', { name: 'Create', exact: true }).click();
   // The (now closed) scoring-note modal stays mounted, so scope by title.
   await expect(page.locator('.ant-modal:has(.ant-modal-title)').filter({ hasText: 'New category' })).toBeHidden();
-  await expect(page.locator('.category-list .ant-card').filter({ hasText: name })).toBeVisible();
+  await expect(page.locator('.category-list .ant-table-row').filter({ hasText: name })).toBeVisible();
 }
 
 categoriesTest.describe('categories CRUD', () => {
   categoriesTest('creates a category', async ({ categoriesPage }) => {
     const name = `e2e-cat-create-${unique()}`;
     await createCategory(categoriesPage, name);
-    const card = categoriesPage.locator('.category-list .ant-card').filter({ hasText: name });
+    const card = categoriesPage.locator('.category-list .ant-table-row').filter({ hasText: name });
     await expect(card).toContainText('No scoring note');
   });
 
   categoriesTest('creates a category with a scoring note', async ({ categoriesPage }) => {
     const name = `e2e-cat-note-${unique()}`;
     await createCategory(categoriesPage, name, { name: 'Hint', description: `Hint text ${unique()}` });
-    const card = categoriesPage.locator('.category-list .ant-card').filter({ hasText: name });
+    const card = categoriesPage.locator('.category-list .ant-table-row').filter({ hasText: name });
     await expect(card).toContainText(/Hint text/);
   });
 
@@ -65,7 +65,7 @@ categoriesTest.describe('categories CRUD', () => {
     const original = `e2e-cat-edit-${unique()}`;
     await createCategory(categoriesPage, original);
 
-    const card = categoriesPage.locator('.category-list .ant-card').filter({ hasText: original });
+    const card = categoriesPage.locator('.category-list .ant-table-row').filter({ hasText: original });
     await card.locator('.anticon-edit').click();
 
     const modal = categoriesPage.locator('.ant-modal:has(.ant-modal-title)');
@@ -96,7 +96,7 @@ categoriesTest.describe('categories CRUD', () => {
       categoriesPage.locator('.ant-modal:has(.ant-modal-title)').filter({ hasText: 'Edit category' }),
     ).toBeHidden();
 
-    const renamedCard = categoriesPage.locator('.category-list .ant-card').filter({ hasText: renamed });
+    const renamedCard = categoriesPage.locator('.category-list .ant-table-row').filter({ hasText: renamed });
     await expect(renamedCard).toBeVisible();
     await expect(renamedCard).toContainText(/Renamed hint/);
   });
@@ -105,7 +105,7 @@ categoriesTest.describe('categories CRUD', () => {
     const name = `e2e-cat-delete-${unique()}`;
     await createCategory(categoriesPage, name);
 
-    const card = categoriesPage.locator('.category-list .ant-card').filter({ hasText: name });
+    const card = categoriesPage.locator('.category-list .ant-table-row').filter({ hasText: name });
     await card.locator('.anticon-delete').click();
     const popover = categoriesPage.locator('.ant-popover:visible');
     await popover.getByRole('button', { name: 'Delete', exact: true }).click();
