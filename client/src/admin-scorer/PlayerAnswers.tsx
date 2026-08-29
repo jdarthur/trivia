@@ -1,6 +1,7 @@
 import React from 'react';
 import ScorerLink from "./ScorerLink"
 import MultiAnswer from "./MultiAnswer"
+import ReactionControl from "../players/ReactionControl";
 
 import {Button, Card, InputNumber, Popover, Slider, Space, Tooltip} from "antd"
 
@@ -79,9 +80,7 @@ export default function PlayerAnswers({
     const incorrectButtonStyle = correct === false ? {background: "#ffccc7"} : {}
     const correctButtonStyle = correct === true ? {background: "#d9f7be"} : {}
 
-    let answer_text = <MultiAnswer answers={answers} question_type={question_type}
-                                   session_id={session_id} current_player={current_player}
-                                   scored={scored}/>
+    let answer_text = <MultiAnswer answers={answers} question_type={question_type}/>
 
     let override = correct === false ? 0 : override_value
     const wager = <div style={{paddingLeft: '10px', fontSize: '1.3em', fontWeight: 'bold'}}>
@@ -123,11 +122,22 @@ export default function PlayerAnswers({
         correctButtonText = moneyball ? moneyballAward : (override === 0 ? wager : override)
     }
 
+    // Reactions only exist once the question is scored. The control overlays
+    // the whole card — stickers "stuck" across the top starting at the
+    // top-right corner and flowing leftward; the + button sits at the right
+    // side of the answer. It attaches to the latest answer, the one rendered
+    // prominently.
+    const reactions = scored && session_id && current_player && lastAnswer && lastAnswer.answer_id ?
+        <ReactionControl session_id={session_id} current_player={current_player}
+                         answer_id={lastAnswer.answer_id} reactions={lastAnswer.reactions}
+                         my_reaction={lastAnswer.my_reaction}/> : null
+
     return (
 
         <Card size="small" title={title} extra={moneyball ? moneyballBadge : (correct === true ? sliderMiniModal : wager)}
-              style={{'width': 200}} bodyStyle={{padding: 0}}>
+              style={{'width': 200, position: 'relative'}} bodyStyle={{padding: 0}}>
             <div className="answered-or-not"> {answer_text} </div>
+            {reactions}
 
             {/* For auto-scored question types the backend judges correctness, so
                 the manual correct/incorrect buttons are hidden; the override

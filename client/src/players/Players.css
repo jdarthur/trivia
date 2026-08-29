@@ -121,18 +121,11 @@
 }
 
 /* Emoji reactions on scored answers (ticket #156). The control overlays the
- * answer box (whose parent, .answer-with-reactions, is position: relative):
- * stickers are "stuck" across the top starting at the top-right corner and
- * flowing leftward, and the "+" button sits at the right side of the answer.
- * The overlay itself lets clicks pass through; only the stickers and the "+"
- * button are interactive. */
-.answer-with-reactions {
-    position: relative;
-    /* Leave a band at the top for the sticker strip so it never overlaps
-     * the answer text. */
-    padding-top: 26px;
-}
-
+ * whole player card (which is position: relative): stickers are "stuck"
+ * across the top of the card starting at the top-right corner — where the
+ * team's icon sits — and flowing leftward, and the "+" button sits at the
+ * right side of the answer. The overlay itself lets clicks pass through; only
+ * the stickers and the "+" button are interactive. */
 .reaction-control {
     position: absolute;
     top: 0;
@@ -156,6 +149,14 @@
     align-items: center;
     gap: 4px;
     pointer-events: auto;
+}
+
+/* In the moderator scorer the card head's top-right slot holds the
+ * interactive score-override trigger (and the moneyball badge), so the
+ * sticker strip sits just below the head there instead of covering it.
+ * The player-status view keeps the icon-corner placement. */
+.player-scorer .reaction-stickers {
+    top: 40px;
 }
 
 /* The "+" button sits at the right side of the answer, vertically centered;
