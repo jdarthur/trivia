@@ -359,12 +359,12 @@ class AnswerQuestion extends React.Component<Props, State> {
                             title="Moneyball rules"
                             content={
                                 <div style={{maxWidth: 280}}>
-                                    <p style={{marginBottom: 8}}>Risk your wager for a 2x payout</p>
+                                    <p style={{marginBottom: 8}}>Risk your wager for a 2× payout</p>
                                     <ul style={{paddingLeft: 18, marginBottom: 0}}>
-                                        <li>You alone are correct → double your wager</li>
-                                        <li>You and one other → whatever you wagered</li>
-                                        <li>You and 2+ others → you get nothing</li>
-                                        <li>Get it wrong → negative wager</li>
+                                        <li>You alone are correct → 2× wager</li>
+                                        <li>You and one other → 1× wager</li>
+                                        <li>You and 2+ others → 0× wager</li>
+                                        <li>Get it wrong → -1× wager</li>
                                     </ul>
                                 </div>
                             }>
