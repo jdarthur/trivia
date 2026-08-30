@@ -29,3 +29,32 @@
     font-weight: normal;
     /* transform: translate(-100%, 100%); */
 }
+
+/* Ticket #214: the ordering answer grid — a single-pane reorder list, visually
+   like one side of an antd <Transfer />, with per-row up/down buttons. */
+.ordered-answer-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.ordered-answer-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 4px 8px;
+    border: 1px solid #d9d9d9;
+    border-radius: 4px;
+    background: #fff;
+}
+
+.ordered-answer-text {
+    flex-grow: 1;
+    margin-right: 8px;
+}
+
+.ordered-answer-controls {
+    display: flex;
+    flex-shrink: 0;
+    gap: 4px;
+}

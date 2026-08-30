@@ -201,7 +201,8 @@ class ActiveGame extends React.Component<Props, State> {
                                                               lefts={this.state.lefts}
                                                               rights={this.state.rights}
                                                               buckets={this.state.buckets}
-                                                              items={this.state.items}/> : null}
+                                                              items={this.state.items}
+                                                              ordered={this.state.ordered}/> : null}
 
                         {this.props.is_mod ?
                             <NextOrPrevious questions={question_indices} rounds={this.props.rounds}

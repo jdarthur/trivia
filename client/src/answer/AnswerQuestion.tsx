@@ -6,6 +6,7 @@ import sendData from "../index"
 
 import { Card, Input, Button, Radio, Select, Checkbox, Popover } from 'antd';
 import { QuestionCircleOutlined } from '@ant-design/icons';
+import OrderedAnswerList from "./OrderedAnswerList";
 
 const { TextArea } = Input;
 
@@ -13,6 +14,7 @@ const FREEFORM = "freeform"
 const MULTIPLE_CHOICE = "multiple_choice"
 const MATCHING = "matching"
 const BUCKETING = "bucketing"
+const ORDERING = "ordering"
 
 interface Props {
     question: number | string
@@ -28,6 +30,7 @@ interface Props {
     rights?: string[]
     buckets?: string[]
     items?: string[]
+    ordered?: string[]
 }
 
 interface State {
@@ -38,6 +41,9 @@ interface State {
     sending: boolean
     selected_choice: string | null
     matches: Record<string, string>
+    // Ticket #214: the player's current order for an ordering question —
+    // seeded from the shuffled `ordered` prop, changed via OrderedAnswerList.
+    order: string[]
     active: boolean
     moneyball: boolean
     // the player's own scored answer for this question, fetched once scored,
@@ -55,6 +61,7 @@ class AnswerQuestion extends React.Component<Props, State> {
         sending: false,
         selected_choice: null,
         matches: {},
+        order: [],
         active: true,
         moneyball: false,
         scored_result: null,
@@ -79,7 +86,11 @@ class AnswerQuestion extends React.Component<Props, State> {
             this.check_active()
         }
         if (this.props.question !== prevProps.question || this.props.round !== prevProps.round) {
-            this.setState({ answer: "", wager: null, dirty: false, answered: false, selected_choice: null, matches: {}, moneyball: false, scored_result: null })
+            this.setState({ answer: "", wager: null, dirty: false, answered: false, selected_choice: null, matches: {}, moneyball: false, scored_result: null,
+                // Ticket #214: seed the ordering grid from the (shuffled)
+                // ordered prop for the new question; a fresh question starts
+                // with an empty grid for every other type.
+                order: this.props.question_type === ORDERING ? (this.props.ordered || []) : [] })
             if (this.props.scored) {
                 this.fetch_scored_result()
             }
@@ -157,6 +168,7 @@ class AnswerQuestion extends React.Component<Props, State> {
         })
     }
     set_moneyball = (checked: boolean) => { this.setState({ moneyball: checked, dirty: true }) }
+    set_order = (order: string[]) => { this.setState({ order, dirty: true }) }
 
     // fetch the player's own scored answer for this question; the Moneyball
     // outcome indicator is derived from it (the flag + points the backend
@@ -230,6 +242,12 @@ class AnswerQuestion extends React.Component<Props, State> {
         if (type === BUCKETING) {
             return (this.props.items || []).every(item => this.state.matches[item])
         }
+        if (type === ORDERING) {
+            // The grid is always seeded from the shuffled `ordered` prop, so a
+            // non-empty order means the question has loaded; wager + dirty are
+            // checked above.
+            return this.state.order.length > 0
+        }
         return this.state.answer !== ""
     }
 
@@ -252,6 +270,9 @@ class AnswerQuestion extends React.Component<Props, State> {
         }
         if (type === MATCHING || type === BUCKETING) {
             return JSON.stringify(this.state.matches)
+        }
+        if (type === ORDERING) {
+            return JSON.stringify(this.state.order)
         }
         return this.state.answer
     }
@@ -325,6 +346,8 @@ class AnswerQuestion extends React.Component<Props, State> {
                     </div>
                 ))}
             </div>
+        ) : type === ORDERING ? (
+            <OrderedAnswerList items={this.state.order} onChange={this.set_order}/>
         ) : (
             <TextArea placeholder="Your answer" value={this.state.answer}
                 onChange={this.set_answer} autoSize={{ minRows: 3 }}
