@@ -11,6 +11,7 @@ var Choices = "choices"
 var Pairs = "pairs"
 var Buckets = "buckets"
 var Items = "items"
+var Ordered = "ordered"
 
 type Question struct {
 	ID         string    `json:"id"`
@@ -21,11 +22,12 @@ type Question struct {
 	RoundsUsed []string  `json:"rounds_used" form:"rounds_used"`
 	UserId     string    `json:"user_id"`
 
-	QuestionType string               `json:"question_type" form:"question_type"` // freeform|multiple_choice|matching|bucketing
-	Choices      []QuestionChoice     `json:"choices,omitempty"`                  // multiple_choice
-	Pairs        []QuestionPair       `json:"pairs,omitempty"`                    // matching
-	Buckets      []QuestionBucket     `json:"buckets,omitempty"`                  // bucketing
-	Items        []QuestionBucketItem `json:"items,omitempty"`                    // bucketing
+	QuestionType string                `json:"question_type" form:"question_type"` // freeform|multiple_choice|matching|bucketing|ordering
+	Choices      []QuestionChoice      `json:"choices,omitempty"`                  // multiple_choice
+	Pairs        []QuestionPair        `json:"pairs,omitempty"`                    // matching
+	Buckets      []QuestionBucket      `json:"buckets,omitempty"`                  // bucketing
+	Items        []QuestionBucketItem  `json:"items,omitempty"`                    // bucketing
+	Ordered      []QuestionOrderedItem `json:"ordered,omitempty"`                  // ordering
 }
 
 type QuestionChoice struct {
@@ -49,6 +51,13 @@ type QuestionBucket struct {
 type QuestionBucketItem struct {
 	Text   string `json:"text"`
 	Bucket string `json:"bucket"`
+}
+
+// QuestionOrderedItem is one entry in an ordering question (ticket #207). The
+// correct order is the slice order of the question's Ordered list — index 0
+// is the first item — so the position is implicit and not stored on the item.
+type QuestionOrderedItem struct {
+	Text string `json:"text"`
 }
 
 func (q Question) SetCreateDate(createDate time.Time) Object {
