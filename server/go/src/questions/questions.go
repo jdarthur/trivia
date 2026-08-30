@@ -121,18 +121,19 @@ func (e *Env) deleteFromCollections(userId, targetQuestionId string) error {
 // The other fields keep their existing merge semantics (empty = no change;
 // child rows are replaced wholesale).
 type QuestionUpdate struct {
-	Category     *string                     `json:"category"`
-	Question     string                      `json:"question"`
-	Answer       string                      `json:"answer"`
-	RoundsUsed   []string                    `json:"rounds_used"`
-	QuestionType string                      `json:"question_type"`
-	Choices      []models.QuestionChoice     `json:"choices"`
-	Pairs        []models.QuestionPair       `json:"pairs"`
-	Buckets      []models.QuestionBucket     `json:"buckets"`
-	Items        []models.QuestionBucketItem `json:"items"`
+	Category     *string                      `json:"category"`
+	Question     string                       `json:"question"`
+	Answer       string                       `json:"answer"`
+	RoundsUsed   []string                     `json:"rounds_used"`
+	QuestionType string                       `json:"question_type"`
+	Choices      []models.QuestionChoice      `json:"choices"`
+	Pairs        []models.QuestionPair        `json:"pairs"`
+	Buckets      []models.QuestionBucket      `json:"buckets"`
+	Items        []models.QuestionBucketItem  `json:"items"`
+	Ordered      []models.QuestionOrderedItem `json:"ordered"`
 }
 
-//Merge update body into existing question
+// Merge update body into existing question
 func merge(update *QuestionUpdate, original *models.Question) {
 
 	// nil = field absent (leave unchanged); "" = the editor's "None" option
@@ -157,6 +158,7 @@ func merge(update *QuestionUpdate, original *models.Question) {
 	original.Pairs = update.Pairs
 	original.Buckets = update.Buckets
 	original.Items = update.Items
+	original.Ordered = update.Ordered
 }
 
 type AttemptedToSetRoundsUsedError struct {
@@ -522,6 +524,115 @@ func (e MultipleChoiceWithBucketsError) Data() interface{} {
 	return e.Buckets
 }
 
+// MissingOrderingPromptError is returned when an ordering question has no
+// prompt (the ordering instruction).
+type MissingOrderingPromptError struct {
+	Question string
+}
+
+func (e MissingOrderingPromptError) Error() string {
+	return "ordering question requires a prompt (the ordering instruction)"
+}
+
+func (e MissingOrderingPromptError) Field() string {
+	return "question"
+}
+
+func (e MissingOrderingPromptError) Data() interface{} {
+	return e.Question
+}
+
+// MissingOrderedItemsError is returned when an ordering question has fewer than
+// two items (a single item would make the question trivial).
+type MissingOrderedItemsError struct {
+	Ordered []models.QuestionOrderedItem
+}
+
+func (e MissingOrderedItemsError) Error() string {
+	return "ordering question must have at least two items"
+}
+
+func (e MissingOrderedItemsError) Field() string {
+	return models.Ordered
+}
+
+func (e MissingOrderedItemsError) Data() interface{} {
+	return e.Ordered
+}
+
+// DuplicateOrderedItemTextError is returned when an ordering question has two
+// items with the same text (ambiguous order).
+type DuplicateOrderedItemTextError struct {
+	Text string
+}
+
+func (e DuplicateOrderedItemTextError) Error() string {
+	return "ordering question cannot have duplicate item text"
+}
+
+func (e DuplicateOrderedItemTextError) Field() string {
+	return models.Ordered
+}
+
+func (e DuplicateOrderedItemTextError) Data() interface{} {
+	return e.Text
+}
+
+// OrderingWithChoicesError is returned when an ordering question carries
+// multiple_choice options (the structured payloads are mutually exclusive).
+type OrderingWithChoicesError struct {
+	Choices []models.QuestionChoice
+}
+
+func (e OrderingWithChoicesError) Error() string {
+	return "ordering question cannot have choices"
+}
+
+func (e OrderingWithChoicesError) Field() string {
+	return models.Choices
+}
+
+func (e OrderingWithChoicesError) Data() interface{} {
+	return e.Choices
+}
+
+// OrderingWithPairsError is returned when an ordering question carries matching
+// pairs (the structured payloads are mutually exclusive).
+type OrderingWithPairsError struct {
+	Pairs []models.QuestionPair
+}
+
+func (e OrderingWithPairsError) Error() string {
+	return "ordering question cannot have pairs"
+}
+
+func (e OrderingWithPairsError) Field() string {
+	return models.Pairs
+}
+
+func (e OrderingWithPairsError) Data() interface{} {
+	return e.Pairs
+}
+
+// OrderingWithBucketsError is returned when an ordering question carries
+// bucketing child rows (the structured payloads are mutually exclusive).
+type OrderingWithBucketsError struct {
+	Rows      interface{}
+	FieldName string
+}
+
+func (e OrderingWithBucketsError) Error() string {
+	return "ordering question cannot have " + e.FieldName
+}
+
+func (e OrderingWithBucketsError) Field() string {
+	return e.FieldName
+}
+
+func (e OrderingWithBucketsError) Data() interface{} {
+	return e.Rows
+}
+
 // validateQuestionType enforces the per-type payload rules before the row and
 // its children are written. The matrix (tickets #99, #164):
 //
@@ -535,6 +646,8 @@ func (e MultipleChoiceWithBucketsError) Data() interface{} {
 //	bucketing        derived answer; 2+ buckets; 1+ items; bucket texts
 //	                 unique; item texts unique; every item assigned to a
 //	                 declared bucket; choices/pairs empty
+//	ordering         derived answer; prompt required; 2+ items; item texts
+//	                 unique; choices/pairs/buckets/items empty
 func validateQuestionType(data models.Question) error {
 	switch data.QuestionType {
 	case "freeform":
@@ -638,6 +751,34 @@ func validateQuestionType(data models.Question) error {
 			}
 		}
 		return nil
+	case "ordering":
+		if data.Question == "" {
+			return MissingOrderingPromptError{Question: data.Question}
+		}
+		if len(data.Choices) != 0 {
+			return OrderingWithChoicesError{Choices: data.Choices}
+		}
+		if len(data.Pairs) != 0 {
+			return OrderingWithPairsError{Pairs: data.Pairs}
+		}
+		if len(data.Buckets) != 0 {
+			return OrderingWithBucketsError{FieldName: models.Buckets, Rows: data.Buckets}
+		}
+		if len(data.Items) != 0 {
+			return OrderingWithBucketsError{FieldName: models.Items, Rows: data.Items}
+		}
+		if len(data.Ordered) < 2 {
+			return MissingOrderedItemsError{Ordered: data.Ordered}
+		}
+		seen := make(map[string]bool)
+		for _, item := range data.Ordered {
+			text := strings.TrimSpace(item.Text)
+			if seen[text] {
+				return DuplicateOrderedItemTextError{Text: item.Text}
+			}
+			seen[text] = true
+		}
+		return nil
 	default:
 		return InvalidQuestionTypeError{QuestionType: data.QuestionType}
 	}
@@ -646,9 +787,10 @@ func validateQuestionType(data models.Question) error {
 // derivedAnswer renders the question's answer string from its structured child
 // rows — MC = the correct option's text; matching = a "left -> right" string,
 // one mapping per line; bucketing = an "item -> bucket" string, one mapping
-// per line. Used when writing the question row so the stored answer column
-// (and everything that reads it, e.g. the score-time snapshot refresh) carries
-// the derived value. freeform returns the caller-supplied answer.
+// per line; ordering = the canonical item order, one item per line. Used when
+// writing the question row so the stored answer column (and everything that
+// reads it, e.g. the score-time snapshot refresh) carries the derived value.
+// freeform returns the caller-supplied answer.
 func derivedAnswer(data models.Question) string {
 	switch data.QuestionType {
 	case "multiple_choice":
@@ -674,6 +816,15 @@ func derivedAnswer(data models.Question) string {
 				sb.WriteString("\n")
 			}
 			fmt.Fprintf(&sb, "%s -> %s", item.Text, item.Bucket)
+		}
+		return sb.String()
+	case "ordering":
+		var sb strings.Builder
+		for i, item := range data.Ordered {
+			if i > 0 {
+				sb.WriteString("\n")
+			}
+			sb.WriteString(item.Text)
 		}
 		return sb.String()
 	default:
@@ -705,6 +856,9 @@ func replaceQuestionChildren(q common.Queryer, ctx context.Context, data models.
 		return err
 	}
 	if _, err := q.ExecContext(ctx, `DELETE FROM question_bucket_item WHERE question_id = ?`, data.ID); err != nil {
+		return err
+	}
+	if _, err := q.ExecContext(ctx, `DELETE FROM question_ordered WHERE question_id = ?`, data.ID); err != nil {
 		return err
 	}
 
@@ -740,6 +894,14 @@ func replaceQuestionChildren(q common.Queryer, ctx context.Context, data models.
 			if _, err := q.ExecContext(ctx,
 				`INSERT INTO question_bucket_item (question_id, position, text, bucket_text) VALUES (?, ?, ?, ?)`,
 				data.ID, i, item.Text, item.Bucket); err != nil {
+				return err
+			}
+		}
+	} else if data.QuestionType == "ordering" {
+		for i, item := range data.Ordered {
+			if _, err := q.ExecContext(ctx,
+				`INSERT INTO question_ordered (question_id, position, text) VALUES (?, ?, ?)`,
+				data.ID, i, item.Text); err != nil {
 				return err
 			}
 		}
