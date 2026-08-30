@@ -27,6 +27,7 @@ interface Props {
     rights?: string[]
     buckets?: string[]
     items?: string[]
+    ordered?: string[]
 }
 
 interface State {
@@ -76,6 +77,7 @@ class ActiveQuestion extends React.Component<Props, State> {
                              pairs={(this.props.lefts || []).map((left, index) => ({left, right: (this.props.rights || [])[index] || ""}))}
                              buckets={(this.props.buckets || []).map(text => ({text}))}
                              items={(this.props.items || []).map(text => ({text, bucket: ""}))}
+                             ordered={this.props.ordered}
             /> : null
 
 

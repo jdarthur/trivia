@@ -25,6 +25,7 @@ interface Props {
     pairs?: { left: string, right: string }[]
     buckets?: { text: string }[]
     items?: { text: string, bucket: string }[]
+    ordered?: { text: string }[]
 }
 
 class ReadOnlyQuestion extends React.Component<Props> {
@@ -74,6 +75,10 @@ class ReadOnlyQuestion extends React.Component<Props> {
                             </tr>
                         ))}
                     </table> : null}
+                {this.props.question_type === "ordering" && (this.props.ordered || []).length > 0 ?
+                    <ol style={{marginTop: 8, paddingLeft: 18}}>
+                        {(this.props.ordered || []).map((item, index) => <li key={index}>{item.text}</li>)}
+                    </ol> : null}
             </Card>
         );
     }

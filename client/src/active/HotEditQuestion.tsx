@@ -22,6 +22,7 @@ interface Props {
     pairs?: QuestionPair[]
     buckets?: QuestionBucket[]
     items?: QuestionBucketItem[]
+    ordered?: string[]
 }
 
 export default function HotEditQuestion(props: Props) {
@@ -58,6 +59,7 @@ export default function HotEditQuestion(props: Props) {
         return props.question_type === "multiple_choice"
             || props.question_type === "matching"
             || props.question_type === "bucketing"
+            || props.question_type === "ordering"
     }
 
     // Ticket #184: the category can only be changed when the user's categories
@@ -159,6 +161,7 @@ export default function HotEditQuestion(props: Props) {
                            pairs={props.pairs}
                            buckets={props.buckets}
                            items={props.items}
+                           ordered={(props.ordered || []).map(text => ({text}))}
                            disabled={structured()}
                            visible={true}/>
     );

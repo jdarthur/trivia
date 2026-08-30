@@ -2,13 +2,13 @@ import React, {useEffect, useState} from 'react';
 import './Question.css';
 
 import {Input, Modal, Radio, Button, Select, Steps, Popconfirm, Tooltip} from 'antd';
-import {ContainerOutlined, EditOutlined, ExclamationCircleOutlined, MinusCircleOutlined, OrderedListOutlined, SwapOutlined} from '@ant-design/icons';
+import {ContainerOutlined, EditOutlined, ExclamationCircleOutlined, MinusCircleOutlined, OrderedListOutlined, SortAscendingOutlined, SwapOutlined} from '@ant-design/icons';
 import FormattedQuestion from "./FormattedQuestion"
 import EditorToolbar from "./EditorToolbar";
 import {ANSWER, CATEGORY, QUESTION} from "./EditQuestionController";
 import CategorySelect from "../category/CategorySelect";
 import CategoryNote from "../category/CategoryNote";
-import type {QuestionBucket, QuestionBucketItem, QuestionChoice, QuestionPair} from "../types/models";
+import type {QuestionBucket, QuestionBucketItem, QuestionChoice, QuestionOrderedItem, QuestionPair} from "../types/models";
 
 const {TextArea} = Input;
 
@@ -19,6 +19,7 @@ const FREEFORM = "freeform"
 const MULTIPLE_CHOICE = "multiple_choice"
 const MATCHING = "matching"
 const BUCKETING = "bucketing"
+const ORDERING = "ordering"
 
 // Ticket #166: the three steps of the multi-step question editor.
 const STEP_BASIC = 0
@@ -36,6 +37,8 @@ const QUESTION_TYPES = [
      description: "Players match each item on the left with its correct partner on the right."},
     {value: BUCKETING, icon: <ContainerOutlined/>, label: "Bucketing",
      description: "Players sort each item into the bucket it belongs to."},
+    {value: ORDERING, icon: <SortAscendingOutlined/>, label: "Ordering",
+     description: "Players put the items in the correct order; the order you list them is the answer key."},
 ]
 
 interface Props {
@@ -63,6 +66,9 @@ interface Props {
     set_buckets?: (buckets: QuestionBucket[]) => void
     items?: QuestionBucketItem[]
     set_items?: (items: QuestionBucketItem[]) => void
+    // Ticket #213: ordering — the author's entry order is the correct order.
+    ordered?: QuestionOrderedItem[]
+    set_ordered?: (ordered: QuestionOrderedItem[]) => void
     disabled?: boolean
     // Ticket #166: opt into the three-step <Steps /> flow. When false/omitted
     // (e.g. the live in-game hot-edit), the legacy single-view modal renders.
@@ -106,6 +112,7 @@ export default function EditQuestionModal(props: Props) {
             || (props.pairs || []).some(pair => pair.left.trim() !== "" || pair.right.trim() !== "")
             || (props.buckets || []).some(bucket => bucket.text.trim() !== "")
             || (props.items || []).some(item => item.text.trim() !== "")
+            || (props.ordered || []).some(item => item.text.trim() !== "")
     }
 
     const requestTypeChange = (value: string) => {
@@ -127,6 +134,7 @@ export default function EditQuestionModal(props: Props) {
         props.set_pairs?.([])
         props.set_buckets?.([])
         props.set_items?.([])
+        props.set_ordered?.([])
     }
 
     const applyTypeChange = () => {
@@ -259,6 +267,21 @@ export default function EditQuestionModal(props: Props) {
         props.set_items?.((props.items || []).filter((_, i) => i !== index))
     }
 
+    // Ticket #213: ordering — rows are numbered 1..n and their entry order IS
+    // the correct order, so there is no correctness toggle, just text rows.
+    const set_ordered_text = (index: number, value: string) => {
+        const next = (props.ordered || []).map((item, i) => i === index ? {...item, text: value} : item)
+        props.set_ordered?.(next)
+    }
+
+    const add_ordered = () => {
+        props.set_ordered?.([...(props.ordered || []), {text: ""}])
+    }
+
+    const remove_ordered = (index: number) => {
+        props.set_ordered?.((props.ordered || []).filter((_, i) => i !== index))
+    }
+
     const correctIndex = (props.choices || []).findIndex(choice => choice.is_correct)
 
     const freeformView = <div>
@@ -362,9 +385,36 @@ export default function EditQuestionModal(props: Props) {
         </div>
     </div>
 
+    // ordering (ticket #213): a numbered list of items in the author's order —
+    // that entry order is the correct order (the answer key). The position
+    // number is rendered explicitly (index + 1) so it shows regardless of CSS
+    // list-marker behavior on the flex rows.
+    const orderedView = <div>
+        <TextArea autoFocus={!!props.category} placeholder="Question" value={props.question}
+                  style={{marginBottom: 10}} id={QUESTION} onClick={() => setFocusedInput(QUESTION)}
+                  onChange={(event) => props.set_question(event.target.value)} autoSize={{minRows: 4}}
+                  onPressEnter={null as any}/>
+
+        {structuredNote}
+        <div style={{marginBottom: 10}}>
+            <div style={{fontWeight: 600, marginBottom: 4}}>Ordered items (first = correct first)</div>
+            {(props.ordered || []).map((item, index) => (
+                <div key={index} style={{display: "flex", alignItems: "center", marginBottom: 6}}>
+                    <span style={{width: 22, flexShrink: 0}}>{index + 1}.</span>
+                    <Input placeholder="Item" value={item.text} style={{flexGrow: 1}} disabled={props.disabled}
+                           onChange={(event) => set_ordered_text(index, event.target.value)}/>
+                    <MinusCircleOutlined onClick={() => remove_ordered(index)} disabled={props.disabled}
+                                         style={{marginLeft: 8, cursor: "pointer"}}/>
+                </div>
+            ))}
+            <Button size="small" type="dashed" onClick={add_ordered} disabled={props.disabled}> Add item </Button>
+        </div>
+    </div>
+
     const editView = questionType === MULTIPLE_CHOICE ? choicesView :
         questionType === MATCHING ? pairsView :
-        questionType === BUCKETING ? bucketsView : freeformView
+        questionType === BUCKETING ? bucketsView :
+        questionType === ORDERING ? orderedView : freeformView
 
     const previewBody = () => {
         if (questionType === MULTIPLE_CHOICE) {
@@ -399,6 +449,14 @@ export default function EditQuestionModal(props: Props) {
                         </tr>
                     ))}
                 </table>
+            </div>
+        }
+        if (questionType === ORDERING) {
+            return <div>
+                <FormattedQuestion question={props.question} answer={""} max_width={425}/>
+                <ol style={{marginTop: 10, paddingLeft: 20}}>
+                    {(props.ordered || []).map((item, index) => <li key={index}>{item.text}</li>)}
+                </ol>
             </div>
         }
         return <FormattedQuestion question={props.question} answer={props.answer} max_width={425}/>

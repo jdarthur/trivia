@@ -37,6 +37,7 @@ interface State {
     rights: string[]
     buckets: string[]
     items: string[]
+    ordered: string[]
 }
 
 class ActiveGame extends React.Component<Props, State> {
@@ -58,7 +59,8 @@ class ActiveGame extends React.Component<Props, State> {
             lefts: [],
             rights: [],
             buckets: [],
-            items: []
+            items: [],
+            ordered: []
         }
     }
 
@@ -129,7 +131,7 @@ class ActiveGame extends React.Component<Props, State> {
                 question: string, answer: string, category: string, id: number,
                 scored: boolean, scoring_note: string, scoring_note_id: string,
                 question_type: string, choices: string[], lefts: string[], rights: string[],
-                buckets: string[], items: string[]
+                buckets: string[], items: string[], ordered: string[]
             }) => {
                 console.log(q)
                 if (this.currentFetch !== this.fetchCounter) {
@@ -149,6 +151,7 @@ class ActiveGame extends React.Component<Props, State> {
                     rights: q.rights || [],
                     buckets: q.buckets || [],
                     items: q.items || [],
+                    ordered: q.ordered || [],
                 })
             })
             .catch((error) => {
@@ -182,6 +185,7 @@ class ActiveGame extends React.Component<Props, State> {
                                             rights={this.state.rights}
                                             buckets={this.state.buckets}
                                             items={this.state.items}
+                                            ordered={this.state.ordered}
                             />
                         </div>
 
