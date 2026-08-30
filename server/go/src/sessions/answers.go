@@ -76,6 +76,12 @@ func (e *Env) AnswerQuestion(c *gin.Context) {
 			return
 		}
 	}
+	if question.QuestionType == "ordering" {
+		if err := validateOrderingAnswer(question, answer.Answer); err != nil {
+			common.Respond(c, nil, err)
+			return
+		}
+	}
 
 	availableWagers, err := getWagers(e, session, *answer.RoundIndex, answer.PlayerId)
 	if err != nil {
@@ -178,6 +184,39 @@ func validateBucketingAnswer(question models.QuestionInRound, answer string) err
 		if !buckets[bucket] {
 			return InvalidBucketingAnswerError{Answer: answer, Reason: "answer contains an unknown bucket: " + bucket}
 		}
+	}
+	return nil
+}
+
+// validateOrderingAnswer enforces the permutation shape of an ordering answer
+// (ticket #212): the answer must be a JSON array of the question's Ordered
+// item texts, with every item appearing exactly once — a permutation, in the
+// player's final order. A JSON array of the right length whose elements are
+// all known items and none repeated is necessarily a full permutation, so the
+// three checks below cover it. Anything else is rejected with
+// InvalidOrderingAnswerError instead of being stored as a certain miss.
+func validateOrderingAnswer(question models.QuestionInRound, answer string) error {
+	var order []string
+	if err := json.Unmarshal([]byte(answer), &order); err != nil {
+		return InvalidOrderingAnswerError{Answer: answer, Reason: "answer must be a JSON array of item texts in order"}
+	}
+
+	canonical := make(map[string]bool, len(question.Ordered))
+	for _, item := range question.Ordered {
+		canonical[item] = true
+	}
+	if len(order) != len(question.Ordered) {
+		return InvalidOrderingAnswerError{Answer: answer, Reason: "answer must include every item exactly once"}
+	}
+	seen := make(map[string]bool, len(order))
+	for _, item := range order {
+		if !canonical[item] {
+			return InvalidOrderingAnswerError{Answer: answer, Reason: "answer contains an unknown item: " + item}
+		}
+		if seen[item] {
+			return InvalidOrderingAnswerError{Answer: answer, Reason: "each item may appear only once"}
+		}
+		seen[item] = true
 	}
 	return nil
 }

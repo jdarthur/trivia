@@ -1652,6 +1652,80 @@ func TestAnswerRejectsInvalidBucketing(t *testing.T) {
 	}
 }
 
+// TestAnswerRejectsInvalidOrdering verifies ticket #212: the API rejects an
+// ordering answer that isn't a permutation of the question's Ordered items —
+// unknown item, duplicate, missing item, malformed JSON — with a 400 and
+// stores nothing, while any valid permutation (including a non-canonical one)
+// is accepted.
+func TestAnswerRejectsInvalidOrdering(t *testing.T) {
+	env := openSessionTestDB(t)
+	gin.SetMode(gin.TestMode)
+
+	qid := createOrderingQuestion(t, env, []models.QuestionOrderedItem{
+		{Text: "Wyoming"},
+		{Text: "Georgia"},
+		{Text: "Texas"},
+		{Text: "California"},
+	})
+	session, p1, _ := newStructuredSession(t, env, qid)
+
+	post := func(answer string) *httptest.ResponseRecorder {
+		t.Helper()
+		recorder := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(recorder)
+		c.Params = gin.Params{{Key: "id", Value: session.ID}}
+		body, err := json.Marshal(map[string]interface{}{
+			"player_id": string(p1), "answer": answer, "wager": 100,
+			"round_id": 0, "question_id": 0,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		c.Request = httptest.NewRequest(http.MethodPost, "/gameplay/session/"+session.ID+"/answer", bytes.NewReader(body))
+		c.Request.Header.Set("Content-Type", "application/json")
+		env.AnswerQuestion(c)
+		return recorder
+	}
+
+	invalid := map[string]string{
+		"unknown item":   `["Wyoming","Georgia","Texas","Florida"]`,
+		"duplicate item": `["Wyoming","Wyoming","Texas","California"]`,
+		"missing item":   `["Wyoming","Georgia","Texas"]`,
+		"malformed JSON": "Wyoming->Georgia",
+	}
+	for name, answer := range invalid {
+		rec := post(answer)
+		if rec.Code != http.StatusBadRequest {
+			t.Errorf("%s: status = %d, want 400: %s", name, rec.Code, rec.Body.String())
+		}
+		var resp struct {
+			Errors string `json:"errors"`
+		}
+		if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+			t.Fatalf("%s: bad error response %q: %v", name, rec.Body.String(), err)
+		}
+		if resp.Errors == "" {
+			t.Errorf("%s: expected an error, got %s", name, rec.Body.String())
+		}
+	}
+
+	// none of the rejected answers were stored
+	var n int
+	if err := env.Db.QueryRow(`SELECT count(*) FROM answer
+		WHERE session_id = ? AND player_id = ?`, session.ID, string(p1)).Scan(&n); err != nil {
+		t.Fatal(err)
+	}
+	if n != 0 {
+		t.Fatalf("rejected ordering answers were stored: %d rows", n)
+	}
+
+	// any valid permutation — here one that is neither canonical nor reversed —
+	// is accepted (correctness is decided at score time, ticket #212)
+	if rec := post(`["Georgia","Wyoming","California","Texas"]`); rec.Code != http.StatusOK {
+		t.Fatalf("valid permutation answer status = %d, want 200: %s", rec.Code, rec.Body.String())
+	}
+}
+
 // TestAutoScoreBucketing verifies bucketing auto-scoring: only a complete and
 // correct item->bucket mapping scores; partial, wrong, or malformed-JSON
 // answers are incorrect (not an error). Many items may share a bucket.
@@ -1702,6 +1776,66 @@ func TestAutoScoreBucketing(t *testing.T) {
 	}
 	if got[p4].Correct || got[p4].PointsAwarded != 0 {
 		t.Errorf("p4 = correct:%v points:%v, want incorrect (malformed JSON)", got[p4].Correct, got[p4].PointsAwarded)
+	}
+}
+
+// TestAutoScoreOrdering verifies ticket #212: ordering auto-scoring is
+// all-or-nothing — the canonical order scores, the reversed order also scores
+// (players commonly trip over ascending/descending but still reach the
+// "correct" answer, per #207), and any other permutation, a partial answer, or
+// malformed JSON is incorrect. The mod's correct flags are ignored.
+func TestAutoScoreOrdering(t *testing.T) {
+	env := openSessionTestDB(t)
+	qid := createOrderingQuestion(t, env, []models.QuestionOrderedItem{
+		{Text: "Alabama"},
+		{Text: "Alaska"},
+		{Text: "Arizona"},
+		{Text: "California"},
+	})
+	session, p1, p2 := newStructuredSession(t, env, qid)
+	p3 := addPlayerToSession(t, env, session.ID, "team-3")
+	p4 := addPlayerToSession(t, env, session.ID, "team-4")
+	p5 := addPlayerToSession(t, env, session.ID, "team-5")
+
+	addAnswer(t, env, session.ID, p1, `["Alabama","Alaska","Arizona","California"]`, 100) // canonical order
+	addAnswer(t, env, session.ID, p2, `["California","Arizona","Alaska","Alabama"]`, 200)  // reversed order
+	addAnswer(t, env, session.ID, p3, `["Alaska","Alabama","California","Arizona"]`, 300)  // wrong order
+	addAnswer(t, env, session.ID, p4, `["Alabama","Alaska","Arizona"]`, 400)               // partial
+	addAnswer(t, env, session.ID, p5, "not-json", 500)                                     // malformed JSON
+
+	req := models.ScoreRequest{RoundIndex: 0, QuestionIndex: 0, Players: map[models.PlayerId]models.CorrectorNot{
+		p1: {Correct: false},
+		p2: {Correct: false},
+		p3: {Correct: true},
+		p4: {Correct: true},
+		p5: {Correct: true},
+	}}
+	if err := scoreQuestionTx(env, session, req, 0, 0); err != nil {
+		t.Fatal(err)
+	}
+
+	answers, err := latestAnswersForQuestion(env, session.ID, 0, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := map[models.PlayerId]models.Answer{}
+	for _, a := range answers {
+		got[a.PlayerId] = a
+	}
+	if !got[p1].Correct || got[p1].PointsAwarded != 100 {
+		t.Errorf("p1 = correct:%v points:%v, want correct with 100 (canonical order)", got[p1].Correct, got[p1].PointsAwarded)
+	}
+	if !got[p2].Correct || got[p2].PointsAwarded != 200 {
+		t.Errorf("p2 = correct:%v points:%v, want correct with 200 (reversed order)", got[p2].Correct, got[p2].PointsAwarded)
+	}
+	if got[p3].Correct || got[p3].PointsAwarded != 0 {
+		t.Errorf("p3 = correct:%v points:%v, want incorrect (wrong order)", got[p3].Correct, got[p3].PointsAwarded)
+	}
+	if got[p4].Correct || got[p4].PointsAwarded != 0 {
+		t.Errorf("p4 = correct:%v points:%v, want incorrect (partial)", got[p4].Correct, got[p4].PointsAwarded)
+	}
+	if got[p5].Correct || got[p5].PointsAwarded != 0 {
+		t.Errorf("p5 = correct:%v points:%v, want incorrect (malformed JSON)", got[p5].Correct, got[p5].PointsAwarded)
 	}
 }
 
@@ -1851,8 +1985,8 @@ func TestOrderedShuffledForPlayers(t *testing.T) {
 	}
 
 	// once scored, the player's view returns to canonical (answer reveal)
-	addAnswer(t, env, session.ID, p1, `{"1":"Alabama","2":"Alaska","3":"Arizona","4":"California"}`, 100)
-	addAnswer(t, env, session.ID, p2, `{"1":"Alabama","2":"Alaska","3":"Arizona","4":"California"}`, 100)
+	addAnswer(t, env, session.ID, p1, `["Alabama","Alaska","Arizona","California"]`, 100)
+	addAnswer(t, env, session.ID, p2, `["Alabama","Alaska","Arizona","California"]`, 100)
 	req := models.ScoreRequest{RoundIndex: 0, QuestionIndex: 0, Players: map[models.PlayerId]models.CorrectorNot{
 		p1: {Correct: true},
 		p2: {Correct: true},
