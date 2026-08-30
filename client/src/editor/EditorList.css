@@ -1,0 +1,28 @@
+/* Shared layout for the editor list pages (Questions, Categories, Rounds,
+   Collections, Games). Previously .ql_and_filter lived in QuestionList.css,
+   which the other pages only picked up when QuestionList happened to be
+   loaded — importing this file makes the dependency explicit. */
+.ql_and_filter {
+	display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    margin: 5px;
+    flex: 1 1 auto;
+}
+
+/* Container for a table plus its ListPagination. The width cap keeps sparse
+   tables (e.g. Categories) from sprawling across the whole page. width: 100%
+   makes the container stretch to its parent (capped at 1200px) instead of
+   shrinking to the table's content — important on the Questions page, whose
+   scroll.x would otherwise pin the table to the scroll width. */
+.table_and_pager {
+    max-width: 1200px;
+    width: 100%;
+}
+
+/* The pager under a table: right-aligned by default, like antd tables. */
+.list-pagination {
+    display: flex;
+    justify-content: flex-end;
+    padding: 10px 5px;
+}

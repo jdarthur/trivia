@@ -35,7 +35,7 @@ export default function ListPagination(props: Props) {
     const rangeStart = meta.total === 0 ? 0 : meta.page * props.pageSize + 1
     const rangeEnd = Math.min((meta.page + 1) * props.pageSize, meta.total)
 
-    return <div style={{display: "flex", justifyContent: "flex-end", padding: "10px 5px"}}>
+    return <div className="list-pagination">
         <Pagination
             current={props.page + 1}
             pageSize={props.pageSize}

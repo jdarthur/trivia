@@ -1,5 +1,6 @@
 import React from 'react';
 import '../round/RoundList.css';
+import '../editor/EditorList.css';
 
 import Game from "./Game"
 import OpenGame from "./OpenGame"

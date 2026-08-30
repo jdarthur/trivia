@@ -10,6 +10,7 @@ import PageHeader from "../common/PageHeader";
 import RoundModal from "./RoundModal";
 import {useDeleteRoundMutation, useGetRoundsQuery} from "../api/main";
 import {useClampToFirstPage, useListFilters} from "../editor/useListFilters";
+import '../editor/EditorList.css';
 import notify, {errorMessage} from "../common/notify";
 import type {Round} from "../types/models";
 
@@ -89,9 +90,9 @@ export default function RoundList(props: Props) {
 
     const modal = <RoundModal visible={modalOpen} setVisible={setModalOpen} round={editing}/>
 
-    const table_and_pager = <div>
+    const table_and_pager = <div className="table_and_pager">
         <Table columns={columns} dataSource={rounds} pagination={false}
-               size="small" style={{maxWidth: 1500}} rowKey="id"/>
+               size="small" rowKey="id"/>
         <ListPagination meta={data} page={filters.page} pageSize={filters.pageSize}
                         set_page={filters.setPage} set_page_size={filters.setPageSize}/>
     </div>
