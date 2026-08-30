@@ -166,6 +166,34 @@ async function seedStartableBucketingGame(request: APIRequestContext, prefix: st
   return { gameId, roundId, qids: [q1, q2] };
 }
 
+// Create an ordering question (ticket #213): the author's entry order is the
+// correct order; the player-facing `ordered` column is shuffled pre-score
+// (ticket #211).
+async function createOrderingQuestion(request: APIRequestContext, category: string, question: string, orderedTexts: string[]): Promise<string> {
+  const categoryId = await createCategory(request, category);
+  const res = await request.post('/editor/question', {
+    headers: { 'borttrivia-token': token },
+    data: {
+      category: categoryId,
+      question,
+      answer: '',
+      question_type: 'ordering',
+      ordered: orderedTexts.map(text => ({ text })),
+    },
+  });
+  expect(res.ok()).toBeTruthy();
+  return (await res.json()).id;
+}
+
+// Seed a startable game whose first question is ordering (ticket #214).
+async function seedStartableOrderingGame(request: APIRequestContext, prefix: string) {
+  const q1 = await createOrderingQuestion(request, `e2e-cat-${prefix}`, `Ordering question ${prefix}`, ['First', 'Second', 'Third']);
+  const q2 = await createQuestion(request, `e2e-cat-${prefix}`, `Second question ${prefix}`, 'Answer two');
+  const roundId = await createRound(request, `e2e-round-${prefix}`, [q1, q2], [100, 200]);
+  const gameId = await createGame(request, `e2e-game-${prefix}`, roundId);
+  return { gameId, roundId, qids: [q1, q2] };
+}
+
 // Create a session for the game; the response carries the mod's player id.
 async function createSession(request: APIRequestContext, name: string, gameId: string) {
   const res = await request.post('/gameplay/session', { data: { name, game_id: gameId } });
@@ -1140,6 +1168,79 @@ test.describe('gameplay navigation, hot-edit, spectator & edge cases', () => {
         return answers[answers.length - 1]?.correct;
       })
       .toBe(true);
+
+    await playerContext.close();
+    await modContext.close();
+    await cleanup(request, seeded, { sessionId, modId, playerIds: [playerId] });
+  });
+
+  test('ordering: a player reorders the shuffled items and the answer posts as a JSON array', async ({
+    browser,
+    request,
+  }) => {
+    test.setTimeout(90000);
+    const prefix = unique();
+    const seeded = await seedStartableOrderingGame(request, prefix);
+    const { sessionId, modId } = await createSession(request, `e2e-session-${prefix}`, seeded.gameId);
+
+    const { context: modContext, page: modPage } = await openModLobby(browser, sessionId, modId);
+    const { context: playerContext, page: playerPage, playerId } = await joinPlayer(
+      browser,
+      sessionId,
+      `Team ${prefix}`,
+      `Player ${prefix}`,
+    );
+    await modPage.locator('.start-button').click();
+    await expect(modPage.locator('.active-game')).toBeVisible({ timeout: 30000 });
+    await expect(playerPage.locator('.active-game')).toBeVisible({ timeout: 30000 });
+
+    // The player's answer card shows the reorder grid, seeded from the
+    // (deterministically) shuffled order of the canonical First/Second/Third.
+    const card = playerPage.locator('.answer-card');
+    const rows = card.locator('.ordered-answer-row');
+    await expect(rows).toHaveCount(3, { timeout: 30000 });
+
+    const rowTexts = () => rows.locator('.ordered-answer-text').allTextContents();
+    const initial = await rowTexts();
+    expect(new Set(initial)).toEqual(new Set(['First', 'Second', 'Third']));
+
+    // Move the second row up: it swaps with the first row (whatever the
+    // shuffle produced), and the row that reaches the top loses its (now
+    // pointless) up button.
+    const movedUp = initial[1];
+    await rows.nth(1).getByRole('button', { name: `Move ${movedUp} up` }).click();
+    const afterSwap = await rowTexts();
+    expect(afterSwap[0]).toBe(movedUp);
+    expect(afterSwap[1]).toBe(initial[0]);
+    await expect(rows.nth(0).getByRole('button', { name: `Move ${movedUp} up` })).toBeDisabled();
+    await expect(rows.nth(0).getByRole('button', { name: `Move ${movedUp} down` })).toBeEnabled();
+
+    // Pick a wager and submit.
+    await card.locator('.ant-radio-button-wrapper').filter({ hasText: '100' }).click();
+    const answerButton = card.getByRole('button', { name: 'Answer', exact: true });
+    await expect(answerButton).toBeEnabled();
+    await answerButton.click();
+
+    // The stored answer is the player's final order as a JSON array.
+    await expect
+      .poll(async () => (await playerAnswers(request, sessionId, modId, playerId, 0, 0)).length)
+      .toBe(1);
+    const submitted = (await playerAnswers(request, sessionId, modId, playerId, 0, 0))[0].answer;
+    expect(JSON.parse(submitted)).toEqual(afterSwap);
+
+    // Re-submitting updates the answer: move the last row up, then Update.
+    const lastText = ((await rows.nth(2).locator('.ordered-answer-text').textContent()) ?? '').trim();
+    await rows.nth(2).getByRole('button', { name: `Move ${lastText} up` }).click();
+    const reordered = await rowTexts();
+    const updateButton = card.getByRole('button', { name: 'Update', exact: true });
+    await expect(updateButton).toBeEnabled();
+    await updateButton.click();
+
+    await expect
+      .poll(async () => (await playerAnswers(request, sessionId, modId, playerId, 0, 0)).length)
+      .toBe(2);
+    const updated = (await playerAnswers(request, sessionId, modId, playerId, 0, 0))[1].answer;
+    expect(JSON.parse(updated)).toEqual(reordered);
 
     await playerContext.close();
     await modContext.close();
