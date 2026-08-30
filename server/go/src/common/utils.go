@@ -274,11 +274,12 @@ func getQuestion(db *sql.DB, id string, m *models.Question) error {
 }
 
 // loadQuestionChildren fills a question's structured child rows (choices for
-// multiple_choice, pairs for matching, buckets + items for bucketing) from the
-// normalized child tables, ordered by position. For structured types it also
-// derives the answer string from the child rows — MC = the correct option's
-// text; matching = a rendered "left -> right" string, one mapping per line;
-// bucketing = a rendered "item -> bucket" string, one mapping per line — so
+// multiple_choice, pairs for matching, buckets + items for bucketing, ordered
+// items for ordering) from the normalized child tables, ordered by position.
+// For structured types it also derives the answer string from the child rows —
+// MC = the correct option's text; matching = a rendered "left -> right" string,
+// one mapping per line; bucketing = a rendered "item -> bucket" string, one
+// mapping per line; ordering = the canonical order, one item per line — so
 // every existing consumer (FormattedQuestion, scorer display, score-time
 // snapshot refresh) keeps working.
 func loadQuestionChildren(db *sql.DB, m *models.Question) error {
@@ -355,6 +356,24 @@ func loadQuestionChildren(db *sql.DB, m *models.Question) error {
 		return err
 	}
 
+	m.Ordered = make([]models.QuestionOrderedItem, 0)
+	rows, err = db.Query(`SELECT text FROM question_ordered
+		WHERE question_id = ? ORDER BY position`, m.ID)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var text string
+		if err := rows.Scan(&text); err != nil {
+			return err
+		}
+		m.Ordered = append(m.Ordered, models.QuestionOrderedItem{Text: text})
+	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
+
 	if m.QuestionType == "multiple_choice" {
 		for _, c := range m.Choices {
 			if c.IsCorrect {
@@ -378,6 +397,15 @@ func loadQuestionChildren(db *sql.DB, m *models.Question) error {
 				sb.WriteString("\n")
 			}
 			fmt.Fprintf(&sb, "%s -> %s", item.Text, item.Bucket)
+		}
+		m.Answer = sb.String()
+	} else if m.QuestionType == "ordering" {
+		var sb strings.Builder
+		for i, item := range m.Ordered {
+			if i > 0 {
+				sb.WriteString("\n")
+			}
+			sb.WriteString(item.Text)
 		}
 		m.Answer = sb.String()
 	}

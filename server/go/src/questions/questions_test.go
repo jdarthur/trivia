@@ -249,6 +249,81 @@ func TestCreateQuestionValidationMatrix(t *testing.T) {
 		t.Fatalf("bucketing create: %v", err)
 	}
 
+	// ordering: missing prompt rejected
+	if _, err := CreateOneQuestion(env, userId, models.Question{
+		QuestionType: "ordering",
+		Ordered:      []models.QuestionOrderedItem{{Text: "A"}, {Text: "B"}},
+	}); err == nil {
+		t.Error("expected MissingOrderingPromptError for ordering without prompt")
+	} else if _, ok := err.(MissingOrderingPromptError); !ok {
+		t.Errorf("expected MissingOrderingPromptError, got %T: %v", err, err)
+	}
+	// ordering: fewer than two items rejected
+	if _, err := CreateOneQuestion(env, userId, models.Question{
+		Question: "q?", QuestionType: "ordering",
+		Ordered: []models.QuestionOrderedItem{{Text: "A"}},
+	}); err == nil {
+		t.Error("expected MissingOrderedItemsError for a single item")
+	} else if _, ok := err.(MissingOrderedItemsError); !ok {
+		t.Errorf("expected MissingOrderedItemsError, got %T: %v", err, err)
+	}
+	// ordering: duplicate item text rejected
+	if _, err := CreateOneQuestion(env, userId, models.Question{
+		Question: "q?", QuestionType: "ordering",
+		Ordered: []models.QuestionOrderedItem{{Text: "A"}, {Text: "A"}},
+	}); err == nil {
+		t.Error("expected DuplicateOrderedItemTextError for duplicate item")
+	} else if _, ok := err.(DuplicateOrderedItemTextError); !ok {
+		t.Errorf("expected DuplicateOrderedItemTextError, got %T: %v", err, err)
+	}
+	// ordering: choices rejected (mutually exclusive payloads)
+	if _, err := CreateOneQuestion(env, userId, models.Question{
+		Question: "q?", QuestionType: "ordering",
+		Ordered: []models.QuestionOrderedItem{{Text: "A"}, {Text: "B"}},
+		Choices: []models.QuestionChoice{{Text: "A", IsCorrect: true}},
+	}); err == nil {
+		t.Error("expected OrderingWithChoicesError")
+	} else if _, ok := err.(OrderingWithChoicesError); !ok {
+		t.Errorf("expected OrderingWithChoicesError, got %T: %v", err, err)
+	}
+	// ordering: pairs rejected (mutually exclusive payloads)
+	if _, err := CreateOneQuestion(env, userId, models.Question{
+		Question: "q?", QuestionType: "ordering",
+		Ordered: []models.QuestionOrderedItem{{Text: "A"}, {Text: "B"}},
+		Pairs:   []models.QuestionPair{{Left: "L", Right: "R"}},
+	}); err == nil {
+		t.Error("expected OrderingWithPairsError")
+	} else if _, ok := err.(OrderingWithPairsError); !ok {
+		t.Errorf("expected OrderingWithPairsError, got %T: %v", err, err)
+	}
+	// ordering: buckets rejected (mutually exclusive payloads)
+	if _, err := CreateOneQuestion(env, userId, models.Question{
+		Question: "q?", QuestionType: "ordering",
+		Ordered: []models.QuestionOrderedItem{{Text: "A"}, {Text: "B"}},
+		Buckets: []models.QuestionBucket{{Text: "B1"}, {Text: "B2"}},
+	}); err == nil {
+		t.Error("expected OrderingWithBucketsError for buckets")
+	} else if _, ok := err.(OrderingWithBucketsError); !ok {
+		t.Errorf("expected OrderingWithBucketsError, got %T: %v", err, err)
+	}
+	// ordering: items rejected (mutually exclusive payloads)
+	if _, err := CreateOneQuestion(env, userId, models.Question{
+		Question: "q?", QuestionType: "ordering",
+		Ordered: []models.QuestionOrderedItem{{Text: "A"}, {Text: "B"}},
+		Items:   []models.QuestionBucketItem{{Text: "I", Bucket: "B1"}},
+	}); err == nil {
+		t.Error("expected OrderingWithBucketsError for items")
+	} else if _, ok := err.(OrderingWithBucketsError); !ok {
+		t.Errorf("expected OrderingWithBucketsError, got %T: %v", err, err)
+	}
+	// ordering: valid
+	if _, err := CreateOneQuestion(env, userId, models.Question{
+		Question: "q?", QuestionType: "ordering",
+		Ordered: []models.QuestionOrderedItem{{Text: "A"}, {Text: "B"}, {Text: "C"}},
+	}); err != nil {
+		t.Fatalf("ordering create: %v", err)
+	}
+
 	// matching: buckets rejected (mutually exclusive payloads)
 	if _, err := CreateOneQuestion(env, userId, models.Question{
 		Question: "q?", QuestionType: "matching",
@@ -379,6 +454,28 @@ func TestCreateQuestionDerivedAnswer(t *testing.T) {
 	if len(got.Choices) != 0 || len(got.Pairs) != 0 {
 		t.Errorf("bucketing should have no choices/pairs, got %+v %+v", got.Choices, got.Pairs)
 	}
+
+	ord, err := CreateOneQuestion(env, userId, models.Question{
+		Question: "q?", QuestionType: "ordering",
+		Ordered: []models.QuestionOrderedItem{{Text: "Alabama"}, {Text: "Alaska"}, {Text: "Arizona"}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err = GetOneQuestion(env, userId, ord.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want = "Alabama\nAlaska\nArizona"
+	if got.Answer != want {
+		t.Errorf("ordering derived answer = %q, want %q", got.Answer, want)
+	}
+	if len(got.Ordered) != 3 || got.Ordered[0].Text != "Alabama" || got.Ordered[2].Text != "Arizona" {
+		t.Errorf("ordering items not loaded in order: %+v", got.Ordered)
+	}
+	if len(got.Choices) != 0 || len(got.Pairs) != 0 {
+		t.Errorf("ordering should have no choices/pairs, got %+v %+v", got.Choices, got.Pairs)
+	}
 }
 
 // TestUpdateQuestionTypeChangeReplacesChildren verifies changing a question's
@@ -476,6 +573,50 @@ func TestUpdateQuestionTypeChangeReplacesChildren(t *testing.T) {
 	got, _ = GetOneQuestion(env, userId, q.ID)
 	if got.QuestionType != "bucketing" || got.Answer != "I1 -> B1\nI2 -> B2" {
 		t.Errorf("bucketing update readback: type=%s answer=%q", got.QuestionType, got.Answer)
+	}
+
+	// bucketing -> ordering: ordered items written, buckets/items/choices/pairs cleared
+	if _, err := UpdateOneQuestion(env, userId, q.ID, QuestionUpdate{
+		QuestionType: "ordering",
+		Ordered:      []models.QuestionOrderedItem{{Text: "A"}, {Text: "B"}, {Text: "C"}},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if n := countChildren(t, env.Db, "question_ordered", q.ID); n != 3 {
+		t.Errorf("after ordering update, ordered = %d, want 3", n)
+	}
+	if n := countChildren(t, env.Db, "question_bucket", q.ID); n != 0 {
+		t.Errorf("after ordering update, buckets = %d, want 0", n)
+	}
+	if n := countChildren(t, env.Db, "question_bucket_item", q.ID); n != 0 {
+		t.Errorf("after ordering update, items = %d, want 0", n)
+	}
+	if n := countChildren(t, env.Db, "question_match", q.ID); n != 0 {
+		t.Errorf("after ordering update, matches = %d, want 0", n)
+	}
+	got, _ = GetOneQuestion(env, userId, q.ID)
+	if got.QuestionType != "ordering" || got.Answer != "A\nB\nC" {
+		t.Errorf("ordering update readback: type=%s answer=%q", got.QuestionType, got.Answer)
+	}
+
+	// ordering -> freeform: ordered cleared, answer set
+	if _, err := UpdateOneQuestion(env, userId, q.ID, QuestionUpdate{
+		QuestionType: "freeform", Question: "q2", Answer: "new answer",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if n := countChildren(t, env.Db, "question_ordered", q.ID); n != 0 {
+		t.Errorf("after freeform update, ordered = %d, want 0", n)
+	}
+	if n := countChildren(t, env.Db, "question_choice", q.ID); n != 0 {
+		t.Errorf("after freeform update, choices = %d, want 0", n)
+	}
+	if n := countChildren(t, env.Db, "question_match", q.ID); n != 0 {
+		t.Errorf("after freeform update, matches = %d, want 0", n)
+	}
+	got, _ = GetOneQuestion(env, userId, q.ID)
+	if got.QuestionType != "freeform" || got.Answer != "new answer" {
+		t.Errorf("freeform update readback: type=%s answer=%q", got.QuestionType, got.Answer)
 	}
 }
 
