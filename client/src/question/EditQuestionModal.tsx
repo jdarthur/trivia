@@ -3,7 +3,7 @@ import './Question.css';
 
 import {Input, Modal, Radio, Button, Select, Steps, Popconfirm, Tooltip} from 'antd';
 import {ContainerOutlined, EditOutlined, ExclamationCircleOutlined, MinusCircleOutlined, OrderedListOutlined, SortAscendingOutlined, SwapOutlined} from '@ant-design/icons';
-import FormattedQuestion from "./FormattedQuestion"
+import QuestionBody from "./QuestionBody"
 import EditorToolbar from "./EditorToolbar";
 import {ANSWER, CATEGORY, QUESTION} from "./EditQuestionController";
 import CategorySelect from "../category/CategorySelect";
@@ -90,6 +90,9 @@ export default function EditQuestionModal(props: Props) {
     const [focusedInput, setFocusedInput] = useState(CATEGORY)
     const [confirmTypeChange, setConfirmTypeChange] = useState(false)
     const [pendingType, setPendingType] = useState<string | null>(null)
+    // Preview: by default show the question as players will see it (no answer,
+    // no grading); "Show answer" reveals the scored in-game view.
+    const [showAnswer, setShowAnswer] = useState(false)
 
     // Ticket #166: reset to the first step whenever the modal is (re)opened so
     // the editor always starts at "Basic info".
@@ -97,6 +100,7 @@ export default function EditQuestionModal(props: Props) {
         if (props.visible) {
             setConfirmTypeChange(false)
             setPendingType(null)
+            setShowAnswer(false)
         }
     }, [props.visible])
 
@@ -416,50 +420,32 @@ export default function EditQuestionModal(props: Props) {
         questionType === BUCKETING ? bucketsView :
         questionType === ORDERING ? orderedView : freeformView
 
+    // The preview shows the question as it will appear to players (no answer,
+    // no grading), with a "Show answer" toggle that reveals the scored in-game
+    // view — ✅/❌ on multiple-choice options, the answer line for freeform.
+    // For matching/bucketing/ordering the structured lists themselves are the
+    // answer key, so they render unchanged. Rendered via the same QuestionBody
+    // the editor's read-only question cards use, so the preview can't drift
+    // from the in-game look.
     const previewBody = () => {
-        if (questionType === MULTIPLE_CHOICE) {
-            return <div>
-                <FormattedQuestion question={props.question} answer={""} max_width={425}/>
-                <ol style={{marginTop: 10, paddingLeft: 20}}>
-                    {(props.choices || []).map((choice, index) => <li key={index}>{choice.text}</li>)}
-                </ol>
+        return <div>
+            <QuestionBody question={props.question}
+                          answer={props.answer}
+                          question_type={questionType}
+                          choices={props.choices}
+                          pairs={props.pairs}
+                          buckets={props.buckets}
+                          items={props.items}
+                          ordered={props.ordered}
+                          max_width={425}
+                          scored={showAnswer}
+                          show_answer={showAnswer}/>
+            <div style={{marginTop: 8}}>
+                <a onClick={() => setShowAnswer(!showAnswer)} style={{fontSize: 12}}>
+                    {showAnswer ? "Hide answer" : "Show answer"}
+                </a>
             </div>
-        }
-        if (questionType === MATCHING) {
-            return <div>
-                <FormattedQuestion question={props.question} answer={""} max_width={425}/>
-                <table style={{marginTop: 10, borderCollapse: "collapse"}}>
-                    {(props.pairs || []).map((pair, index) => (
-                        <tr key={index}>
-                            <td style={{border: "1px solid #d9d9d9", padding: "4px 8px"}}>{pair.left}</td>
-                            <td style={{border: "1px solid #d9d9d9", padding: "4px 8px"}}>{pair.right}</td>
-                        </tr>
-                    ))}
-                </table>
-            </div>
-        }
-        if (questionType === BUCKETING) {
-            return <div>
-                <FormattedQuestion question={props.question} answer={""} max_width={425}/>
-                <table style={{marginTop: 10, borderCollapse: "collapse"}}>
-                    {(props.items || []).map((item, index) => (
-                        <tr key={index}>
-                            <td style={{border: "1px solid #d9d9d9", padding: "4px 8px"}}>{item.text}</td>
-                            <td style={{border: "1px solid #d9d9d9", padding: "4px 8px"}}>{item.bucket}</td>
-                        </tr>
-                    ))}
-                </table>
-            </div>
-        }
-        if (questionType === ORDERING) {
-            return <div>
-                <FormattedQuestion question={props.question} answer={""} max_width={425}/>
-                <ol style={{marginTop: 10, paddingLeft: 20}}>
-                    {(props.ordered || []).map((item, index) => <li key={index}>{item.text}</li>)}
-                </ol>
-            </div>
-        }
-        return <FormattedQuestion question={props.question} answer={props.answer} max_width={425}/>
+        </div>
     }
 
     const view = selectedTab === EDIT ? editView :

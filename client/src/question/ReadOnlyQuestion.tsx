@@ -1,7 +1,7 @@
 import React from 'react';
 import { Card } from 'antd';
 
-import FormattedQuestion from "./FormattedQuestion";
+import QuestionBody from "./QuestionBody";
 import CategoryName from "../category/CategoryName";
 
 import {
@@ -51,34 +51,16 @@ class ReadOnlyQuestion extends React.Component<Props> {
             // (ticket #180); the card title resolves it to the name.
             <Card title={<CategoryName id={this.props.category}/>} size="small" extra={edit}
                 style={{ width: 225, margin: 5, background: background, cursor: cursor }}>
-                <FormattedQuestion question={this.props.question}
-                    answer={this.props.answer} max_width={200} />
-                {this.props.question_type === "multiple_choice" && (this.props.choices || []).length > 0 ?
-                    <ol style={{marginTop: 8, paddingLeft: 18}}>
-                        {(this.props.choices || []).map((choice, index) => <li key={index}>{choice.text}</li>)}
-                    </ol> : null}
-                {this.props.question_type === "matching" && (this.props.pairs || []).length > 0 ?
-                    <table style={{marginTop: 8, borderCollapse: "collapse"}}>
-                        {(this.props.pairs || []).map((pair, index) => (
-                            <tr key={index}>
-                                <td style={{border: "1px solid #d9d9d9", padding: "2px 6px"}}>{pair.left}</td>
-                                <td style={{border: "1px solid #d9d9d9", padding: "2px 6px"}}>{pair.right}</td>
-                            </tr>
-                        ))}
-                    </table> : null}
-                {this.props.question_type === "bucketing" && (this.props.items || []).length > 0 ?
-                    <table style={{marginTop: 8, borderCollapse: "collapse"}}>
-                        {(this.props.items || []).map((item, index) => (
-                            <tr key={index}>
-                                <td style={{border: "1px solid #d9d9d9", padding: "2px 6px"}}>{item.text}</td>
-                                <td style={{border: "1px solid #d9d9d9", padding: "2px 6px"}}>{item.bucket}</td>
-                            </tr>
-                        ))}
-                    </table> : null}
-                {this.props.question_type === "ordering" && (this.props.ordered || []).length > 0 ?
-                    <ol style={{marginTop: 8, paddingLeft: 18}}>
-                        {(this.props.ordered || []).map((item, index) => <li key={index}>{item.text}</li>)}
-                    </ol> : null}
+                <QuestionBody question={this.props.question}
+                              answer={this.props.answer}
+                              question_type={this.props.question_type}
+                              choices={this.props.choices}
+                              pairs={this.props.pairs}
+                              buckets={this.props.buckets}
+                              items={this.props.items}
+                              ordered={this.props.ordered}
+                              max_width={200}
+                              show_answer/>
             </Card>
         );
     }

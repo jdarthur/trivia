@@ -287,6 +287,19 @@ editorTest.describe('question type change (ticket #166)', () => {
     await modal.getByRole('button', { name: 'Next', exact: true }).click();
     await expect(modal.getByRole('button', { name: 'Add', exact: true })).toBeVisible();
 
+    // The preview defaults to the player view: options without grading marks.
+    await expect(modal.getByText('Option A', { exact: true })).toBeVisible();
+    await expect(modal.getByText('Option B', { exact: true })).toBeVisible();
+    await expect(modal.getByText('✅')).toHaveCount(0);
+    await expect(modal.getByText('❌')).toHaveCount(0);
+
+    // "Show answer" reveals the scored in-game view: the correct option marked
+    // ✅ + bold, every other option ❌.
+    await modal.getByText('Show answer').click();
+    await expect(modal.getByText('✅ Option A')).toBeVisible();
+    await expect(modal.getByText('❌ Option B')).toBeVisible();
+    await expect(modal.getByText('Hide answer')).toBeVisible();
+
     // Dismiss without saving (the form is empty, so the X button just closes).
     await modal.locator('.ant-modal-close').click();
     await expect(modal).toBeHidden();
