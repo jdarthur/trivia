@@ -1,4 +1,4 @@
-import { expect, test, type APIRequestContext, type BrowserContext, type Page } from '@playwright/test';
+import { expect, test, type APIRequestContext, type BrowserContext, type Locator, type Page } from '@playwright/test';
 
 // Gameplay e2e (ticket #109): lobby + session start, first slice of the
 // single-session suite. Unlike the editor suites, gameplay is anonymous and
@@ -369,6 +369,33 @@ test.describe('gameplay lobby & session start', () => {
 // The player's answer card: the Card wrapping the "Your answer" textarea.
 function playerAnswerCard(page: Page) {
   return page.locator('.ant-card').filter({ has: page.locator('textarea[placeholder="Your answer"]') });
+}
+
+// Drive the ordering reorder grid (ticket #214) to a target order: for each
+// position, find the item that belongs there and keep clicking its row's up
+// button until it lands at that position. The grid always holds a permutation
+// of the items, so the target is always reachable. If the shuffle already
+// matched the target (no moves needed), nudge the first item down and back so
+// the answer counts as edited and the submit button enables.
+async function reorderGridTo(card: Locator, target: string[]) {
+  const rows = card.locator('.ordered-answer-row');
+  let moved = false;
+  for (let pos = 0; pos < target.length; pos++) {
+    const wanted = target[pos];
+    for (;;) {
+      const texts = (await rows.locator('.ordered-answer-text').allTextContents()).map((t) => t.trim());
+      const idx = texts.indexOf(wanted);
+      if (idx === pos) break;
+      expect(idx).toBeGreaterThan(pos);
+      await rows.nth(idx).getByRole('button', { name: `Move ${wanted} up` }).click();
+      moved = true;
+    }
+  }
+  if (!moved) {
+    const texts = (await rows.locator('.ordered-answer-text').allTextContents()).map((t) => t.trim());
+    await rows.nth(0).getByRole('button', { name: `Move ${texts[0]} down` }).click();
+    await rows.nth(1).getByRole('button', { name: `Move ${texts[0]} up` }).click();
+  }
 }
 
 // Read the mod's view of answers for one question (round/question indices).
@@ -1241,6 +1268,144 @@ test.describe('gameplay navigation, hot-edit, spectator & edge cases', () => {
       .toBe(2);
     const updated = (await playerAnswers(request, sessionId, modId, playerId, 0, 0))[1].answer;
     expect(JSON.parse(updated)).toEqual(reordered);
+
+    await playerContext.close();
+    await modContext.close();
+    await cleanup(request, seeded, { sessionId, modId, playerIds: [playerId] });
+  });
+
+  test('ordering: canonical, reversed and wrong orders auto-score correctly', async ({ browser, request }) => {
+    test.setTimeout(120000);
+    const prefix = unique();
+    const seeded = await seedStartableOrderingGame(request, prefix);
+    const { sessionId, modId } = await createSession(request, `e2e-session-${prefix}`, seeded.gameId);
+
+    const { context: modContext, page: modPage } = await openModLobby(browser, sessionId, modId);
+    const p1 = await joinPlayer(browser, sessionId, `Team A ${prefix}`, `Player A ${prefix}`);
+    const p2 = await joinPlayer(browser, sessionId, `Team B ${prefix}`, `Player B ${prefix}`);
+    const p3 = await joinPlayer(browser, sessionId, `Team C ${prefix}`, `Player C ${prefix}`);
+
+    await modPage.locator('.start-button').click();
+    await expect(modPage.locator('.active-game')).toBeVisible({ timeout: 30000 });
+    for (const p of [p1, p2, p3]) {
+      await expect(p.page.locator('.active-game')).toBeVisible({ timeout: 30000 });
+    }
+
+    // Each player reorders the (shuffled) grid to their chosen answer, picks a
+    // wager and submits: canonical, reversed (accepted per ticket #212) and a
+    // wrong order.
+    const submit = async (player: { page: Page; playerId: string }, order: string[]) => {
+      const card = player.page.locator('.answer-card');
+      await reorderGridTo(card, order);
+      await card.locator('.ant-radio-button-wrapper').filter({ hasText: '100' }).click();
+      const answerButton = card.getByRole('button', { name: 'Answer', exact: true });
+      await expect(answerButton).toBeEnabled();
+      await answerButton.click();
+
+      await expect
+        .poll(async () => (await playerAnswers(request, sessionId, modId, player.playerId, 0, 0)).length)
+        .toBe(1);
+      const stored = (await playerAnswers(request, sessionId, modId, player.playerId, 0, 0))[0].answer;
+      expect(JSON.parse(stored)).toEqual(order);
+    };
+
+    await submit(p1, ['First', 'Second', 'Third']); // canonical
+    await submit(p2, ['Third', 'Second', 'First']); // reversed
+    await submit(p3, ['Second', 'First', 'Third']); // wrong
+
+    // Ordering is auto-scored by the backend (ticket #212), so the mod's
+    // scorer has no manual correct/incorrect buttons — the Score button is
+    // all that's needed.
+    const scoreButton = modPage.locator('.player-scorer').getByRole('button', { name: 'Score', exact: true });
+    await expect(scoreButton).toBeEnabled({ timeout: 30000 });
+    await scoreButton.click();
+
+    // Scoring commits atomically; the canonical player's wager (100) landing
+    // confirms it finished. correct=false is omitted by the answers API
+    // (models.Answer), so correctness is asserted via the awarded points:
+    // canonical and reversed orders score their wager, a wrong order scores 0.
+    const latestPoints = async (playerId: string) => {
+      const answers = await playerAnswers(request, sessionId, modId, playerId, 0, 0);
+      const latest = answers[answers.length - 1];
+      return latest ? (latest.points_awarded ?? 0) : undefined;
+    };
+    await expect.poll(() => latestPoints(p1.playerId)).toBe(100); // canonical order correct
+    await expect.poll(() => latestPoints(p2.playerId)).toBe(100); // reversed order correct
+
+    // Wrong order: the scoreboard stays at 0 for that team (the end-to-end
+    // check, mirroring the freeform incorrect-answer test).
+    await expect(
+      modPage.locator('.scoreboard .ant-card').filter({ hasText: `Team C ${prefix}` }),
+    ).toContainText('0', { timeout: 30000 });
+
+    await p1.context.close();
+    await p2.context.close();
+    await p3.context.close();
+    await modContext.close();
+    await cleanup(request, seeded, { sessionId, modId, playerIds: [p1.playerId, p2.playerId, p3.playerId] });
+  });
+
+  test('ordering: mod sees a shuffled list pre-score, canonical post-score, and numbered scorer answers', async ({
+    browser,
+    request,
+  }) => {
+    test.setTimeout(90000);
+    const prefix = unique();
+    const seeded = await seedStartableOrderingGame(request, prefix);
+    const { sessionId, modId } = await createSession(request, `e2e-session-${prefix}`, seeded.gameId);
+
+    const { context: modContext, page: modPage } = await openModLobby(browser, sessionId, modId);
+    const { context: playerContext, page: playerPage, playerId } = await joinPlayer(
+      browser,
+      sessionId,
+      `Team ${prefix}`,
+      `Player ${prefix}`,
+    );
+    await modPage.locator('.start-button').click();
+    await expect(modPage.locator('.active-game')).toBeVisible({ timeout: 30000 });
+    await expect(playerPage.locator('.active-game')).toBeVisible({ timeout: 30000 });
+
+    const modBox = modPage.locator('.active-question-box');
+
+    // Pre-score (ticket #215): the mod's question box lists the ordering items
+    // in a shuffled order — the server serves the mod the canonical order, so
+    // the client shows a deterministic shuffle, always a permutation.
+    const modItems = modBox.locator('ol li');
+    await expect(modItems).toHaveCount(3, { timeout: 30000 });
+    const preScore = (await modItems.allTextContents()).map((t) => t.trim());
+    expect(new Set(preScore)).toEqual(new Set(['First', 'Second', 'Third']));
+
+    // The player submits the canonical order.
+    const card = playerPage.locator('.answer-card');
+    await reorderGridTo(card, ['First', 'Second', 'Third']);
+    await card.locator('.ant-radio-button-wrapper').filter({ hasText: '100' }).click();
+    const answerButton = card.getByRole('button', { name: 'Answer', exact: true });
+    await expect(answerButton).toBeEnabled();
+    await answerButton.click();
+    await expect
+      .poll(async () => (await playerAnswers(request, sessionId, modId, playerId, 0, 0)).length)
+      .toBe(1);
+
+    // The mod's scorer renders the submitted JSON array as a numbered list,
+    // not raw JSON (ticket #215).
+    const scorerList = modPage.locator('.answered-or-not ol');
+    await expect(scorerList).toHaveCount(1, { timeout: 30000 });
+    await expect
+      .poll(async () => (await scorerList.locator('li').allTextContents()).map((t) => t.trim()), { timeout: 30000 })
+      .toEqual(['First', 'Second', 'Third']);
+
+    // Score, then the mod's question box reveals the canonical order.
+    const scoreButton = modPage.locator('.player-scorer').getByRole('button', { name: 'Score', exact: true });
+    await expect(scoreButton).toBeEnabled({ timeout: 30000 });
+    await scoreButton.click();
+    await expect.poll(async () => {
+      const answers = await playerAnswers(request, sessionId, modId, playerId, 0, 0);
+      return answers[answers.length - 1]?.correct;
+    }).toBe(true);
+
+    await expect
+      .poll(async () => (await modBox.locator('ol li').allTextContents()).map((t) => t.trim()), { timeout: 30000 })
+      .toEqual(['First', 'Second', 'Third']);
 
     await playerContext.close();
     await modContext.close();
