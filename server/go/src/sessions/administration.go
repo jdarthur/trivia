@@ -147,9 +147,9 @@ func upsertSessionQuestion(e *Env, sessionId string, roundIndex int, questionInd
 }
 
 // replaceSnapshotChildren copies the canonical question_choice / question_match
-// / question_bucket / question_bucket_item rows for a question into the
-// session snapshot child tables, replacing any prior snapshot rows for that
-// (session, round, question) wholesale.
+// / question_bucket / question_bucket_item / question_ordered rows for a
+// question into the session snapshot child tables, replacing any prior
+// snapshot rows for that (session, round, question) wholesale.
 func replaceSnapshotChildren(e *Env, sessionId string, roundIndex int, questionIndex int, questionId string) error {
 	if _, err := e.Db.Exec(`DELETE FROM session_question_choice
 		WHERE session_id = ? AND round_index = ? AND question_index = ?`,
@@ -192,6 +192,17 @@ func replaceSnapshotChildren(e *Env, sessionId string, roundIndex int, questionI
 	if _, err := e.Db.Exec(`INSERT INTO session_question_bucket_item
 		(session_id, round_index, question_index, position, text, bucket_text)
 		SELECT ?, ?, ?, position, text, bucket_text FROM question_bucket_item WHERE question_id = ?`,
+		sessionId, roundIndex, questionIndex, questionId); err != nil {
+		return err
+	}
+	if _, err := e.Db.Exec(`DELETE FROM session_question_ordered
+		WHERE session_id = ? AND round_index = ? AND question_index = ?`,
+		sessionId, roundIndex, questionIndex); err != nil {
+		return err
+	}
+	if _, err := e.Db.Exec(`INSERT INTO session_question_ordered
+		(session_id, round_index, question_index, position, text)
+		SELECT ?, ?, ?, position, text FROM question_ordered WHERE question_id = ?`,
 		sessionId, roundIndex, questionIndex, questionId); err != nil {
 		return err
 	}
@@ -303,6 +314,13 @@ func getCurrentQuestion(e *Env, c *gin.Context) (models.QuestionInRound, error) 
 				// reordered; scoring still compares each item to its
 				// canonical bucket.
 				question.Buckets = shuffledStrings(question.Buckets, session.ID, currentRound, currentQuestion)
+			}
+			if question.QuestionType == "ordering" {
+				// Ticket #211: shuffle the ordered column pre-score so the correct
+				// order isn't revealed up front (same rationale as matching #161 and
+				// bucketing #164). Deterministic per (session, round, question); the
+				// canonical order is served once scored.
+				question.Ordered = shuffledStrings(question.Ordered, session.ID, currentRound, currentQuestion)
 			}
 		}
 

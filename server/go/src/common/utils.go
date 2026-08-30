@@ -642,8 +642,8 @@ func loadSessionRounds(db *sql.DB, m *models.Session) error {
 }
 
 // loadSessionQuestionChildren fills the structured payload (choices / pairs /
-// buckets / items) of each overlaid session question snapshot from the
-// snapshot child tables.
+// buckets / items / ordered) of each overlaid session question snapshot from
+// the snapshot child tables.
 func loadSessionQuestionChildren(db *sql.DB, m *models.Session) error {
 	rows, err := db.Query(`SELECT round_index, question_index, position, text, is_correct
 		FROM session_question_choice WHERE session_id = ? ORDER BY round_index, question_index, position`, m.ID)
@@ -743,6 +743,28 @@ func loadSessionQuestionChildren(db *sql.DB, m *models.Session) error {
 			q.Items = make([]string, 0)
 		}
 		q.Items = append(q.Items, text)
+	}
+
+	rows, err = db.Query(`SELECT round_index, question_index, position, text
+		FROM session_question_ordered WHERE session_id = ? ORDER BY round_index, question_index, position`, m.ID)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var roundIndex, questionIndex, position int
+		var text string
+		if err := rows.Scan(&roundIndex, &questionIndex, &position, &text); err != nil {
+			return err
+		}
+		if roundIndex >= len(m.Rounds) || questionIndex >= len(m.Rounds[roundIndex].Questions) {
+			continue
+		}
+		q := &m.Rounds[roundIndex].Questions[questionIndex]
+		if q.Ordered == nil {
+			q.Ordered = make([]string, 0)
+		}
+		q.Ordered = append(q.Ordered, text)
 	}
 	return rows.Err()
 }

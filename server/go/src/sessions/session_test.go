@@ -1156,6 +1156,17 @@ func createBucketingQuestion(t *testing.T, env *Env, buckets []models.QuestionBu
 	return q.ID
 }
 
+func createOrderingQuestion(t *testing.T, env *Env, ordered []models.QuestionOrderedItem) string {
+	t.Helper()
+	q, err := questions.CreateOneQuestion((*questions.Env)(env), "user-1", models.Question{
+		Question: "O?", QuestionType: "ordering", Ordered: ordered,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return q.ID
+}
+
 // newStructuredSession builds a session around a single given question, two
 // players, and the (0,0) snapshot set.
 func newStructuredSession(t *testing.T, env *Env, questionId string) (session models.Session, p1 models.PlayerId, p2 models.PlayerId) {
@@ -1773,6 +1784,85 @@ func TestBucketsShuffledForPlayers(t *testing.T) {
 	qScored := fetch(p1)
 	if !sameOrder(qScored.Buckets, canonical) {
 		t.Errorf("post-score player buckets %v, want canonical %v", qScored.Buckets, canonical)
+	}
+}
+
+// TestOrderedShuffledForPlayers verifies ticket #211: pre-score, the
+// player-facing ordered column of an ordering question is a deterministic
+// permutation of the canonical order — the same order for every player and
+// every refetch — while the mod's view stays canonical (it is the answer key).
+// Once scored, the player's view returns to canonical order, revealing the
+// answer the way matching and bucketing do.
+func TestOrderedShuffledForPlayers(t *testing.T) {
+	env := openSessionTestDB(t)
+	gin.SetMode(gin.TestMode)
+
+	ordered := []models.QuestionOrderedItem{
+		{Text: "Alabama"},
+		{Text: "Alaska"},
+		{Text: "Arizona"},
+		{Text: "California"},
+	}
+	qid := createOrderingQuestion(t, env, ordered)
+	session, p1, p2 := newStructuredSession(t, env, qid)
+
+	fetch := func(player models.PlayerId) models.QuestionInRound {
+		t.Helper()
+		recorder := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(recorder)
+		c.Params = gin.Params{{Key: "id", Value: session.ID}}
+		c.Request = httptest.NewRequest(http.MethodGet,
+			"/gameplay/session/"+session.ID+"/current-question?player_id="+string(player), nil)
+		env.GetCurrentQuestion(c)
+		var q models.QuestionInRound
+		if err := json.Unmarshal(recorder.Body.Bytes(), &q); err != nil {
+			t.Fatalf("bad current-question response %q: %v", recorder.Body.String(), err)
+		}
+		return q
+	}
+
+	canonical := make([]string, 0, len(ordered))
+	for _, o := range ordered {
+		canonical = append(canonical, o.Text)
+	}
+
+	// pre-score: players see a permutation of the canonical order, identical
+	// across players and across refetches
+	q1 := fetch(p1)
+	q1again := fetch(p1)
+	q2 := fetch(p2)
+	if len(q1.Ordered) != len(ordered) {
+		t.Fatalf("player ordered = %v, want %d entries", q1.Ordered, len(ordered))
+	}
+	if !sameStrings(q1.Ordered, canonical) {
+		t.Errorf("player ordered %v are not a permutation of canonical %v", q1.Ordered, canonical)
+	}
+	if !sameOrder(q1.Ordered, q1again.Ordered) {
+		t.Errorf("refetch changed the player's ordered order: %v vs %v", q1.Ordered, q1again.Ordered)
+	}
+	if !sameOrder(q1.Ordered, q2.Ordered) {
+		t.Errorf("players saw different ordered orders: %v vs %v", q1.Ordered, q2.Ordered)
+	}
+
+	// the mod's view stays canonical — it is the answer key
+	qMod := fetch(session.Moderator)
+	if !sameOrder(qMod.Ordered, canonical) {
+		t.Errorf("mod ordered %v, want canonical %v", qMod.Ordered, canonical)
+	}
+
+	// once scored, the player's view returns to canonical (answer reveal)
+	addAnswer(t, env, session.ID, p1, `{"1":"Alabama","2":"Alaska","3":"Arizona","4":"California"}`, 100)
+	addAnswer(t, env, session.ID, p2, `{"1":"Alabama","2":"Alaska","3":"Arizona","4":"California"}`, 100)
+	req := models.ScoreRequest{RoundIndex: 0, QuestionIndex: 0, Players: map[models.PlayerId]models.CorrectorNot{
+		p1: {Correct: true},
+		p2: {Correct: true},
+	}}
+	if err := scoreQuestionTx(env, session, req, 0, 0); err != nil {
+		t.Fatal(err)
+	}
+	qScored := fetch(p1)
+	if !sameOrder(qScored.Ordered, canonical) {
+		t.Errorf("post-score player ordered %v, want canonical %v", qScored.Ordered, canonical)
 	}
 }
 
