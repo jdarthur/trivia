@@ -422,11 +422,11 @@ export default function EditQuestionModal(props: Props) {
 
     // The preview shows the question as it will appear to players (no answer,
     // no grading), with a "Show answer" toggle that reveals the scored in-game
-    // view — ✅/❌ on multiple-choice options, the answer line for freeform.
-    // For matching/bucketing/ordering the structured lists themselves are the
-    // answer key, so they render unchanged. Rendered via the same QuestionBody
-    // the editor's read-only question cards use, so the preview can't drift
-    // from the in-game look.
+    // view — ✅/❌ on multiple-choice options, the answer line for freeform,
+    // and each bucketing item tagged with its bucket (the answer key).
+    // Matching/ordering lists themselves are the answer key, so they render
+    // unchanged. Rendered via the same QuestionBody the editor's read-only
+    // question cards use, so the preview can't drift from the in-game look.
     const previewBody = () => {
         return <div>
             <QuestionBody question={props.question}
