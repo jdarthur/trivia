@@ -292,3 +292,80 @@ editorTest.describe('question type change (ticket #166)', () => {
     await expect(modal).toBeHidden();
   });
 });
+
+// Ticket #213: the ordering question type — the author's entry order is the
+// correct order, so the editor is a numbered item list and the answer key is
+// that order.
+editorTest.describe('ordering question type (ticket #213)', () => {
+  editorTest('creates an ordering question whose answer key is the entry order', async ({ editorPage }) => {
+    const question = `Put these in order ${unique()}`;
+    await editorPage.getByRole('button', { name: /New/ }).first().click();
+    const modal = editorPage.locator('.ant-modal:has(.ant-modal-title)');
+    await expect(modal).toBeVisible();
+    await expect(modal.locator('.ant-modal-title')).toHaveText('Add question');
+
+    // Step 1 (Basic info): switch to Ordering — the form is empty, so the type
+    // changes immediately with no confirmation tooltip.
+    await modal.locator('.ant-radio-wrapper', { hasText: 'Ordering' }).click();
+    await expect(editorPage.locator('.ant-popover:visible')).toHaveCount(0);
+    await modal.getByRole('button', { name: 'Next', exact: true }).click();
+
+    // Step 2 (Question editor): fill the question and add two ordered items.
+    await modal.locator('#question').fill(question);
+    const addItem = modal.getByRole('button', { name: /Add item/ });
+    await addItem.click();
+    await addItem.click();
+    await modal.locator('input[placeholder="Item"]').first().fill('First');
+    await modal.locator('input[placeholder="Item"]').nth(1).fill('Second');
+    await modal.getByRole('button', { name: 'Next', exact: true }).click();
+
+    // Step 3 (Preview): the ordered list is the answer key.
+    await expect(modal.getByText('First', { exact: true })).toBeVisible();
+    await expect(modal.getByText('Second', { exact: true })).toBeVisible();
+    await modal.getByRole('button', { name: 'Add', exact: true }).click();
+    await expect(modal).toBeHidden();
+
+    // The list row shows the question and the derived answer (the ordered
+    // items, one per line).
+    const row = editorPage.locator('.ant-table-tbody tr').filter({ hasText: question });
+    await expect(row).toBeVisible();
+    await expect(row).toContainText('First');
+    await expect(row).toContainText('Second');
+
+    await deleteQuestion(editorPage, question);
+  });
+
+  editorTest('ordering requires at least two items before advancing to Preview', async ({ editorPage }) => {
+    await editorPage.getByRole('button', { name: /New/ }).first().click();
+    const modal = editorPage.locator('.ant-modal:has(.ant-modal-title)');
+    await expect(modal).toBeVisible();
+    await expect(modal.locator('.ant-modal-title')).toHaveText('Add question');
+
+    // Step 1 (Basic info): switch to Ordering, then advance.
+    await modal.locator('.ant-radio-wrapper', { hasText: 'Ordering' }).click();
+    await modal.getByRole('button', { name: 'Next', exact: true }).click();
+
+    // Step 2 (Question editor): no items yet — Next shows the validation error.
+    await modal.locator('#question').fill('Order these');
+    await modal.getByRole('button', { name: 'Next', exact: true }).click();
+    await expect(modal.getByText('Please add at least two ordered items')).toBeVisible();
+
+    // A single item is still not enough.
+    const addItem = modal.getByRole('button', { name: /Add item/ });
+    await addItem.click();
+    await modal.locator('input[placeholder="Item"]').fill('Only one');
+    await modal.getByRole('button', { name: 'Next', exact: true }).click();
+    await expect(modal.getByText('Please add at least two ordered items')).toBeVisible();
+
+    // Two items clears the error and Next advances to Preview.
+    await addItem.click();
+    await modal.locator('input[placeholder="Item"]').nth(1).fill('Second');
+    await expect(modal.getByText('Please add at least two ordered items')).toBeHidden();
+    await modal.getByRole('button', { name: 'Next', exact: true }).click();
+    await expect(modal.getByRole('button', { name: 'Add', exact: true })).toBeVisible();
+
+    // Dismiss without saving (the form is empty, so the X button just closes).
+    await modal.locator('.ant-modal-close').click();
+    await expect(modal).toBeHidden();
+  });
+});

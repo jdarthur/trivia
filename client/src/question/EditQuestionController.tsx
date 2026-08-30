@@ -5,7 +5,7 @@ import {Button} from 'antd';
 import EditQuestionModal, {STEP_COUNT, STEP_EDITOR} from "./EditQuestionModal";
 import {useCreateQuestionMutation, useDeleteQuestionMutation, useUpdateQuestionMutation} from "../api/main";
 import notify, {errorMessage} from "../common/notify";
-import type {Question, QuestionBucket, QuestionBucketItem, QuestionChoice, QuestionPair} from "../types/models";
+import type {Question, QuestionBucket, QuestionBucketItem, QuestionChoice, QuestionOrderedItem, QuestionPair} from "../types/models";
 
 export const CATEGORY = "category"
 export const QUESTION = "question"
@@ -28,6 +28,7 @@ export default function EditQuestionController(props: Props) {
     const [pairs, setPairs] = useState<QuestionPair[]>([])
     const [buckets, setBuckets] = useState<QuestionBucket[]>([])
     const [items, setItems] = useState<QuestionBucketItem[]>([])
+    const [ordered, setOrdered] = useState<QuestionOrderedItem[]>([])
     // Ticket #166: the current step of the multi-step question editor.
     const [step, setStep] = useState(0)
     // Set when Next is attempted on the Question step so the validation error
@@ -45,6 +46,7 @@ export default function EditQuestionController(props: Props) {
         setPairs(props.selected?.pairs || [])
         setBuckets(props.selected?.buckets || [])
         setItems(props.selected?.items || [])
+        setOrdered(props.selected?.ordered || [])
         // Ticket #166: a new question starts at the first step; an existing
         // one opens on the Question step, since editing usually means changing
         // the question text rather than the type/category info.
@@ -78,7 +80,8 @@ export default function EditQuestionController(props: Props) {
             choices: choices,
             pairs: pairs,
             buckets: buckets,
-            items: items
+            items: items,
+            ordered: ordered
         }
 
         const response = !!id
@@ -109,6 +112,10 @@ export default function EditQuestionController(props: Props) {
         if (question_type === "multiple_choice" &&
             !choices.some(choice => choice.is_correct)) {
             return "Please select a correct answer"
+        }
+        // Ticket #213: the server requires at least two ordered items.
+        if (question_type === "ordering" && ordered.length < 2) {
+            return "Please add at least two ordered items"
         }
         return ""
     }
@@ -168,6 +175,7 @@ export default function EditQuestionController(props: Props) {
                            pairs={pairs} set_pairs={setPairs}
                            buckets={buckets} set_buckets={setBuckets}
                            items={items} set_items={setItems}
+                           ordered={ordered} set_ordered={setOrdered}
                            steps step={step} step_error={step_error}
                            visible={props.visible}/>
     );
