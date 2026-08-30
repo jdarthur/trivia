@@ -12,6 +12,7 @@ import {useDeleteCategoryMutation, useGetCategoriesQuery, useGetScoringNotesQuer
 import {useClampToFirstPage, useListFilters} from "../editor/useListFilters";
 import notify, {errorMessage} from "../common/notify";
 import type {Category} from "../types/models";
+import '../editor/EditorList.css';
 
 interface Props {
     token?: string
@@ -81,8 +82,10 @@ export default function CategoryList(props: Props) {
     const columns = [
         {title: "", render: delete_edit, width: '5em'},
         {title: 'Name', dataIndex: 'name', ellipsis: {showTitle: false}},
-        {title: 'Scoring note', render: (text: any, category: Category) => noteText(category) || "No scoring note",
-         ellipsis: {showTitle: false}},
+        {title: 'Scoring note', render: (text: any, category: Category) => {
+            const note = noteText(category)
+            return note || <span style={{color: "rgba(0, 0, 0, 0.25)", fontStyle: "italic"}}>No scoring note</span>
+        }, ellipsis: {showTitle: false}},
         {title: 'Questions', render: questions_tag}
     ]
 
@@ -94,9 +97,9 @@ export default function CategoryList(props: Props) {
 
     const modal = <CategoryModal visible={modalOpen} setVisible={setModalOpen} category={editing}/>
 
-    const table_and_pager = <div>
+    const table_and_pager = <div className="table_and_pager">
         <Table columns={columns} dataSource={categories} pagination={false}
-               size="small" style={{maxWidth: 1500}} rowKey="id"/>
+               size="small" rowKey="id"/>
         <ListPagination meta={data} page={filters.page} pageSize={filters.pageSize}
                         set_page={filters.setPage} set_page_size={filters.setPageSize}/>
     </div>

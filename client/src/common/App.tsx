@@ -13,7 +13,8 @@ import {
     FolderOpenOutlined,
     FormOutlined,
     OrderedListOutlined,
-    QuestionCircleOutlined,
+    PlayCircleOutlined,
+    ReadOutlined,
     TrophyOutlined,
 } from '@ant-design/icons';
 import {useAuth0} from "@auth0/auth0-react";
@@ -125,7 +126,7 @@ export default function App() {
               </div>
               <Menu defaultSelectedKeys={['2']} mode="horizontal" theme="dark"
                     defaultOpenKeys={showEditor ? ['sub1'] : []}>
-                <Menu.Item key="1">
+                <Menu.Item key="1" icon={<PlayCircleOutlined/>}>
                     <Link to={"/"}>Play</Link>
                 </Menu.Item>
 
@@ -133,7 +134,7 @@ export default function App() {
                   <Menu.Item key="6" icon={<FolderOpenOutlined/>} disabled={!showEditor}>
                       <Link to={"categories"}>{CATEGORY}</Link>
                   </Menu.Item>
-                  <Menu.Item key="2" icon={<QuestionCircleOutlined/>} disabled={!showEditor}>
+                  <Menu.Item key="2" icon={<ReadOutlined/>} disabled={!showEditor}>
                     <Link to={"questions"}>{QUESTION}</Link>
                   </Menu.Item>
                   <Menu.Item key="3" icon={<OrderedListOutlined/>} disabled={!showEditor}>

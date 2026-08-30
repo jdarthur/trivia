@@ -59,10 +59,10 @@ export default function ScoringNote(props: Props) {
     }
 
     return (
-        <span style={{display: "flex", alignItems: "center"}}>
+        <span style={{display: "flex", alignItems: "center", justifyContent: "space-between"}}>
             {newNoteModal}
-            <span style={{marginLeft: 10}}>Note: </span>
-            <Select style={{marginLeft: 5, width: 125}} value={props.scoring_note}
+            <span style={{marginRight: 10}}>Note: </span>
+            <Select style={{width: 200}} value={props.scoring_note}
                     onSelect={props.set_scoring_note}
                     dropdownRender={menu => newButton(menu)}>
 

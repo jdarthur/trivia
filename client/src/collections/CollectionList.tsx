@@ -8,6 +8,7 @@ import PageHeader from "../common/PageHeader";
 import {useSearchParams} from "react-router";
 import ImportCollection from "./ImportCollection";
 import {DatabaseOutlined} from '@ant-design/icons';
+import '../editor/EditorList.css';
 
 interface Props {
     token?: string

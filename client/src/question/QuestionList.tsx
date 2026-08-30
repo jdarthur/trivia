@@ -1,5 +1,6 @@
 import React, {useState} from 'react';
 import './QuestionList.css';
+import '../editor/EditorList.css';
 
 import DeleteConfirm from "../editor/DeleteConfirm"
 import EditorFilter from "../editor/EditorFilter"
@@ -9,7 +10,7 @@ import NewButton from "../editor/NewButton"
 
 import {Table} from "antd"
 
-import {EditOutlined, QuestionCircleOutlined} from '@ant-design/icons';
+import {EditOutlined, ReadOutlined} from '@ant-design/icons';
 import PageHeader from "../common/PageHeader";
 import {useDeleteQuestionMutation, useGetQuestionsQuery} from "../api/main";
 import {useClampToFirstPage, useListFilters} from "../editor/useListFilters";
@@ -100,10 +101,10 @@ export default function QuestionList(props: Props) {
         y: false as any
     }
 
-    const table_and_modal = <div>
+    const table_and_modal = <div className="table_and_pager">
 
         <Table columns={columns} dataSource={questions} pagination={false}
-               scroll={scroll} size="small" style={{maxWidth: 1500}} rowKey={"id"}/>
+               scroll={scroll} size="small" rowKey={"id"}/>
         <ListPagination meta={data} page={filters.page} pageSize={filters.pageSize}
                         set_page={filters.setPage} set_page_size={filters.setPageSize}/>
     </div>
@@ -114,7 +115,7 @@ export default function QuestionList(props: Props) {
 
     return (
         <div className="ql_and_filter">
-            <PageHeader breadcrumbs={["Editor", <><QuestionCircleOutlined/> Questions</>]} header={header} style={{marginBottom: 10}}/>
+            <PageHeader breadcrumbs={["Editor", <><ReadOutlined/> Questions</>]} header={header} style={{marginBottom: 10}}/>
             {question_editor}
             <LoadingOrView loading={isFetching} class_name="question-list"
                            empty={questions?.length === 0} loaded_view={table_and_modal}/>
