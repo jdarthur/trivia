@@ -482,6 +482,7 @@ func scoreQuestionTx(e *Env, session models.Session, requestBody models.ScoreReq
 		correctChoiceText := ""
 		var matchLefts, matchRights []string
 		var bucketItems, bucketBuckets []string
+		var orderedItems []string
 		if questionType == "multiple_choice" {
 			err := q.QueryRowContext(ctx, `SELECT text FROM session_question_choice
 				WHERE session_id = ? AND round_index = ? AND question_index = ? AND is_correct = 1`,
@@ -531,6 +532,26 @@ func scoreQuestionTx(e *Env, session models.Session, requestBody models.ScoreReq
 				return err
 			}
 			rows.Close()
+		} else if questionType == "ordering" {
+			rows, err := q.QueryContext(ctx, `SELECT text FROM session_question_ordered
+				WHERE session_id = ? AND round_index = ? AND question_index = ? ORDER BY position`,
+				session.ID, roundIndex, questionIndex)
+			if err != nil {
+				return err
+			}
+			for rows.Next() {
+				var item string
+				if err := rows.Scan(&item); err != nil {
+					rows.Close()
+					return err
+				}
+				orderedItems = append(orderedItems, item)
+			}
+			if err := rows.Err(); err != nil {
+				rows.Close()
+				return err
+			}
+			rows.Close()
 		}
 
 		// First pass: read every player's latest answer and determine
@@ -571,7 +592,7 @@ func scoreQuestionTx(e *Env, session models.Session, requestBody models.ScoreReq
 			// auto-scored against the snapshot answer key.
 			score.isCorrect = correctOrNot.Correct
 			if questionType != "freeform" {
-				score.isCorrect = autoScoredCorrect(questionType, latestAnswer, correctChoiceText, matchLefts, matchRights, bucketItems, bucketBuckets)
+				score.isCorrect = autoScoredCorrect(questionType, latestAnswer, correctChoiceText, matchLefts, matchRights, bucketItems, bucketBuckets, orderedItems)
 			}
 
 			scores = append(scores, score)
@@ -670,8 +691,14 @@ func scoreQuestionTx(e *Env, session models.Session, requestBody models.ScoreReq
 // exactly one entry per snapshot pair and every left maps to its right
 // (all-or-nothing). bucketing: the answer is a JSON map of item text -> chosen
 // bucket text; it is correct only if the map has exactly one entry per
-// snapshot item and every item maps to its bucket (all-or-nothing).
-func autoScoredCorrect(questionType string, latestAnswer string, correctChoiceText string, matchLefts []string, matchRights []string, bucketItems []string, bucketBuckets []string) bool {
+// snapshot item and every item maps to its bucket (all-or-nothing). ordering:
+// the answer is a JSON array of item texts in the player's final order; it is
+// correct only if the array equals the canonical order or the canonical order
+// reversed (all-or-nothing — players commonly trip over ascending/descending
+// but still reach the "correct" answer, per ticket #207). The stored answer
+// stays whatever the player submitted; reversed correctness is decided here at
+// score time.
+func autoScoredCorrect(questionType string, latestAnswer string, correctChoiceText string, matchLefts []string, matchRights []string, bucketItems []string, bucketBuckets []string, orderedItems []string) bool {
 	switch questionType {
 	case "multiple_choice":
 		return strings.TrimSpace(latestAnswer) == correctChoiceText
@@ -703,6 +730,25 @@ func autoScoredCorrect(questionType string, latestAnswer string, correctChoiceTe
 			}
 		}
 		return true
+	case "ordering":
+		var order []string
+		if err := json.Unmarshal([]byte(latestAnswer), &order); err != nil {
+			return false
+		}
+		if len(order) != len(orderedItems) {
+			return false
+		}
+		canonical := true
+		reversed := true
+		for i, item := range orderedItems {
+			if order[i] != item {
+				canonical = false
+			}
+			if order[i] != orderedItems[len(orderedItems)-1-i] {
+				reversed = false
+			}
+		}
+		return canonical || reversed
 	default:
 		return false
 	}

@@ -90,3 +90,22 @@ func (e InvalidBucketingAnswerError) Field() string {
 func (e InvalidBucketingAnswerError) Data() interface{} {
 	return e.Answer
 }
+
+// InvalidOrderingAnswerError is returned when an ordering answer violates
+// the shape of the question (ticket #212): the answer must be a JSON array of
+// item texts that is a permutation of the question's Ordered items — every
+// item exactly once, no duplicates, no unknown texts. Anything else is
+// rejected at submit time instead of being stored as a certain miss.
+type InvalidOrderingAnswerError struct {
+	Answer string
+	Reason string
+}
+func (e InvalidOrderingAnswerError) Error() string {
+	return "invalid ordering answer: " + e.Reason
+}
+func (e InvalidOrderingAnswerError) Field() string {
+	return "answer"
+}
+func (e InvalidOrderingAnswerError) Data() interface{} {
+	return e.Answer
+}
