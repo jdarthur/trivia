@@ -1,7 +1,7 @@
 import React from 'react';
 
-import {Tag} from 'antd';
 import FormattedQuestion from "./FormattedQuestion";
+import BucketedItems from "./BucketedItems";
 import type {QuestionBucket, QuestionBucketItem, QuestionChoice, QuestionOrderedItem, QuestionPair} from "../types/models";
 
 interface Props {
@@ -25,34 +25,6 @@ interface Props {
     // carry answer text (structured types store it in their lists), so this
     // only affects freeform questions.
     show_answer?: boolean
-}
-
-// Tag background colors, one per bucket via a stable hash so the same bucket
-// always gets the same color across re-renders (no flicker). All are dark
-// shades (antd level-7/8, relative luminance ≤ ~0.14 — well under 50%
-// brightness) so white tag text stays readable: antd renders white text when
-// a custom hex color is passed, and every color here keeps ≥5.4:1 contrast
-// against it. Gold/lime use their darker level-8 shade to clear the bar.
-const TAG_COLORS = [
-    "#a8071a", // red
-    "#ad2e24", // volcano
-    "#ad4e00", // orange
-    "#874d00", // gold
-    "#3f6600", // lime
-    "#237804", // green
-    "#006d75", // cyan
-    "#0050b3", // blue
-    "#10239e", // geekblue
-    "#391085", // purple
-    "#9e1068", // magenta
-]
-
-function bucketColor(bucket: string): string {
-    let hash = 0
-    for (let i = 0; i < bucket.length; i++) {
-        hash = (hash * 31 + bucket.charCodeAt(i)) >>> 0
-    }
-    return TAG_COLORS[hash % TAG_COLORS.length]
 }
 
 /**
@@ -103,21 +75,7 @@ export default function QuestionBody(props: Props) {
                     // The answer key: each item tagged with the bucket it
                     // belongs to, colorized per bucket so the grouping is
                     // visible at a glance.
-                    <ul style={{marginTop: 10, paddingLeft: 18}}>
-                        {(props.items || []).map((item, index) => (
-                            <li key={index} style={{marginBottom: 4}}>
-                                {item.text}{" "}
-                                {item.bucket ?
-                                    // variant="solid" (antd v6): a custom hex
-                                    // color on the default "filled" variant is
-                                    // lightened to 95% lightness with the text
-                                    // in the original color; solid keeps the
-                                    // dark background with white text.
-                                    <Tag color={bucketColor(item.bucket)} variant="solid">{item.bucket}</Tag> :
-                                    <Tag>Unassigned</Tag>}
-                            </li>
-                        ))}
-                    </ul>
+                    <BucketedItems items={props.items || []}/>
                 ) : (
                     <table style={{marginTop: 10, borderCollapse: "collapse", width: "100%"}}>
                         <tbody>

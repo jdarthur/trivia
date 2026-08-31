@@ -139,6 +139,8 @@ export interface QuestionInRound {
   rights?: string[];
   buckets?: string[];
   items?: string[];
+  /** bucketing: item -> bucket mapping, parallel to `items` (the answer key). */
+  item_buckets?: string[];
   ordered?: string[];
 }
 

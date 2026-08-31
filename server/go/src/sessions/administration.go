@@ -292,6 +292,9 @@ func getCurrentQuestion(e *Env, c *gin.Context) (models.QuestionInRound, error) 
 		if models.PlayerId(playerId) != session.Moderator && !question.Scored {
 			question.Answer = ""
 			question.QuestionId = ""
+			// Ticket #164: the item -> bucket mapping is the bucketing answer
+			// key, so players must not see it before the question is scored.
+			question.ItemBuckets = nil
 			if question.QuestionType == "matching" {
 				// Ticket #161: shuffle the rights column so the correct
 				// pairing isn't revealed by row alignment. The shuffle is
