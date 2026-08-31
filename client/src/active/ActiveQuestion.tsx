@@ -6,6 +6,7 @@ import {EditOutlined, InfoCircleOutlined, PlaySquareOutlined} from '@ant-design/
 import FormattedQuestion, {MemoFormattedQuestion} from "../question/FormattedQuestion"
 import HotEditQuestion from "./HotEditQuestion";
 import HotEditRoundName from "./HotEditRoundName";
+import {hashSeed, seededShuffle} from "../common/shuffle";
 
 interface Props {
     session_state: any
@@ -35,45 +36,7 @@ interface State {
     round_editor_open: boolean
 }
 
-// FNV-1a 32-bit over the question's identity — a stable, dependency-free seed
-// for the mod's display shuffle below (not the server's FNV-128a/PCG, so the
-// exact order may differ from a player's; both are stable permutations of the
-// canonical order).
-function hashSeed(...parts: (string | number)[]): number {
-    let hash = 0x811c9dc5
-    for (const part of parts) {
-        const text = String(part)
-        for (let i = 0; i < text.length; i++) {
-            hash ^= text.charCodeAt(i)
-            hash = Math.imul(hash, 0x01000193)
-        }
-    }
-    return hash >>> 0
-}
-
-// mulberry32: a tiny seeded PRNG backing the deterministic display shuffle.
-function mulberry32(seed: number): () => number {
-    let state = seed
-    return () => {
-        state = (state + 0x6D2B79F5) | 0
-        let t = Math.imul(state ^ (state >>> 15), 1 | state)
-        t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t
-        return ((t ^ (t >>> 14)) >>> 0) / 4294967296
-    }
-}
-
-// Fisher-Yates with the seeded PRNG. Display-only: the canonical order is
-// never reordered anywhere (the server snapshot stays canonical).
-function seededShuffle(items: string[], seed: number): string[] {
-    const out = [...items]
-    const rand = mulberry32(seed)
-    for (let i = out.length - 1; i > 0; i--) {
-        const j = Math.floor(rand() * (i + 1))
-        ;[out[i], out[j]] = [out[j], out[i]]
-    }
-    return out
-}
-
+// Ticket #215: pre-score, the mod's question box mirrors the shuffled list
 class ActiveQuestion extends React.Component<Props, State> {
 
     state: State = {

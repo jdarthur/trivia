@@ -401,7 +401,7 @@ export default function EditQuestionModal(props: Props) {
 
         {structuredNote}
         <div style={{marginBottom: 10}}>
-            <div style={{fontWeight: 600, marginBottom: 4}}>Ordered items (first = correct first)</div>
+            <div style={{fontWeight: 600, marginBottom: 4}}>Ordered items (in correct order)</div>
             {(props.ordered || []).map((item, index) => (
                 <div key={index} style={{display: "flex", alignItems: "center", marginBottom: 6}}>
                     <span style={{width: 22, flexShrink: 0}}>{index + 1}.</span>
@@ -423,8 +423,10 @@ export default function EditQuestionModal(props: Props) {
     // The preview shows the question as it will appear to players (no answer,
     // no grading), with a "Show answer" toggle that reveals the scored in-game
     // view — ✅/❌ on multiple-choice options, the answer line for freeform.
-    // For matching/bucketing/ordering the structured lists themselves are the
-    // answer key, so they render unchanged. Rendered via the same QuestionBody
+    // Matching and bucketing lists are the answer key, so they render
+    // unchanged; ordering shows its items scrambled (a bullet list, like the
+    // shuffled list players see in-game, ticket #211/#215) and reveals the
+    // canonical 1..n order on Show answer. Rendered via the same QuestionBody
     // the editor's read-only question cards use, so the preview can't drift
     // from the in-game look.
     const previewBody = () => {
@@ -439,7 +441,8 @@ export default function EditQuestionModal(props: Props) {
                           ordered={props.ordered}
                           max_width={425}
                           scored={showAnswer}
-                          show_answer={showAnswer}/>
+                          show_answer={showAnswer}
+                          scramble_ordered={!showAnswer}/>
             <div style={{marginTop: 8}}>
                 <a onClick={() => setShowAnswer(!showAnswer)} style={{fontSize: 12}}>
                     {showAnswer ? "Hide answer" : "Show answer"}
