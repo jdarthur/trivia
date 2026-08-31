@@ -108,7 +108,12 @@ export default function QuestionBody(props: Props) {
                             <li key={index} style={{marginBottom: 4}}>
                                 {item.text}{" "}
                                 {item.bucket ?
-                                    <Tag color={bucketColor(item.bucket)}>{item.bucket}</Tag> :
+                                    // variant="solid" (antd v6): a custom hex
+                                    // color on the default "filled" variant is
+                                    // lightened to 95% lightness with the text
+                                    // in the original color; solid keeps the
+                                    // dark background with white text.
+                                    <Tag color={bucketColor(item.bucket)} variant="solid">{item.bucket}</Tag> :
                                     <Tag>Unassigned</Tag>}
                             </li>
                         ))}

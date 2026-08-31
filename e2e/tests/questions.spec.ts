@@ -438,8 +438,17 @@ editorTest.describe('bucketing question type (ticket #164)', () => {
     await modal.getByText('Show answer').click();
     await expect(modal.getByText('Hide answer')).toBeVisible();
     await expect(modal.locator('.ant-tag')).toHaveCount(2);
-    await expect(modal.locator('li', { hasText: 'Dog' }).locator('.ant-tag')).toHaveText('Animals');
-    await expect(modal.locator('li', { hasText: 'Rose' }).locator('.ant-tag')).toHaveText('Plants');
+    const dogTag = modal.locator('li', { hasText: 'Dog' }).locator('.ant-tag');
+    const roseTag = modal.locator('li', { hasText: 'Rose' }).locator('.ant-tag');
+    await expect(dogTag).toHaveText('Animals');
+    await expect(roseTag).toHaveText('Plants');
+    // Bucket tags use the dark palette with white text (variant="solid"): the
+    // antd v6 default "filled" variant would lighten a custom hex color to 95%
+    // lightness and color the text with the original color, killing contrast.
+    await expect(dogTag).toHaveCSS('background-color', 'rgb(0, 80, 179)'); // #0050b3
+    await expect(roseTag).toHaveCSS('background-color', 'rgb(173, 78, 0)'); // #ad4e00
+    await expect(dogTag).toHaveCSS('color', 'rgb(255, 255, 255)');
+    await expect(roseTag).toHaveCSS('color', 'rgb(255, 255, 255)');
 
     // "Hide answer" returns to the player view.
     await modal.getByText('Hide answer').click();
