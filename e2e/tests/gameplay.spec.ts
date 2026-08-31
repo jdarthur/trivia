@@ -839,8 +839,13 @@ test.describe('gameplay navigation, hot-edit, spectator & edge cases', () => {
     await expect(modPage.locator('.active-game')).toBeVisible({ timeout: 30000 });
 
     // Round 1, question 1: grid shows two categories with cat-a active.
+    // Every tile must show a category NAME, including the not-yet-visited ones:
+    // only the active question has a session_question snapshot, so before the
+    // round's categories were resolved server-side the un-visited tiles rendered
+    // the raw category UUID (the active one looked fine, which hid the bug).
     await expect(modPage.locator('.active-question-box')).toContainText(`R1Q1 ${prefix}`, { timeout: 30000 });
     await expect(modPage.locator('.round-category')).toHaveCount(2);
+    await expect(modPage.locator('.round-category')).toHaveText([`cat-a-${prefix}`, `cat-b-${prefix}`]);
     await expect(modPage.locator('.round-category.active')).toHaveText(`cat-a-${prefix}`);
 
     // Next question -> R1Q2, and the grid tracks cat-b.
@@ -859,6 +864,7 @@ test.describe('gameplay navigation, hot-edit, spectator & edge cases', () => {
     await modPage.getByRole('button', { name: 'Next Round', exact: true }).click();
     await expect(modPage.locator('.active-question-box')).toContainText(`R2Q1 ${prefix}`, { timeout: 30000 });
     await expect(modPage.locator('.round-category')).toHaveCount(2);
+    await expect(modPage.locator('.round-category')).toHaveText([`cat-c-${prefix}`, `cat-d-${prefix}`]);
     await expect(modPage.locator('.round-category.active')).toHaveText(`cat-c-${prefix}`);
     // Round name reflects round two.
     await expect(modPage.locator('.ant-breadcrumb')).toContainText(`round-two-${prefix}`);

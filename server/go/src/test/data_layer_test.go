@@ -331,7 +331,10 @@ func TestSessionRelationalState(t *testing.T) {
 	if len(got.Rounds[0].Wagers) != 1 || got.Rounds[0].Wagers[0] != 100 {
 		t.Fatalf("session round wagers = %v", got.Rounds[0].Wagers)
 	}
-	if len(got.Rounds[0].Questions) != 1 || got.Rounds[0].Questions[0].Category != category.ID {
+	// The derived category carries the category's NAME, not its ID: the session
+	// wire format is name-based (the session_question snapshot column stores a
+	// name), while the question row stores the category's ID.
+	if len(got.Rounds[0].Questions) != 1 || got.Rounds[0].Questions[0].Category != category.Name {
 		t.Fatalf("session round questions = %+v", got.Rounds[0].Questions)
 	}
 	// the question id must survive the relational round-trip
