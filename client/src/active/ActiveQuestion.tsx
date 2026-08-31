@@ -4,6 +4,7 @@ import './ActiveGame.css';
 import {Breadcrumb, Card, Tooltip} from 'antd';
 import {EditOutlined, InfoCircleOutlined, PlaySquareOutlined} from '@ant-design/icons';
 import FormattedQuestion, {MemoFormattedQuestion} from "../question/FormattedQuestion"
+import BucketedItems from "../question/BucketedItems"
 import HotEditQuestion from "./HotEditQuestion";
 import HotEditRoundName from "./HotEditRoundName";
 import {hashSeed, seededShuffle} from "../common/shuffle";
@@ -28,6 +29,9 @@ interface Props {
     rights?: string[]
     buckets?: string[]
     items?: string[]
+    // bucketing: item -> bucket mapping, parallel to `items` — the answer
+    // key, served to the mod (and to everyone once the question is scored).
+    item_buckets?: string[]
     ordered?: string[]
 }
 
@@ -117,8 +121,21 @@ class ActiveQuestion extends React.Component<Props, State> {
 
         // Ticket #160: once a multiple-choice question is scored, the option
         // list below already shows the correct answer (✅ + bold), so the
-        // standalone answer line is hidden to avoid duplicating it.
+        // standalone answer line is hidden to avoid duplicating it. The same
+        // applies to a scored bucketing question: the item list below is the
+        // answer key (each item tagged with its bucket), so the derived
+        // answer text would duplicate it.
         const mcScored = this.props.scored && this.props.question_type === "multiple_choice"
+        const bucketingScored = this.props.scored && this.props.question_type === "bucketing"
+            && (this.props.items || []).length > 0
+        const hideAnswerLine = mcScored || bucketingScored
+
+        // The bucketing answer key once scored: items tagged with the bucket
+        // they belong to (same rendering as the editor preview's Show answer).
+        const bucketedItems = (this.props.items || []).map((text, index) => ({
+            text,
+            bucket: (this.props.item_buckets || [])[index] || ""
+        }))
 
         return (
             <Card className="question-card" bodyStyle={{padding: 20}}>
@@ -139,8 +156,8 @@ class ActiveQuestion extends React.Component<Props, State> {
 
                 <div className="active-question-box">
                     <MemoFormattedQuestion question={this.props.question}
-                                           answer={mcScored ? "" : this.props.answer} max_width={350}
-                                           scored={mcScored ? false : this.props.scored}
+                                           answer={hideAnswerLine ? "" : this.props.answer} max_width={350}
+                                           scored={hideAnswerLine ? false : this.props.scored}
                     />
                     {this.props.question_type === "multiple_choice" && (this.props.choices || []).length > 0 ?
                         <ol style={{marginTop: 10, paddingLeft: 20}}>
@@ -172,6 +189,9 @@ class ActiveQuestion extends React.Component<Props, State> {
                             </tbody>
                         </table> : null}
                     {this.props.question_type === "bucketing" && (this.props.items || []).length > 0 ?
+                        this.props.scored ? (
+                            <BucketedItems items={bucketedItems}/>
+                        ) : (
                         <table style={{marginTop: 10, borderCollapse: "collapse", width: "100%"}}>
                             <tbody>
                                 <tr>
@@ -187,7 +207,8 @@ class ActiveQuestion extends React.Component<Props, State> {
                                     </td>
                                 </tr>
                             </tbody>
-                        </table> : null}
+                        </table>
+                        ) : null}
                     {this.props.question_type === "ordering" && (this.props.ordered || []).length > 0 ?
                         <ol style={{marginTop: 10, paddingLeft: 20}}>
                             {this.orderedItems().map((item, index) => <li key={index}>{item}</li>)}

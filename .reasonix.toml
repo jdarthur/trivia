@@ -1,0 +1,6 @@
+# Reasonix project configuration.
+
+[verifier]
+# Map a custom make command so Reasonix treats it as an official test task
+# (e.g. for the end-to-end Playwright suite, which `make e2e` drives).
+commands = [ "make e2e" ]

@@ -1196,6 +1196,17 @@ test.describe('gameplay navigation, hot-edit, spectator & edge cases', () => {
       })
       .toBe(true);
 
+    // Once scored, the mod's question box reveals the answer key: the item
+    // list is replaced by items tagged with the bucket they belong to (dark
+    // tag background, white text — same view as the editor preview's "Show
+    // answer").
+    await expect(modBox.locator('.ant-tag')).toHaveCount(3, { timeout: 30000 });
+    await expect(modBox.locator('li', { hasText: 'frog' }).locator('.ant-tag')).toHaveText('Amphibian');
+    await expect(modBox.locator('li', { hasText: 'lion' }).locator('.ant-tag')).toHaveText('Mammal');
+    await expect(modBox.locator('li', { hasText: 'human' }).locator('.ant-tag')).toHaveText('Mammal');
+    await expect(modBox.locator('li', { hasText: 'frog' }).locator('.ant-tag')).toHaveCSS('color', 'rgb(255, 255, 255)');
+    await expect(modBox.locator('li', { hasText: 'frog' }).locator('.ant-tag')).toHaveCSS('background-color', 'rgb(35, 120, 4)'); // #237804 for "Amphibian"
+
     await playerContext.close();
     await modContext.close();
     await cleanup(request, seeded, { sessionId, modId, playerIds: [playerId] });

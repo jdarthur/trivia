@@ -10,11 +10,11 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/gin-gonic/gin"
 	"github.com/jdarthur/trivia/common"
 	"github.com/jdarthur/trivia/models"
 	"github.com/jdarthur/trivia/questions"
 	"github.com/jdarthur/trivia/store"
-	"github.com/gin-gonic/gin"
 )
 
 // These tests exercise the session-port logic (#76) directly: scoring runs in
@@ -663,8 +663,8 @@ func TestAnswersUnscoredAndScored(t *testing.T) {
 	if err := scoreQuestionTx(env, session2, models.ScoreRequest{
 		RoundIndex: 0, QuestionIndex: 0,
 		Players: map[models.PlayerId]models.CorrectorNot{
-			p1: {Correct: true},
-			p2: {Correct: false},
+			p1:    {Correct: true},
+			p2:    {Correct: false},
 			third: {Correct: false},
 		},
 	}, 0, 0); err != nil {
@@ -885,7 +885,7 @@ func TestStartSessionPersistsCurrentQuestion(t *testing.T) {
 		t.Fatalf("CreateSession aborted with %d: %s", rec.Code, rec.Body.String())
 	}
 	var created struct {
-		ID string `json:"id"`
+		ID  string `json:"id"`
 		Mod string `json:"mod"`
 	}
 	if err := json.Unmarshal(rec.Body.Bytes(), &created); err != nil {
@@ -1498,6 +1498,28 @@ func TestStructuredPlayerView(t *testing.T) {
 	if q.Answer != "" {
 		t.Errorf("player saw the bucketing answer key pre-score: %q", q.Answer)
 	}
+	if len(q.ItemBuckets) != 0 {
+		t.Errorf("player saw the bucketing item->bucket mapping pre-score: %v", q.ItemBuckets)
+	}
+
+	// The mod's view carries the canonical item -> bucket mapping — it is the
+	// answer key, so it is served pre-score (like Answer) for the mod only.
+	recorder = httptest.NewRecorder()
+	c, _ = gin.CreateTestContext(recorder)
+	c.Params = gin.Params{{Key: "id", Value: session3.ID}}
+	c.Request = httptest.NewRequest(http.MethodGet,
+		"/gameplay/session/"+session3.ID+"/current-question?player_id="+string(session3.Moderator), nil)
+	env.GetCurrentQuestion(c)
+	if err := json.Unmarshal(recorder.Body.Bytes(), &q); err != nil {
+		t.Fatalf("bad current-question response %q: %v", recorder.Body.String(), err)
+	}
+	wantItemBuckets := []string{"Amphibian", "Mammal", "Mammal"}
+	if len(q.ItemBuckets) != 3 || !sameOrder(q.ItemBuckets, wantItemBuckets) {
+		t.Errorf("mod item->bucket mapping = %v, want %v", q.ItemBuckets, wantItemBuckets)
+	}
+	if !sameOrder(q.Items, []string{"frog", "lion", "human"}) {
+		t.Errorf("mod items = %v, want canonical order", q.Items)
+	}
 }
 
 // TestMatchingRightsShuffledForPlayers verifies ticket #161: pre-score, the
@@ -1742,10 +1764,10 @@ func TestAutoScoreBucketing(t *testing.T) {
 	p3 := addPlayerToSession(t, env, session.ID, "team-3")
 	p4 := addPlayerToSession(t, env, session.ID, "team-4")
 
-	addAnswer(t, env, session.ID, p1, `{"frog":"Amphibian","lion":"Mammal","human":"Mammal"}`, 100) // complete + correct
-	addAnswer(t, env, session.ID, p2, `{"frog":"Amphibian","lion":"Mammal"}`, 200)                  // partial
+	addAnswer(t, env, session.ID, p1, `{"frog":"Amphibian","lion":"Mammal","human":"Mammal"}`, 100)    // complete + correct
+	addAnswer(t, env, session.ID, p2, `{"frog":"Amphibian","lion":"Mammal"}`, 200)                     // partial
 	addAnswer(t, env, session.ID, p3, `{"frog":"Mammal","lion":"Amphibian","human":"Amphibian"}`, 300) // wrong mapping
-	addAnswer(t, env, session.ID, p4, "not-json", 400)                                              // malformed JSON
+	addAnswer(t, env, session.ID, p4, "not-json", 400)                                                 // malformed JSON
 
 	req := models.ScoreRequest{RoundIndex: 0, QuestionIndex: 0, Players: map[models.PlayerId]models.CorrectorNot{
 		p1: {Correct: false},
@@ -1798,10 +1820,10 @@ func TestAutoScoreOrdering(t *testing.T) {
 	p5 := addPlayerToSession(t, env, session.ID, "team-5")
 
 	addAnswer(t, env, session.ID, p1, `["Alabama","Alaska","Arizona","California"]`, 100) // canonical order
-	addAnswer(t, env, session.ID, p2, `["California","Arizona","Alaska","Alabama"]`, 200)  // reversed order
-	addAnswer(t, env, session.ID, p3, `["Alaska","Alabama","California","Arizona"]`, 300)  // wrong order
-	addAnswer(t, env, session.ID, p4, `["Alabama","Alaska","Arizona"]`, 400)               // partial
-	addAnswer(t, env, session.ID, p5, "not-json", 500)                                     // malformed JSON
+	addAnswer(t, env, session.ID, p2, `["California","Arizona","Alaska","Alabama"]`, 200) // reversed order
+	addAnswer(t, env, session.ID, p3, `["Alaska","Alabama","California","Arizona"]`, 300) // wrong order
+	addAnswer(t, env, session.ID, p4, `["Alabama","Alaska","Arizona"]`, 400)              // partial
+	addAnswer(t, env, session.ID, p5, "not-json", 500)                                    // malformed JSON
 
 	req := models.ScoreRequest{RoundIndex: 0, QuestionIndex: 0, Players: map[models.PlayerId]models.CorrectorNot{
 		p1: {Correct: false},

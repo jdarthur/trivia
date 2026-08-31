@@ -77,7 +77,11 @@ type QuestionInRound struct {
 	Rights        []string `json:"rights,omitempty"`  // matching: column B
 	Buckets       []string `json:"buckets,omitempty"` // bucketing: bucket names
 	Items         []string `json:"items,omitempty"`   // bucketing: item texts
-	Ordered       []string `json:"ordered,omitempty"` // ordering: canonical order (shuffled pre-score)
+	// ItemBuckets is the item -> bucket mapping, parallel to Items (same
+	// index). It is the bucketing answer key: hidden from players pre-score
+	// (like Answer), served to the mod and to everyone once scored.
+	ItemBuckets []string `json:"item_buckets,omitempty"`
+	Ordered     []string `json:"ordered,omitempty"` // ordering: canonical order (shuffled pre-score)
 }
 
 type ScoreRequest struct {

@@ -382,3 +382,84 @@ editorTest.describe('ordering question type (ticket #213)', () => {
     await expect(modal).toBeHidden();
   });
 });
+
+// Ticket #164: the bucketing question type. The preview's "Show answer"
+// toggle reveals the answer key — each item tagged with the bucket it
+// belongs to — since the plain player view (items | buckets) doesn't show
+// the assignment.
+editorTest.describe('bucketing question type (ticket #164)', () => {
+  editorTest('preview "Show answer" tags each item with its bucket', async ({ editorPage }) => {
+    const question = `Sort these ${unique()}`;
+    await editorPage.getByRole('button', { name: /New/ }).first().click();
+    const modal = editorPage.locator('.ant-modal:has(.ant-modal-title)');
+    await expect(modal).toBeVisible();
+    await expect(modal.locator('.ant-modal-title')).toHaveText('Add question');
+
+    // Step 1 (Basic info): switch to Bucketing — the form is empty, so the
+    // type changes immediately with no confirmation tooltip.
+    await modal.locator('.ant-radio-wrapper', { hasText: 'Bucketing' }).click();
+    await expect(editorPage.locator('.ant-popover:visible')).toHaveCount(0);
+    await modal.getByRole('button', { name: 'Next', exact: true }).click();
+
+    // Step 2 (Question editor): fill the question, add two buckets, and two
+    // items each assigned to one of them.
+    await modal.locator('#question').fill(question);
+    const addBucket = modal.getByRole('button', { name: /Add bucket/ });
+    await addBucket.click();
+    await addBucket.click();
+    await modal.locator('input[placeholder="Bucket"]').first().fill('Animals');
+    await modal.locator('input[placeholder="Bucket"]').nth(1).fill('Plants');
+    const addItem = modal.getByRole('button', { name: /Add item/ });
+    await addItem.click();
+    await addItem.click();
+    await modal.locator('input[placeholder="Item"]').first().fill('Dog');
+    await modal.locator('input[placeholder="Item"]').nth(1).fill('Rose');
+    await modal.locator('.ant-select').first().click();
+    await editorPage.locator('.ant-select-dropdown:visible .ant-select-item-option-content')
+        .filter({ hasText: /^Animals$/ }).click();
+    // Wait for the closing dropdown's leave animation to finish before opening
+    // the next select: while it animates out it still matches `:visible` and
+    // would shadow the second select's dropdown.
+    await expect(editorPage.locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden)')).toHaveCount(0);
+    await modal.locator('.ant-select').nth(1).click();
+    await editorPage.locator('.ant-select-dropdown:visible .ant-select-item-option-content')
+        .filter({ hasText: /^Plants$/ }).click();
+    await modal.getByRole('button', { name: 'Next', exact: true }).click();
+
+    // Step 3 (Preview): the default player view shows the items and buckets
+    // but not the assignments — no tags yet.
+    await expect(modal.getByText('Dog', { exact: true })).toBeVisible();
+    await expect(modal.getByText('Rose', { exact: true })).toBeVisible();
+    await expect(modal.getByText('Animals', { exact: true })).toBeVisible();
+    await expect(modal.getByText('Plants', { exact: true })).toBeVisible();
+    await expect(modal.locator('.ant-tag')).toHaveCount(0);
+
+    // "Show answer" reveals the answer key: each item tagged with its bucket.
+    await modal.getByText('Show answer').click();
+    await expect(modal.getByText('Hide answer')).toBeVisible();
+    await expect(modal.locator('.ant-tag')).toHaveCount(2);
+    const dogTag = modal.locator('li', { hasText: 'Dog' }).locator('.ant-tag');
+    const roseTag = modal.locator('li', { hasText: 'Rose' }).locator('.ant-tag');
+    await expect(dogTag).toHaveText('Animals');
+    await expect(roseTag).toHaveText('Plants');
+    // Bucket tags use the dark palette with white text (variant="solid"): the
+    // antd v6 default "filled" variant would lighten a custom hex color to 95%
+    // lightness and color the text with the original color, killing contrast.
+    await expect(dogTag).toHaveCSS('background-color', 'rgb(0, 80, 179)'); // #0050b3
+    await expect(roseTag).toHaveCSS('background-color', 'rgb(173, 78, 0)'); // #ad4e00
+    await expect(dogTag).toHaveCSS('color', 'rgb(255, 255, 255)');
+    await expect(roseTag).toHaveCSS('color', 'rgb(255, 255, 255)');
+
+    // "Hide answer" returns to the player view.
+    await modal.getByText('Hide answer').click();
+    await expect(modal.locator('.ant-tag')).toHaveCount(0);
+
+    await modal.getByRole('button', { name: 'Add', exact: true }).click();
+    await expect(modal).toBeHidden();
+
+    const row = editorPage.locator('.ant-table-tbody tr').filter({ hasText: question });
+    await expect(row).toBeVisible();
+
+    await deleteQuestion(editorPage, question);
+  });
+});
