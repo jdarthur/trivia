@@ -596,6 +596,9 @@ func loadSessionRounds(db *sql.DB, m *models.Session) error {
 			if err := getQuestion(db, questionId, &q); err != nil {
 				continue
 			}
+			// question.Category is the category's ID (ticket #180); it is
+			// resolved to the category's name below, before the snapshot rows
+			// are overlaid.
 			roundInGame.Questions = append(roundInGame.Questions, models.QuestionInRound{
 				Category:   q.Category,
 				QuestionId: questionId,
@@ -603,6 +606,10 @@ func loadSessionRounds(db *sql.DB, m *models.Session) error {
 			})
 		}
 		m.Rounds = append(m.Rounds, roundInGame)
+	}
+
+	if err := resolveRoundCategoryNames(db, m.Rounds); err != nil {
+		return err
 	}
 
 	// Overlay the per-question snapshots taken at set/score/hot-edit time.
@@ -639,6 +646,76 @@ func loadSessionRounds(db *sql.DB, m *models.Session) error {
 	}
 
 	return loadSessionQuestionChildren(db, m)
+}
+
+// resolveRoundCategoryNames rewrites each derived question's Category from the
+// category's ID to its display name, in one query.
+//
+// The session wire format carries the category NAME: the session_question
+// snapshot column stores a name (resolved at set-time, ticket #179), while the
+// question row stores the category's ID (ticket #180). Without this, the
+// questions a session has not snapshotted yet — every question the host has not
+// advanced to, and the whole round strip at game start — carry the raw UUID
+// into the gameplay category strip and breadcrumb, until navigating to a
+// question snapshots it and the name appears.
+//
+// An ID with no matching category row keeps its value rather than rendering
+// blank, matching CategoryName's fallback. (Deleting a category clears the
+// question's reference via ON DELETE SET NULL, so that row renders as empty.)
+func resolveRoundCategoryNames(db *sql.DB, rounds []models.RoundInGame) error {
+	ids := make(map[string]bool)
+	for _, round := range rounds {
+		for _, q := range round.Questions {
+			if q.Category != "" {
+				ids[q.Category] = true
+			}
+		}
+	}
+	if len(ids) == 0 {
+		return nil
+	}
+
+	names := make(map[string]string, len(ids))
+	args := make([]any, 0, len(ids))
+	for id := range ids {
+		args = append(args, id)
+	}
+	// Query in chunks of the category-ID set so a large game can't exceed
+	// SQLite's bound-parameter limit.
+	const chunk = 200
+	for start := 0; start < len(args); start += chunk {
+		end := start + chunk
+		if end > len(args) {
+			end = len(args)
+		}
+		rows, err := db.Query(`SELECT id, name FROM category WHERE id IN (`+
+			strings.TrimSuffix(strings.Repeat("?,", end-start), ",")+`)`, args[start:end]...)
+		if err != nil {
+			return err
+		}
+		for rows.Next() {
+			var id, name string
+			if err := rows.Scan(&id, &name); err != nil {
+				rows.Close()
+				return err
+			}
+			names[id] = name
+		}
+		err = rows.Err()
+		rows.Close()
+		if err != nil {
+			return err
+		}
+	}
+
+	for _, round := range rounds {
+		for i := range round.Questions {
+			if name, ok := names[round.Questions[i].Category]; ok {
+				round.Questions[i].Category = name
+			}
+		}
+	}
+	return nil
 }
 
 // loadSessionQuestionChildren fills the structured payload (choices / pairs /
