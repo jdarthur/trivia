@@ -1,0 +1,39 @@
+/* TransferQuestions — responsive, full-width transfer (round modal). */
+
+.transfer-questions {
+    width: 100%;
+}
+
+/* The transfer takes up all the available width; the two lists share it
+   equally (flex-basis 0, so a full "available" side can't grow wider than a
+   nearly-empty "in round" side) and the inline listStyle width is overridden
+   so they grow/shrink with the modal instead of being fixed at 250px. */
+.transfer-questions .ant-transfer {
+    display: flex;
+    align-items: stretch;
+    width: 100%;
+}
+
+.transfer-questions .ant-transfer-section {
+    flex: 1 1 0 !important;
+    width: auto !important;
+    min-width: 0;
+}
+
+.transfer-questions .ant-transfer-actions {
+    flex: none;
+    align-self: center;
+}
+
+/* Narrow screens: stack the two lists instead of squeezing them side by side.
+   The round modal is min(920px, 94vw), so below ~860px of viewport there is
+   no room left for both lists at a usable width. */
+@media (max-width: 860px) {
+    .transfer-questions .ant-transfer {
+        flex-direction: column;
+    }
+
+    .transfer-questions .ant-transfer-section {
+        width: 100% !important;
+    }
+}

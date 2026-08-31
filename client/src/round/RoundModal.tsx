@@ -143,7 +143,10 @@ export default function RoundModal(props: Props) {
     </div>
 
     const questionsStep = <TransferQuestions data={allQuestions} selected={questions}
-                                             setQuestionIds={onQuestionsChange}/>
+                                             setQuestionIds={onQuestionsChange}
+                                             titles={["Available questions", "Questions in round"]}
+                                             showFilters
+                                             unusedFilter={(q) => !q.rounds_used?.some(r => r !== id)}/>
 
     const body = <div style={{display: "flex", flexDirection: "column"}}>
         <Steps size="small" current={step} style={{marginBottom: 20}}
@@ -153,7 +156,7 @@ export default function RoundModal(props: Props) {
 
     return (
         <Modal open={props.visible} title={id ? "Edit round" : "Add round"}
-               onCancel={close} footer={footer} width="620px">
+               onCancel={close} footer={footer} width="min(920px, 94vw)">
             {body}
         </Modal>
     );

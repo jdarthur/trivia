@@ -56,7 +56,8 @@ export default function NewCollection(props: Props) {
                 <Input placeholder={"Collection name"} value={name} onChange={(event) => setName(event.target.value)}/>
                 <TransferQuestions data={allQuestions}
                                    setQuestionIds={setQuestions}
-                                   selected={questions} />
+                                   selected={questions}
+                                   titles={["Available questions", "Questions in collection"]} />
             </div>
         </Modal>
     )
