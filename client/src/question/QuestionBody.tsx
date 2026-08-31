@@ -1,6 +1,7 @@
 import React from 'react';
 
 import FormattedQuestion from "./FormattedQuestion";
+import BucketedItems from "./BucketedItems";
 import type {QuestionBucket, QuestionBucketItem, QuestionChoice, QuestionOrderedItem, QuestionPair} from "../types/models";
 
 interface Props {
@@ -16,8 +17,9 @@ interface Props {
     // Graded rendering mirroring the in-game question box after scoring: the
     // multiple-choice option list marks the correct choice (✅ + bold) and the
     // standalone answer line is hidden for multiple choice (it would duplicate
-    // the marked option, ticket #160). For matching/bucketing/ordering the
-    // structured lists themselves are the answer key, so they render unchanged.
+    // the marked option, ticket #160). For bucketing, the items render tagged
+    // with the bucket they belong to (the answer key); matching and ordering
+    // lists themselves are the answer key, so they render unchanged.
     scored?: boolean
     // Whether to render the standalone answer line. Only freeform questions
     // carry answer text (structured types store it in their lists), so this
@@ -69,22 +71,29 @@ export default function QuestionBody(props: Props) {
                     </tbody>
                 </table> : null}
             {props.question_type === "bucketing" && (props.items || []).length > 0 ?
-                <table style={{marginTop: 10, borderCollapse: "collapse", width: "100%"}}>
-                    <tbody>
-                        <tr>
-                            <td style={{border: "1px solid #d9d9d9", padding: "4px 8px", verticalAlign: "top"}}>
-                                <ul style={{margin: 0, paddingLeft: 18}}>
-                                    {(props.items || []).map((item, index) => <li key={index}>{item.text}</li>)}
-                                </ul>
-                            </td>
-                            <td style={{border: "1px solid #d9d9d9", padding: "4px 8px", verticalAlign: "top"}}>
-                                <ul style={{margin: 0, paddingLeft: 18}}>
-                                    {(props.buckets || []).map((bucket, index) => <li key={index}>{bucket.text}</li>)}
-                                </ul>
-                            </td>
-                        </tr>
-                    </tbody>
-                </table> : null}
+                props.scored ? (
+                    // The answer key: each item tagged with the bucket it
+                    // belongs to, colorized per bucket so the grouping is
+                    // visible at a glance.
+                    <BucketedItems items={props.items || []}/>
+                ) : (
+                    <table style={{marginTop: 10, borderCollapse: "collapse", width: "100%"}}>
+                        <tbody>
+                            <tr>
+                                <td style={{border: "1px solid #d9d9d9", padding: "4px 8px", verticalAlign: "top"}}>
+                                    <ul style={{margin: 0, paddingLeft: 18}}>
+                                        {(props.items || []).map((item, index) => <li key={index}>{item.text}</li>)}
+                                    </ul>
+                                </td>
+                                <td style={{border: "1px solid #d9d9d9", padding: "4px 8px", verticalAlign: "top"}}>
+                                    <ul style={{margin: 0, paddingLeft: 18}}>
+                                        {(props.buckets || []).map((bucket, index) => <li key={index}>{bucket.text}</li>)}
+                                    </ul>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                ) : null}
             {props.question_type === "ordering" && (props.ordered || []).length > 0 ?
                 <ol style={{marginTop: 10, paddingLeft: 20}}>
                     {(props.ordered || []).map((item, index) => <li key={index}>{item.text}</li>)}

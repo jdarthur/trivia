@@ -150,7 +150,7 @@ func stringValue(v interface{}) string {
 }
 
 // nilIfEmpty maps an empty string to NULL. question.category_id and
-// category.scoring_note_id are nullable FK columns where NULL — not '' — is
+// category.scoring_note_id are nullable FK columns where NULL — not ” — is
 // the "unset" sentinel; the API wire format keeps the historical empty string.
 func nilIfEmpty(s string) interface{} {
 	if s == "" {
@@ -723,7 +723,7 @@ func loadSessionQuestionChildren(db *sql.DB, m *models.Session) error {
 		return err
 	}
 
-	rows, err = db.Query(`SELECT round_index, question_index, position, text
+	rows, err = db.Query(`SELECT round_index, question_index, position, text, bucket_text
 		FROM session_question_bucket_item WHERE session_id = ? ORDER BY round_index, question_index, position`, m.ID)
 	if err != nil {
 		return err
@@ -731,8 +731,8 @@ func loadSessionQuestionChildren(db *sql.DB, m *models.Session) error {
 	defer rows.Close()
 	for rows.Next() {
 		var roundIndex, questionIndex, position int
-		var text string
-		if err := rows.Scan(&roundIndex, &questionIndex, &position, &text); err != nil {
+		var text, bucketText string
+		if err := rows.Scan(&roundIndex, &questionIndex, &position, &text, &bucketText); err != nil {
 			return err
 		}
 		if roundIndex >= len(m.Rounds) || questionIndex >= len(m.Rounds[roundIndex].Questions) {
@@ -741,8 +741,10 @@ func loadSessionQuestionChildren(db *sql.DB, m *models.Session) error {
 		q := &m.Rounds[roundIndex].Questions[questionIndex]
 		if q.Items == nil {
 			q.Items = make([]string, 0)
+			q.ItemBuckets = make([]string, 0)
 		}
 		q.Items = append(q.Items, text)
+		q.ItemBuckets = append(q.ItemBuckets, bucketText)
 	}
 
 	rows, err = db.Query(`SELECT round_index, question_index, position, text
