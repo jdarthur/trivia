@@ -91,7 +91,7 @@ function normalizeData(data: Question[] | undefined) {
 
 function renderQuestion(item: any) {
     return <span>
-        <b><CategoryName id={item.category}/></b>:
+        <b><CategoryName id={item.category}/></b>
         <span> {item.question} </span>
         <i>({item.answer? item.answer : "no answer"})</i>
     </span>

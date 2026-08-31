@@ -4,9 +4,10 @@
     width: 100%;
 }
 
-/* The transfer takes up all the available width; the two lists share it and
-   the inline listStyle width is overridden so they grow/shrink with the
-   modal instead of being fixed at 250px. */
+/* The transfer takes up all the available width; the two lists share it
+   equally (flex-basis 0, so a full "available" side can't grow wider than a
+   nearly-empty "in round" side) and the inline listStyle width is overridden
+   so they grow/shrink with the modal instead of being fixed at 250px. */
 .transfer-questions .ant-transfer {
     display: flex;
     align-items: stretch;
@@ -14,7 +15,7 @@
 }
 
 .transfer-questions .ant-transfer-section {
-    flex: 1 1 auto !important;
+    flex: 1 1 0 !important;
     width: auto !important;
     min-width: 0;
 }
