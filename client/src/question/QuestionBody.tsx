@@ -1,6 +1,7 @@
 import React from 'react';
 
 import FormattedQuestion from "./FormattedQuestion";
+import {hashSeed, seededShuffle} from "../common/shuffle";
 import BucketedItems from "./BucketedItems";
 import type {QuestionBucket, QuestionBucketItem, QuestionChoice, QuestionOrderedItem, QuestionPair} from "../types/models";
 
@@ -25,6 +26,13 @@ interface Props {
     // carry answer text (structured types store it in their lists), so this
     // only affects freeform questions.
     show_answer?: boolean
+    // Ordering (ticket #213): when set, the items render as a bullet list in
+    // a deterministic scrambled order — mirroring the shuffled list players
+    // see in-game pre-score (ticket #211/#215) — instead of the canonical
+    // numbered answer key. Used by the editor's Preview step before "Show
+    // answer"; the read-only question cards show the answer key, so they
+    // leave this off.
+    scramble_ordered?: boolean
 }
 
 /**
@@ -95,9 +103,22 @@ export default function QuestionBody(props: Props) {
                     </table>
                 ) : null}
             {props.question_type === "ordering" && (props.ordered || []).length > 0 ?
-                <ol style={{marginTop: 10, paddingLeft: 20}}>
-                    {(props.ordered || []).map((item, index) => <li key={index}>{item.text}</li>)}
-                </ol> : null}
+                props.scramble_ordered ? (
+                    // The pre-answer preview: a bullet list in a deterministic
+                    // scrambled order (same shuffle the mod's in-game question
+                    // box uses, ticket #215) — seeded from the question's own
+                    // content so the preview is stable across re-renders.
+                    <ul style={{marginTop: 10, paddingLeft: 20}}>
+                        {seededShuffle((props.ordered || []).map(item => item.text),
+                                       hashSeed(props.question, ...(props.ordered || []).map(item => item.text)))
+                            .map((text, index) => <li key={index}>{text}</li>)}
+                    </ul>
+                ) : (
+                    // The answer key: the canonical order, numbered 1..n.
+                    <ol style={{marginTop: 10, paddingLeft: 20}}>
+                        {(props.ordered || []).map((item, index) => <li key={index}>{item.text}</li>)}
+                    </ol>
+                ) : null}
         </div>
     );
 }

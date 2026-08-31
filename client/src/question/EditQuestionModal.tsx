@@ -401,7 +401,7 @@ export default function EditQuestionModal(props: Props) {
 
         {structuredNote}
         <div style={{marginBottom: 10}}>
-            <div style={{fontWeight: 600, marginBottom: 4}}>Ordered items (first = correct first)</div>
+            <div style={{fontWeight: 600, marginBottom: 4}}>Ordered items (in correct order)</div>
             {(props.ordered || []).map((item, index) => (
                 <div key={index} style={{display: "flex", alignItems: "center", marginBottom: 6}}>
                     <span style={{width: 22, flexShrink: 0}}>{index + 1}.</span>
@@ -439,7 +439,8 @@ export default function EditQuestionModal(props: Props) {
                           ordered={props.ordered}
                           max_width={425}
                           scored={showAnswer}
-                          show_answer={showAnswer}/>
+                          show_answer={showAnswer}
+                          scramble_ordered={!showAnswer}/>
             <div style={{marginTop: 8}}>
                 <a onClick={() => setShowAnswer(!showAnswer)} style={{fontSize: 12}}>
                     {showAnswer ? "Hide answer" : "Show answer"}
