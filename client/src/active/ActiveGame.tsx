@@ -2,7 +2,7 @@ import React from 'react';
 import './ActiveGame.css';
 import ActiveQuestion from "./ActiveQuestion"
 import ActiveRound from "./ActiveRound"
-import NextOrPrevious from "../control/NextOrPrevious"
+import GameControlCard from "../control/GameControlCard"
 import AnswerQuestion from "../answer/AnswerQuestion"
 import PlayerScorer from "../admin-scorer/PlayerScorer"
 import PlayerStatus from "../players/PlayerStatus"
@@ -39,9 +39,16 @@ interface State {
     items: string[]
     item_buckets: string[]
     ordered: string[]
+    // Mirrored from PlayerScorer (see its on_scorable prop): the Score button
+    // lives in this component's control card, not in the scorer.
+    scorable: boolean
 }
 
 class ActiveGame extends React.Component<Props, State> {
+
+    // The scorer holds every player's judgment; the control card's Score
+    // button submits through it.
+    scorer_ref = React.createRef<PlayerScorer>()
 
     constructor(props: Props) {
         super(props)
@@ -62,8 +69,17 @@ class ActiveGame extends React.Component<Props, State> {
             buckets: [],
             items: [],
             item_buckets: [],
-            ordered: []
+            ordered: [],
+            scorable: false
         }
+    }
+
+    set_scorable = (scorable: boolean) => {
+        this.setState({scorable: scorable})
+    }
+
+    score = () => {
+        this.scorer_ref.current?.score()
     }
 
     // Ticket #146: a slow response for a previous question/round must not
@@ -209,12 +225,14 @@ class ActiveGame extends React.Component<Props, State> {
                                                               ordered={this.state.ordered}/> : null}
 
                         {this.props.is_mod ?
-                            <NextOrPrevious questions={question_indices} rounds={this.props.rounds}
-                                            active_question={this.state.active_question}
-                                            active_round={this.state.active_round}
-                                            session_id={this.props.session_id}
-                                            player_id={this.props.player_id}
-                                            fullRounds={this.props.fullRounds}
+                            <GameControlCard questions={question_indices} rounds={this.props.rounds}
+                                             active_question={this.state.active_question}
+                                             active_round={this.state.active_round}
+                                             session_id={this.props.session_id}
+                                             player_id={this.props.player_id}
+                                             fullRounds={this.props.fullRounds}
+                                             score_disabled={!this.state.scorable}
+                                             on_score={this.score}
                             /> : null}
 
                     </div>
@@ -224,11 +242,12 @@ class ActiveGame extends React.Component<Props, State> {
 
                 </div>
                 {this.props.is_mod ?
-                    <PlayerScorer question_id={this.state.active_question}
+                    <PlayerScorer ref={this.scorer_ref} question_id={this.state.active_question}
                                   round_id={this.state.active_round} session_id={this.props.session_id}
                                   player_id={this.props.player_id} session_state={this.props.session_state}
                                   scored={this.state.scored as boolean}
-                                  question_type={this.state.question_type}/> : null}
+                                  question_type={this.state.question_type}
+                                  on_scorable={this.set_scorable}/> : null}
 
                 {!this.props.is_mod ?
                     <PlayerStatus question_id={this.state.active_question}

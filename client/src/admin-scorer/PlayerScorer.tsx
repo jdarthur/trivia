@@ -3,8 +3,6 @@ import sendData from "../index"
 import PlayerAnswer from "./PlayerAnswers"
 import "./Scorer.css"
 
-import {Button} from "antd"
-
 interface ScoreState {
     correct?: boolean
     score_override?: number | string | null
@@ -18,6 +16,13 @@ interface Props {
     session_state: any
     scored: boolean
     question_type?: string
+    /**
+     * Reports whether every active player has been judged, i.e. whether
+     * score() would do anything. The Score button lives in the moderator's
+     * GameControlCard (not in this component), so it needs to mirror this.
+     * Called on mount and whenever it changes.
+     */
+    on_scorable?: (scorable: boolean) => void
 }
 
 interface State {
@@ -42,7 +47,12 @@ class PlayerScorer extends React.Component<Props, State> {
     // for them can be dropped (ticket #8).
     latest_answer_ids: Record<string, string> = {}
 
+    // Last value handed to on_scorable, so the parent is only told when it
+    // actually changes (otherwise its setState would re-render on every bump).
+    last_reported_scorable: boolean | null = null
+
     componentDidMount() {
+        this.report_scorable()
         const answers = sessionStorage.getItem("answers")
         if (answers && answers !== "undefined") {
             const answersStored = JSON.parse(answers)
@@ -68,6 +78,21 @@ class PlayerScorer extends React.Component<Props, State> {
             // was scored): refetch the answers.
             this.get_answers()
         }
+        // Judging a player (or a fresh fetch of the answers) can flip
+        // scorable(); the Score button lives outside this component, so keep
+        // the parent in sync after every update.
+        this.report_scorable()
+    }
+
+    // Tell the parent whether the question can be scored, but only when the
+    // answer changed — the parent holds it in state to drive the button.
+    report_scorable = () => {
+        const scorable = this.scorable()
+        if (scorable === this.last_reported_scorable) {
+            return
+        }
+        this.last_reported_scorable = scorable
+        this.props.on_scorable?.(scorable)
     }
 
     get_answers = () => {
@@ -296,12 +321,12 @@ class PlayerScorer extends React.Component<Props, State> {
             return card
         })
 
+        // The Score button is not here: it lives in the moderator's
+        // GameControlCard (which calls score() and mirrors scorable() through
+        // the on_scorable prop), so the scorer is only the per-player cards.
         return (
             <div className="player-scorer">
                 {answers}
-                <Button type="primary" onClick={this.score} disabled={!this.scorable()} style={{margin: 10}}>
-                    Score
-                </Button>
             </div>
         );
     }

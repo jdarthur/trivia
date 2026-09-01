@@ -1,6 +1,33 @@
-.next-or-previous {
+/*
+ * The moderator's control card (GameControlCard): one row of three slots —
+ * back, score, forward. Each slot flexes equally so the score button stays
+ * centred even when the back slot is empty (first question of the game).
+ */
+.game-control-card {
+    width: 100%;
+}
+
+.game-control-row {
     display: flex;
     flex-direction: row;
-    justify-content: space-between;
-    padding: 10px;
+    align-items: center;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 8px 10px;
+}
+
+/* Equal-width slots so Score sits dead centre. The slots keep their default
+   automatic minimum size (a button's own text width), so on a narrow screen
+   the row wraps rather than letting the buttons overlap. */
+.game-control-slot {
+    flex: 1;
+    display: flex;
+}
+
+.game-control-slot-center {
+    justify-content: center;
+}
+
+.game-control-slot-end {
+    justify-content: flex-end;
 }
