@@ -1387,7 +1387,7 @@ test.describe('gameplay navigation, hot-edit, spectator & edge cases', () => {
     // Pre-score (ticket #215): the mod's question box lists the ordering items
     // in a shuffled order — the server serves the mod the canonical order, so
     // the client shows a deterministic shuffle, always a permutation.
-    const modItems = modBox.locator('ol li');
+    const modItems = modBox.locator('ul li');
     await expect(modItems).toHaveCount(3, { timeout: 30000 });
     const preScore = (await modItems.allTextContents()).map((t) => t.trim());
     expect(new Set(preScore)).toEqual(new Set(['First', 'Second', 'Third']));
@@ -1421,7 +1421,7 @@ test.describe('gameplay navigation, hot-edit, spectator & edge cases', () => {
     }).toBe(true);
 
     await expect
-      .poll(async () => (await modBox.locator('ol li').allTextContents()).map((t) => t.trim()), { timeout: 30000 })
+      .poll(async () => (await modBox.locator('ul li').allTextContents()).map((t) => t.trim()), { timeout: 30000 })
       .toEqual(['First', 'Second', 'Third']);
 
     await playerContext.close();
