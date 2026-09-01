@@ -124,11 +124,15 @@ class ActiveQuestion extends React.Component<Props, State> {
         // standalone answer line is hidden to avoid duplicating it. The same
         // applies to a scored bucketing question: the item list below is the
         // answer key (each item tagged with its bucket), so the derived
-        // answer text would duplicate it.
+        // answer text would duplicate it. A scored ordering question is the
+        // same: its list below shows the canonical order (the answer key), so
+        // the standalone answer line would just repeat it.
         const mcScored = this.props.scored && this.props.question_type === "multiple_choice"
         const bucketingScored = this.props.scored && this.props.question_type === "bucketing"
             && (this.props.items || []).length > 0
-        const hideAnswerLine = mcScored || bucketingScored
+        const orderingScored = this.props.scored && this.props.question_type === "ordering"
+            && (this.props.ordered || []).length > 0
+        const hideAnswerLine = mcScored || bucketingScored || orderingScored
 
         // The bucketing answer key once scored: items tagged with the bucket
         // they belong to (same rendering as the editor preview's Show answer).
@@ -210,9 +214,9 @@ class ActiveQuestion extends React.Component<Props, State> {
                         </table>
                         ) : null}
                     {this.props.question_type === "ordering" && (this.props.ordered || []).length > 0 ?
-                        <ol style={{marginTop: 10, paddingLeft: 20}}>
+                        <ul style={{marginTop: 10, paddingLeft: 20}}>
                             {this.orderedItems().map((item, index) => <li key={index}>{item}</li>)}
-                        </ol> : null}
+                        </ul> : null}
                     {editQuestionModal}
                 </div>
             </Card>

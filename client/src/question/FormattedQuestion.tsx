@@ -3,7 +3,7 @@ import React, {memo} from 'react';
 import ReactMarkdown from "react-markdown";
 import type {Components} from "react-markdown";
 import remarkGfm from 'remark-gfm'
-import {Image} from 'antd'
+import {Divider, Image} from 'antd'
 
 import './Question.css';
 
@@ -36,6 +36,7 @@ export default function FormattedQuestion(props: Props) {
                            children={props.question}
                            remarkPlugins={[remarkGfm]}
             />
+            {answer ? <Divider style={{margin: "12px 0"}}/> : null}
             <ReactMarkdown components={renderers} children={answer}
                            remarkPlugins={[remarkGfm]}
             />
