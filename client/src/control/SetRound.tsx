@@ -9,6 +9,8 @@ interface Props {
     target: number
     question_target?: number
     label: string
+    // Leading icon for the moderator's control card (e.g. <DoubleRightOutlined/>).
+    icon?: React.ReactNode
 }
 
 interface State {
@@ -45,8 +47,13 @@ class SetRound extends React.Component<Props, State> {
 
 
     render() {
+        // aria-label keeps the accessible name to just the label: the icon's
+        // own aria-label would otherwise be read out as part of the button.
         return (
-            <Button type="primary" onClick={this.set_round} disabled={this.state.loading}> {this.props.label} </Button>
+            <Button onClick={this.set_round} disabled={this.state.loading}
+                    icon={this.props.icon} aria-label={this.props.label}>
+                {this.props.label}
+            </Button>
         );
     }
 }

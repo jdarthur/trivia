@@ -450,7 +450,7 @@ test.describe('gameplay question flow, answering & wagering', () => {
     await expect(modPage.locator('.active-game')).toBeVisible({ timeout: 30000 });
     await expect(playerPage.locator('.active-game')).toBeVisible({ timeout: 30000 });
 
-    // Mod advances to the second question (NextOrPrevious -> SetQuestion).
+    // Mod advances to the second question (GameControlCard -> SetQuestion).
     await modPage.getByRole('button', { name: 'Next Question', exact: true }).click();
     await expect(modPage.locator('.active-question-box')).toContainText(`Second question ${prefix}`, {
       timeout: 30000,
@@ -563,10 +563,12 @@ async function answerQuestion(page: Page, wager: number, answer: string) {
 }
 
 // Mark every joined player correct/incorrect in the mod's scorer and submit.
+// The judgment lives in the scorer row; the Score button itself is the mod's
+// control card (GameControlCard) under the question.
 async function scoreCurrentQuestion(modPage: Page, correct: boolean) {
   const scorer = modPage.locator('.player-scorer');
   await scorer.locator(`button:has(.anticon-${correct ? 'check' : 'close'})`).click();
-  const scoreButton = scorer.getByRole('button', { name: 'Score', exact: true });
+  const scoreButton = modPage.locator('.game-control-card').getByRole('button', { name: 'Score', exact: true });
   await expect(scoreButton).toBeEnabled();
   await scoreButton.click();
 }
@@ -744,7 +746,9 @@ test.describe('gameplay scoring, scoreboard & statuses', () => {
     // though the new answer is loaded, the Score button stays disabled.
     const scorer = g.modPage.locator('.player-scorer');
     await expect(scorer.locator('button:has(.anticon-check)')).toBeVisible({ timeout: 30000 });
-    await expect(scorer.getByRole('button', { name: 'Score', exact: true })).toBeDisabled();
+    await expect(
+      g.modPage.locator('.game-control-card').getByRole('button', { name: 'Score', exact: true }),
+    ).toBeDisabled();
 
     // Score the second question correct for 200 -> total 300.
     await scoreCurrentQuestion(g.modPage, true);
@@ -1099,7 +1103,7 @@ test.describe('gameplay navigation, hot-edit, spectator & edge cases', () => {
     // Multiple choice is auto-scored by the backend, so the mod's scorer has
     // no manual correct/incorrect buttons — the Score button is all that's
     // needed (see PlayerAnswers' !auto_scored guard).
-    const scoreButton = modPage.locator('.player-scorer').getByRole('button', { name: 'Score', exact: true });
+    const scoreButton = modPage.locator('.game-control-card').getByRole('button', { name: 'Score', exact: true });
     await expect(scoreButton).toBeEnabled({ timeout: 30000 });
     await scoreButton.click();
 
@@ -1190,7 +1194,7 @@ test.describe('gameplay navigation, hot-edit, spectator & edge cases', () => {
 
     // Bucketing is auto-scored by the backend, so the mod's scorer has no
     // manual correct/incorrect buttons — the Score button is all that's needed.
-    const scoreButton = modPage.locator('.player-scorer').getByRole('button', { name: 'Score', exact: true });
+    const scoreButton = modPage.locator('.game-control-card').getByRole('button', { name: 'Score', exact: true });
     await expect(scoreButton).toBeEnabled({ timeout: 30000 });
     await scoreButton.click();
 
@@ -1333,7 +1337,7 @@ test.describe('gameplay navigation, hot-edit, spectator & edge cases', () => {
     // Ordering is auto-scored by the backend (ticket #212), so the mod's
     // scorer has no manual correct/incorrect buttons — the Score button is
     // all that's needed.
-    const scoreButton = modPage.locator('.player-scorer').getByRole('button', { name: 'Score', exact: true });
+    const scoreButton = modPage.locator('.game-control-card').getByRole('button', { name: 'Score', exact: true });
     await expect(scoreButton).toBeEnabled({ timeout: 30000 });
     await scoreButton.click();
 
@@ -1412,7 +1416,7 @@ test.describe('gameplay navigation, hot-edit, spectator & edge cases', () => {
       .toEqual(['First', 'Second', 'Third']);
 
     // Score, then the mod's question box reveals the canonical order.
-    const scoreButton = modPage.locator('.player-scorer').getByRole('button', { name: 'Score', exact: true });
+    const scoreButton = modPage.locator('.game-control-card').getByRole('button', { name: 'Score', exact: true });
     await expect(scoreButton).toBeEnabled({ timeout: 30000 });
     await scoreButton.click();
     await expect.poll(async () => {
