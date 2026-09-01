@@ -120,6 +120,7 @@ func main() {
 	//router.GET("/gameplay/sessions",s.GetAllSessions)
 	router.GET("/gameplay/session/:id", s.GetOneSession)
 	router.GET("/gameplay/session/:id/scoreboard", s.GetSessionScoreboard)
+	router.GET("/gameplay/session/:id/score-history", s.GetSessionScoreHistory)
 	router.POST("/gameplay/session", s.CreateSession)
 	router.PUT("/gameplay/session/:id", s.UpdateSession)
 	router.DELETE("/gameplay/session/:id", s.DeleteSession)
