@@ -194,9 +194,11 @@
 
 /* Stickers look like little labels: rounded, slightly tilted, with a soft
  * shadow. The emoji is ~20% larger than the base chip text so it reads as
- * the main content. */
+ * the main content. Every sticker is clickable — your own removes your
+ * reaction, another team's quick-reacts the same emoji — so they all get the
+ * pointer cursor. */
 .reaction-chip {
-    cursor: default;
+    cursor: pointer;
     border: 1px solid #d9d9d9;
     border-radius: 10px;
     padding: 0 6px;
@@ -215,9 +217,8 @@
     transform: rotate(1.5deg);
 }
 
-/* The caller's own reaction is highlighted and tap-to-remove. */
+/* The caller's own reaction is highlighted (and tap-to-remove). */
 .reaction-chip.mine {
-    cursor: pointer;
     background: #d9f7be;
     border-color: #52c41a;
     font-weight: bold;

@@ -848,6 +848,31 @@ test.describe('gameplay scoring, scoreboard & statuses', () => {
     await expect(playerControl.locator('.reaction-chip')).toHaveCount(1, { timeout: 30000 });
     await expect(playerControl.locator('.reaction-chip').filter({ hasText: '😂' })).toHaveCount(0);
 
+    // Quick-react: the player taps the *mod's* ❤️ sticker (the only one left,
+    // not theirs) and the same emoji is reacted for the player's own team —
+    // the sticker becomes the player's and its count goes 1 -> 2.
+    const modHeart = playerControl.locator('.reaction-chip').filter({ hasText: '❤️' });
+    await expect(modHeart).toHaveCount(1, { timeout: 30000 });
+    await expect(modHeart).not.toHaveClass(/mine/);
+    await expect(modHeart).toContainText('1');
+    await modHeart.click();
+    await expect(playerControl.locator('.reaction-chip.mine').filter({ hasText: '❤️' })).toContainText('2', {
+      timeout: 30000,
+    });
+
+    // The mod sees the shared count, and it stays *their* sticker on their side.
+    await expect(modControl.locator('.reaction-chip.mine').filter({ hasText: '❤️' })).toContainText('2', {
+      timeout: 30000,
+    });
+
+    // Tapping it again now removes the player's copy (the sticker is theirs),
+    // leaving only the mod's ❤️.
+    await playerControl.locator('.reaction-chip.mine').filter({ hasText: '❤️' }).click();
+    await expect(playerControl.locator('.reaction-chip').filter({ hasText: '❤️' })).toContainText('1', {
+      timeout: 30000,
+    });
+    await expect(playerControl.locator('.reaction-chip.mine')).toHaveCount(0, { timeout: 30000 });
+
     await g.playerContext.close();
     await g.modContext.close();
     await cleanup(request, g.seeded, { sessionId: g.sessionId, modId: g.modId, playerIds: [g.playerId] });

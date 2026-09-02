@@ -15,19 +15,17 @@ interface Props {
     my_reaction?: string
 }
 
-interface State {
-    picker_open: boolean
-}
-
 /**
  * Emoji reactions on one scored answer (ticket #156), in two pieces that
  * anchor to different boxes:
  *
  * - `ReactionStickers` — the counts, rendered as stickers "stuck" across the
  *   top of the card starting at the top-right corner and flowing leftward.
- *   Hovering a sticker shows the team names of the players who reacted with it.
- *   Callers render this as a direct child of the card (`position: relative`),
- *   which also carries the `reaction-host` class used by the e2e specs.
+ *   Hovering a sticker shows the team names of the players who reacted with it,
+ *   and clicking one acts on it: your own sticker removes your reaction,
+ *   another team's quick-reacts the same emoji for your team. Callers render
+ *   this as a direct child of the card (`position: relative`), which also
+ *   carries the `reaction-host` class used by the e2e specs.
  * - `ReactionAdd` — the "+" button that opens an emoji picker
  *   (emoji-picker-react) in a Popover, so the small answer cards don't carry
  *   the full picker UI. Callers render this *inside the answer box* (also
@@ -96,15 +94,23 @@ export function ReactionStickers({session_id, current_player, answer_id, reactio
             const who = summary.players && summary.players.length > 0
                 ? summary.players.join(', ')
                 : undefined
+            // Every sticker is clickable: your own removes your reaction,
+            // someone else's quick-reacts the same emoji for your team (the
+            // PUT upserts on UNIQUE(answer_id, player_id), so it also replaces
+            // whatever you had reacted with).
+            const click = !answer_id ? undefined : () => mine
+                ? remove_reaction(session_id, answer_id, current_player)
+                : set_reaction(session_id, answer_id, current_player, emoji)
+            // The tooltip names who reacted and what the click will do.
+            const action = mine ? "click to remove" : "click to react the same"
+            const title = who ? who + " — " + action : action
             const chip = (
                 <span key={emoji} className={"reaction-chip" + (mine ? " mine" : "")}
-                      onClick={mine && answer_id
-                          ? () => remove_reaction(session_id, answer_id, current_player)
-                          : undefined}>
+                      onClick={click}>
                     {emoji} {summary.count}
                 </span>
             )
-            return who ? <Tooltip key={emoji} title={who}>{chip}</Tooltip> : chip
+            return <Tooltip key={emoji} title={title}>{chip}</Tooltip>
         })
 
     if (stickers.length === 0) return null
