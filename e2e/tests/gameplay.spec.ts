@@ -877,6 +877,74 @@ test.describe('gameplay scoring, scoreboard & statuses', () => {
     await g.modContext.close();
     await cleanup(request, g.seeded, { sessionId: g.sessionId, modId: g.modId, playerIds: [g.playerId] });
   });
+
+  // Ticket #239: the score graph modal (opened from the scoreboard title
+  // button) renders the chart + legend, tracks the live game while it stays
+  // open, and dismisses with the scoreboard still updating behind it.
+  //
+  // The graph is opened on the PLAYER's page: an open antd modal's wrap
+  // swallows clicks on its own page, so the actor that keeps driving (the mod,
+  // advancing and scoring) must stay modal-free while the player's graph
+  // refetches on the session-state changes.
+  test('the score graph modal opens, tracks a scored question while open, and dismisses with the scoreboard live', async ({
+    browser,
+    request,
+  }) => {
+    test.setTimeout(120000);
+    const prefix = unique();
+    const g = await setupActiveGame(browser, request, prefix);
+
+    // Score the first question (100).
+    await answerQuestion(g.playerPage, 100, 'First answer');
+    await scoreCurrentQuestion(g.modPage, true);
+    await expect(
+      g.modPage.locator('.scoreboard .ant-card').filter({ hasText: g.teamName }),
+    ).toContainText('100', { timeout: 30000 });
+
+    // Advance to the second question and have the player answer it before the
+    // graph opens, so the player's answer card is not behind the modal.
+    await g.modPage.getByRole('button', { name: 'Next Question', exact: true }).click();
+    await expect(g.playerPage.locator('.active-question-box')).toContainText(`Second question ${prefix}`, {
+      timeout: 30000,
+    });
+    await answerQuestion(g.playerPage, 200, 'Second answer');
+
+    // Open the score graph from the scoreboard's title button.
+    await g.playerPage.getByRole('button', { name: 'Show score graph' }).click();
+    const modal = g.playerPage.locator('.score-graph-modal');
+    await expect(modal).toBeVisible({ timeout: 30000 });
+    await expect(modal).toContainText('Score progression');
+
+    // The chart (stable .score-chart class — no SVG internals) draws the
+    // team's line over the two reached questions, and the legend lists the
+    // team with its running total (Q2 not scored yet, so it stays flat at 100).
+    await expect(modal.locator('.score-chart')).toBeVisible({ timeout: 30000 });
+    await expect(modal.locator('.score-chart .score-chart-line')).toHaveCount(1);
+    const legendRow = modal.locator('.score-graph-legend-row').filter({ hasText: g.teamName });
+    await expect(legendRow).toBeVisible();
+    await expect(legendRow).toContainText('100');
+
+    // Score the second question (200) on the mod's page: the still-open graph
+    // refetches on the session-state change and the legend total moves to 300.
+    await scoreCurrentQuestion(g.modPage, true);
+    await expect(legendRow).toContainText('300', { timeout: 30000 });
+
+    // The scoreboard behind the open modal updated too...
+    await expect(
+      g.playerPage.locator('.scoreboard .ant-card').filter({ hasText: g.teamName }),
+    ).toContainText('300', { timeout: 30000 });
+
+    // ...and the modal dismisses cleanly, leaving the live scoreboard visible.
+    await modal.locator('.ant-modal-close').click();
+    await expect(modal).not.toBeVisible();
+    await expect(
+      g.playerPage.locator('.scoreboard .ant-card').filter({ hasText: g.teamName }),
+    ).toContainText('300');
+
+    await g.playerContext.close();
+    await g.modContext.close();
+    await cleanup(request, g.seeded, { sessionId: g.sessionId, modId: g.modId, playerIds: [g.playerId] });
+  });
 });
 
 // --- Ticket #112: navigation, hot-edit, spectator & edge cases ------------
