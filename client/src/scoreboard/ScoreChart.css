@@ -1,0 +1,68 @@
+/*
+ * ScoreChart: the cumulative-score line graph (ticket #236, part of #233).
+ *
+ * The SVG sizes itself with viewBox + preserveAspectRatio, so it fills its
+ * container's width and keeps its aspect ratio inside the modal on phones.
+ * Class names are prefixed .score-chart-* — client CSS is global, so nothing
+ * here is bare (a plain `.gridline` or `.axis` could collide with a rule
+ * elsewhere in the app).
+ */
+.score-chart {
+    display: block;
+    width: 100%;
+    height: auto;
+    background: white;
+}
+
+.score-chart-empty {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 160px;
+    border: 1px dashed #d9d9d9;
+    border-radius: 6px;
+    color: rgba(0, 0, 0, 0.45);
+    font-size: 0.9em;
+}
+
+/* Gridlines are lighter than the axis; the zero line sits between them. */
+.score-chart-grid {
+    stroke: #f0f0f0;
+    stroke-width: 1;
+}
+.score-chart-zero {
+    stroke: #bfbfbf;
+    stroke-width: 1;
+}
+.score-chart-axis {
+    stroke: #d9d9d9;
+    stroke-width: 1;
+}
+
+/* Round boundaries read as a slightly heavier divider than a gridline. */
+.score-chart-round-edge {
+    stroke: #d9d9d9;
+    stroke-width: 1.5;
+}
+
+.score-chart-y-label,
+.score-chart-x-label {
+    fill: rgba(0, 0, 0, 0.45);
+    font-size: 12px;
+}
+.score-chart-round-label {
+    fill: rgba(0, 0, 0, 0.45);
+    font-size: 11px;
+    font-weight: bold;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.score-chart-line {
+    stroke-width: 2;
+    fill: none;
+}
+.score-chart-dot {
+    stroke: white;
+    stroke-width: 0.75;
+}
