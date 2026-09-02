@@ -2,7 +2,7 @@ import React from 'react';
 import "./Players.css"
 import PlayerIcon from '../lobby/PlayerIcon';
 import MultiAnswer from "../admin-scorer/MultiAnswer"
-import ReactionControl from "../players/ReactionControl";
+import {ReactionAdd, ReactionStickers} from "../players/ReactionControl";
 
 import {Card, Tooltip} from "antd"
 
@@ -97,15 +97,18 @@ class CorrectOrNot extends React.Component<Props> {
         // Reactions exist once the question is scored: only scored answers
         // carry an answer_id, so the control stays hidden while the question
         // is still open (this view also renders pre-scoring in the status
-        // modal). The control overlays the whole card — stickers "stuck"
-        // across the top starting at the top-right corner (where this team's
-        // icon sits) and flowing leftward; the + button sits at the right
-        // side of the answer. It attaches to the latest answer, the one
-        // rendered prominently.
-        const reactions = last_answer.answer_id ?
-            <ReactionControl session_id={this.props.session_id} current_player={this.props.current_player}
-                             answer_id={last_answer.answer_id} reactions={last_answer.reactions}
-                             my_reaction={last_answer.my_reaction}/> : null
+        // modal). The stickers are a direct child of the card so they straddle
+        // its top edge; the + button lives inside the answer box so it centers
+        // on the answer and is inset from the box's right edge. Both attach to
+        // the latest answer, the one rendered prominently.
+        const can_react = Boolean(last_answer.answer_id)
+        const reaction_props = {
+            session_id: this.props.session_id,
+            current_player: this.props.current_player,
+            answer_id: last_answer.answer_id,
+            reactions: last_answer.reactions,
+            my_reaction: last_answer.my_reaction,
+        }
 
         return (<div className={this.props.is_mobile ? "player-status-box player-status-box-mini" : "player-status-box"}
                  style={{display: 'flex', alignItems: 'stretch'}}>
@@ -119,19 +122,25 @@ class CorrectOrNot extends React.Component<Props> {
                     </Card> :
                     //show full version with full answers
                     <Card size="small" title={title} extra={icon}
+                          // reaction-host: the card that carries both reaction
+                          // pieces (stickers here, + button in the answer box)
+                          className={can_react ? "reaction-host" : undefined}
                           style={{
                               flex: 1,
                               display: 'flex',
                               flexDirection: 'column',
                               justifyContent: 'space-between',
-                              // anchors the reaction overlay to the whole card
+                              // anchors the reaction sticker strip to the card
                               position: 'relative'
                           }}>
 
-                        <div className="answer-text"><MultiAnswer answers={this.props.answers} omitWager={true}
-                                                                  question_type={this.props.question_type}/></div>
+                        <div className={can_react ? "answer-text reaction-anchor" : "answer-text"}>
+                            <MultiAnswer answers={this.props.answers} omitWager={true}
+                                         question_type={this.props.question_type}/>
+                            {can_react ? <ReactionAdd {...reaction_props} /> : null}
+                        </div>
                         {correctness_and_wager}
-                        {reactions}
+                        {can_react ? <ReactionStickers {...reaction_props} /> : null}
                     </Card>}
             </div>
         )

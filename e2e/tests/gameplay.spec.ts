@@ -771,8 +771,8 @@ test.describe('gameplay scoring, scoreboard & statuses', () => {
 
     // Reactions only exist once the question is scored: neither the player's
     // status bar nor the mod's scorer renders the control before that.
-    await expect(g.playerPage.locator('.reaction-control')).toHaveCount(0);
-    await expect(g.modPage.locator('.reaction-control')).toHaveCount(0);
+    await expect(g.playerPage.locator('.reaction-host')).toHaveCount(0);
+    await expect(g.modPage.locator('.reaction-host')).toHaveCount(0);
 
     await answerQuestion(g.playerPage, 100, 'First answer');
     await scoreCurrentQuestion(g.modPage, true);
@@ -782,8 +782,32 @@ test.describe('gameplay scoring, scoreboard & statuses', () => {
 
     // The player adds a 👍 reaction on their team's answer card. The mod's
     // own card has no answer, so exactly one control exists per page.
-    const playerControl = g.playerPage.locator('.player-status-bar .reaction-control');
+    const playerControl = g.playerPage.locator('.player-status-bar .reaction-host');
     await expect(playerControl).toHaveCount(1, { timeout: 30000 });
+
+    // Spacing: the "+" button is a flex sibling of the answer inside the answer
+    // box, so it sits beside the answer — vertically centered on it, inset from
+    // the card's right edge, and never overlapping the answer text — without
+    // costing the answer a line. Anchoring it to the card instead centered it
+    // on the title row and let it land on the answer text.
+    //
+    // `.reaction-host` is the Card element itself, so the host's box is the
+    // card's box; the card height is the tell for the answer having wrapped.
+    const expectAddBesideAnswer = async (control: Locator, cardHeightLimit: number) => {
+        const add = await control.locator('.reaction-add').boundingBox();
+        const answer = await control.locator('.reaction-anchor > :first-child').boundingBox();
+        const card = await control.boundingBox();
+        expect(add).not.toBeNull();
+        expect(answer).not.toBeNull();
+        expect(card).not.toBeNull();
+        if (!add || !answer || !card) return;
+        expect(Math.abs((add.y + add.height / 2) - (answer.y + answer.height / 2))).toBeLessThan(2);
+        expect(add.x).toBeGreaterThanOrEqual(answer.x + answer.width);
+        expect(card.x + card.width - (add.x + add.width)).toBeGreaterThanOrEqual(6);
+        expect(card.height).toBeLessThan(cardHeightLimit);
+    };
+    await expectAddBesideAnswer(playerControl, 150);
+
     await playerControl.locator('.reaction-add-button').click();
     await pickEmoji(g.playerPage, 'thumbs up', '1f44d');
     await expect(playerControl.locator('.reaction-chip.mine').filter({ hasText: '👍' })).toContainText('1', {
@@ -791,11 +815,15 @@ test.describe('gameplay scoring, scoreboard & statuses', () => {
     });
 
     // The reaction appears on the mod's page after the session-state refetch.
-    const modControl = g.modPage.locator('.player-scorer .reaction-control');
+    const modControl = g.modPage.locator('.player-scorer .reaction-host');
     await expect(modControl).toHaveCount(1, { timeout: 30000 });
     await expect(modControl.locator('.reaction-chip').filter({ hasText: '👍' })).toContainText('1', {
       timeout: 30000,
     });
+
+    // The moderator's scorer card is the narrow one, and the one where the
+    // button clipped the answer text — same check there guards the regression.
+    await expectAddBesideAnswer(modControl, 150);
 
     // The mod (also a player) adds their own ❤️ reaction.
     await modControl.locator('.reaction-add-button').click();
@@ -819,6 +847,31 @@ test.describe('gameplay scoring, scoreboard & statuses', () => {
     await playerControl.locator('.reaction-chip.mine').click();
     await expect(playerControl.locator('.reaction-chip')).toHaveCount(1, { timeout: 30000 });
     await expect(playerControl.locator('.reaction-chip').filter({ hasText: '😂' })).toHaveCount(0);
+
+    // Quick-react: the player taps the *mod's* ❤️ sticker (the only one left,
+    // not theirs) and the same emoji is reacted for the player's own team —
+    // the sticker becomes the player's and its count goes 1 -> 2.
+    const modHeart = playerControl.locator('.reaction-chip').filter({ hasText: '❤️' });
+    await expect(modHeart).toHaveCount(1, { timeout: 30000 });
+    await expect(modHeart).not.toHaveClass(/mine/);
+    await expect(modHeart).toContainText('1');
+    await modHeart.click();
+    await expect(playerControl.locator('.reaction-chip.mine').filter({ hasText: '❤️' })).toContainText('2', {
+      timeout: 30000,
+    });
+
+    // The mod sees the shared count, and it stays *their* sticker on their side.
+    await expect(modControl.locator('.reaction-chip.mine').filter({ hasText: '❤️' })).toContainText('2', {
+      timeout: 30000,
+    });
+
+    // Tapping it again now removes the player's copy (the sticker is theirs),
+    // leaving only the mod's ❤️.
+    await playerControl.locator('.reaction-chip.mine').filter({ hasText: '❤️' }).click();
+    await expect(playerControl.locator('.reaction-chip').filter({ hasText: '❤️' })).toContainText('1', {
+      timeout: 30000,
+    });
+    await expect(playerControl.locator('.reaction-chip.mine')).toHaveCount(0, { timeout: 30000 });
 
     await g.playerContext.close();
     await g.modContext.close();
