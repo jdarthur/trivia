@@ -1,11 +1,13 @@
 import React from 'react';
 import sendData from "../index"
 import PlayerScore from "./PlayerScore"
+import ScoreGraphModal from "./ScoreGraphModal"
 import "./Scoreboard.css"
 
 import {
     FundProjectionScreenOutlined
 } from '@ant-design/icons';
+import {Button} from "antd";
 import type { PlayerScore as PlayerScoreModel } from '../types/models';
 
 interface Props {
@@ -22,12 +24,15 @@ interface Props {
 
 interface State {
     scores: PlayerScoreModel[]
+    // Ticket #237: whether the score-graph modal is open.
+    graph_open: boolean
 }
 
 class Scoreboard extends React.Component<Props, State> {
 
     state: State = {
-        scores: []
+        scores: [],
+        graph_open: false,
     }
 
     // Ticket #146: a slow response for a previous question/round must not
@@ -79,6 +84,10 @@ class Scoreboard extends React.Component<Props, State> {
         }
     }
 
+    // Ticket #237: the title's icon is the entry point to the score graph.
+    open_graph = () => this.setState({graph_open: true})
+    close_graph = () => this.setState({graph_open: false})
+
     render() {
         const scores_sorted = this.state.scores?.sort((a, b) => {
             const score_a = sum(a.score)
@@ -97,15 +106,29 @@ class Scoreboard extends React.Component<Props, State> {
                 active={player.active} />
         })
 
+        // The icon was decorative; it's now the entry point to the score graph
+        // (ticket #237). A text Button keeps keyboard activation and a visible
+        // hover/focus state, and stays quiet -- the title row must not grow
+        // (see .scoreboard-graph-button in ScoreGraphModal.css).
+        const graph_button = <Button type="text" size="small" className="scoreboard-graph-button"
+                                     icon={<FundProjectionScreenOutlined/>}
+                                     aria-label="Show score graph"
+                                     onClick={this.open_graph}/>
+
         // Compact single-line rows. The orientation (column vs. horizontal
         // strip) is decided by CSS media queries in Scoreboard.css, so the
         // markup is the same for every screen size.
         const scoreboard = <div className="scoreboard">
             <div className="scoreboard-title">
                 <span>Scoreboard</span>
-                <FundProjectionScreenOutlined />
+                {graph_button}
             </div>
             {scores}
+            <ScoreGraphModal open={this.state.graph_open} session_id={this.props.session_id}
+                             player_id={this.props.player_id} round_id={this.props.round_id}
+                             session_state={this.props.session_state}
+                             question_id={this.props.question_id}
+                             onClose={this.close_graph}/>
         </div>
 
         return scoreboard
