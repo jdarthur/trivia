@@ -1,4 +1,4 @@
-import React from 'react';
+import React, {useRef, useState} from 'react';
 import "./ScoreChart.css"
 
 /**
@@ -6,9 +6,14 @@ import "./ScoreChart.css"
  * over the questions of a game (ticket #236, part of #233).
  *
  * Purely presentational: it takes an x-axis of question labels and one series
- * per team, and draws. No fetching (the modal owns that, #237), and no
- * tooltips / legend / PNG export (#238, #240) — it renders standalone so those
- * can stack on top later.
+ * per team, and draws. No fetching (the modal owns that, #237); the legend and
+ * PNG export live in the modal too (#238, #240) — the chart itself only draws.
+ *
+ * Point detail (ticket #238) is drawn here because it needs the geometry:
+ * every dot gets an enlarged invisible hit circle, and hovering/tapping one
+ * shows a positioned overlay with the team, question label, points awarded for
+ * that question and the running total. Click-to-isolate (dim every line but
+ * the picked team's) is a prop so the legend in the modal can drive it.
  *
  * It sizes itself with `viewBox` + `preserveAspectRatio` and `width: 100%`
  * (see ScoreChart.css), so it fills its container and keeps its aspect ratio.
@@ -23,6 +28,10 @@ export interface Series {
     name: string
     color: string
     values: number[]
+    /** Team icon name, for the modal's legend (ticket #238). */
+    icon?: string
+    /** Whether the team is still in the game; inactive teams are dimmed in the legend. */
+    active?: boolean
 }
 
 interface Props {
@@ -31,6 +40,11 @@ interface Props {
     series: Series[]
     width?: number
     height?: number
+    /**
+     * Click-to-isolate (ticket #238): when set to a team name, every other
+     * line fades to a ghost. null/undefined leaves all lines full strength.
+     */
+    isolated?: string | null
 }
 
 const TARGET_TICKS = 5
@@ -100,7 +114,23 @@ function fmtTick(v: number): string {
     return String(Math.round(v * 100) / 100)
 }
 
-const ScoreChart: React.FC<Props> = ({axis, series, width = 800, height = 400}) => {
+// Per-question points for the tooltip: signed, so a Moneyball miss reads as
+// "-10" and a gain as "+10" (0 stays unsigned).
+function fmtPts(v: number): string {
+    const n = Math.round(v * 100) / 100
+    return n > 0 ? "+" + n : String(n)
+}
+
+const ScoreChart: React.FC<Props> = ({axis, series, width = 800, height = 400, isolated = null}) => {
+    // The tooltip overlay is positioned from the hovered dot's viewBox
+    // coordinates scaled by the rendered size (the wrapper's clientWidth over
+    // the viewBox width; with `width: 100%` + `height: auto` the aspect ratio
+    // matches, so one scale serves both axes).
+    const wrapRef = useRef<HTMLDivElement>(null)
+    const tipRef = useRef<HTMLDivElement>(null)
+    // hover is an index into `drawn` plus a point index; null = no tooltip.
+    const [hover, setHover] = useState<{s: number, i: number} | null>(null)
+
     // Axis type scales with the coordinate space rather than being a fixed 12px
     // inside an 800-unit viewBox. Note that under `width: 100%` + preserveAspect-
     // Ratio everything in the SVG — text included — scales with the container, so
@@ -222,17 +252,16 @@ const ScoreChart: React.FC<Props> = ({axis, series, width = 800, height = 400}) 
     // give hover/tap (ticket #238) a hit target, but 60 questions of 3px dots
     // would read as a bead necklace.
     const dotR = points > 48 ? 1.8 : points > 24 ? 2.4 : 3
+    // The visible dot is small, so the invisible hit circle around it stays
+    // comfortably tappable no matter how long the game (ticket #238).
+    const hitR = Math.max(11, dotR + 8)
 
     const lines = drawn.map((s, seriesIndex) => {
         const pts: string[] = []
         for (let i = 0; i < points; i++) pts.push(`${x(i)},${y(valueAt(s.values, i))}`)
-        const dots = []
-        for (let i = 0; i < points; i++) {
-            dots.push(
-                <circle key={i} className="score-chart-dot" cx={x(i)}
-                        cy={y(valueAt(s.values, i))} r={dotR} fill={s.color}/>
-            )
-        }
+        // Click-to-isolate (ticket #238): everything except the picked team
+        // fades; the picked team's dots still hover/tooltip like normal.
+        const dimmed = isolated != null && s.name !== isolated
         return (
             // A single point has no segment to draw — a zero-length polyline
             // renders as nothing (and with round caps can flash a blob), so it
@@ -240,57 +269,129 @@ const ScoreChart: React.FC<Props> = ({axis, series, width = 800, height = 400}) 
             // Keyed by index, not team name: two teams can share a display name
             // (the API has no uniqueness constraint on it), and React needs the
             // keys unique. Series order is stable from the score-history API.
-            <g key={seriesIndex} className="score-chart-series" data-team={s.name}>
+            <g key={seriesIndex}
+               className={"score-chart-series" + (dimmed ? " score-chart-dimmed" : "")}
+               data-team={s.name}>
                 {points > 1
                     ? <polyline className="score-chart-line" fill="none" stroke={s.color}
                                 strokeLinejoin="round" strokeLinecap="round" points={pts.join(' ')}/>
                     : null}
-                {dots}
+                {Array.from({length: points}, (_, i) => {
+                    const cx = x(i)
+                    const cy = y(valueAt(s.values, i))
+                    const label = axis[i] ?? ""
+                    return (
+                        // The visible dot is decorative (pointer-events: none in
+                        // the CSS) so the enlarged transparent hit circle under
+                        // it owns the hover/tap target: a comfortable touch area
+                        // even where the dot itself is 1.8px (ticket #238).
+                        <g key={i}>
+                            <circle className="score-chart-hit" cx={cx} cy={cy} r={hitR}
+                                    role="img"
+                                    aria-label={`${s.name}, ${label}, ${fmtTick(valueAt(s.values, i))} total`}
+                                    onMouseEnter={() => setHover({s: seriesIndex, i})}
+                                    onMouseLeave={() => setHover(h => h && h.s === seriesIndex && h.i === i ? null : h)}
+                                    onClick={(e) => {
+                                        e.stopPropagation()
+                                        setHover({s: seriesIndex, i})
+                                    }}/>
+                            <circle className="score-chart-dot" cx={cx} cy={cy} r={dotR} fill={s.color}/>
+                        </g>
+                    )
+                })}
             </g>
         )
     })
+
+    // The tooltip for the hovered point. Computed from the same x()/y() the
+    // dots are drawn at, then scaled by the SVG's rendered size (see the note
+    // by wrapRef). Points awarded = the step from the previous cumulative
+    // value, so the tooltip reads like the score history ("+10 on R2Q3").
+    const tooltip = (() => {
+        if (!hover) return null
+        const s = drawn[hover.s]
+        if (!s || hover.i >= points) return null
+        const v = valueAt(s.values, hover.i)
+        const prev = hover.i === 0 ? 0 : valueAt(s.values, hover.i - 1)
+        const label = axis[hover.i] ?? ""
+        const wrap = wrapRef.current
+        const scale = wrap && wrap.clientWidth > 0 ? wrap.clientWidth / width : 1
+        const px = x(hover.i) * scale
+        const py = y(v) * scale
+        // The tooltip's own size is measured once it has rendered; the
+        // fallbacks cover the very first frame so placement is stable.
+        const tip = tipRef.current
+        const tipW = tip?.offsetWidth ?? 180
+        const tipH = tip?.offsetHeight ?? 84
+        const wrapW = wrap?.clientWidth ?? width
+        const left = Math.max(tipW / 2 + 4, Math.min(wrapW - tipW / 2 - 4, px))
+        const above = py - tipH - 10 >= 4
+        const top = above ? py - tipH - 10 : py + 14
+        const pointsWord = v - prev === 1 || v - prev === -1 ? "pt" : "pts"
+        return (
+            <div className="score-chart-tooltip" ref={tipRef} style={{left, top}}>
+                <span className="score-chart-tooltip-team">
+                    <span className="score-chart-tooltip-dot" style={{background: s.color}}/>
+                    {s.name}
+                </span>
+                <span className="score-chart-tooltip-line">{label}</span>
+                <span className="score-chart-tooltip-line">
+                    {fmtPts(v - prev)} {pointsWord} · {fmtTick(v)} total
+                </span>
+            </div>
+        )
+    })()
 
     const questionWord = points === 1 ? "question" : "questions"
     const teamWord = teamCount === 1 ? "team" : "teams"
 
     return (
-        <svg className="score-chart" viewBox={`0 0 ${width} ${height}`}
-             preserveAspectRatio="xMidYMid meet" role="img"
-             aria-label={`Score progression over ${points} ${questionWord}; ${teamCount} ${teamWord}`}>
-            {ticks.map((t, i) => (
-                <g key={i}>
-                    <line className="score-chart-grid" x1={M.left} x2={M.left + plotW}
-                          y1={y(t)} y2={y(t)}/>
-                    <text className="score-chart-y-label" x={M.left - 8} y={y(t)}
-                          textAnchor="end" dominantBaseline="middle"
-                          style={{fontSize: tickFont}}>{fmtTick(t)}</text>
-                </g>
-            ))}
-            {zeroLine}
-            {rounds.map((r, i) => (
-                <g key={i}>
-                    {r.dividerX > M.left
-                        ? <line className="score-chart-round-edge" x1={r.dividerX} x2={r.dividerX}
-                                y1={M.top} y2={M.top + plotH}/>
-                        : null}
-                    {showRoundLabels
-                        ? <text className="score-chart-round-label" x={(x(r.first) + x(r.last)) / 2}
-                                y={M.top + plotH + tickFont + roundFont + 6} textAnchor="middle"
-                                style={{fontSize: roundFont}}>R{r.round}</text>
-                        : null}
-                </g>
-            ))}
-            {xLabels.map((l, i) => (
-                <text key={i} className="score-chart-x-label" x={l.x}
-                      y={M.top + plotH + tickFont + 6} textAnchor="middle"
-                      style={{fontSize: tickFont}}>{l.text}</text>
-            ))}
-            <line className="score-chart-axis" x1={M.left} x2={M.left + plotW}
-                  y1={M.top + plotH} y2={M.top + plotH}/>
-            <line className="score-chart-axis" x1={M.left} x2={M.left}
-                  y1={M.top} y2={M.top + plotH}/>
-            {lines}
-        </svg>
+        // The wrapper is the positioning context for the tooltip overlay and
+        // the reference for scaling viewBox coords to pixels. Clicking the
+        // chart's dead space dismisses the tooltip (a tap-away on touch);
+        // the hit circles stopPropagation so tapping a dot keeps it.
+        <div className="score-chart-wrap" ref={wrapRef}
+             onClick={() => setHover(null)}
+             onMouseLeave={() => setHover(null)}>
+            <svg className="score-chart" viewBox={`0 0 ${width} ${height}`}
+                 preserveAspectRatio="xMidYMid meet" role="img"
+                 aria-label={`Score progression over ${points} ${questionWord}; ${teamCount} ${teamWord}`}>
+                {ticks.map((t, i) => (
+                    <g key={i}>
+                        <line className="score-chart-grid" x1={M.left} x2={M.left + plotW}
+                              y1={y(t)} y2={y(t)}/>
+                        <text className="score-chart-y-label" x={M.left - 8} y={y(t)}
+                              textAnchor="end" dominantBaseline="middle"
+                              style={{fontSize: tickFont}}>{fmtTick(t)}</text>
+                    </g>
+                ))}
+                {zeroLine}
+                {rounds.map((r, i) => (
+                    <g key={i}>
+                        {r.dividerX > M.left
+                            ? <line className="score-chart-round-edge" x1={r.dividerX} x2={r.dividerX}
+                                    y1={M.top} y2={M.top + plotH}/>
+                            : null}
+                        {showRoundLabels
+                            ? <text className="score-chart-round-label" x={(x(r.first) + x(r.last)) / 2}
+                                    y={M.top + plotH + tickFont + roundFont + 6} textAnchor="middle"
+                                    style={{fontSize: roundFont}}>R{r.round}</text>
+                            : null}
+                    </g>
+                ))}
+                {xLabels.map((l, i) => (
+                    <text key={i} className="score-chart-x-label" x={l.x}
+                          y={M.top + plotH + tickFont + 6} textAnchor="middle"
+                          style={{fontSize: tickFont}}>{l.text}</text>
+                ))}
+                <line className="score-chart-axis" x1={M.left} x2={M.left + plotW}
+                      y1={M.top + plotH} y2={M.top + plotH}/>
+                <line className="score-chart-axis" x1={M.left} x2={M.left}
+                      y1={M.top} y2={M.top + plotH}/>
+                {lines}
+            </svg>
+            {tooltip}
+        </div>
     )
 }
 
