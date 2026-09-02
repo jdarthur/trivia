@@ -1,7 +1,7 @@
 import React from 'react';
 import ScorerLink from "./ScorerLink"
 import MultiAnswer from "./MultiAnswer"
-import ReactionControl from "../players/ReactionControl";
+import {ReactionAdd, ReactionStickers} from "../players/ReactionControl";
 
 import {Button, Card, InputNumber, Popover, Slider, Space, Tooltip} from "antd"
 
@@ -122,22 +122,38 @@ export default function PlayerAnswers({
         correctButtonText = moneyball ? moneyballAward : (override === 0 ? wager : override)
     }
 
-    // Reactions only exist once the question is scored. The control overlays
-    // the whole card — stickers "stuck" across the top starting at the
-    // top-right corner and flowing leftward; the + button sits at the right
-    // side of the answer. It attaches to the latest answer, the one rendered
-    // prominently.
-    const reactions = scored && session_id && current_player && lastAnswer && lastAnswer.answer_id ?
-        <ReactionControl session_id={session_id} current_player={current_player}
-                         answer_id={lastAnswer.answer_id} reactions={lastAnswer.reactions}
-                         my_reaction={lastAnswer.my_reaction}/> : null
+    // Reactions only exist once the question is scored. The stickers are a
+    // direct child of the card so they straddle its top edge; the + button
+    // lives inside the answer box so it centers on the answer and is inset
+    // from the box's right edge. Both attach to the latest answer, the one
+    // rendered prominently.
+    const reaction_props = scored && session_id && current_player && lastAnswer?.answer_id ? {
+        session_id: session_id,
+        current_player: current_player,
+        answer_id: lastAnswer.answer_id,
+        reactions: lastAnswer.reactions,
+        my_reaction: lastAnswer.my_reaction,
+    } : null
 
     return (
 
+        // reaction-host: the card that carries both reaction pieces (stickers
+        // here, the + button inside the answer box below).
+        //
+        // Width 228 (was 200): the answer box shares its row with the + button
+        // (see `.reaction-anchor`), and a typical answer like
+        // "First answer (wager: 100)" needs ~178px of line width — more than
+        // 200px leaves once the button takes its share. At 200px the answer
+        // wrapped and the card grew ~22px; 228 keeps one line at the original
+        // card height.
         <Card size="small" title={title} extra={moneyball ? moneyballBadge : (correct === true ? sliderMiniModal : wager)}
-              style={{'width': 200, position: 'relative'}} bodyStyle={{padding: 0}}>
-            <div className="answered-or-not"> {answer_text} </div>
-            {reactions}
+              className={reaction_props ? "reaction-host" : undefined}
+              style={{'width': 228, position: 'relative'}} bodyStyle={{padding: 0}}>
+            <div className={reaction_props ? "answered-or-not reaction-anchor" : "answered-or-not"}>
+                {answer_text}
+                {reaction_props && <ReactionAdd {...reaction_props} />}
+            </div>
+            {reaction_props && <ReactionStickers {...reaction_props} />}
 
             {/* For auto-scored question types the backend judges correctness, so
                 the manual correct/incorrect buttons are hidden; the override

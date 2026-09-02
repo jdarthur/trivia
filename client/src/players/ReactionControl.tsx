@@ -20,13 +20,20 @@ interface State {
 }
 
 /**
- * Emoji reactions on one scored answer (ticket #156). Rendered as stickers
- * "stuck" across the top of the answer box, starting at the top-right corner
- * and flowing leftward; the "+" button sits at the right side of the answer.
- * Hovering a sticker shows the team names of the players who reacted with it.
- * The caller's own reaction is highlighted; a "+" button opens an emoji
- * picker (emoji-picker-react) in a Popover so the small answer cards don't
- * carry the full picker UI.
+ * Emoji reactions on one scored answer (ticket #156), in two pieces that
+ * anchor to different boxes:
+ *
+ * - `ReactionStickers` — the counts, rendered as stickers "stuck" across the
+ *   top of the card starting at the top-right corner and flowing leftward.
+ *   Hovering a sticker shows the team names of the players who reacted with it.
+ *   Callers render this as a direct child of the card (`position: relative`),
+ *   which also carries the `reaction-host` class used by the e2e specs.
+ * - `ReactionAdd` — the "+" button that opens an emoji picker
+ *   (emoji-picker-react) in a Popover, so the small answer cards don't carry
+ *   the full picker UI. Callers render this *inside the answer box* (also
+ *   `position: relative`), so it is centered on the answer itself and inset
+ *   from the box's right edge — centering it on the whole card instead put it
+ *   over the title row and flush against the card border.
  *
  * The API allows exactly one emoji per (answer, player): tapping the
  * highlighted chip removes the reaction, picking a different emoji changes it
@@ -35,75 +42,72 @@ interface State {
  * state token, so the existing session_state refetch pattern propagates the
  * new counts to every client — no optimistic update needed.
  */
-class ReactionControl extends React.Component<Props, State> {
 
-    state: State = {picker_open: false}
+// PUT creates or modifies (upsert); DELETE removes. Fire-and-forget like the
+// other gameplay mutations — the state-token bump drives a refetch.
+// Failures are logged (and the picker still closes); the player can retry.
+function remove_reaction(session_id: string, answer_id: string, player_id: string) {
+    sendData("/gameplay/session/" + session_id + "/reaction", "DELETE", {answer_id, player_id})
+        .catch((error) => console.error("Failed to remove reaction:", error))
+}
 
-    // PUT creates or modifies (upsert); DELETE removes. Fire-and-forget like
-    // the other gameplay mutations — the state-token bump drives a refetch.
-    // Failures are logged (and the picker still closes); the player can retry.
-    set_reaction = (emoji: string) => {
-        const {session_id, current_player, answer_id, my_reaction} = this.props
-        if (!answer_id) return
-        const url = "/gameplay/session/" + session_id + "/reaction"
-        if (emoji === my_reaction) {
-            sendData(url, "DELETE", {answer_id, player_id: current_player})
-                .catch((error) => console.error("Failed to remove reaction:", error))
-        } else {
-            sendData(url, "PUT", {answer_id, player_id: current_player, emoji})
-                .catch((error) => console.error("Failed to set reaction:", error))
-        }
-        this.setState({picker_open: false})
-    }
-
-    remove_reaction = () => {
-        const {session_id, current_player, answer_id} = this.props
-        if (!answer_id) return
-        sendData("/gameplay/session/" + session_id + "/reaction", "DELETE", {
-            answer_id, player_id: current_player
-        }).catch((error) => console.error("Failed to remove reaction:", error))
-    }
-
-    render() {
-        const {answer_id, reactions, my_reaction} = this.props
-        if (!answer_id) return null
-
-        const stickers = Object.entries(reactions || {})
-            .sort((a, b) => b[1].count - a[1].count || a[0].localeCompare(b[0]))
-            .map(([emoji, summary]) => {
-                const mine = emoji === my_reaction
-                // Who reacted: the team names the API aggregates per emoji.
-                // Hovering the sticker reveals them (tooltip).
-                const who = summary.players && summary.players.length > 0
-                    ? summary.players.join(', ')
-                    : undefined
-                const chip = (
-                    <span key={emoji} className={"reaction-chip" + (mine ? " mine" : "")}
-                          onClick={mine ? this.remove_reaction : undefined}>
-                        {emoji} {summary.count}
-                    </span>
-                )
-                return who ? <Tooltip key={emoji} title={who}>{chip}</Tooltip> : chip
-            })
-
-        const picker = (
-            <EmojiPicker width={300} height={320} emojiStyle={EmojiStyle.NATIVE}
-                         previewConfig={{showPreview: false}}
-                         onEmojiClick={(data) => this.set_reaction(data.emoji)}/>
-        )
-
-        return (
-            <div className="reaction-control">
-                <div className="reaction-stickers">{stickers}</div>
-                <div className="reaction-add">
-                    <Popover content={picker} trigger="click" open={this.state.picker_open}
-                             onOpenChange={(open) => this.setState({picker_open: open})}>
-                        <button type="button" className="reaction-add-button" aria-label="Add reaction">+</button>
-                    </Popover>
-                </div>
-            </div>
-        )
+function set_reaction(session_id: string, answer_id: string, player_id: string, emoji: string,
+                      my_reaction?: string) {
+    if (emoji === my_reaction) {
+        remove_reaction(session_id, answer_id, player_id)
+    } else {
+        sendData("/gameplay/session/" + session_id + "/reaction", "PUT", {answer_id, player_id, emoji})
+            .catch((error) => console.error("Failed to set reaction:", error))
     }
 }
 
-export default ReactionControl;
+/** The "+"/picker button. Renders nothing until the answer can be reacted to. */
+export function ReactionAdd({session_id, current_player, answer_id}: Props) {
+    const [picker_open, set_picker_open] = React.useState(false)
+    if (!answer_id) return null
+
+    const picker = (
+        <EmojiPicker width={300} height={320} emojiStyle={EmojiStyle.NATIVE}
+                     previewConfig={{showPreview: false}}
+                     onEmojiClick={(data) => {
+                         set_reaction(session_id, answer_id, current_player, data.emoji);
+                         set_picker_open(false)
+                     }}/>
+    )
+
+    return (
+        <div className="reaction-add">
+            <Popover content={picker} trigger="click" open={picker_open}
+                     onOpenChange={set_picker_open}>
+                <button type="button" className="reaction-add-button" aria-label="Add reaction">+</button>
+            </Popover>
+        </div>
+    )
+}
+
+/** The sticker strip of existing reactions. Renders nothing when there are none. */
+export function ReactionStickers({session_id, current_player, answer_id, reactions, my_reaction}: Props) {
+    const stickers = Object.entries(reactions || {})
+        .sort((a, b) => b[1].count - a[1].count || a[0].localeCompare(b[0]))
+        .map(([emoji, summary]) => {
+            const mine = emoji === my_reaction
+            // Who reacted: the team names the API aggregates per emoji.
+            // Hovering the sticker reveals them (tooltip).
+            const who = summary.players && summary.players.length > 0
+                ? summary.players.join(', ')
+                : undefined
+            const chip = (
+                <span key={emoji} className={"reaction-chip" + (mine ? " mine" : "")}
+                      onClick={mine && answer_id
+                          ? () => remove_reaction(session_id, answer_id, current_player)
+                          : undefined}>
+                    {emoji} {summary.count}
+                </span>
+            )
+            return who ? <Tooltip key={emoji} title={who}>{chip}</Tooltip> : chip
+        })
+
+    if (stickers.length === 0) return null
+
+    return <div className="reaction-stickers">{stickers}</div>
+}
