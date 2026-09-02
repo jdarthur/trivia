@@ -68,8 +68,67 @@
     color: rgba(0, 0, 0, 0.45);
     /* Text-only note over the chart's top-right corner. That corner is empty
        in every plot (the leader's line ends below it), and the translucent
-       backing keeps it readable if a line ever crosses through. */
+       backing keeps it readable if a line ever crosses through. pointer-events
+       none so it never swallows a tap on a dot underneath (ticket #238). */
     background: rgba(255, 255, 255, 0.8);
     padding: 0 4px;
     border-radius: 3px;
+    pointer-events: none;
+}
+
+/*
+ * Legend (ticket #238): one row per team — color dot + icon + name + final
+ * total — in scoreboard order (the series are already sorted that way), so it
+ * doubles as a mini standings. A grid that reflows to a single column on
+ * phones (the modal is min(720px, 92vw), so ~330px at 360px viewport) and
+ * stays a compact two-ish columns on desktop even for a 12-team game. The
+ * whole row is the click-to-isolate target.
+ */
+.score-graph-legend {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 2px 14px;
+    margin-top: 12px;
+    padding-top: 10px;
+    border-top: 1px solid #f0f0f0;
+}
+.score-graph-legend-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+    padding: 4px 6px;
+    border: none;
+    border-radius: 4px;
+    background: none;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+.score-graph-legend-row:hover {
+    background: rgba(0, 0, 0, 0.045);
+}
+/* Inactive teams (left the game) read like their scoreboard row: faded. */
+.score-graph-legend-row.inactive {
+    opacity: 0.5;
+}
+.score-graph-legend-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+/* The name is the flexible middle: it truncates (ShortTextWithPopover) rather
+   than wrapping, so a long team name can't blow out the row or the modal. */
+.score-graph-legend-name {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.score-graph-legend-total {
+    flex-shrink: 0;
+    font-weight: bold;
+    margin-left: 4px;
 }

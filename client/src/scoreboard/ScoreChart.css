@@ -14,6 +14,12 @@
     background: white;
 }
 
+/* The wrapper is the positioning context for the tooltip overlay and the
+   reference for scaling viewBox coordinates to pixels (ticket #238). */
+.score-chart-wrap {
+    position: relative;
+}
+
 .score-chart-empty {
     display: flex;
     align-items: center;
@@ -62,7 +68,53 @@
     stroke-width: 2;
     fill: none;
 }
+/* The visible dot is decorative; the enlarged transparent hit circle under it
+   owns hover/tap so the touch target stays comfortable (ticket #238). */
 .score-chart-dot {
     stroke: white;
     stroke-width: 0.75;
+    pointer-events: none;
+}
+.score-chart-hit {
+    fill: transparent;
+    pointer-events: all;
+    cursor: pointer;
+}
+
+/* Click-to-isolate (ticket #238): every line but the picked team fades. */
+.score-chart-dimmed {
+    opacity: 0.15;
+}
+
+/* Point tooltip: a positioned overlay div (ticket #238). pointer-events: none
+   so it never blocks hovering the dots underneath; dark so it reads over any
+   line color. */
+.score-chart-tooltip {
+    position: absolute;
+    z-index: 10;
+    max-width: 220px;
+    padding: 6px 10px;
+    border-radius: 6px;
+    background: rgba(0, 0, 0, 0.78);
+    color: #fff;
+    font-size: 12px;
+    line-height: 1.5;
+    pointer-events: none;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+}
+.score-chart-tooltip-team {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-weight: bold;
+    margin-bottom: 2px;
+}
+.score-chart-tooltip-dot {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+.score-chart-tooltip-line {
+    display: block;
 }

@@ -2,16 +2,25 @@ import React from 'react';
 import sendData from "../index"
 import ScoreChart, {Series} from "./ScoreChart"
 import {teamColors} from "../common/colors"
+import ShortTextWithPopover from "../common/ShortTextWithPopover";
+import PlayerIcon from '../lobby/PlayerIcon';
 import "./ScoreGraphModal.css"
 
 import {Alert, Modal, Spin} from 'antd';
 
 /**
  * The score graph modal (ticket #237, part of #233): fetches the session's
- * cumulative-score history and renders it with ScoreChart (#236).
+ * cumulative-score history and renders it with ScoreChart (#236) plus the
+ * legend (ticket #238).
  *
  * It owns the fetch so ScoreChart stays presentational. Opened from the
  * scoreboard's title button; read-only, so no save footer.
+ *
+ * The legend (ticket #238) renders below the chart: one row per team — color
+ * dot + icon + name + final total — in the same order as the scoreboard
+ * (total desc, then name asc; the series come from toChartData already sorted
+ * that way). Rows double as click-to-isolate: clicking one fades every other
+ * line in the chart (handy for a 12-team game), clicking again restores.
  *
  * Refresh policy: fetch on open, then again whenever the parent's session
  * token / round / question changes while open, so an open graph tracks the
@@ -37,6 +46,9 @@ interface State {
     error: string | null
     // The chart's viewBox, kept in state so a viewport change re-renders it.
     size: {width: number, height: number}
+    // Click-to-isolate (ticket #238): the team name whose line stays bright;
+    // null = nothing isolated.
+    isolated: string | null
 }
 
 // One series of GET /gameplay/session/:id/score-history (models.ScoreHistorySeries).
@@ -69,6 +81,7 @@ class ScoreGraphModal extends React.Component<Props, State> {
         loading: false,
         error: null,
         size: chartSize(),
+        isolated: null,
     }
 
     mounted = false
@@ -99,7 +112,8 @@ class ScoreGraphModal extends React.Component<Props, State> {
             // A different session: drop the previous one's data instead of
             // showing it while the new session loads. readCache() is keyed by
             // session, so it returns null here and the modal shows the spinner.
-            this.setState({axis: [], series: []}, () => this.load())
+            // Isolation is per-session data too, so it resets.
+            this.setState({axis: [], series: [], isolated: null}, () => this.load())
             return
         }
 
@@ -189,6 +203,45 @@ class ScoreGraphModal extends React.Component<Props, State> {
         }
     }
 
+    // Click-to-isolate (ticket #238): picking a legend row fades every other
+    // line in the chart; picking the same row again restores all of them.
+    toggleIsolate = (name: string) => {
+        this.setState(prev => ({isolated: prev.isolated === name ? null : name}))
+    }
+
+    // The legend (ticket #238): one row per team in scoreboard order — the
+    // series come from toChartData already sorted (total desc, name asc), so
+    // this agrees with the scoreboard list beside the modal. Each row doubles
+    // as a mini standings entry: color dot (exactly the line's stroke) + icon
+    // + team name + final cumulative total. Long names reuse
+    // ShortTextWithPopover so a row never wraps.
+    renderLegend() {
+        const {series, isolated} = this.state
+        return (
+            <div className="score-graph-legend" role="list">
+                {series.map((s, i) => {
+                    const total = s.values.length > 0 ? fmtTotal(s.values[s.values.length - 1]) : "0"
+                    const inactive = s.active === false
+                    const pressed = isolated === s.name
+                    return (
+                        <button key={i} type="button" role="listitem"
+                                className={"score-graph-legend-row" + (inactive ? " inactive" : "")}
+                                title={pressed ? "Restore all teams" : "Highlight this team"}
+                                aria-pressed={pressed}
+                                onClick={() => this.toggleIsolate(s.name)}>
+                            <span className="score-graph-legend-dot" style={{background: s.color}}/>
+                            <PlayerIcon icon_name={s.icon}/>
+                            <span className="score-graph-legend-name">
+                                <ShortTextWithPopover text={s.name} maxLength={20}/>
+                            </span>
+                            <span className="score-graph-legend-total">{total}</span>
+                        </button>
+                    )
+                })}
+            </div>
+        )
+    }
+
     render() {
         const {axis, series, loading, error, size} = this.state
         const {width, height} = size
@@ -208,7 +261,9 @@ class ScoreGraphModal extends React.Component<Props, State> {
             // yet) -- ScoreChart renders its own empty state for that.
             body = (
                 <div className="score-graph-body">
-                    <ScoreChart axis={axis} series={series} width={width} height={height}/>
+                    <ScoreChart axis={axis} series={series} width={width} height={height}
+                                isolated={this.state.isolated}/>
+                    {series.length > 0 ? this.renderLegend() : null}
                     {loading ? <div className="score-graph-refresh">Updating…</div> : null}
                 </div>
             )
@@ -264,10 +319,17 @@ export function toChartData(data: any): {axis: string[], series: Series[]} {
             name,
             color: colors[name],
             values: Array.isArray(raw[i].cumulative) ? raw[i].cumulative : [],
+            icon: raw[i].icon,
+            active: raw[i].active,
         }
     })
 
     return {axis, series}
+}
+
+// The legend's final total; same rounding as the chart's axis labels.
+function fmtTotal(v: number): string {
+    return String(Math.round(v * 100) / 100)
 }
 
 export default ScoreGraphModal
