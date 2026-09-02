@@ -240,7 +240,7 @@ const ScoreChart: React.FC<Props> = ({axis, series, width = 800, height = 400}) 
             // Keyed by index, not team name: two teams can share a display name
             // (the API has no uniqueness constraint on it), and React needs the
             // keys unique. Series order is stable from the score-history API.
-            <g key={seriesIndex} className="score-chart-series">
+            <g key={seriesIndex} className="score-chart-series" data-team={s.name}>
                 {points > 1
                     ? <polyline className="score-chart-line" fill="none" stroke={s.color}
                                 strokeLinejoin="round" strokeLinecap="round" points={pts.join(' ')}/>

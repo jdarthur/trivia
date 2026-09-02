@@ -238,6 +238,7 @@ class ActiveGame extends React.Component<Props, State> {
                     </div>
                     <Scoreboard round_id={this.state.active_round} session_id={this.props.session_id}
                                 player_id={this.props.player_id} session_state={this.props.session_state}
+                                question_id={this.state.active_question}
                                 is_mobile={this.props.is_mobile}/>
 
                 </div>

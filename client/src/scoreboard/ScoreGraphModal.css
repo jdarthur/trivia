@@ -1,0 +1,75 @@
+/*
+ * The score graph modal and the button that opens it (ticket #237, part of #233).
+ *
+ * Class names are prefixed .score-graph-* / .scoreboard-graph-button — client
+ * CSS is global, so nothing here is bare (see the note in ScoreChart.css).
+ */
+
+/*
+ * The graph button sits in the scoreboard's title row, which is a compact
+ * single line on wide screens and a narrow column in the <=1000px horizontal
+ * strip. antd's default text button is 32px tall with padding, which would
+ * grow that row, so it's collapsed to the icon's own box. The hover/focus
+ * background is kept -- that's the point of making it a real control.
+ */
+.scoreboard-graph-button.ant-btn {
+    /* antd gives a small button a 24px controlHeight plus horizontal padding and
+       a min-width, all of which grow the title row. Collapse the box to the
+       icon's own footprint: the row must stay the height the bare decorative
+       icon gave it (measured 34.09px on desktop, 41.58px at 375px wide).
+
+       The padding stays (it makes the hover/focus background and the click
+       target bigger than the 14px glyph) and is clawed back with an equal
+       negative margin, so it costs no layout. */
+    height: auto;
+    min-width: 0;
+    min-height: 0;
+    /* type="text" keeps a 1px transparent border; in the <=1000px column layout
+       the button's own height is what the row measures, so those 2px showed up
+       as a taller title. */
+    border-width: 0;
+    padding: 4px;
+    margin: -4px;
+    line-height: 1;
+    font-size: 1em;
+    color: rgba(0, 0, 0, 0.45);
+    flex-shrink: 0;
+}
+.scoreboard-graph-button.ant-btn:hover {
+    color: #1890ff;
+    background: rgba(0, 0, 0, 0.06);
+}
+.scoreboard-graph-button.ant-btn:focus-visible {
+    outline: 2px solid #1890ff;
+    outline-offset: 1px;
+}
+
+/* Modal body: the chart fills the width; the refresh note is unobtrusive. */
+.score-graph-modal .ant-modal-body {
+    padding-top: 8px;
+}
+
+.score-graph-body {
+    position: relative;
+}
+
+/* Space holder while the first fetch is in flight: same box the chart will
+   take, so the modal doesn't resize when the graph lands. */
+.score-graph-placeholder {
+    width: 100%;
+    min-height: 160px;
+}
+
+.score-graph-refresh {
+    position: absolute;
+    top: 0;
+    right: 0;
+    font-size: 0.75em;
+    color: rgba(0, 0, 0, 0.45);
+    /* Text-only note over the chart's top-right corner. That corner is empty
+       in every plot (the leader's line ends below it), and the translucent
+       backing keeps it readable if a line ever crosses through. */
+    background: rgba(255, 255, 255, 0.8);
+    padding: 0 4px;
+    border-radius: 3px;
+}
