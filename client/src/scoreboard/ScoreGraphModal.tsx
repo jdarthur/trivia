@@ -1,12 +1,14 @@
 import React from 'react';
 import sendData from "../index"
 import ScoreChart, {Series} from "./ScoreChart"
+import {chartToPngBlob, downloadBlob, exportFilename, LegendEntry} from "./ExportPng"
 import {teamColors} from "../common/colors"
 import ShortTextWithPopover from "../common/ShortTextWithPopover";
 import PlayerIcon from '../lobby/PlayerIcon';
 import "./ScoreGraphModal.css"
 
-import {Alert, Modal, Spin} from 'antd';
+import {Alert, Button, Modal, Spin} from 'antd';
+import {DownloadOutlined} from '@ant-design/icons';
 
 /**
  * The score graph modal (ticket #237, part of #233): fetches the session's
@@ -36,6 +38,8 @@ interface Props {
     round_id: string | number | null
     session_state: any
     question_id?: string | number
+    /** Session name, for the PNG export's filename (ticket #240). */
+    session_name?: string
     onClose: () => void
 }
 
@@ -49,6 +53,11 @@ interface State {
     // Click-to-isolate (ticket #238): the team name whose line stays bright;
     // null = nothing isolated.
     isolated: string | null
+    // PNG export (ticket #240): true while rasterizing, and a sticky note when
+    // this browser couldn't produce a file — the button retires itself rather
+    // than throwing at the user on every click.
+    exporting: boolean
+    export_failed: boolean
 }
 
 // One series of GET /gameplay/session/:id/score-history (models.ScoreHistorySeries).
@@ -82,12 +91,17 @@ class ScoreGraphModal extends React.Component<Props, State> {
         error: null,
         size: chartSize(),
         isolated: null,
+        exporting: false,
+        export_failed: false,
     }
 
     mounted = false
     // Ticket #146 pattern: a slow response for a superseded request must not
     // overwrite a newer one.
     fetchCounter = 0
+    // The chart's <svg>, rasterized by the PNG export (ticket #240). Null in
+    // the empty state, which is one of the things that disables the button.
+    svg_ref = React.createRef<SVGSVGElement>()
 
     componentDidMount() {
         this.mounted = true
@@ -209,6 +223,34 @@ class ScoreGraphModal extends React.Component<Props, State> {
         this.setState(prev => ({isolated: prev.isolated === name ? null : name}))
     }
 
+    // PNG export (ticket #240): rasterize the live chart SVG plus the legend's
+    // data at 2x and download it. The legend is rebuilt as SVG primitives from
+    // `series` rather than copied from the DOM, so no team icon (an antd
+    // <span> with a webfont glyph) can drop out of or taint the canvas.
+    export_png = () => {
+        const svg = this.svg_ref.current
+        if (!svg || this.state.exporting) return
+        this.setState({exporting: true})
+        const legend: LegendEntry[] = this.state.series.map(s => ({
+            name: s.name,
+            color: s.color,
+            total: s.values.length > 0 ? fmtTotal(s.values[s.values.length - 1]) : "0",
+            active: s.active,
+        }))
+        chartToPngBlob(svg, legend)
+            .then(blob => {
+                downloadBlob(blob, exportFilename(this.props.session_name, this.props.session_id))
+                if (this.mounted) this.setState({exporting: false})
+            })
+            .catch(error => {
+                // A canvas this browser won't rasterize is not the player's
+                // problem to read about: drop the control and carry on. The
+                // graph itself is untouched.
+                console.error("Failed to export the score graph:", error)
+                if (this.mounted) this.setState({exporting: false, export_failed: true})
+            })
+    }
+
     // The legend (ticket #238): one row per team in scoreboard order — the
     // series come from toChartData already sorted (total desc, name asc), so
     // this agrees with the scoreboard list beside the modal. Each row doubles
@@ -243,7 +285,7 @@ class ScoreGraphModal extends React.Component<Props, State> {
     }
 
     render() {
-        const {axis, series, loading, error, size} = this.state
+        const {axis, series, loading, error, size, exporting, export_failed} = this.state
         const {width, height} = size
 
         let body: React.ReactNode
@@ -262,16 +304,35 @@ class ScoreGraphModal extends React.Component<Props, State> {
             body = (
                 <div className="score-graph-body">
                     <ScoreChart axis={axis} series={series} width={width} height={height}
-                                isolated={this.state.isolated}/>
+                                isolated={this.state.isolated} svgRef={this.svg_ref}/>
                     {series.length > 0 ? this.renderLegend() : null}
                     {loading ? <div className="score-graph-refresh">Updating…</div> : null}
                 </div>
             )
         }
 
+        // Export lives in the footer (ticket #240), and only when there is
+        // something to export: nothing drawn, or a browser that already failed
+        // to rasterize once. Hiding it beats a control that can only fail. It
+        // stays enabled during a background refresh — the user exports what's
+        // on screen — so it doesn't flicker every time the live game ticks.
+        // `drawable` mirrors ScoreChart's own empty condition (no axis, or no
+        // series with a number): without a drawn <svg> there is nothing to
+        // rasterize, and the ref would be null.
+        const drawable = axis.length > 0 && series.some(s => s && s.values.length > 0)
+        const can_export = !error && !export_failed && drawable
+        const footer = can_export
+            ? <div className="score-graph-footer">
+                <Button icon={<DownloadOutlined/>} loading={exporting}
+                        onClick={this.export_png}>
+                    Export PNG
+                </Button>
+            </div>
+            : null
+
         return (
             <Modal title="Score progression" open={this.props.open} onCancel={this.props.onClose}
-                   centered={true} footer={null} destroyOnHidden={true}
+                   centered={true} footer={footer} destroyOnHidden={true}
                    width="min(720px, 92vw)" className="score-graph-modal">
                 <Spin spinning={loading && series.length === 0}>
                     {body}

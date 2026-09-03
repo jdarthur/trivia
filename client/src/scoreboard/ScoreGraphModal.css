@@ -132,3 +132,21 @@
     font-weight: bold;
     margin-left: 4px;
 }
+
+/*
+ * Footer (ticket #240): the PNG export lives here. antd right-aligns a custom
+ * footer with 8px gaps, which is what we want; it only needs breathing room
+ * below the legend. No separator rule — the legend already has one directly
+ * above, and two hairlines in a row read as a rendering glitch.
+ */
+.score-graph-modal .ant-modal-footer {
+    margin-top: 16px;
+    padding-bottom: 0;
+}
+
+/* Explicit alignment rather than relying on the inherited text-align antd
+   puts on the footer, since the content here is a wrapper div, not buttons. */
+.score-graph-footer {
+    display: flex;
+    justify-content: flex-end;
+}

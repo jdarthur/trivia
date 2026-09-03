@@ -1,4 +1,6 @@
 import { expect, test, type APIRequestContext, type BrowserContext, type Locator, type Page } from '@playwright/test';
+import fs from 'fs';
+import zlib from 'zlib';
 
 // Gameplay e2e (ticket #109): lobby + session start, first slice of the
 // single-session suite. Unlike the editor suites, gameplay is anonymous and
@@ -31,6 +33,113 @@ function buildMockToken(name: string): string {
   return `${header}.${payload}.`;
 }
 const token = buildMockToken(DEV_USER);
+
+// --- PNG assertions for the score-graph export (ticket #240) --------------
+
+/**
+ * Decode a PNG produced by canvas.toBlob into raw RGBA pixels.
+ *
+ * Deliberately minimal: it handles what a browser canvas actually emits (8-bit,
+ * color type 2 or 6, interlace off) and throws on anything else rather than
+ * silently returning wrong pixels. Written by hand so the e2e suite keeps zero
+ * extra dependencies.
+ */
+function decodePng(buf: Buffer) {
+  const PNG_SIG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+  if (buf.length < 8 || !buf.subarray(0, 8).equals(PNG_SIG)) {
+    throw new Error('not a PNG');
+  }
+
+  let offset = 8;
+  let width = 0;
+  let height = 0;
+  let bitDepth = 0;
+  let colorType = 0;
+  let interlace = 0;
+  const idat: Buffer[] = [];
+
+  while (offset + 8 <= buf.length) {
+    const length = buf.readUInt32BE(offset);
+    const type = buf.subarray(offset + 4, offset + 8).toString('ascii');
+    const data = buf.subarray(offset + 8, offset + 8 + length);
+    if (type === 'IHDR') {
+      width = data.readUInt32BE(0);
+      height = data.readUInt32BE(4);
+      bitDepth = data[8];
+      colorType = data[9];
+      interlace = data[12];
+    } else if (type === 'IDAT') {
+      idat.push(Buffer.from(data));
+    } else if (type === 'IEND') {
+      break;
+    }
+    offset += 12 + length; // length + type + data + CRC
+  }
+
+  if (bitDepth !== 8 || interlace !== 0 || (colorType !== 2 && colorType !== 6)) {
+    throw new Error(`unsupported PNG: bitDepth=${bitDepth} colorType=${colorType} interlace=${interlace}`);
+  }
+  const channels = colorType === 6 ? 4 : 3;
+
+  const raw = zlib.inflateSync(Buffer.concat(idat));
+  const stride = width * channels;
+  const px = Buffer.alloc(height * stride);
+
+  // Un-filter each scanline against the one before it (PNG spec §9).
+  let pos = 0;
+  for (let y = 0; y < height; y++) {
+    const filter = raw[pos++];
+    const line = raw.subarray(pos, pos + stride);
+    pos += stride;
+    const out = px.subarray(y * stride, (y + 1) * stride);
+    const prev = y > 0 ? px.subarray((y - 1) * stride, y * stride) : null;
+    for (let x = 0; x < stride; x++) {
+      const a = x >= channels ? out[x - channels] : 0;
+      const b = prev ? prev[x] : 0;
+      const c = prev && x >= channels ? prev[x - channels] : 0;
+      let value: number;
+      switch (filter) {
+        case 0: value = line[x]; break;
+        case 1: value = line[x] + a; break;
+        case 2: value = line[x] + b; break;
+        case 3: value = line[x] + ((a + b) >> 1); break;
+        case 4: {
+          const p = a + b - c;
+          const pa = Math.abs(p - a), pb = Math.abs(p - b), pc = Math.abs(p - c);
+          value = line[x] + (pa <= pb && pa <= pc ? a : pb <= pc ? b : c);
+          break;
+        }
+        default: throw new Error(`bad PNG filter type ${filter} on row ${y}`);
+      }
+      out[x] = value & 0xff;
+    }
+  }
+
+  return {
+    width,
+    height,
+    /** [r, g, b] at (x, y); alpha is ignored (the export is opaque by design). */
+    pixel(x: number, y: number): [number, number, number] {
+      const i = y * stride + x * channels;
+      return [px[i], px[i + 1], px[i + 2]];
+    },
+    /** Pixels in the rect that differ from white by more than a hair. */
+    countInk(x0: number, y0: number, x1: number, y1: number): number {
+      let n = 0;
+      const left = Math.max(0, Math.floor(x0));
+      const top = Math.max(0, Math.floor(y0));
+      const right = Math.min(width, Math.ceil(x1));
+      const bottom = Math.min(height, Math.ceil(y1));
+      for (let y = top; y < bottom; y++) {
+        for (let x = left; x < right; x++) {
+          const [r, g, b] = this.pixel(x, y);
+          if (r < 245 || g < 245 || b < 245) n++;
+        }
+      }
+      return n;
+    },
+  };
+}
 
 // --- Editor seeding (via API, dev JWT) ------------------------------------
 
@@ -928,6 +1037,56 @@ test.describe('gameplay scoring, scoreboard & statuses', () => {
     // refetches on the session-state change and the legend total moves to 300.
     await scoreCurrentQuestion(g.modPage, true);
     await expect(legendRow).toContainText('300', { timeout: 30000 });
+
+    // Ticket #240: export the graph as a PNG. The button is in the modal
+    // footer and only appears once there is a chart to export.
+    const exportButton = modal.getByRole('button', { name: /Export PNG/ });
+    await expect(exportButton).toBeVisible();
+
+    // Capture the chart's own viewBox so the assertions below can check the
+    // raster scale and the legend band without hardcoding chartSize()'s math.
+    const chartBox = await modal.locator('.score-chart').evaluate(el => {
+      const box = (el as SVGSVGElement).viewBox.baseVal;
+      return { width: box.width, height: box.height };
+    });
+    expect(chartBox.width).toBeGreaterThan(0);
+
+    const [download] = await Promise.all([
+      g.playerPage.waitForEvent('download'),
+      exportButton.click(),
+    ]);
+    // Named from the session, per the ticket ("trivia-<session-name>.png").
+    expect(download.suggestedFilename()).toBe(`trivia-e2e-session-${prefix}.png`);
+
+    const pngPath = await download.path();
+    expect(pngPath).toBeTruthy();
+    const png = decodePng(await fs.promises.readFile(pngPath!));
+
+    // 2x for retina...
+    expect(png.width).toBe(chartBox.width * 2);
+    // ...taller than the chart alone, because the legend is appended below it.
+    expect(png.height).toBeGreaterThan(chartBox.height * 2);
+
+    // White background: the corners and the very top edge are outside the plot.
+    expect(png.pixel(0, 0)).toEqual([255, 255, 255]);
+    expect(png.pixel(png.width - 1, 0)).toEqual([255, 255, 255]);
+
+    // The plot and the legend band both carry ink, so neither is a blank
+    // region of the canvas.
+    const plotInk = png.countInk(0, 0, png.width, chartBox.height * 2);
+    const legendInk = png.countInk(0, chartBox.height * 2, png.width, png.height);
+    expect(plotInk).toBeGreaterThan(50);
+    expect(legendInk).toBeGreaterThan(50);
+
+    // "Includes the legend" means its text actually rasterized, not just the
+    // color dot and the rule above it. The rule is a full-width hairline near
+    // the top of the band and the dot sits at the left edge, so sampling the
+    // lower-middle of the band — below the rule, right of the dot — isolates
+    // the team name and its total.
+    const bandTop = chartBox.height * 2;
+    const bandH = png.height - bandTop;
+    const textInk = png.countInk(48, bandTop + bandH * 0.35, png.width, png.height);
+    expect(textInk).toBeGreaterThan(20);
 
     // The scoreboard behind the open modal updated too...
     await expect(
