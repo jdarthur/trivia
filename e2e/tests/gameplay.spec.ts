@@ -34,6 +34,38 @@ function buildMockToken(name: string): string {
 }
 const token = buildMockToken(DEV_USER);
 
+// --- Color distance (for the team-palette assertions) ---------------------
+
+/** Parse `rgb(r, g, b)` / `rgba(r, g, b, a)` into 0-255 channels. */
+function parseRgb(css: string): [number, number, number] {
+  const m = /rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/.exec(css);
+  if (!m) throw new Error(`not an rgb color: ${css}`);
+  return [Number(m[1]), Number(m[2]), Number(m[3])];
+}
+
+/**
+ * CIE76 color distance in Lab space: 0 is identical, ~2.3 is the
+ * "just noticeable" threshold, and anything under ~25 reads as the same color
+ * family in a different light. Cheap and good enough to catch the palette bug
+ * this guards (the old leader/runner-up pair measured 8.8).
+ */
+function deltaE76(a: [number, number, number], b: [number, number, number]): number {
+  const [l1, l2] = [lab(a), lab(b)];
+  return Math.sqrt((l1[0] - l2[0]) ** 2 + (l1[1] - l2[1]) ** 2 + (l1[2] - l2[2]) ** 2);
+}
+
+function lab(rgbv: [number, number, number]): [number, number, number] {
+  const lin = rgbv.map(c => {
+    const s = c / 255;
+    return s <= 0.04045 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
+  });
+  const x = (lin[0] * 0.4124564 + lin[1] * 0.3575761 + lin[2] * 0.1804375) / 0.95047;
+  const y = lin[0] * 0.2126729 + lin[1] * 0.7151522 + lin[2] * 0.0721750;
+  const z = (lin[0] * 0.0193339 + lin[1] * 0.1191920 + lin[2] * 0.9503041) / 1.08883;
+  const f = (t: number) => (t > 216 / 24389 ? Math.cbrt(t) : (841 / 108) * t + 4 / 29);
+  return [116 * f(y) - 16, 500 * (f(x) - f(y)), 200 * (f(y) - f(z))];
+}
+
 // --- PNG assertions for the score-graph export (ticket #240) --------------
 
 /**
@@ -671,12 +703,26 @@ async function answerQuestion(page: Page, wager: number, answer: string) {
   await button.click();
 }
 
-// Mark every joined player correct/incorrect in the mod's scorer and submit.
-// The judgment lives in the scorer row; the Score button itself is the mod's
-// control card (GameControlCard) under the question.
-async function scoreCurrentQuestion(modPage: Page, correct: boolean) {
+// Judge the joined players in the mod's scorer and submit. The judgment lives
+// in each player's scorer card; the Score button itself is the mod's control
+// card (GameControlCard) under the question, and only enables once every active
+// player has been judged.
+//
+// With teamNames given, each named team's card is judged in turn (a multi-team
+// game). Without them there is one player and the scorer's single check/close
+// button is the target.
+async function scoreCurrentQuestion(modPage: Page, correct: boolean, teamNames?: string[]) {
   const scorer = modPage.locator('.player-scorer');
-  await scorer.locator(`button:has(.anticon-${correct ? 'check' : 'close'})`).click();
+  const icon = `button:has(.anticon-${correct ? 'check' : 'close'})`;
+  if (teamNames) {
+    for (const team of teamNames) {
+      const card = scorer.locator('.ant-card').filter({ hasText: team });
+      await expect(card).toBeVisible({ timeout: 30000 });
+      await card.locator(icon).click();
+    }
+  } else {
+    await scorer.locator(icon).click();
+  }
   const scoreButton = modPage.locator('.game-control-card').getByRole('button', { name: 'Score', exact: true });
   await expect(scoreButton).toBeEnabled();
   await scoreButton.click();
@@ -1103,6 +1149,91 @@ test.describe('gameplay scoring, scoreboard & statuses', () => {
     await g.playerContext.close();
     await g.modContext.close();
     await cleanup(request, g.seeded, { sessionId: g.sessionId, modId: g.modId, playerIds: [g.playerId] });
+  });
+
+  // The score-graph team colors have to be tellable apart, not merely different
+  // hex values. The original palette walked the hue wheel in rank order, so the
+  // leader and runner-up got adjacent hues: red #a8071a vs volcano #ad2e24 is
+  // ΔE 8.8, which reads as one color in two lights. TEAM_COLORS is now ordered
+  // by measured distinctness, and this asserts the separation survives to the
+  // browser instead of trusting the palette comment.
+  test('score graph assigns teams colors far enough apart to tell apart', async ({
+    browser,
+    request,
+  }) => {
+    test.setTimeout(120000);
+    const prefix = unique();
+    const seeded = await seedStartableGame(request, prefix);
+    const { sessionId, modId } = await createSession(request, `e2e-session-${prefix}`, seeded.gameId);
+
+    const { context: modContext, page: modPage } = await openModLobby(browser, sessionId, modId, DEV_USER);
+    // "Team N " is 7 chars and the prefix is 13, so each name is exactly 20 —
+    // the maxLength ShortTextWithPopover truncates *above*. A longer name would
+    // render as "Charlie 17884060…" in the scorer card and no filter on the
+    // full name could find it.
+    const teamNames = [1, 2, 3, 4].map(n => `Team ${n} ${prefix}`);
+    const joined = [];
+    for (const name of teamNames) {
+      joined.push(await joinPlayer(browser, sessionId, name, name.replace('Team', 'Player')));
+    }
+
+    await modPage.locator('.start-button').click();
+    await expect(modPage.locator('.active-game')).toBeVisible({ timeout: 30000 });
+    for (const p of joined) {
+      await expect(p.page.locator('.active-game')).toBeVisible({ timeout: 30000 });
+    }
+
+    // One scored question is enough to put every team on the graph.
+    for (const p of joined) {
+      await answerQuestion(p.page, 100, `answer from ${p.playerId}`);
+    }
+    await scoreCurrentQuestion(modPage, true, teamNames);
+
+    // A second question, so each series has two points and ScoreChart draws a
+    // polyline rather than a lone dot (it skips the line when there is only one
+    // point — see the `points > 1` guard).
+    await modPage.getByRole('button', { name: 'Next Question', exact: true }).click();
+    for (const p of joined) {
+      await answerQuestion(p.page, 200, `second answer from ${p.playerId}`);
+    }
+    await scoreCurrentQuestion(modPage, true, teamNames);
+
+    // Open the graph on the first player's page.
+    await joined[0].page.getByRole('button', { name: 'Show score graph' }).click();
+    const modal = joined[0].page.locator('.score-graph-modal');
+    await expect(modal).toBeVisible({ timeout: 30000 });
+    await expect(modal.locator('.score-graph-legend-row')).toHaveCount(teamNames.length, { timeout: 30000 });
+
+    // The legend dot carries the team's exact line color, so it is the cleanest
+    // read of the assignment (a polyline can be overdrawn by another line).
+    const dots = await modal.locator('.score-graph-legend-dot').evaluateAll(els =>
+      els.map(el => getComputedStyle(el).backgroundColor),
+    );
+    expect(dots).toHaveLength(teamNames.length);
+    expect(new Set(dots).size).toBe(teamNames.length);
+
+    // Pairwise perceptual distance, not string inequality.
+    for (let i = 0; i < dots.length; i++) {
+      for (let j = i + 1; j < dots.length; j++) {
+        const d = deltaE76(parseRgb(dots[i]), parseRgb(dots[j]));
+        expect(d, `${dots[i]} vs ${dots[j]} should be visually distinct`).toBeGreaterThanOrEqual(25);
+      }
+    }
+
+    // The chart strokes agree with the legend, so the lines themselves — not
+    // just the key — are the distinct colors.
+    const lines = modal.locator('.score-chart .score-chart-line');
+    await expect(lines).toHaveCount(teamNames.length, { timeout: 30000 });
+    const strokes = await lines.evaluateAll(els => els.map(el => el.getAttribute('stroke')));
+    expect(new Set(strokes.map(s => s?.toLowerCase())).size).toBe(teamNames.length);
+
+    for (const p of joined) await p.context.close();
+    await modContext.close();
+    await cleanup(request, seeded, {
+      sessionId,
+      modId,
+      playerIds: joined.map(p => p.playerId),
+    });
   });
 });
 

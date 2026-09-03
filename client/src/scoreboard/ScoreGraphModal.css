@@ -118,19 +118,33 @@
     border-radius: 50%;
     flex-shrink: 0;
 }
-/* The name is the flexible middle: it truncates (ShortTextWithPopover) rather
-   than wrapping, so a long team name can't blow out the row or the modal. */
-.score-graph-legend-name {
+/* The name + total cluster is the flexible part of the row: it grows to fill
+   the column, the name truncates inside it (ShortTextWithPopover) so a long
+   team name can't blow out the row or the modal, and the total rides right
+   behind the name instead of being pushed to the far edge of the row. */
+.score-graph-legend-label {
+    display: flex;
+    align-items: baseline;
     flex: 1 1 auto;
+    min-width: 0;
+}
+.score-graph-legend-name {
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
+/* The separator keeps the number from reading as part of the name (a bare
+   space left "Team 2 8" looking like one string). aria-hidden so a screen
+   reader doesn't announce it between the name and its score. */
+.score-graph-legend-sep {
+    flex-shrink: 0;
+    margin: 0 4px;
+    color: rgba(0, 0, 0, 0.3);
+}
 .score-graph-legend-total {
     flex-shrink: 0;
     font-weight: bold;
-    margin-left: 4px;
 }
 
 /*

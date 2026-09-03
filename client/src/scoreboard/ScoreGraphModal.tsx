@@ -273,10 +273,18 @@ class ScoreGraphModal extends React.Component<Props, State> {
                                 onClick={() => this.toggleIsolate(s.name)}>
                             <span className="score-graph-legend-dot" style={{background: s.color}}/>
                             <PlayerIcon icon_name={s.icon}/>
-                            <span className="score-graph-legend-name">
-                                <ShortTextWithPopover text={s.name} maxLength={20}/>
+                            {/* Name and total are one cluster rather than
+                                opposite ends of the row: with the row up to
+                                ~330px wide, pushing the total to the far right
+                                left a gap wide enough to read as belonging to
+                                whichever neighbour it landed under. */}
+                            <span className="score-graph-legend-label">
+                                <span className="score-graph-legend-name">
+                                    <ShortTextWithPopover text={s.name} maxLength={20}/>
+                                </span>
+                                <span className="score-graph-legend-sep" aria-hidden="true">·</span>
+                                <span className="score-graph-legend-total">{total}</span>
                             </span>
-                            <span className="score-graph-legend-total">{total}</span>
                         </button>
                     )
                 })}

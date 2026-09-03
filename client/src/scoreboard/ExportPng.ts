@@ -51,6 +51,7 @@ const EXPORT_FONT = 'Helvetica, Arial, sans-serif'
 const SVG_NS = 'http://www.w3.org/2000/svg'
 
 const LEGEND_INK = 'rgba(0, 0, 0, 0.72)'
+const LEGEND_SEP = 'rgba(0, 0, 0, 0.3)'
 const LEGEND_RULE = '#f0f0f0'
 
 export interface LegendEntry {
@@ -117,9 +118,13 @@ function clip(text: string, maxChars: number): string {
 }
 
 /**
- * Build the export's legend: a grid of dot + name + total rows, matching the
+ * Build the export's legend: a grid of dot + "name · total" rows, matching the
  * on-screen legend's column behaviour (one column per ~200 viewBox units) so a
  * 12-team game doesn't export a 12-row wall.
+ *
+ * The total sits right behind the name rather than at the far edge of the
+ * column, and a separator keeps it from reading as part of the name — the same
+ * choice the on-screen legend makes, so the PNG looks like the modal.
  *
  * Coordinates are local to the block (y = 0 is its top edge); the caller places
  * it below the chart with a translate.
@@ -131,11 +136,13 @@ function buildLegend(entries: LegendEntry[], width: number): LegendLayout {
     const cols = Math.max(1, Math.floor(width / 200))
     const rows = Math.ceil(entries.length / cols) || 0
     const colW = width / cols
-    // Room for the dot, the name, and a right-aligned total.
+    // Room for the dot, then the name · total cluster.
     const dotR = Math.max(4, Math.round(font * 0.36))
     const gap = Math.round(font * 0.5)
-    const totalW = entries.reduce((w, e) => Math.max(w, e.total.length), 1) * font * CHAR_W + gap
-    const nameChars = Math.floor((colW - dotR * 2 - gap * 3 - totalW) / (font * CHAR_W))
+    const longestTotal = entries.reduce((w, e) => Math.max(w, e.total.length), 1)
+    // "name · total": the separator plus the widest total must fit too.
+    const reserved = dotR * 2 + gap * 2 + (longestTotal + 2) * font * CHAR_W
+    const nameChars = Math.floor((colW - reserved) / (font * CHAR_W))
 
     const g = el('g', {'class': 'score-graph-export-legend'})
     g.appendChild(el('line', {
@@ -151,16 +158,26 @@ function buildLegend(entries: LegendEntry[], width: number): LegendLayout {
         rowNode.appendChild(el('circle', {
             cx: x0 + dotR + 2, cy, r: dotR, fill: e.color,
         }))
+        // Name, separator and total are laid out as one left-aligned cluster.
+        // The name is clipped first so the total's x can be placed after it
+        // without measuring text (a standalone SVG can't be measured here).
+        const label = clip(e.name, nameChars)
+        const nameX = x0 + dotR * 2 + gap
+        const nameW = label.length * font * CHAR_W
         rowNode.appendChild(el('text', {
-            x: x0 + dotR * 2 + gap, y: cy,
+            x: nameX, y: cy,
             'dominant-baseline': 'middle', 'font-family': EXPORT_FONT,
             'font-size': font, fill: LEGEND_INK,
-        }, clip(e.name, nameChars)))
+        }, label))
         rowNode.appendChild(el('text', {
-            x: x0 + colW - 2, y: cy,
-            'text-anchor': 'end', 'dominant-baseline': 'middle',
-            'font-family': EXPORT_FONT, 'font-size': font,
-            'font-weight': 'bold', fill: LEGEND_INK,
+            x: nameX + nameW + gap, y: cy,
+            'dominant-baseline': 'middle', 'font-family': EXPORT_FONT,
+            'font-size': font, fill: LEGEND_SEP,
+        }, '·'))
+        rowNode.appendChild(el('text', {
+            x: nameX + nameW + gap * 2, y: cy,
+            'dominant-baseline': 'middle', 'font-family': EXPORT_FONT,
+            'font-size': font, 'font-weight': 'bold', fill: LEGEND_INK,
         }, e.total))
         g.appendChild(rowNode)
     })
