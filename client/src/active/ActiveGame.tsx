@@ -17,6 +17,8 @@ interface Props {
     rounds: number[]
     is_mobile?: boolean
     fullRounds: RoundInGame[]
+    /** Session name, threaded down to the score-graph PNG export (#240). */
+    session_name?: string
 }
 
 interface State {
@@ -239,6 +241,7 @@ class ActiveGame extends React.Component<Props, State> {
                     <Scoreboard round_id={this.state.active_round} session_id={this.props.session_id}
                                 player_id={this.props.player_id} session_state={this.props.session_state}
                                 question_id={this.state.active_question}
+                                session_name={this.props.session_name}
                                 is_mobile={this.props.is_mobile}/>
 
                 </div>

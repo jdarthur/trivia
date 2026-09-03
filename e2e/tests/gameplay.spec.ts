@@ -1,4 +1,6 @@
 import { expect, test, type APIRequestContext, type BrowserContext, type Locator, type Page } from '@playwright/test';
+import fs from 'fs';
+import zlib from 'zlib';
 
 // Gameplay e2e (ticket #109): lobby + session start, first slice of the
 // single-session suite. Unlike the editor suites, gameplay is anonymous and
@@ -31,6 +33,145 @@ function buildMockToken(name: string): string {
   return `${header}.${payload}.`;
 }
 const token = buildMockToken(DEV_USER);
+
+// --- Color distance (for the team-palette assertions) ---------------------
+
+/** Parse `rgb(r, g, b)` / `rgba(r, g, b, a)` into 0-255 channels. */
+function parseRgb(css: string): [number, number, number] {
+  const m = /rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/.exec(css);
+  if (!m) throw new Error(`not an rgb color: ${css}`);
+  return [Number(m[1]), Number(m[2]), Number(m[3])];
+}
+
+/**
+ * CIE76 color distance in Lab space: 0 is identical, ~2.3 is the
+ * "just noticeable" threshold, and anything under ~25 reads as the same color
+ * family in a different light. Cheap and good enough to catch the palette bug
+ * this guards (the old leader/runner-up pair measured 8.8).
+ */
+function deltaE76(a: [number, number, number], b: [number, number, number]): number {
+  const [l1, l2] = [lab(a), lab(b)];
+  return Math.sqrt((l1[0] - l2[0]) ** 2 + (l1[1] - l2[1]) ** 2 + (l1[2] - l2[2]) ** 2);
+}
+
+function lab(rgbv: [number, number, number]): [number, number, number] {
+  const lin = rgbv.map(c => {
+    const s = c / 255;
+    return s <= 0.04045 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
+  });
+  const x = (lin[0] * 0.4124564 + lin[1] * 0.3575761 + lin[2] * 0.1804375) / 0.95047;
+  const y = lin[0] * 0.2126729 + lin[1] * 0.7151522 + lin[2] * 0.0721750;
+  const z = (lin[0] * 0.0193339 + lin[1] * 0.1191920 + lin[2] * 0.9503041) / 1.08883;
+  const f = (t: number) => (t > 216 / 24389 ? Math.cbrt(t) : (841 / 108) * t + 4 / 29);
+  return [116 * f(y) - 16, 500 * (f(x) - f(y)), 200 * (f(y) - f(z))];
+}
+
+// --- PNG assertions for the score-graph export (ticket #240) --------------
+
+/**
+ * Decode a PNG produced by canvas.toBlob into raw RGBA pixels.
+ *
+ * Deliberately minimal: it handles what a browser canvas actually emits (8-bit,
+ * color type 2 or 6, interlace off) and throws on anything else rather than
+ * silently returning wrong pixels. Written by hand so the e2e suite keeps zero
+ * extra dependencies.
+ */
+function decodePng(buf: Buffer) {
+  const PNG_SIG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+  if (buf.length < 8 || !buf.subarray(0, 8).equals(PNG_SIG)) {
+    throw new Error('not a PNG');
+  }
+
+  let offset = 8;
+  let width = 0;
+  let height = 0;
+  let bitDepth = 0;
+  let colorType = 0;
+  let interlace = 0;
+  const idat: Buffer[] = [];
+
+  while (offset + 8 <= buf.length) {
+    const length = buf.readUInt32BE(offset);
+    const type = buf.subarray(offset + 4, offset + 8).toString('ascii');
+    const data = buf.subarray(offset + 8, offset + 8 + length);
+    if (type === 'IHDR') {
+      width = data.readUInt32BE(0);
+      height = data.readUInt32BE(4);
+      bitDepth = data[8];
+      colorType = data[9];
+      interlace = data[12];
+    } else if (type === 'IDAT') {
+      idat.push(Buffer.from(data));
+    } else if (type === 'IEND') {
+      break;
+    }
+    offset += 12 + length; // length + type + data + CRC
+  }
+
+  if (bitDepth !== 8 || interlace !== 0 || (colorType !== 2 && colorType !== 6)) {
+    throw new Error(`unsupported PNG: bitDepth=${bitDepth} colorType=${colorType} interlace=${interlace}`);
+  }
+  const channels = colorType === 6 ? 4 : 3;
+
+  const raw = zlib.inflateSync(Buffer.concat(idat));
+  const stride = width * channels;
+  const px = Buffer.alloc(height * stride);
+
+  // Un-filter each scanline against the one before it (PNG spec §9).
+  let pos = 0;
+  for (let y = 0; y < height; y++) {
+    const filter = raw[pos++];
+    const line = raw.subarray(pos, pos + stride);
+    pos += stride;
+    const out = px.subarray(y * stride, (y + 1) * stride);
+    const prev = y > 0 ? px.subarray((y - 1) * stride, y * stride) : null;
+    for (let x = 0; x < stride; x++) {
+      const a = x >= channels ? out[x - channels] : 0;
+      const b = prev ? prev[x] : 0;
+      const c = prev && x >= channels ? prev[x - channels] : 0;
+      let value: number;
+      switch (filter) {
+        case 0: value = line[x]; break;
+        case 1: value = line[x] + a; break;
+        case 2: value = line[x] + b; break;
+        case 3: value = line[x] + ((a + b) >> 1); break;
+        case 4: {
+          const p = a + b - c;
+          const pa = Math.abs(p - a), pb = Math.abs(p - b), pc = Math.abs(p - c);
+          value = line[x] + (pa <= pb && pa <= pc ? a : pb <= pc ? b : c);
+          break;
+        }
+        default: throw new Error(`bad PNG filter type ${filter} on row ${y}`);
+      }
+      out[x] = value & 0xff;
+    }
+  }
+
+  return {
+    width,
+    height,
+    /** [r, g, b] at (x, y); alpha is ignored (the export is opaque by design). */
+    pixel(x: number, y: number): [number, number, number] {
+      const i = y * stride + x * channels;
+      return [px[i], px[i + 1], px[i + 2]];
+    },
+    /** Pixels in the rect that differ from white by more than a hair. */
+    countInk(x0: number, y0: number, x1: number, y1: number): number {
+      let n = 0;
+      const left = Math.max(0, Math.floor(x0));
+      const top = Math.max(0, Math.floor(y0));
+      const right = Math.min(width, Math.ceil(x1));
+      const bottom = Math.min(height, Math.ceil(y1));
+      for (let y = top; y < bottom; y++) {
+        for (let x = left; x < right; x++) {
+          const [r, g, b] = this.pixel(x, y);
+          if (r < 245 || g < 245 || b < 245) n++;
+        }
+      }
+      return n;
+    },
+  };
+}
 
 // --- Editor seeding (via API, dev JWT) ------------------------------------
 
@@ -562,12 +703,26 @@ async function answerQuestion(page: Page, wager: number, answer: string) {
   await button.click();
 }
 
-// Mark every joined player correct/incorrect in the mod's scorer and submit.
-// The judgment lives in the scorer row; the Score button itself is the mod's
-// control card (GameControlCard) under the question.
-async function scoreCurrentQuestion(modPage: Page, correct: boolean) {
+// Judge the joined players in the mod's scorer and submit. The judgment lives
+// in each player's scorer card; the Score button itself is the mod's control
+// card (GameControlCard) under the question, and only enables once every active
+// player has been judged.
+//
+// With teamNames given, each named team's card is judged in turn (a multi-team
+// game). Without them there is one player and the scorer's single check/close
+// button is the target.
+async function scoreCurrentQuestion(modPage: Page, correct: boolean, teamNames?: string[]) {
   const scorer = modPage.locator('.player-scorer');
-  await scorer.locator(`button:has(.anticon-${correct ? 'check' : 'close'})`).click();
+  const icon = `button:has(.anticon-${correct ? 'check' : 'close'})`;
+  if (teamNames) {
+    for (const team of teamNames) {
+      const card = scorer.locator('.ant-card').filter({ hasText: team });
+      await expect(card).toBeVisible({ timeout: 30000 });
+      await card.locator(icon).click();
+    }
+  } else {
+    await scorer.locator(icon).click();
+  }
   const scoreButton = modPage.locator('.game-control-card').getByRole('button', { name: 'Score', exact: true });
   await expect(scoreButton).toBeEnabled();
   await scoreButton.click();
@@ -929,6 +1084,56 @@ test.describe('gameplay scoring, scoreboard & statuses', () => {
     await scoreCurrentQuestion(g.modPage, true);
     await expect(legendRow).toContainText('300', { timeout: 30000 });
 
+    // Ticket #240: export the graph as a PNG. The button is in the modal
+    // footer and only appears once there is a chart to export.
+    const exportButton = modal.getByRole('button', { name: /Export PNG/ });
+    await expect(exportButton).toBeVisible();
+
+    // Capture the chart's own viewBox so the assertions below can check the
+    // raster scale and the legend band without hardcoding chartSize()'s math.
+    const chartBox = await modal.locator('.score-chart').evaluate(el => {
+      const box = (el as SVGSVGElement).viewBox.baseVal;
+      return { width: box.width, height: box.height };
+    });
+    expect(chartBox.width).toBeGreaterThan(0);
+
+    const [download] = await Promise.all([
+      g.playerPage.waitForEvent('download'),
+      exportButton.click(),
+    ]);
+    // Named from the session, per the ticket ("trivia-<session-name>.png").
+    expect(download.suggestedFilename()).toBe(`trivia-e2e-session-${prefix}.png`);
+
+    const pngPath = await download.path();
+    expect(pngPath).toBeTruthy();
+    const png = decodePng(await fs.promises.readFile(pngPath!));
+
+    // 2x for retina...
+    expect(png.width).toBe(chartBox.width * 2);
+    // ...taller than the chart alone, because the legend is appended below it.
+    expect(png.height).toBeGreaterThan(chartBox.height * 2);
+
+    // White background: the corners and the very top edge are outside the plot.
+    expect(png.pixel(0, 0)).toEqual([255, 255, 255]);
+    expect(png.pixel(png.width - 1, 0)).toEqual([255, 255, 255]);
+
+    // The plot and the legend band both carry ink, so neither is a blank
+    // region of the canvas.
+    const plotInk = png.countInk(0, 0, png.width, chartBox.height * 2);
+    const legendInk = png.countInk(0, chartBox.height * 2, png.width, png.height);
+    expect(plotInk).toBeGreaterThan(50);
+    expect(legendInk).toBeGreaterThan(50);
+
+    // "Includes the legend" means its text actually rasterized, not just the
+    // color dot and the rule above it. The rule is a full-width hairline near
+    // the top of the band and the dot sits at the left edge, so sampling the
+    // lower-middle of the band — below the rule, right of the dot — isolates
+    // the team name and its total.
+    const bandTop = chartBox.height * 2;
+    const bandH = png.height - bandTop;
+    const textInk = png.countInk(48, bandTop + bandH * 0.35, png.width, png.height);
+    expect(textInk).toBeGreaterThan(20);
+
     // The scoreboard behind the open modal updated too...
     await expect(
       g.playerPage.locator('.scoreboard .ant-card').filter({ hasText: g.teamName }),
@@ -944,6 +1149,91 @@ test.describe('gameplay scoring, scoreboard & statuses', () => {
     await g.playerContext.close();
     await g.modContext.close();
     await cleanup(request, g.seeded, { sessionId: g.sessionId, modId: g.modId, playerIds: [g.playerId] });
+  });
+
+  // The score-graph team colors have to be tellable apart, not merely different
+  // hex values. The original palette walked the hue wheel in rank order, so the
+  // leader and runner-up got adjacent hues: red #a8071a vs volcano #ad2e24 is
+  // ΔE 8.8, which reads as one color in two lights. TEAM_COLORS is now ordered
+  // by measured distinctness, and this asserts the separation survives to the
+  // browser instead of trusting the palette comment.
+  test('score graph assigns teams colors far enough apart to tell apart', async ({
+    browser,
+    request,
+  }) => {
+    test.setTimeout(120000);
+    const prefix = unique();
+    const seeded = await seedStartableGame(request, prefix);
+    const { sessionId, modId } = await createSession(request, `e2e-session-${prefix}`, seeded.gameId);
+
+    const { context: modContext, page: modPage } = await openModLobby(browser, sessionId, modId, DEV_USER);
+    // "Team N " is 7 chars and the prefix is 13, so each name is exactly 20 —
+    // the maxLength ShortTextWithPopover truncates *above*. A longer name would
+    // render as "Charlie 17884060…" in the scorer card and no filter on the
+    // full name could find it.
+    const teamNames = [1, 2, 3, 4].map(n => `Team ${n} ${prefix}`);
+    const joined = [];
+    for (const name of teamNames) {
+      joined.push(await joinPlayer(browser, sessionId, name, name.replace('Team', 'Player')));
+    }
+
+    await modPage.locator('.start-button').click();
+    await expect(modPage.locator('.active-game')).toBeVisible({ timeout: 30000 });
+    for (const p of joined) {
+      await expect(p.page.locator('.active-game')).toBeVisible({ timeout: 30000 });
+    }
+
+    // One scored question is enough to put every team on the graph.
+    for (const p of joined) {
+      await answerQuestion(p.page, 100, `answer from ${p.playerId}`);
+    }
+    await scoreCurrentQuestion(modPage, true, teamNames);
+
+    // A second question, so each series has two points and ScoreChart draws a
+    // polyline rather than a lone dot (it skips the line when there is only one
+    // point — see the `points > 1` guard).
+    await modPage.getByRole('button', { name: 'Next Question', exact: true }).click();
+    for (const p of joined) {
+      await answerQuestion(p.page, 200, `second answer from ${p.playerId}`);
+    }
+    await scoreCurrentQuestion(modPage, true, teamNames);
+
+    // Open the graph on the first player's page.
+    await joined[0].page.getByRole('button', { name: 'Show score graph' }).click();
+    const modal = joined[0].page.locator('.score-graph-modal');
+    await expect(modal).toBeVisible({ timeout: 30000 });
+    await expect(modal.locator('.score-graph-legend-row')).toHaveCount(teamNames.length, { timeout: 30000 });
+
+    // The legend dot carries the team's exact line color, so it is the cleanest
+    // read of the assignment (a polyline can be overdrawn by another line).
+    const dots = await modal.locator('.score-graph-legend-dot').evaluateAll(els =>
+      els.map(el => getComputedStyle(el).backgroundColor),
+    );
+    expect(dots).toHaveLength(teamNames.length);
+    expect(new Set(dots).size).toBe(teamNames.length);
+
+    // Pairwise perceptual distance, not string inequality.
+    for (let i = 0; i < dots.length; i++) {
+      for (let j = i + 1; j < dots.length; j++) {
+        const d = deltaE76(parseRgb(dots[i]), parseRgb(dots[j]));
+        expect(d, `${dots[i]} vs ${dots[j]} should be visually distinct`).toBeGreaterThanOrEqual(25);
+      }
+    }
+
+    // The chart strokes agree with the legend, so the lines themselves — not
+    // just the key — are the distinct colors.
+    const lines = modal.locator('.score-chart .score-chart-line');
+    await expect(lines).toHaveCount(teamNames.length, { timeout: 30000 });
+    const strokes = await lines.evaluateAll(els => els.map(el => el.getAttribute('stroke')));
+    expect(new Set(strokes.map(s => s?.toLowerCase())).size).toBe(teamNames.length);
+
+    for (const p of joined) await p.context.close();
+    await modContext.close();
+    await cleanup(request, seeded, {
+      sessionId,
+      modId,
+      playerIds: joined.map(p => p.playerId),
+    });
   });
 });
 
