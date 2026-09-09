@@ -296,10 +296,9 @@ func TestImportSessionFlattening(t *testing.T) {
 				},
 			},
 		},
-		// per-question points keyed by the overall question index; kept in the
-		// document for realism, but the import derives totals from the answers
-		Scoreboard: map[string][]float64{p1ID: {10, 0}, p2ID: {7, 0}},
-		Players:    []string{p1ID, p2ID},
+		// per-question points keyed by the overall question index; the import
+		// derives totals from the answers, not this document (see importSessionScores)
+		Players: []string{p1ID, p2ID},
 	}
 	if err := im.importSession(ctx, tx, rawDoc(t, session)); err != nil {
 		t.Fatal(err)
@@ -816,8 +815,7 @@ func TestImportedSessionReadsBack(t *testing.T) {
 				},
 			},
 		},
-		Scoreboard: map[string][]float64{p1ID: {10, 0}, p2ID: {7, 0}},
-		Players:    []string{p1ID, p2ID},
+		Players: []string{p1ID, p2ID},
 	})
 	importAll(im.importAnswer,
 		mongoAnswer{ID: binID(t, a1ID), CreateDate: created, PlayerId: p1ID, Answer: "A0", Wager: 10, Correct: true, PointsAwarded: 10},
@@ -943,9 +941,9 @@ func TestScoreboardSkipsUnscoredQuestion(t *testing.T) {
 				},
 			},
 		},
-		// dense-looking, but q1 has no slot: 5 is round 1's points
-		Scoreboard: map[string][]float64{p1ID: {10, 5}},
-		Players:    []string{p1ID},
+		// the legacy scoreboard array looked dense, but q1 has no slot: 5 is
+		// round 1's points; the import derives totals from the answers
+		Players: []string{p1ID},
 	}
 	if err := im.importSession(ctx, tx, rawDoc(t, session)); err != nil {
 		t.Fatal(err)
@@ -977,4 +975,54 @@ func TestScoreboardSkipsUnscoredQuestion(t *testing.T) {
 	if im.summary.SessionScores != 2 {
 		t.Fatalf("SessionScores = %d, want 2", im.summary.SessionScores)
 	}
+}
+
+// TestImportSessionIgnoresLegacyScoreboardShape locks in the fix for the
+// import failure "cannot decode double into a slice". Some legacy sessions
+// stored the scoreboard as player UUID -> single double rather than the
+// per-question array the old struct expected, so decoding it as
+// map[string][]float64 aborted the whole import. The scoreboard document is
+// no longer decoded at all (per-round totals derive from the answers, see
+// importSessionScores), so either shape must import cleanly.
+func TestImportSessionIgnoresLegacyScoreboardShape(t *testing.T) {
+	db := testDB(t)
+	ctx := context.Background()
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer tx.Rollback() //nolint:errcheck // no-op after Commit
+
+	const (
+		p1ID = "60000000-0000-0000-0000-000000000001"
+		sID  = "70000000-0000-0000-0000-000000000001"
+	)
+	created := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
+
+	im := newImporter()
+	if err := im.importPlayer(ctx, tx, rawDoc(t, mongoPlayer{ID: binID(t, p1ID), CreateDate: created, TeamName: "Team A"})); err != nil {
+		t.Fatal(err)
+	}
+
+	// The legacy scoreboard value here is a single double — the shape that
+	// previously failed with "cannot decode double into a slice". The import
+	// ignores the scoreboard, so the session must still import.
+	session := map[string]interface{}{
+		"_id":         binID(t, sID),
+		"create_date": created,
+		"started":     true,
+		"players":     []string{p1ID},
+		"scoreboard":  map[string]float64{p1ID: 10},
+		"rounds":      []interface{}{},
+	}
+	if err := im.importSession(ctx, tx, rawDoc(t, session)); err != nil {
+		t.Fatalf("session with a single-double scoreboard must import cleanly: %v", err)
+	}
+	if im.summary.Sessions != 1 || im.summary.SessionPlayers != 1 {
+		t.Fatalf("summary = %+v", im.summary)
+	}
+	if err := tx.Commit(); err != nil {
+		t.Fatal(err)
+	}
+	assertRows(t, db, []interface{}{sID}, `SELECT id FROM session WHERE id = ?`, sID)
 }

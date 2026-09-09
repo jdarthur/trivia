@@ -147,8 +147,11 @@ type mongoSession struct {
 	Rounds          []mongoRoundInGame   `bson:"rounds"`
 	CurrentRound    *int                 `bson:"current_round"`
 	CurrentQuestion *int                 `bson:"current_question"`
-	Scoreboard      map[string][]float64 `bson:"scoreboard"` // key: player UUID; decoded for completeness, points derive from the answers (see importSessionScores)
-	Players         []string             `bson:"players"`    // player UUIDs, join order
+	// The legacy scoreboard (player UUID -> points per scored question) is
+	// deliberately not decoded: its shape varied across old writes (some
+	// sessions stored a single double), and the import derives per-round
+	// totals from the answers instead (see importSessionScores).
+	Players []string `bson:"players"` // player UUIDs, join order
 }
 
 type mongoRoundInGame struct {
