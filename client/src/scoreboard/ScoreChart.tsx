@@ -45,6 +45,12 @@ interface Props {
      * line fades to a ghost. null/undefined leaves all lines full strength.
      */
     isolated?: string | null
+    /**
+     * The <svg> node, handed to the caller for rasterizing (ticket #240).
+     * Stays null in the empty state — there is nothing to export then, and a
+     * caller should disable its button rather than fail.
+     */
+    svgRef?: React.Ref<SVGSVGElement>
 }
 
 const TARGET_TICKS = 5
@@ -121,7 +127,7 @@ function fmtPts(v: number): string {
     return n > 0 ? "+" + n : String(n)
 }
 
-const ScoreChart: React.FC<Props> = ({axis, series, width = 800, height = 400, isolated = null}) => {
+const ScoreChart: React.FC<Props> = ({axis, series, width = 800, height = 400, isolated = null, svgRef}) => {
     // The tooltip overlay is positioned from the hovered dot's viewBox
     // coordinates scaled by the rendered size (the wrapper's clientWidth over
     // the viewBox width; with `width: 100%` + `height: auto` the aspect ratio
@@ -354,7 +360,7 @@ const ScoreChart: React.FC<Props> = ({axis, series, width = 800, height = 400, i
              onClick={() => setHover(null)}
              onMouseLeave={() => setHover(null)}>
             <svg className="score-chart" viewBox={`0 0 ${width} ${height}`}
-                 preserveAspectRatio="xMidYMid meet" role="img"
+                 preserveAspectRatio="xMidYMid meet" role="img" ref={svgRef}
                  aria-label={`Score progression over ${points} ${questionWord}; ${teamCount} ${teamWord}`}>
                 {ticks.map((t, i) => (
                     <g key={i}>

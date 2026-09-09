@@ -16,6 +16,8 @@ interface Props {
     round_id: string | number | null
     session_state: any
     question_id?: string | number
+    /** Session name, for the score-graph PNG export's filename (#240). */
+    session_name?: string
     // Kept for API compatibility. The layout now reflows responsively (a
     // compact column on wide screens, a horizontal strip across the top on
     // narrow ones) instead of switching to a modal, so this is unused.
@@ -128,6 +130,7 @@ class Scoreboard extends React.Component<Props, State> {
                              player_id={this.props.player_id} round_id={this.props.round_id}
                              session_state={this.props.session_state}
                              question_id={this.props.question_id}
+                             session_name={this.props.session_name}
                              onClose={this.close_graph}/>
         </div>
 

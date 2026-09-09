@@ -23,6 +23,10 @@ interface State {
     started: boolean
     rounds: number[]
     fullRounds: RoundInGame[]
+    // The session's name, from GET /gameplay/session/:id. Already set by
+    // get_session (it was untyped until the score-graph PNG export needed it
+    // for a filename, ticket #240).
+    name: string
 }
 
 class Homepage extends React.Component<Props, State> {
@@ -43,7 +47,8 @@ class Homepage extends React.Component<Props, State> {
             is_mod: false,
             started: false,
             rounds: [],
-            fullRounds: []
+            fullRounds: [],
+            name: ""
         }
     }
 
@@ -164,6 +169,7 @@ class Homepage extends React.Component<Props, State> {
             <ActiveGame session_id={this.state.session_id} player_id={this.state.player_id}
                         session_state={this.state.sess_state} is_mod={this.state.is_mod}
                         rounds={this.state.rounds} is_mobile={this.props.is_mobile}
+                        session_name={this.state.name}
                         fullRounds={this.state.fullRounds}/>
             :
 
