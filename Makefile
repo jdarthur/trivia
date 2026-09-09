@@ -32,9 +32,10 @@ run: build-client server-bin
 
 # Like `make run`, but serving HTTPS: the server terminates TLS itself, using
 # the certificate and key files server-cert.pem / server-key.pem in the server
-# module directory. Drop a production cert/key under those names to use it.
+# module directory, and binds to 0.0.0.0:443 (so port 443 must be free/owned by
+# this process). Drop a production cert/key under those names to use it.
 prod: build-client server-bin
-	cd server/go/src && CLIENT_DIR=../../../client/build ./trivia-server --tls-cert server-cert.pem --tls-key server-key.pem
+	cd server/go/src && CLIENT_DIR=../../../client/build ./trivia-server --addr 0.0.0.0:443 --tls-cert server-cert.pem --tls-key server-key.pem
 
 # Same checks CI runs (server build/vet/test, client audit).
 check:
