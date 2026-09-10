@@ -92,8 +92,7 @@ class PlayerStatus extends React.Component<Props, State> {
             const currentFetch = this.fetchCounter
 
             let url = "/gameplay/session/" + this.props.session_id + "/answers"
-            url += "?player_id=" + this.props.player_id
-            url += "&round_id=" + this.props.round_id
+            url += "?round_id=" + this.props.round_id
             url += "&question_id=" + this.props.question_id
             console.log(url)
 

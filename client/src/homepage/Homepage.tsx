@@ -4,6 +4,7 @@ import NewGameModal from "./NewGameModal"
 import GameLobby from "../lobby/GameLobby"
 import ActiveGame from "../active/ActiveGame"
 import type {RoundInGame} from "../types/models"
+import {getPlayerToken} from "../common/playerToken"
 
 const SESSION_ID = "session_id"
 const PLAYER_ID = "player_id"
@@ -62,7 +63,10 @@ class Homepage extends React.Component<Props, State> {
         let search = window.location.search;
         let params = new URLSearchParams(search);
         let session_id = params.get(SESSION_ID);
-        let player_id = params.get(PLAYER_ID);
+        // player_id is no longer a URL credential (ticket #256): it is
+        // bootstrapped from sessionStorage, and identity comes from the
+        // player_token header the API verifies.
+        let player_id = sessionStorage.getItem(PLAYER_ID);
 
         const state: any = {}
         if (session_id) {
@@ -120,13 +124,10 @@ class Homepage extends React.Component<Props, State> {
     get_session = () => {
         if (this.state.session_id !== "") {
             let url = "/gameplay/session/" + this.state.session_id
-            if (this.state.player_id) {
-                url = url + "?player_id=" + this.state.player_id
-            }
             this.pollController?.abort()
             const controller = new AbortController()
             this.pollController = controller
-            fetch(url, {signal: controller.signal})
+            fetch(url, {signal: controller.signal, headers: {'borttrivia-player-token': getPlayerToken()}})
                 .then(response => {
                     if (!response.ok) {
                         throw new Error(`Request failed (${response.status} ${response.statusText})`)

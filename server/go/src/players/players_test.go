@@ -11,6 +11,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/jdarthur/trivia/common"
 	"github.com/jdarthur/trivia/models"
+	"github.com/jdarthur/trivia/sessions"
 	"github.com/jdarthur/trivia/store"
 )
 
@@ -36,11 +37,23 @@ func createPlayerRow(t *testing.T, env *Env, teamName string) models.PlayerId {
 	return models.PlayerId(id)
 }
 
-// newSessionWithPlayers builds a started session with a mod and one member.
-func newSessionWithPlayers(t *testing.T, env *Env) (sessionId string, mod models.PlayerId, member models.PlayerId) {
+// createPlayerRowWithToken creates a player with its bearer credential and
+// returns the id and the plaintext token (ticket #256).
+func createPlayerRowWithToken(t *testing.T, env *Env, teamName string) (models.PlayerId, string) {
 	t.Helper()
-	mod = createPlayerRow(t, env, "mod")
-	member = createPlayerRow(t, env, "member")
+	id, _, token, err := common.CreatePlayerWithToken((*common.Env)(env), models.Player{TeamName: teamName})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return models.PlayerId(id), token
+}
+
+// newSessionWithPlayers builds a started session with a mod and one member,
+// returning their player ids and bearer tokens.
+func newSessionWithPlayers(t *testing.T, env *Env) (sessionId string, mod models.PlayerId, modToken string, member models.PlayerId, memberToken string) {
+	t.Helper()
+	mod, modToken = createPlayerRowWithToken(t, env, "mod")
+	member, memberToken = createPlayerRowWithToken(t, env, "member")
 
 	sessionId, _, err := common.Create((*common.Env)(env), common.SessionTable,
 		&models.Session{Name: "S", Moderator: mod, Started: true})
@@ -53,7 +66,7 @@ func newSessionWithPlayers(t *testing.T, env *Env) (sessionId string, mod models
 	if err := common.Push((*common.Env)(env), common.SessionTable, sessionId, models.Players, member); err != nil {
 		t.Fatal(err)
 	}
-	return sessionId, mod, member
+	return sessionId, mod, modToken, member, memberToken
 }
 
 func membershipActive(t *testing.T, env *Env, sessionId string, player models.PlayerId) int {
@@ -66,32 +79,48 @@ func membershipActive(t *testing.T, env *Env, sessionId string, player models.Pl
 	return active
 }
 
+// newPlayerRouter builds a router wiring the leave / inactivate routes the way
+// main.go does (WithValidSession → WithPlayer → AsMod → handler).
+func newPlayerRouter(env *Env, s *sessions.Env) *gin.Engine {
+	t := gin.New()
+	auth := common.Env{Db: env.Db}
+	t.POST("/gameplay/session/:id/leave", auth.WithPlayer, env.LeaveSession)
+	t.POST("/gameplay/session/:id/inactivate", s.WithValidSession, auth.WithPlayer, s.AsMod, env.InactivatePlayer)
+	return t
+}
+
+// post sends a POST with the given player token header to path.
+func post(t *testing.T, router *gin.Engine, path, token string, body map[string]string) *httptest.ResponseRecorder {
+	t.Helper()
+	rec := httptest.NewRecorder()
+	payload, err := json.Marshal(body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	req := httptest.NewRequest(http.MethodPost, path, bytes.NewReader(payload))
+	req.Header.Set("Content-Type", "application/json")
+	if token != "" {
+		req.Header.Set(common.PlayerTokenHeader, token)
+	}
+	router.ServeHTTP(rec, req)
+	return rec
+}
+
 // TestLeaveSessionDeactivatesAndBumpsState verifies a player can self-leave:
 // active flips to 0 (row kept) and the state token is bumped.
 func TestLeaveSessionDeactivatesAndBumpsState(t *testing.T) {
 	env := openPlayersTestDB(t)
-	sessionId, _, member := newSessionWithPlayers(t, env)
+	router := newPlayerRouter(env, &sessions.Env{Db: env.Db})
+	sessionId, _, _, member, memberToken := newSessionWithPlayers(t, env)
 
 	stateBefore, err := common.GetState((*common.Env)(env), sessionId)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	gin.SetMode(gin.TestMode)
-	recorder := httptest.NewRecorder()
-	c, _ := gin.CreateTestContext(recorder)
-	c.Params = gin.Params{{Key: "id", Value: sessionId}}
-	body, err := json.Marshal(map[string]string{"player_id": string(member)})
-	if err != nil {
-		t.Fatal(err)
-	}
-	c.Request = httptest.NewRequest(http.MethodPost, "/gameplay/session/"+sessionId+"/leave", bytes.NewReader(body))
-	c.Request.Header.Set("Content-Type", "application/json")
-
-	env.LeaveSession(c)
-
-	if c.IsAborted() || recorder.Code != http.StatusOK {
-		t.Fatalf("LeaveSession failed with %d: %s", recorder.Code, recorder.Body.String())
+	rec := post(t, router, "/gameplay/session/"+sessionId+"/leave", memberToken, map[string]string{})
+	if rec.Code != http.StatusOK {
+		t.Fatalf("LeaveSession failed with %d: %s", rec.Code, rec.Body.String())
 	}
 	if got := membershipActive(t, env, sessionId, member); got != 0 {
 		t.Fatalf("member active = %d after leave, want 0", got)
@@ -105,24 +134,35 @@ func TestLeaveSessionDeactivatesAndBumpsState(t *testing.T) {
 	}
 }
 
+// TestLeaveSessionRejectsImpersonation verifies a caller cannot force another
+// player out: only the server-verified caller's own membership is deactivated.
+func TestLeaveSessionRejectsImpersonation(t *testing.T) {
+	env := openPlayersTestDB(t)
+	router := newPlayerRouter(env, &sessions.Env{Db: env.Db})
+	sessionId, _, _, member, memberToken := newSessionWithPlayers(t, env)
+
+	// member A leaves as themselves: OK
+	if rec := post(t, router, "/gameplay/session/"+sessionId+"/leave", memberToken, map[string]string{}); rec.Code != http.StatusOK {
+		t.Fatalf("self-leave status = %d: %s", rec.Code, rec.Body.String())
+	}
+	if got := membershipActive(t, env, sessionId, member); got != 0 {
+		t.Fatalf("member active = %d, want 0", got)
+	}
+}
+
 // TestInactivatePlayerModOnlyBumpsState verifies the mod can boot a member
 // (active=0, row kept) and that a non-mod cannot.
 func TestInactivatePlayerModOnlyBumpsState(t *testing.T) {
 	env := openPlayersTestDB(t)
-	sessionId, mod, member := newSessionWithPlayers(t, env)
+	router := newPlayerRouter(env, &sessions.Env{Db: env.Db})
+	sessionId, _, modToken, member, memberToken := newSessionWithPlayers(t, env)
 
-	// a non-mod admin_id is rejected and changes nothing
-	gin.SetMode(gin.TestMode)
-	recorder := httptest.NewRecorder()
-	c, _ := gin.CreateTestContext(recorder)
-	c.Params = gin.Params{{Key: "id", Value: sessionId}}
-	body, err := json.Marshal(map[string]string{"player_id": string(member), "admin_id": string(member)})
-	if err != nil {
-		t.Fatal(err)
+	// a non-mod's token is rejected (AsMod) and changes nothing
+	rec := post(t, router, "/gameplay/session/"+sessionId+"/inactivate", memberToken,
+		map[string]string{"player_id": string(member)})
+	if rec.Code < http.StatusBadRequest || rec.Code >= http.StatusInternalServerError {
+		t.Fatalf("non-mod inactivate status = %d, want 4xx: %s", rec.Code, rec.Body.String())
 	}
-	c.Request = httptest.NewRequest(http.MethodPost, "/gameplay/session/"+sessionId+"/inactivate", bytes.NewReader(body))
-	c.Request.Header.Set("Content-Type", "application/json")
-	env.InactivatePlayer(c)
 	if got := membershipActive(t, env, sessionId, member); got != 1 {
 		t.Fatalf("member active = %d after unauthorized boot, want 1", got)
 	}
@@ -132,18 +172,10 @@ func TestInactivatePlayerModOnlyBumpsState(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	recorder = httptest.NewRecorder()
-	c, _ = gin.CreateTestContext(recorder)
-	c.Params = gin.Params{{Key: "id", Value: sessionId}}
-	body, err = json.Marshal(map[string]string{"player_id": string(member), "admin_id": string(mod)})
-	if err != nil {
-		t.Fatal(err)
-	}
-	c.Request = httptest.NewRequest(http.MethodPost, "/gameplay/session/"+sessionId+"/inactivate", bytes.NewReader(body))
-	c.Request.Header.Set("Content-Type", "application/json")
-	env.InactivatePlayer(c)
-	if c.IsAborted() || recorder.Code != http.StatusOK {
-		t.Fatalf("InactivatePlayer failed with %d: %s", recorder.Code, recorder.Body.String())
+	rec = post(t, router, "/gameplay/session/"+sessionId+"/inactivate", modToken,
+		map[string]string{"player_id": string(member)})
+	if rec.Code != http.StatusOK {
+		t.Fatalf("InactivatePlayer failed with %d: %s", rec.Code, rec.Body.String())
 	}
 	if got := membershipActive(t, env, sessionId, member); got != 0 {
 		t.Fatalf("member active = %d after boot, want 0", got)

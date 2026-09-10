@@ -69,7 +69,6 @@ class Scoreboard extends React.Component<Props, State> {
             const currentFetch = this.fetchCounter
 
             let url = "/gameplay/session/" + this.props.session_id + "/scoreboard"
-            url += "?player_id=" + this.props.player_id
             console.log(url)
             sendData(url, "GET")
                 .then((data: any) => {

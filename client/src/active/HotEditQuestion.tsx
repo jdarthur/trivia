@@ -5,6 +5,7 @@ import {Button} from 'antd';
 import EditQuestionModal from "../question/EditQuestionModal";
 import {useAllCategories} from "../api/main";
 import type {QuestionBucket, QuestionBucketItem, QuestionPair} from "../types/models";
+import {getPlayerToken} from "../common/playerToken";
 
 interface Props {
     // The snapshot carries the category NAME (resolved server-side); the
@@ -168,10 +169,10 @@ export default function HotEditQuestion(props: Props) {
 }
 
 async function save(session_id: string, player_id: string, question_data: any): Promise<any> {
-    const url = "/gameplay/session/" + session_id + "/hot-edit-question?player_id=" + player_id
+    const url = "/gameplay/session/" + session_id + "/hot-edit-question"
     const response = await fetch(url, {
         method: "PUT",
-        headers: {'Content-Type': 'application/json'},
+        headers: {'Content-Type': 'application/json', 'borttrivia-player-token': getPlayerToken()},
         body: JSON.stringify(question_data)
     })
     return response.json()

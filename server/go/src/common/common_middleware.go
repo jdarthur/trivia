@@ -35,7 +35,33 @@ func (e MissingTokenError) Error() string {
 	return "Missing auth token"
 }
 
+// PlayerTokenHeader is the header carrying the gameplay bearer credential. It
+// deliberately travels in a header, not a query param or body field, so the
+// token never appears in a URL (the screen-share / history / Referer leak the
+// old player_id credential was subject to).
+const PlayerTokenHeader = "borttrivia-player-token"
+
+// MissingPlayerTokenError is returned when a gameplay endpoint that requires a
+// player credential is called without the token header.
+type MissingPlayerTokenError struct{}
+
+func (e MissingPlayerTokenError) Error() string {
+	return "Missing player token"
+}
+
+// InvalidPlayerTokenError is returned when the presented token does not match
+// any player's stored token_hash.
+type InvalidPlayerTokenError struct{}
+
+func (e InvalidPlayerTokenError) Error() string {
+	return "Invalid player token"
+}
+
 var USER_ID = "userId"
+
+// PLAYER_ID is the gin context key the WithPlayer middleware sets with the
+// server-verified player ID.
+var PLAYER_ID = "playerId"
 
 // DevMode gates acceptance of unsigned mock JWTs. It is set only by the API's
 // --dev-mode flag (main.go); default builds leave it false and behave exactly
@@ -246,6 +272,68 @@ func decodeDevToken(jwtToken string, db *sql.DB) (jwt.MapClaims, error) {
 	}
 
 	return claims, nil
+}
+
+// WithPlayer authenticates a gameplay caller by its per-player bearer token
+// (ticket #256). It hashes the token, looks up the matching player row, and on
+// success sets the server-verified player ID in the context. On failure it
+// responds and aborts (fail closed). player_id is a public identifier and not
+// a credential; this middleware is how the caller proves they are that player.
+func (e *Env) WithPlayer(c *gin.Context) {
+	token := c.GetHeader(PlayerTokenHeader)
+	if token == "" {
+		Respond(c, nil, MissingPlayerTokenError{})
+		c.Abort()
+		return
+	}
+	playerId, err := PlayerIdFromToken(e.Db, token)
+	if err != nil {
+		Respond(c, nil, err)
+		c.Abort()
+		return
+	}
+	if playerId == "" {
+		Respond(c, nil, InvalidPlayerTokenError{})
+		c.Abort()
+		return
+	}
+	c.Set(PLAYER_ID, playerId)
+	c.Next()
+}
+
+// WithPlayerOptional is the read-path variant of WithPlayer: it sets the
+// server-verified player ID when a valid token is presented, but does NOT
+// reject an absent or invalid token. An unauthenticated caller is treated as a
+// spectator (GetPlayerId returns ""), and the read handlers narrow disclosure
+// accordingly — so a spectator can view a session read-only, and no caller can
+// widen their own disclosure by claiming to be the mod. Write / moderator
+// routes must use the strict WithPlayer instead.
+func (e *Env) WithPlayerOptional(c *gin.Context) {
+	token := c.GetHeader(PlayerTokenHeader)
+	if token == "" {
+		c.Next()
+		return
+	}
+	playerId, err := PlayerIdFromToken(e.Db, token)
+	if err != nil {
+		Respond(c, nil, err)
+		c.Abort()
+		return
+	}
+	if playerId != "" {
+		c.Set(PLAYER_ID, playerId)
+	}
+	c.Next()
+}
+
+// GetPlayerId returns the server-verified player ID set by WithPlayer, or ""
+// when the caller was not authenticated as a player.
+func GetPlayerId(c *gin.Context) string {
+	value, ok := c.Get(PLAYER_ID)
+	if ok {
+		return value.(string)
+	}
+	return ""
 }
 
 func (e *Env) AsUser(c *gin.Context) {

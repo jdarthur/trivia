@@ -1,4 +1,5 @@
 import React from 'react';
+import {getPlayerToken, clearPlayerToken} from "../common/playerToken";
 
 interface Props {
     session_id: string
@@ -13,7 +14,7 @@ export default function LeaveGame({session_id, player_id}: Props) {
         const url = "/gameplay/session/" + session_id + "/leave"
         fetch(url, {
             method: "POST",
-            headers: {'Content-Type': 'application/json'},
+            headers: {'Content-Type': 'application/json', 'borttrivia-player-token': getPlayerToken()},
             body: JSON.stringify({player_id})
         }).then(response => {
             if (!response.ok) {
@@ -27,6 +28,7 @@ export default function LeaveGame({session_id, player_id}: Props) {
             sessionStorage.removeItem("scoreboard")
             sessionStorage.removeItem("answers")
             sessionStorage.removeItem("status")
+            clearPlayerToken()
             window.location.href = window.location.origin + window.location.pathname
         }).catch((error) => {
             // A failed leave keeps the player in the game: don't clear

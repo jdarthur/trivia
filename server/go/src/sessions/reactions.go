@@ -35,6 +35,9 @@ func (e *Env) SetReaction(c *gin.Context) {
 		common.Respond(c, nil, err)
 		return
 	}
+	// The actor is the server-verified caller, never the body's player_id — so
+	// a caller cannot react as another player.
+	req.PlayerId = models.PlayerId(common.GetPlayerId(c))
 	req.Emoji = strings.TrimSpace(req.Emoji)
 	if !isSingleEmoji(req.Emoji) {
 		common.Respond(c, nil, InvalidEmojiError{Emoji: req.Emoji})
@@ -84,6 +87,9 @@ func (e *Env) RemoveReaction(c *gin.Context) {
 		common.Respond(c, nil, err)
 		return
 	}
+	// The actor is the server-verified caller, never the body's player_id — so
+	// a caller cannot remove another player's reaction.
+	req.PlayerId = models.PlayerId(common.GetPlayerId(c))
 
 	answer, err := validateReactionTarget(e, sessionId, req)
 	if err != nil {

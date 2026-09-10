@@ -27,6 +27,10 @@ type Session struct {
 	CurrentQuestion *int                   `json:"current_question,omitempty"`
 	Scoreboard      map[PlayerId][]float64 `json:"scoreboard,omitempty"`
 	Players         []PlayerId             `json:"players,omitempty"`
+	// PlayerToken is the moderator's one-time bearer credential, populated ONLY
+	// by CreateSession and returned exactly once. It is never set on any read
+	// path, so omitempty keeps it off the wire there.
+	PlayerToken string `json:"player_token,omitempty"`
 }
 
 func (s Session) SetCreateDate(createDate time.Time) Object {

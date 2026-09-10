@@ -17,9 +17,8 @@ import (
 )
 
 type CurrentQuestionRequest struct {
-	QuestionIndex int    `json:"question_id"`
-	RoundIndex    int    `json:"round_id"`
-	ModeratorId   string `json:"player_id"`
+	QuestionIndex int `json:"question_id"`
+	RoundIndex    int `json:"round_id"`
 }
 
 func (e *Env) SetCurrentQuestion(c *gin.Context) {
@@ -40,10 +39,8 @@ func (e *Env) SetCurrentQuestion(c *gin.Context) {
 		return
 	}
 
-	if models.PlayerId(requestBody.ModeratorId) != existingSession.Moderator {
-		common.Respond(c, nil, UnauthorizedSessionActionError{ModeratorId: models.PlayerId(requestBody.ModeratorId), SessionId: sessionId})
-		return
-	}
+	// Moderator authorization is enforced by the AsMod middleware; the body's
+	// player_id is no longer trusted.
 
 	//can't set current question if we passed the wrong round index
 	if requestBody.RoundIndex != *existingSession.CurrentRound {
@@ -210,9 +207,8 @@ func replaceSnapshotChildren(e *Env, sessionId string, roundIndex int, questionI
 }
 
 type CurrentRoundRequest struct {
-	RoundIndex    int    `json:"round_id"`
-	QuestionIndex int    `json:"question_id"`
-	ModeratorId   string `json:"player_id"`
+	RoundIndex    int `json:"round_id"`
+	QuestionIndex int `json:"question_id"`
 }
 
 func (e *Env) SetCurrentRound(c *gin.Context) {
@@ -232,11 +228,8 @@ func (e *Env) SetCurrentRound(c *gin.Context) {
 		return
 	}
 
-	//can't do this if you aren't the mod
-	if models.PlayerId(requestBody.ModeratorId) != session.Moderator {
-		common.Respond(c, nil, UnauthorizedSessionActionError{ModeratorId: models.PlayerId(requestBody.ModeratorId), SessionId: sessionId})
-		return
-	}
+	// Moderator authorization is enforced by the AsMod middleware; the body's
+	// player_id is no longer trusted.
 
 	err = _setCurrentRound(e, &session, requestBody.RoundIndex, requestBody.QuestionIndex)
 	if err == nil {
@@ -274,7 +267,7 @@ func (e *Env) GetCurrentQuestion(c *gin.Context) {
 func getCurrentQuestion(e *Env, c *gin.Context) (models.QuestionInRound, error) {
 
 	sessionId := c.Param("id")
-	playerId := c.Query("player_id")
+	playerId := common.GetPlayerId(c)
 	var session models.Session
 	err := common.GetOne((*common.Env)(e), common.SessionTable, sessionId, &session)
 	if err != nil {
@@ -431,9 +424,8 @@ func scoreQuestion(e *Env, c *gin.Context) (models.ScoreRequest, error) {
 		return models.ScoreRequest{}, err
 	}
 
-	if requestBody.ModeratorId != session.Moderator {
-		return models.ScoreRequest{}, UnauthorizedSessionActionError{SessionId: sessionId, ModeratorId: requestBody.ModeratorId}
-	}
+	// Moderator authorization is enforced by the AsMod middleware; the body's
+	// player_id is no longer trusted.
 
 	for _, playerId := range session.Players {
 		if _, ok := requestBody.Players[playerId]; !ok {

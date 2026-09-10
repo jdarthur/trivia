@@ -25,8 +25,11 @@ type scoreHistoryFixture struct {
 	router    *gin.Engine
 	sessionId string
 	mod       string
+	modToken  string
 	p1        string
+	p1Token   string
 	p2        string
+	p2Token   string
 }
 
 func newScoreHistoryFixture(t *testing.T) *scoreHistoryFixture {
@@ -35,10 +38,7 @@ func newScoreHistoryFixture(t *testing.T) *scoreHistoryFixture {
 	db := GetDb()
 	env := &common.Env{Db: db}
 
-	mod, _, err := common.Create(env, common.PlayerTable, &models.Player{TeamName: "mod", RealName: "mod"})
-	if err != nil {
-		t.Fatal(err)
-	}
+	mod, modToken := createPlayerWithToken(t, env, "mod")
 	sessionId, _, err := common.Create(env, common.SessionTable, &models.Session{
 		Name: "S", Moderator: models.PlayerId(mod),
 	})
@@ -46,8 +46,8 @@ func newScoreHistoryFixture(t *testing.T) *scoreHistoryFixture {
 		t.Fatal(err)
 	}
 
-	p1 := createPlayer(t, env, "team-1")
-	p2 := createPlayer(t, env, "team-2")
+	p1, p1Token := createPlayerWithToken(t, env, "team-1")
+	p2, p2Token := createPlayerWithToken(t, env, "team-2")
 	if err := common.Push(env, common.SessionTable, sessionId, models.Players, models.PlayerId(p1)); err != nil {
 		t.Fatal(err)
 	}
@@ -65,11 +65,14 @@ func newScoreHistoryFixture(t *testing.T) *scoreHistoryFixture {
 
 	router := gin.New()
 	s := sessions.Env{Db: db}
-	router.GET("/gameplay/session/:id/score-history", s.GetSessionScoreHistory)
+	auth := common.Env{Db: db}
+	router.GET("/gameplay/session/:id/score-history", auth.WithPlayer, s.GetSessionScoreHistory)
 
 	return &scoreHistoryFixture{
 		db: db, router: router, sessionId: sessionId,
-		mod: mod, p1: p1, p2: p2,
+		mod: mod, modToken: modToken,
+		p1: p1, p1Token: p1Token,
+		p2: p2, p2Token: p2Token,
 	}
 }
 
@@ -89,16 +92,14 @@ func (f *scoreHistoryFixture) answer(t *testing.T, player string, round, questio
 	return id
 }
 
-// get hits the score-history route as caller ("" for anonymous) and decodes
-// the response; errBody is the parsed error JSON when status != 200.
-func (f *scoreHistoryFixture) get(t *testing.T, caller string) (int, models.ScoreHistory, map[string]interface{}) {
+// get hits the score-history route authenticated with the given player token;
+// errBody is the parsed error JSON when status != 200.
+func (f *scoreHistoryFixture) get(t *testing.T, token string) (int, models.ScoreHistory, map[string]interface{}) {
 	t.Helper()
 	url := "/gameplay/session/" + f.sessionId + "/score-history"
-	if caller != "" {
-		url += "?player_id=" + caller
-	}
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, url, nil)
+	req.Header.Set(common.PlayerTokenHeader, token)
 	f.router.ServeHTTP(rec, req)
 
 	if rec.Code != http.StatusOK {
@@ -148,7 +149,7 @@ func TestScoreHistoryAxisAndRunningSum(t *testing.T) {
 	f.answer(t, f.p1, 0, 0, 100)
 	f.answer(t, f.p1, 1, 0, 50)
 
-	_, history, _ := f.get(t, "")
+	_, history, _ := f.get(t, f.modToken)
 	wantLabels := []string{"R1Q1", "R1Q2", "R2Q1"}
 	if len(history.PointsPerQuestion) != len(wantLabels) {
 		t.Fatalf("axis = %v, want %v", history.PointsPerQuestion, wantLabels)
@@ -175,7 +176,7 @@ func TestScoreHistoryRescoreReplaces(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, history, _ := f.get(t, "")
+	_, history, _ := f.get(t, f.modToken)
 	eqCumulative(t, seriesByTeam(t, history)["team-1"].Cumulative, 200, 250, 250)
 }
 
@@ -187,7 +188,7 @@ func TestScoreHistoryLatestAnswerWins(t *testing.T) {
 	f.answer(t, f.p1, 0, 0, 40) // re-answer supersedes
 	f.answer(t, f.p1, 0, 0, 25) // and again
 
-	_, history, _ := f.get(t, "")
+	_, history, _ := f.get(t, f.modToken)
 	eqCumulative(t, seriesByTeam(t, history)["team-1"].Cumulative, 25, 25, 25)
 }
 
@@ -198,7 +199,7 @@ func TestScoreHistoryMoneyballNegative(t *testing.T) {
 	f.answer(t, f.p1, 0, 1, 200)  // lone correct: 2X
 	f.answer(t, f.p1, 1, 0, 50)
 
-	_, history, _ := f.get(t, "")
+	_, history, _ := f.get(t, f.modToken)
 	eqCumulative(t, seriesByTeam(t, history)["team-1"].Cumulative, -100, 100, 150)
 }
 
@@ -216,7 +217,7 @@ func TestScoreHistoryRemovedPlayerStillAppears(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, history, _ := f.get(t, "")
+	_, history, _ := f.get(t, f.modToken)
 	byTeam := seriesByTeam(t, history)
 	if _, ok := byTeam["team-3"]; !ok {
 		t.Fatalf("removed player missing from history: %+v", history.Series)
@@ -225,14 +226,14 @@ func TestScoreHistoryRemovedPlayerStillAppears(t *testing.T) {
 }
 
 // player_id is masked: a caller sees only their own id, a moderator sees
-// everyone's, an anonymous caller sees none.
+// everyone's, and a caller with no (or a bad) token is rejected outright.
 func TestScoreHistoryPlayerIdMasking(t *testing.T) {
 	f := newScoreHistoryFixture(t)
 	f.answer(t, f.p1, 0, 0, 100)
 	f.answer(t, f.p2, 0, 1, 50)
 
 	// as team-1: own id exposed, team-2's omitted
-	_, history, _ := f.get(t, f.p1)
+	_, history, _ := f.get(t, f.p1Token)
 	byTeam := seriesByTeam(t, history)
 	if byTeam["team-1"].PlayerId != models.PlayerId(f.p1) {
 		t.Fatalf("caller player_id not exposed: %+v", byTeam["team-1"])
@@ -242,17 +243,18 @@ func TestScoreHistoryPlayerIdMasking(t *testing.T) {
 	}
 
 	// as the moderator: everyone's id exposed
-	_, history, _ = f.get(t, f.mod)
+	_, history, _ = f.get(t, f.modToken)
 	byTeam = seriesByTeam(t, history)
 	if byTeam["team-1"].PlayerId != models.PlayerId(f.p1) || byTeam["team-2"].PlayerId != models.PlayerId(f.p2) {
 		t.Fatalf("moderator should see all player ids: %+v", history.Series)
 	}
 
-	// anonymous: no ids
+	// no token: a spectator is served the masked view (all ids hidden), never
+	// an authenticated view
 	_, history, _ = f.get(t, "")
 	byTeam = seriesByTeam(t, history)
 	if byTeam["team-1"].PlayerId != "" || byTeam["team-2"].PlayerId != "" {
-		t.Fatalf("anonymous caller leaked ids: %+v", history.Series)
+		t.Fatalf("spectator (no token) leaked ids: %+v", history.Series)
 	}
 }
 
@@ -263,6 +265,7 @@ func TestScoreHistoryUnknownSession(t *testing.T) {
 
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/gameplay/session/not-a-real-id/score-history", nil)
+	req.Header.Set(common.PlayerTokenHeader, f.modToken)
 	f.router.ServeHTTP(rec, req)
 
 	if rec.Code != http.StatusNotFound {

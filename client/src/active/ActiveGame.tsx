@@ -8,6 +8,7 @@ import PlayerScorer from "../admin-scorer/PlayerScorer"
 import PlayerStatus from "../players/PlayerStatus"
 import Scoreboard from '../scoreboard/Scoreboard';
 import type {RoundInGame} from "../types/models"
+import {getPlayerToken} from "../common/playerToken"
 
 interface Props {
     session_id: string
@@ -139,8 +140,8 @@ class ActiveGame extends React.Component<Props, State> {
     }
 
     get_current_question = () => {
-        let url = "/gameplay/session/" + this.props.session_id + "/current-question?player_id=" + this.props.player_id
-        return fetch(url)
+        let url = "/gameplay/session/" + this.props.session_id + "/current-question"
+        return fetch(url, {headers: {'borttrivia-player-token': getPlayerToken()}})
             .then(response => {
                 if (!response.ok) {
                     throw new Error(`Request failed (${response.status} ${response.statusText})`)

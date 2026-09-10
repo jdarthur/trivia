@@ -2,8 +2,12 @@ package common
 
 import (
 	"context"
+	"crypto/rand"
+	"crypto/sha256"
 	"database/sql"
 	"database/sql/driver"
+	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -1119,6 +1123,72 @@ func insertPlayer(db *sql.DB, m models.Player) error {
 	return err
 }
 
+// insertPlayerWithToken is the token-aware player insert: it writes the row
+// together with the SHA-256 hash of the bearer token the client will hold.
+// Only the hash is persisted — the plaintext token is returned to the client
+// once and never stored.
+func insertPlayerWithToken(db *sql.DB, m models.Player, tokenHash string) error {
+	_, err := db.Exec(`INSERT INTO player (id, create_date, team_name, real_name, icon, token_hash)
+		VALUES (?, ?, ?, ?, ?, ?)`,
+		m.ID, formatTime(m.CreateDate), m.TeamName, m.RealName, m.Icon, tokenHash)
+	return err
+}
+
+// IssuePlayerToken returns a new high-entropy bearer token (32 bytes from
+// crypto/rand, base64url-encoded) together with its SHA-256 hex hash for
+// storage in player.token_hash. Plain SHA-256 is correct here: the token is
+// random, not a password, so bcrypt/argon2 would add nothing.
+func IssuePlayerToken() (string, string, error) {
+	buf := make([]byte, 32)
+	if _, err := rand.Read(buf); err != nil {
+		return "", "", err
+	}
+	token := base64.RawURLEncoding.EncodeToString(buf)
+	return token, HashPlayerToken(token), nil
+}
+
+// HashPlayerToken returns the SHA-256 hex digest of a player token — the form
+// stored in player.token_hash.
+func HashPlayerToken(token string) string {
+	sum := sha256.Sum256([]byte(token))
+	return hex.EncodeToString(sum[:])
+}
+
+// CreatePlayerWithToken creates a player row together with its bearer-token
+// credential, returning the player ID, create date, and the plaintext token
+// (returned to the client exactly once). It mirrors the generic Create flow
+// for the ID/create-date generation but writes the token hash too.
+func CreatePlayerWithToken(e *Env, data models.Player) (string, time.Time, string, error) {
+	token, tokenHash, err := IssuePlayerToken()
+	if err != nil {
+		return "", time.Time{}, "", err
+	}
+	createDate := time.Now()
+	id := uuid.New().String()
+	data = data.SetId(id).SetCreateDate(createDate).(models.Player)
+	if err := insertPlayerWithToken(e.Db, data, tokenHash); err != nil {
+		return "", time.Time{}, "", err
+	}
+	return id, createDate, token, nil
+}
+
+// PlayerIdFromToken resolves a bearer token to the player ID whose stored
+// token_hash matches it. It returns "" when no player holds that token; a
+// legacy row with an empty token_hash never matches a non-empty token, so it
+// can never authenticate under the hard-cutover decision.
+func PlayerIdFromToken(db *sql.DB, token string) (string, error) {
+	hash := HashPlayerToken(token)
+	var id string
+	err := db.QueryRow(`SELECT id FROM player WHERE token_hash = ?`, hash).Scan(&id)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", nil
+	}
+	if err != nil {
+		return "", err
+	}
+	return id, nil
+}
+
 func insertAnswer(db *sql.DB, m models.Answer) error {
 	var roundIndex, questionIndex interface{}
 	if m.RoundIndex != nil {
@@ -1844,6 +1914,10 @@ func Respond(c *gin.Context, data interface{}, err error) {
 			c.JSON(http.StatusUnauthorized, gin.H{"errors": t.Error()})
 		case MissingTokenError:
 			c.JSON(http.StatusUnauthorized, gin.H{"errors": t.Error()})
+		case MissingPlayerTokenError:
+			c.JSON(http.StatusUnauthorized, gin.H{"errors": t.Error()})
+		case InvalidPlayerTokenError:
+			c.JSON(http.StatusForbidden, gin.H{"errors": t.Error()})
 
 		default:
 			fmt.Println(reflect.TypeOf(err))
