@@ -150,14 +150,13 @@ func main() {
 
 	fmt.Println("\nPlayer API:")
 	p := players.Env{Db: db}
-	router.GET("/gameplay/player/:id", p.GetOnePlayer)
+	router.GET("/gameplay/player/:id", auth.WithPlayer, p.GetOnePlayer)
 	router.POST("/gameplay/player", p.CreatePlayer)
-	router.PUT("/gameplay/player/:id", p.UpdatePlayer)
+	router.PUT("/gameplay/player/:id", auth.WithPlayer, p.UpdatePlayer)
 	router.POST("/gameplay/session/:id/add", p.AddPlayerToSession)
 	router.POST("/gameplay/session/:id/remove", s.WithValidSession, auth.WithPlayer, s.AsMod, p.RemovePlayerFromSession)
 	router.POST("/gameplay/session/:id/leave", auth.WithPlayer, p.LeaveSession)
 	router.POST("/gameplay/session/:id/inactivate", s.WithValidSession, auth.WithPlayer, s.AsMod, p.InactivatePlayer)
-	router.DELETE("/gameplay/player/:id", p.DeletePlayer)
 
 	fmt.Println("\nCollection API:")
 	coll := collections.Env{Db: db}

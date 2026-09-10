@@ -9,8 +9,17 @@ import (
 
 type Env common.Env
 
+// GetOnePlayer returns the caller's own player record. Ownership is enforced:
+// the caller's server-verified player id (set by common.WithPlayer) must match
+// the :id path param, so a caller can read only their own row (player_id is a
+// public identifier, not a credential; the bearer token is the credential).
 func (e *Env) GetOnePlayer(c *gin.Context) {
 	playerId := c.Param("id")
+
+	if err := requireOwnPlayer(c, playerId); err != nil {
+		common.Respond(c, nil, err)
+		return
+	}
 
 	var player models.Player
 	err := common.GetOne((*common.Env)(e), common.PlayerTable, playerId, &player)
@@ -232,9 +241,18 @@ func deactivatePlayer(e *Env, sessionId string, playerId models.PlayerId) error 
 	return err
 }
 
+// UpdatePlayer lets a player edit their own identity. Ownership is enforced:
+// the caller's server-verified player id (set by common.WithPlayer) must match
+// the :id path param, so a caller can only update their own record — they can
+// no longer overwrite another player's team_name / real_name / icon.
 func (e *Env) UpdatePlayer(c *gin.Context) {
 
 	playerId := c.Param("id")
+
+	if err := requireOwnPlayer(c, playerId); err != nil {
+		common.Respond(c, nil, err)
+		return
+	}
 
 	var requestBody models.Player
 	err := c.ShouldBind(&requestBody)
@@ -286,16 +304,15 @@ func bumpPlayerSessions(e *common.Env, playerId string) error {
 	return rows.Err()
 }
 
-func (e *Env) DeletePlayer(c *gin.Context) {
-	playerId := c.Param("id")
-
-	var original models.Player
-	err := common.GetOne((*common.Env)(e), common.PlayerTable, playerId, &original)
-	if err != nil {
-		common.Respond(c, nil, err)
+// requireOwnPlayer verifies that the authenticated caller (the server-verified
+// player id set by common.WithPlayer) is the player addressed by :id. In the
+// per-player bearer model player_id is a public identifier, not a credential —
+// the token is the credential — so a caller may read or update only their own
+// row. The verified id is read from the gin context, never from the body/query.
+func requireOwnPlayer(c *gin.Context, playerId string) error {
+	verified := common.GetPlayerId(c)
+	if verified == "" || verified != playerId {
+		return common.NotYourPlayerError{PlayerId: playerId}
 	}
-
-	err = common.Delete((*common.Env)(e), common.PlayerTable, playerId)
-
-	common.Respond(c, original, err)
+	return nil
 }
