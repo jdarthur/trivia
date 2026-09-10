@@ -73,6 +73,16 @@ async function waitForRoundPersisted(request: APIRequestContext, name: string) {
     .toBeTruthy();
 }
 
+// Narrow the list to rows whose text matches `text` via the filter bar. The
+// rounds list is ordered oldest-first, so a freshly-created round (and any
+// round created by an earlier test) can sit on a later page; searching brings
+// the row we care about onto page 1 regardless of how many rows accumulated.
+async function search(page: Page, text: string) {
+  const input = page.locator('.filter_holder input[placeholder="Search"]');
+  await input.fill(text);
+  await input.press('Enter');
+}
+
 // Create a round through the UI (ticket #199): click New, type the name on the
 // Details step, advance to the Questions step, and click Add. Wait for the new
 // row to appear in the table and confirm it is persisted server-side (see
@@ -87,6 +97,7 @@ async function createRoundViaUI(page: Page, request: APIRequestContext, name: st
   await modal.getByRole('button', { name: 'Next', exact: true }).click();
   await modal.getByRole('button', { name: 'Add', exact: true }).click();
   await expect(modal).toBeHidden();
+  await search(page, name);
   await expect(roundRow(page, name)).toBeVisible();
   await waitForRoundPersisted(request, name);
 }
@@ -104,8 +115,10 @@ function roundRow(page: Page, name: string) {
 }
 
 // Open a round's editor modal by clicking its table row's Edit icon. The modal
-// always starts on the Details step.
+// always starts on the Details step. Search for the round first: a reload (see
+// reloadRounds) clears the filter, and the round may sit on a later page.
 async function openRound(page: Page, name: string) {
+  await search(page, name);
   await expect(roundRow(page, name)).toBeVisible();
   await roundRow(page, name).locator('.anticon-edit').click();
   const modal = page.locator('.ant-modal:has(.ant-modal-title)');

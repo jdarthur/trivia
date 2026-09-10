@@ -39,7 +39,7 @@ export function useListFilters(options: UseListFiltersOptions = {}): ListFilters
         unused_only: options.unused_only ?? false,
         text_filter: "",
         page: 0,
-        page_size: options.page_size ?? 50,
+        page_size: options.page_size ?? 10,
     }))
 
     // Each setter updates from the previous state rather than a captured copy,
@@ -66,7 +66,7 @@ export function useListFilters(options: UseListFiltersOptions = {}): ListFilters
         unusedOnly: !!params.unused_only,
         textFilter: params.text_filter || "",
         page: params.page || 0,
-        pageSize: params.page_size || 50,
+        pageSize: params.page_size || 10,
         setUnusedOnly,
         setTextFilter,
         setPage,

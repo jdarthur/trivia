@@ -89,12 +89,14 @@ editorTest.describe('questions filtering & pagination', () => {
     const marker = `e2e-page-${unique()}`;
     await seedQuestions(request, marker, 12);
 
-    // Search for the marker: 12 matches, all fitting on the default page.
+    // Search for the marker: 12 matches. The default page size is 10, so the
+    // first page holds ten and a second page appears with the remaining two.
     await search(editorPage, marker);
-    await expect(editorPage.locator('.ant-pagination')).toContainText('1-12 of 12');
+    await expect(editorPage.locator('.ant-pagination')).toContainText('1-10 of 12');
+    await expect(dataRows(editorPage)).toHaveCount(10);
 
-    // Shrink the page size: the server returns 10 per page, so a second page
-    // appears holding the remaining two.
+    // Pick the same page size explicitly (it is the default): the counts are
+    // unchanged, but this exercises the size changer.
     await choosePageSize(editorPage, 10);
     await expect(editorPage.locator('.ant-pagination')).toContainText('1-10 of 12');
     await expect(dataRows(editorPage)).toHaveCount(10);
@@ -189,7 +191,7 @@ categoriesTest.describe('categories filtering & pagination', () => {
     }
 
     await search(categoriesPage, marker);
-    // The page-size default is 24, so all four show; shrink it to force a page 2.
+    // Four matches fit within the 10-per-page default, so no second page.
     await expect(categoriesPage.locator('.ant-pagination')).toContainText('1-4 of 4');
     await choosePageSize(categoriesPage, 10);
     await expect(dataRows(categoriesPage)).toHaveCount(4);
@@ -255,7 +257,8 @@ roundsTest.describe('rounds filtering & pagination', () => {
     }
 
     await search(roundsPage, marker);
-    await expect(roundsPage.locator('.ant-pagination')).toContainText('1-12 of 12');
+    // The default page size is 10, so 12 matches split across two pages.
+    await expect(roundsPage.locator('.ant-pagination')).toContainText('1-10 of 12');
 
     await choosePageSize(roundsPage, 10);
     await expect(roundsPage.locator('.ant-pagination')).toContainText('1-10 of 12');
