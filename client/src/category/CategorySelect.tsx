@@ -20,13 +20,25 @@ export default function CategorySelect(props: Props) {
 
     const {data: categories} = useAllCategories()
 
+    // Most-recently-used first (the server stamps category.last_used whenever
+    // a question is saved using it). The timestamp is a sortable fixed-width
+    // string, so lexical comparison is chronological; categories that have
+    // never been used carry the zero-time value and sort last. Ties break by
+    // create_date descending, matching the scoring-note picker.
+    const sorted = [...(categories || [])].sort((a, b) => {
+        if (a.last_used !== b.last_used) {
+            return a.last_used < b.last_used ? 1 : -1
+        }
+        return a.create_date < b.create_date ? 1 : -1
+    })
+
     const options = [
         <Select.Option value={""} label={"None"} key={"none"}>
             <span>None</span>
         </Select.Option>
     ]
 
-    ;(categories || []).forEach((item) => {
+    sorted.forEach((item) => {
         options.push(<Select.Option value={item.id} label={item.name} key={item.id}>
             <span>{item.name}</span>
         </Select.Option>)
@@ -53,6 +65,10 @@ export default function CategorySelect(props: Props) {
             <span style={{marginLeft: 10}}>Category: </span>
             <Select style={{marginLeft: 5, width: 200}} value={props.category}
                     onSelect={props.set_category}
+                    showSearch
+                    virtual={false}
+                    filterOption={(input, option) =>
+                        String(option?.label ?? '').toLowerCase().includes(input.toLowerCase())}
                     dropdownRender={menu => newButton(menu)}>
                 {options}
             </Select>

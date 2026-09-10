@@ -15,6 +15,7 @@ type Category struct {
 	ID          string    `json:"id"`
 	UserId      string    `json:"-"`
 	CreateDate  time.Time `json:"create_date"`
+	LastUsed    time.Time `json:"last_used"`
 	Name        string    `json:"name"`
 	ScoringNote string    `json:"scoring_note"`
 
@@ -46,9 +47,11 @@ func (c Category) MarshalJSON() ([]byte, error) {
 	type Alias Category
 	return json.Marshal(&struct {
 		CreateDate string `json:"create_date"`
+		LastUsed   string `json:"last_used"`
 		Alias
 	}{
 		CreateDate: dateFormat(c.CreateDate),
+		LastUsed:   dateFormat(c.LastUsed),
 		Alias:      Alias(c),
 	})
 }

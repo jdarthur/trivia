@@ -1023,6 +1023,11 @@ func CreateOneQuestion(e *Env, userId string, data models.Question) (models.Ques
 		if category.ScoringNote != "" {
 			err = UpdateLastUsedForScoringNote(e, userId, category.ScoringNote)
 		}
+		// Using the category also stamps its own last_used, so the category
+		// selector floats the categories the user is working with to the top.
+		if err := UpdateLastUsedForCategory(e, userId, data.Category); err != nil {
+			return models.Question{}, err
+		}
 	}
 
 	return data, err
@@ -1076,6 +1081,16 @@ func UpdateOneQuestion(e *Env, userId, questionId string, data QuestionUpdate) (
 	})
 	if err != nil {
 		return models.Question{}, err
+	}
+
+	// Using the category stamps its own last_used whenever the question is
+	// saved with a category — even when it was already the category — so a
+	// category the user keeps working with floats back to the top of the
+	// selector rather than being stuck down the list.
+	if question.Category != "" {
+		if err := UpdateLastUsedForCategory(e, userId, question.Category); err != nil {
+			return models.Question{}, err
+		}
 	}
 
 	// The category carries the scoring note now (ticket #179): assigning a

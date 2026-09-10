@@ -100,6 +100,8 @@ export interface ScoringNote {
 export interface Category {
   id: string;
   create_date: WireTimestamp;
+  /** Bumped server-side when a question is created/updated with this category (ticket: category recency). */
+  last_used: WireTimestamp;
   name: string;
   scoring_note: string;
   /** Derived server-side: how many questions reference this category (ticket #195). */
