@@ -27,16 +27,15 @@ interface Props {
  * Ticket #196 adds the shared filter/pagination controls: search by name and
  * an unused-only toggle (a category is unused when no question references it —
  * the server computes that, and sends the count as questions_used, which each
- * row shows). Categories default to unused-only, like the questions/rounds
- * pages: the common case on this page is tidying up the unused set, so show
- * those first rather than the whole list.
+ * row shows). Categories default to showing everything, since this page is
+ * where you go to see and tidy up the whole set.
  */
 export default function CategoryList(props: Props) {
 
     const [modalOpen, setModalOpen] = useState(false)
     const [editing, setEditing] = useState<Category | null>(null)
 
-    const filters = useListFilters({unused_only: true, page_size: 25})
+    const filters = useListFilters({page_size: 25})
     const {data, isLoading} = useGetCategoriesQuery(filters.query)
     const categories = data?.categories
     useClampToFirstPage(data, filters.page, filters.setPage)

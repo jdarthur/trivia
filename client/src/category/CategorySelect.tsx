@@ -66,6 +66,7 @@ export default function CategorySelect(props: Props) {
             <Select style={{marginLeft: 5, width: 200}} value={props.category}
                     onSelect={props.set_category}
                     showSearch
+                    virtual={false}
                     filterOption={(input, option) =>
                         String(option?.label ?? '').toLowerCase().includes(input.toLowerCase())}
                     dropdownRender={menu => newButton(menu)}>
