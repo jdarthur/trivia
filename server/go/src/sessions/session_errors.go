@@ -84,6 +84,21 @@ func (e UnauthorizedSessionActionError) Data() interface{} {
 	return e.ModeratorId
 }
 
+//Error when the moderator-gating middleware runs without a session in the
+//gin context. This means the route was mounted without WithValidSession, i.e.
+//a misconfiguration: fail closed rather than letting the protected handler run.
+type MissingSessionContextError struct{}
+
+func (e MissingSessionContextError) Error() string {
+	return "Forbidden: no session in context"
+}
+func (e MissingSessionContextError) Field() string {
+	return ""
+}
+func (e MissingSessionContextError) Data() interface{} {
+	return nil
+}
+
 //Error when trying to start a session that is already started
 type SessionAlreadyStartedError struct {
 	SessionId string
