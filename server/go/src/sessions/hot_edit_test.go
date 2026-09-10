@@ -286,3 +286,126 @@ func TestHotEditQuestionNoCategory(t *testing.T) {
 		t.Errorf("question category = %q, want empty", question.Category)
 	}
 }
+
+// Ticket #255: AsMod must fail closed. Mounted WITHOUT WithValidSession there is
+// no session in the context; gin continues the chain when a middleware returns
+// without Next/Abort, so the protected handler must NOT run and the response
+// must be a 4xx.
+func TestAsModFailsClosedWithoutSession(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	env := &Env{}
+
+	protectedRan := false
+	protected := func(c *gin.Context) {
+		protectedRan = true
+		c.JSON(http.StatusOK, gin.H{"ok": true})
+	}
+
+	// Real route chain so c.Abort() actually stops the handler from running.
+	r := gin.New()
+	r.PUT("/gameplay/session/:id/hot-edit-question", env.AsMod, protected)
+
+	recorder := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPut, "/gameplay/session/abc/hot-edit-question", nil)
+	r.ServeHTTP(recorder, req)
+
+	if protectedRan {
+		t.Fatal("protected handler ran even though no session was in context (fail-open)")
+	}
+	if recorder.Code != http.StatusForbidden {
+		t.Fatalf("status = %d, want %d (%s)", recorder.Code, http.StatusForbidden, recorder.Body.String())
+	}
+}
+
+// Ticket #255: AsMod with a wrong ?player_id still rejects with a 4xx.
+func TestAsModRejectsWrongModerator(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	env := openSessionTestDB(t)
+	session := models.Session{ID: "s1", Moderator: "mod"}
+
+	protectedRan := false
+	protected := func(c *gin.Context) {
+		protectedRan = true
+		c.JSON(http.StatusOK, gin.H{"ok": true})
+	}
+
+	// Seed the session in the context the way WithValidSession would.
+	withSession := func(c *gin.Context) {
+		c.Set("session", session)
+		c.Next()
+	}
+
+	r := gin.New()
+	r.PUT("/gameplay/session/:id/hot-edit-question", withSession, env.AsMod, protected)
+
+	recorder := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPut, "/gameplay/session/s1/hot-edit-question?player_id=wrong", nil)
+	r.ServeHTTP(recorder, req)
+
+	if protectedRan {
+		t.Fatal("protected handler ran for the wrong moderator (fail-open)")
+	}
+	// UnauthorizedSessionActionError implements common.InvalidDataError -> 400.
+	if recorder.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want %d (%s)", recorder.Code, http.StatusBadRequest, recorder.Body.String())
+	}
+}
+
+// Ticket #255: AsMod with the correct ?player_id reaches the protected handler.
+func TestAsModAllowsCorrectModerator(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	env := openSessionTestDB(t)
+	session := models.Session{ID: "s1", Moderator: "mod"}
+
+	protectedRan := false
+	protected := func(c *gin.Context) {
+		protectedRan = true
+		c.JSON(http.StatusOK, gin.H{"ok": true})
+	}
+
+	withSession := func(c *gin.Context) {
+		c.Set("session", session)
+		c.Next()
+	}
+
+	r := gin.New()
+	r.PUT("/gameplay/session/:id/hot-edit-question", withSession, env.AsMod, protected)
+
+	recorder := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPut, "/gameplay/session/s1/hot-edit-question?player_id=mod", nil)
+	r.ServeHTTP(recorder, req)
+
+	if !protectedRan {
+		t.Fatal("protected handler did not run for the correct moderator")
+	}
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d (%s)", recorder.Code, http.StatusOK, recorder.Body.String())
+	}
+}
+
+// Ticket #255: WithValidSession must not fall through to the protected handler
+// (or set a zero-value session) when the session ID doesn't exist.
+func TestWithValidSessionBadSessionId(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	env := openSessionTestDB(t)
+
+	protectedRan := false
+	protected := func(c *gin.Context) {
+		protectedRan = true
+		c.JSON(http.StatusOK, gin.H{"ok": true})
+	}
+
+	r := gin.New()
+	r.PUT("/gameplay/session/:id/hot-edit-question", env.WithValidSession, protected)
+
+	recorder := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPut, "/gameplay/session/does-not-exist/hot-edit-question", nil)
+	r.ServeHTTP(recorder, req)
+
+	if protectedRan {
+		t.Fatal("protected handler ran even though the session does not exist (fail-open)")
+	}
+	if recorder.Code != http.StatusNotFound {
+		t.Fatalf("status = %d, want %d (%s)", recorder.Code, http.StatusNotFound, recorder.Body.String())
+	}
+}
