@@ -619,6 +619,27 @@ var migrations = []migration{
 			)`,
 		},
 	},
+	{
+		version: 16,
+		name:    "category last_used",
+		// ticket (category selector recency): the editor's category selector
+		// shows most-recently-used categories first, so a category tracks when
+		// a question last used it. The column is a TEXT timestamp in the same
+		// wire/storage format as scoring_note.last_used (migration 1) and is
+		// bumped on question create/update (questions.CreateOneQuestion /
+		// UpdateOneQuestion). Existing used categories are backfilled from the
+		// most recent question that references them; unused categories keep the
+		// '' default (zero time), which sorts last.
+		statements: []string{
+			`ALTER TABLE category ADD COLUMN last_used TEXT NOT NULL DEFAULT ''`,
+			`UPDATE category SET last_used = (
+				SELECT MAX(question.create_date) FROM question
+				WHERE question.category_id = category.id
+			) WHERE EXISTS (
+				SELECT 1 FROM question WHERE question.category_id = category.id
+			)`,
+		},
+	},
 }
 
 // Migrate brings db up to the latest schema version, applying each pending

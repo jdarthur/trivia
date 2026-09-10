@@ -3,6 +3,7 @@ package questions
 import (
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/jdarthur/trivia/common"
@@ -114,6 +115,16 @@ func UpdateCategory(e *Env, userId, categoryId string, data models.Category) (mo
 		}
 	}
 
+	// last_used is derived (bumped when a question uses the category), so the
+	// request must not set it — same rule as scoring notes.
+	if !data.LastUsed.IsZero() {
+		return models.Category{}, CategoryFieldError{
+			ErrorData:  data.LastUsed,
+			ErrorField: "last_used",
+			Message:    fmt.Sprintf("Category 'last used' field cannot be set in request"),
+		}
+	}
+
 	// make sure this category exists and is owned by this user
 	category, err := GetOneCategory(e, userId, categoryId)
 	if err != nil {
@@ -182,12 +193,37 @@ func GetAllCategories(e *Env, userId string) ([]*models.Category, error) {
 	return data.([]*models.Category), nil
 }
 
+// UpdateLastUsedForCategory stamps a category as used "now". The question
+// create/update handlers call it whenever a question is saved using the
+// category, so the editor's category selector can float recently-used
+// categories to the top (mirrors UpdateLastUsedForScoringNote).
+func UpdateLastUsedForCategory(e *Env, userId, categoryId string) error {
+	category, err := GetOneCategory(e, userId, categoryId)
+	if err != nil {
+		return err
+	}
+
+	category.LastUsed = time.Now()
+
+	return common.Set((*common.Env)(e), common.CategoryTable, categoryId, category)
+}
+
 func validateCategory(category models.Category) error {
 	if !category.CreateDate.IsZero() {
 		return CategoryFieldError{
 			ErrorData:  category.CreateDate,
 			ErrorField: "create_date",
 			Message:    fmt.Sprintf("Category 'create date' field cannot be set in request"),
+		}
+	}
+
+	// last_used is derived (bumped when a question uses the category), so the
+	// request must not set it — same rule as scoring notes.
+	if !category.LastUsed.IsZero() {
+		return CategoryFieldError{
+			ErrorData:  category.LastUsed,
+			ErrorField: "last_used",
+			Message:    fmt.Sprintf("Category 'last used' field cannot be set in request"),
 		}
 	}
 

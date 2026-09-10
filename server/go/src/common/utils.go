@@ -1347,14 +1347,14 @@ func updateScoringNote(db *sql.DB, id string, m models.ScoringNote) error {
 }
 
 func getCategory(db *sql.DB, id string, m *models.Category) error {
-	var createDate string
+	var createDate, lastUsed string
 	var scoringNoteId sql.NullString
 	// questions_used is derived here too, so a single-category read agrees with
 	// the list query (models.InUse).
-	err := db.QueryRow(`SELECT id, user_id, create_date, name, scoring_note_id,
+	err := db.QueryRow(`SELECT id, user_id, create_date, last_used, name, scoring_note_id,
 		(SELECT count(*) FROM question q WHERE q.category_id = category.id)
 		FROM category WHERE id = ?`, id).
-		Scan(&m.ID, &m.UserId, &createDate, &m.Name, &scoringNoteId, &m.QuestionsUsed)
+		Scan(&m.ID, &m.UserId, &createDate, &lastUsed, &m.Name, &scoringNoteId, &m.QuestionsUsed)
 	if errors.Is(err, sql.ErrNoRows) {
 		return NonexistentIdError{RecordType: CategoryTable, ID: id}
 	}
@@ -1362,6 +1362,7 @@ func getCategory(db *sql.DB, id string, m *models.Category) error {
 		return err
 	}
 	m.CreateDate = ParseTime(createDate)
+	m.LastUsed = ParseTime(lastUsed)
 	// scoring_note_id is a nullable FK column; NULL surfaces as the
 	// wire-format empty string.
 	if scoringNoteId.Valid {
@@ -1371,15 +1372,15 @@ func getCategory(db *sql.DB, id string, m *models.Category) error {
 }
 
 func insertCategory(db *sql.DB, m models.Category) error {
-	_, err := db.Exec(`INSERT INTO category (id, user_id, create_date, name, scoring_note_id)
-		VALUES (?, ?, ?, ?, ?)`,
-		m.ID, m.UserId, formatTime(m.CreateDate), m.Name, nilIfEmpty(m.ScoringNote))
+	_, err := db.Exec(`INSERT INTO category (id, user_id, create_date, last_used, name, scoring_note_id)
+		VALUES (?, ?, ?, ?, ?, ?)`,
+		m.ID, m.UserId, formatTime(m.CreateDate), formatTime(m.LastUsed), m.Name, nilIfEmpty(m.ScoringNote))
 	return err
 }
 
 func updateCategory(db *sql.DB, id string, m models.Category) error {
-	res, err := db.Exec(`UPDATE category SET name = ?, scoring_note_id = ? WHERE id = ?`,
-		m.Name, nilIfEmpty(m.ScoringNote), id)
+	res, err := db.Exec(`UPDATE category SET name = ?, scoring_note_id = ?, last_used = ? WHERE id = ?`,
+		m.Name, nilIfEmpty(m.ScoringNote), formatTime(m.LastUsed), id)
 	return rowsAffected(res, err, CategoryTable, id)
 }
 
@@ -1532,7 +1533,7 @@ func scanTable(objectType string) (string, bool) {
 		// questions_used is derived in the same pass (ticket #195: it backs the
 		// unused_only filter and lets the editor show usage without a second
 		// request per category).
-		return `SELECT id, user_id, create_date, name, scoring_note_id,
+		return `SELECT id, user_id, create_date, last_used, name, scoring_note_id,
 			(SELECT count(*) FROM question q WHERE q.category_id = category.id) AS questions_used
 			FROM category`, true
 	default:
@@ -1616,12 +1617,13 @@ func (e *Env) scanRow(objectType string, s rowScanner) (interface{}, error) {
 
 	case CategoryTable:
 		var m models.Category
-		var createDate string
+		var createDate, lastUsed string
 		var scoringNoteId sql.NullString
-		if err := s.Scan(&m.ID, &m.UserId, &createDate, &m.Name, &scoringNoteId, &m.QuestionsUsed); err != nil {
+		if err := s.Scan(&m.ID, &m.UserId, &createDate, &lastUsed, &m.Name, &scoringNoteId, &m.QuestionsUsed); err != nil {
 			return nil, err
 		}
 		m.CreateDate = ParseTime(createDate)
+		m.LastUsed = ParseTime(lastUsed)
 		if scoringNoteId.Valid {
 			m.ScoringNote = scoringNoteId.String
 		}
