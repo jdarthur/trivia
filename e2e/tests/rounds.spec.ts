@@ -298,3 +298,41 @@ roundsTest.describe('rounds CRUD', () => {
     await expect(roundRow(roundsPage, name)).toHaveCount(0);
   });
 });
+
+roundsTest.describe('questions count popover', () => {
+  // Ticket #272: clicking the "N questions" count Tag opens a popover with an
+  // abbreviated question/answer preview. Seed a round containing a question via
+  // the API, then click the row's count Tag and assert the preview text appears.
+  roundsTest('opens a popover with the question/answer preview', async ({ roundsPage, request }) => {
+    const marker = `e2e-round-pop-${unique()}`;
+    const question = `Popover question ${marker}`;
+    const answer = `Popover answer ${marker}`;
+    const questionId = await createQuestion(request, `qcat ${marker}`, question, answer);
+
+    const round = await request.post('/editor/round', {
+      headers: { 'borttrivia-token': token },
+      data: { name: `round ${marker}`, questions: [questionId], wagers: [100] },
+    });
+    expect(round.ok()).toBeTruthy();
+
+    // Reload after seeding: the question list is cached client-side and only
+    // invalidated by RTK mutations, so a raw API seed needs a fresh fetch before
+    // the popover can resolve the question text.
+    await roundsPage.reload();
+    await expect(roundsPage.locator('.round_list')).toBeVisible();
+
+    // Search so the freshly-created round lands on page 1.
+    await search(roundsPage, `round ${marker}`);
+
+    const row = roundRow(roundsPage, `round ${marker}`);
+    await expect(row).toContainText('1 question');
+
+    // Click the count Tag to open the preview popover.
+    await row.locator('.ant-tag').click();
+    const popover = roundsPage.locator('.ant-popover:visible');
+    await expect(popover).toBeVisible();
+    await expect(popover).toContainText('1 question');
+    await expect(popover).toContainText(question);
+    await expect(popover).toContainText(answer);
+  });
+});

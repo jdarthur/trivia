@@ -1,9 +1,57 @@
-import { expect } from '@playwright/test';
+import { expect, type APIRequestContext } from '@playwright/test';
 import { categoriesTest } from '../fixtures/editor';
 
 // A unique-ish suffix keeps every test's data distinct from anything left in
 // the shared dev DB, so tests don't collide with each other or with leftovers.
 const unique = () => String(Date.now());
+
+const DEV_USER = 'alice';
+
+// Build the same unsigned (alg "none") dev-mode mock JWT the client produces for
+// ?mockUser login (client/src/common/mockUser.js). The --dev-mode backend accepts
+// it on the `borttrivia-token` header for the seeded dev user.
+function b64url(s: string): string {
+  return Buffer.from(s, 'utf8')
+    .toString('base64')
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/, '');
+}
+function buildMockToken(name: string): string {
+  const header = b64url(JSON.stringify({ alg: 'none', typ: 'JWT' }));
+  const payload = b64url(
+    JSON.stringify({ sub: `dev|${name}`, exp: Math.floor(Date.now() / 1000) + 60 * 60 }),
+  );
+  return `${header}.${payload}.`;
+}
+const token = buildMockToken(DEV_USER);
+
+// Seed a category via the API (the question API takes a category ID).
+async function createCategoryViaAPI(request: APIRequestContext, name: string): Promise<string> {
+  const res = await request.post('/editor/category', {
+    headers: { 'borttrivia-token': token },
+    data: { name },
+  });
+  expect(res.ok()).toBeTruthy();
+  const json = await res.json();
+  return json.id;
+}
+
+// Seed a question referencing the given category via the API.
+async function createQuestion(
+  request: APIRequestContext,
+  category: string,
+  question: string,
+  answer: string,
+): Promise<string> {
+  const res = await request.post('/editor/question', {
+    headers: { 'borttrivia-token': token },
+    data: { category, question, answer },
+  });
+  expect(res.ok()).toBeTruthy();
+  const json = await res.json();
+  return json.id;
+}
 
 // Open the New category modal, optionally attach a scoring note (created
 // inline via the note selector's "New" button), and submit. Then assert the
@@ -110,5 +158,40 @@ categoriesTest.describe('categories CRUD', () => {
     const popover = categoriesPage.locator('.ant-popover:visible');
     await popover.getByRole('button', { name: 'Delete', exact: true }).click();
     await expect(card).toBeHidden();
+  });
+});
+
+categoriesTest.describe('questions count popover', () => {
+  // Ticket #272: clicking the "N questions" count Tag opens a popover with an
+  // abbreviated question/answer preview. Seed a categorized question via the
+  // API, then click the row's count Tag and assert the preview text appears.
+  categoriesTest('opens a popover with the question/answer preview', async ({ categoriesPage, request }) => {
+    const marker = `e2e-cat-pop-${unique()}`;
+    const question = `Popover question ${marker}`;
+    const answer = `Popover answer ${marker}`;
+    const categoryId = await createCategoryViaAPI(request, `cat ${marker}`);
+    await createQuestion(request, categoryId, question, answer);
+
+    // Reload after seeding: the question list is cached client-side and only
+    // invalidated by RTK mutations, so a raw API seed needs a fresh fetch before
+    // the popover can resolve the question text.
+    await categoriesPage.reload();
+    await expect(categoriesPage.locator('.category-list')).toBeVisible();
+
+    // Search so the freshly-created category lands on page 1.
+    const input = categoriesPage.locator('input[placeholder="Search"]');
+    await input.fill(`cat ${marker}`);
+    await input.press('Enter');
+
+    const row = categoriesPage.locator('.category-list .ant-table-row').filter({ hasText: `cat ${marker}` });
+    await expect(row).toContainText('1 question');
+
+    // Click the count Tag to open the preview popover.
+    await row.locator('.ant-tag').click();
+    const popover = categoriesPage.locator('.ant-popover:visible');
+    await expect(popover).toBeVisible();
+    await expect(popover).toContainText('1 question');
+    await expect(popover).toContainText(question);
+    await expect(popover).toContainText(answer);
   });
 });

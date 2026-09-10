@@ -1,5 +1,5 @@
 import React, {useState} from 'react';
-import {Table, Tag} from "antd";
+import {Table} from "antd";
 import {EditOutlined, FolderOpenOutlined} from '@ant-design/icons';
 import LoadingOrView from "../editor/LoadingOrView";
 import NewButton from "../editor/NewButton";
@@ -8,10 +8,11 @@ import EditorFilter from "../editor/EditorFilter";
 import ListPagination from "../editor/ListPagination";
 import PageHeader from "../common/PageHeader";
 import CategoryModal from "./CategoryModal";
-import {useDeleteCategoryMutation, useGetCategoriesQuery, useGetScoringNotesQuery} from "../api/main";
+import {useAllQuestions, useDeleteCategoryMutation, useGetCategoriesQuery, useGetScoringNotesQuery} from "../api/main";
 import {useClampToFirstPage, useListFilters} from "../editor/useListFilters";
 import notify, {errorMessage} from "../common/notify";
-import type {Category} from "../types/models";
+import QuestionsPreview from "../common/QuestionsPreview";
+import type {Category, Question} from "../types/models";
 import '../editor/EditorList.css';
 
 interface Props {
@@ -40,6 +41,8 @@ export default function CategoryList(props: Props) {
     const categories = data?.categories
     useClampToFirstPage(data, filters.page, filters.setPage)
     const {data: notes} = useGetScoringNotesQuery()
+
+    const {data: allQuestions} = useAllQuestions()
 
     const [deleteCategory] = useDeleteCategoryMutation()
 
@@ -74,10 +77,13 @@ export default function CategoryList(props: Props) {
         </span>
 
     // questions_used comes from the server (ticket #195): how many questions
-    // reference this category.
-    const questions_tag = (text: any, category: Category) => <Tag color={category.questions_used ? "blue" : undefined}>
-            {category.questions_used === 1 ? "1 question" : `${category.questions_used} questions`}
-        </Tag>
+    // reference this category. The clickable Tag (ticket #272) opens a popover
+    // of abbreviated question/answer previews, resolved from the full question
+    // list by category.
+    const questions_tag = (text: any, category: Category) => {
+        const questions: Question[] = (allQuestions || []).filter(q => q.category === category.id)
+        return <QuestionsPreview questions={questions} count={category.questions_used}/>
+    }
 
     const columns = [
         {title: "", render: delete_edit, width: '5em'},
