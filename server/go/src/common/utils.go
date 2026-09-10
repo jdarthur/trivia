@@ -1918,6 +1918,8 @@ func Respond(c *gin.Context, data interface{}, err error) {
 			c.JSON(http.StatusUnauthorized, gin.H{"errors": t.Error()})
 		case InvalidPlayerTokenError:
 			c.JSON(http.StatusForbidden, gin.H{"errors": t.Error()})
+		case NotYourPlayerError:
+			c.JSON(http.StatusForbidden, gin.H{"errors": t.Error()})
 
 		default:
 			fmt.Println(reflect.TypeOf(err))

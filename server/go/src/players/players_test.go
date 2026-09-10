@@ -79,11 +79,14 @@ func membershipActive(t *testing.T, env *Env, sessionId string, player models.Pl
 	return active
 }
 
-// newPlayerRouter builds a router wiring the leave / inactivate routes the way
-// main.go does (WithValidSession → WithPlayer → AsMod → handler).
+// newPlayerRouter builds a router wiring the player read / update / leave /
+// inactivate routes the way main.go does (WithPlayer → handler, or
+// WithValidSession → WithPlayer → AsMod → handler).
 func newPlayerRouter(env *Env, s *sessions.Env) *gin.Engine {
 	t := gin.New()
 	auth := common.Env{Db: env.Db}
+	t.GET("/gameplay/player/:id", auth.WithPlayer, env.GetOnePlayer)
+	t.PUT("/gameplay/player/:id", auth.WithPlayer, env.UpdatePlayer)
 	t.POST("/gameplay/session/:id/leave", auth.WithPlayer, env.LeaveSession)
 	t.POST("/gameplay/session/:id/inactivate", s.WithValidSession, auth.WithPlayer, s.AsMod, env.InactivatePlayer)
 	return t
@@ -104,6 +107,38 @@ func post(t *testing.T, router *gin.Engine, path, token string, body map[string]
 	}
 	router.ServeHTTP(rec, req)
 	return rec
+}
+
+// do sends a request of the given method with a player token header to path.
+func do(t *testing.T, router *gin.Engine, method, path, token string, body map[string]string) *httptest.ResponseRecorder {
+	t.Helper()
+	rec := httptest.NewRecorder()
+	var req *http.Request
+	if body != nil {
+		payload, err := json.Marshal(body)
+		if err != nil {
+			t.Fatal(err)
+		}
+		req = httptest.NewRequest(method, path, bytes.NewReader(payload))
+	} else {
+		req = httptest.NewRequest(method, path, nil)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	if token != "" {
+		req.Header.Set(common.PlayerTokenHeader, token)
+	}
+	router.ServeHTTP(rec, req)
+	return rec
+}
+
+// playerRow reads a player row back by id, failing the test on error.
+func playerRow(t *testing.T, env *Env, id models.PlayerId) models.Player {
+	t.Helper()
+	var p models.Player
+	if err := common.GetOne((*common.Env)(env), common.PlayerTable, string(id), &p); err != nil {
+		t.Fatal(err)
+	}
+	return p
 }
 
 // TestLeaveSessionDeactivatesAndBumpsState verifies a player can self-leave:
@@ -186,5 +221,95 @@ func TestInactivatePlayerModOnlyBumpsState(t *testing.T) {
 	}
 	if stateBefore == stateAfter {
 		t.Fatal("state token did not change on inactivate")
+	}
+}
+
+// TestUpdatePlayerOwnership verifies a player can update only their own record:
+// Player A's credential cannot PUT Player B's row (4xx, and B's row unchanged),
+// and A can update their own team_name / real_name / icon.
+func TestUpdatePlayerOwnership(t *testing.T) {
+	env := openPlayersTestDB(t)
+	router := newPlayerRouter(env, &sessions.Env{Db: env.Db})
+	_, _, _, member, memberToken := newSessionWithPlayers(t, env)
+	other, _ := createPlayerRowWithToken(t, env, "other")
+
+	// Player A cannot overwrite Player B's record.
+	rec := do(t, router, http.MethodPut, "/gameplay/player/"+string(other), memberToken,
+		map[string]string{"team_name": "hacked", "real_name": "hacker", "icon": "😈"})
+	if rec.Code < http.StatusBadRequest || rec.Code >= http.StatusInternalServerError {
+		t.Fatalf("cross-player update status = %d, want 4xx: %s", rec.Code, rec.Body.String())
+	}
+	if got := playerRow(t, env, other).TeamName; got != "other" {
+		t.Fatalf("other player team_name = %q after unauthorized update, want %q", got, "other")
+	}
+
+	// A player can update their own record, and it sticks.
+	rec = do(t, router, http.MethodPut, "/gameplay/player/"+string(member), memberToken,
+		map[string]string{"team_name": "Alpha", "real_name": "Alice", "icon": "🦄"})
+	if rec.Code != http.StatusOK {
+		t.Fatalf("self-update status = %d: %s", rec.Code, rec.Body.String())
+	}
+	p := playerRow(t, env, member)
+	if p.TeamName != "Alpha" || p.RealName != "Alice" || p.Icon != "🦄" {
+		t.Fatalf("self-update not persisted: %+v", p)
+	}
+}
+
+// TestGetOnePlayerOwnership verifies a player can read only their own record:
+// Player A's credential cannot GET Player B's row, but can read their own.
+func TestGetOnePlayerOwnership(t *testing.T) {
+	env := openPlayersTestDB(t)
+	router := newPlayerRouter(env, &sessions.Env{Db: env.Db})
+	_, _, _, member, memberToken := newSessionWithPlayers(t, env)
+	other, _ := createPlayerRowWithToken(t, env, "other")
+
+	rec := do(t, router, http.MethodGet, "/gameplay/player/"+string(other), memberToken, nil)
+	if rec.Code < http.StatusBadRequest || rec.Code >= http.StatusInternalServerError {
+		t.Fatalf("cross-player read status = %d, want 4xx: %s", rec.Code, rec.Body.String())
+	}
+
+	rec = do(t, router, http.MethodGet, "/gameplay/player/"+string(member), memberToken, nil)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("self-read status = %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+// TestGetOnePlayerRequiresToken verifies the read is fail-closed: no token is
+// rejected rather than treated as a spectator, since the response is the
+// caller's own identity.
+func TestGetOnePlayerRequiresToken(t *testing.T) {
+	env := openPlayersTestDB(t)
+	router := newPlayerRouter(env, &sessions.Env{Db: env.Db})
+	_, _, _, member, _ := newSessionWithPlayers(t, env)
+
+	rec := do(t, router, http.MethodGet, "/gameplay/player/"+string(member), "", nil)
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("unauthenticated read status = %d, want 401: %s", rec.Code, rec.Body.String())
+	}
+}
+
+// TestUpdatePlayerBumpsSessions verifies that a self-update still bumps the
+// state token of each session the player belongs to.
+func TestUpdatePlayerBumpsSessions(t *testing.T) {
+	env := openPlayersTestDB(t)
+	router := newPlayerRouter(env, &sessions.Env{Db: env.Db})
+	sessionId, _, _, member, memberToken := newSessionWithPlayers(t, env)
+
+	stateBefore, err := common.GetState((*common.Env)(env), sessionId)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	rec := do(t, router, http.MethodPut, "/gameplay/player/"+string(member), memberToken,
+		map[string]string{"team_name": "Alpha", "real_name": "Alice", "icon": "🦄"})
+	if rec.Code != http.StatusOK {
+		t.Fatalf("self-update status = %d: %s", rec.Code, rec.Body.String())
+	}
+	stateAfter, err := common.GetState((*common.Env)(env), sessionId)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if stateBefore == stateAfter {
+		t.Fatal("state token did not change on self-update")
 	}
 }

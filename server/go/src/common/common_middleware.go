@@ -57,6 +57,18 @@ func (e InvalidPlayerTokenError) Error() string {
 	return "Invalid player token"
 }
 
+// NotYourPlayerError is returned when a gameplay caller attempts to read or
+// modify a player record that is not their own. In the per-player bearer model
+// the token binds a caller to exactly one player; player_id is a public
+// identifier and not a credential, so a caller may only act on their own row.
+type NotYourPlayerError struct {
+	PlayerId string
+}
+
+func (e NotYourPlayerError) Error() string {
+	return fmt.Sprintf("Player %v is not you", e.PlayerId)
+}
+
 var USER_ID = "userId"
 
 // PLAYER_ID is the gin context key the WithPlayer middleware sets with the
