@@ -640,6 +640,20 @@ var migrations = []migration{
 			)`,
 		},
 	},
+	{
+		version: 17,
+		name:    "player token credential",
+		// ticket #256: gameplay auth moves off the public player_id (which
+		// travels in URLs and is handed out on every roster/scoreboard read)
+		// and onto a per-player bearer capability. A random token is issued
+		// once at player create and only its SHA-256 hash is stored here. The
+		// empty-string default marks a legacy row with no token: under the
+		// hard-cutover decision it can never authenticate, and the plaintext
+		// token is never persisted (only the hash is).
+		statements: []string{
+			`ALTER TABLE player ADD COLUMN token_hash TEXT NOT NULL DEFAULT ''`,
+		},
+	},
 }
 
 // Migrate brings db up to the latest schema version, applying each pending

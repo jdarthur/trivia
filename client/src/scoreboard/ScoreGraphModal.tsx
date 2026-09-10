@@ -164,7 +164,6 @@ class ScoreGraphModal extends React.Component<Props, State> {
         }
 
         const url = "/gameplay/session/" + this.props.session_id + "/score-history"
-            + "?player_id=" + this.props.player_id
 
         sendData(url, "GET")
             .then((data: any) => {

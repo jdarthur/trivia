@@ -64,8 +64,7 @@ class WagerManager extends React.Component<Props, State> {
             const currentFetch = this.fetchCounter
 
             let url = "/gameplay/session/" + this.props.session_id + "/wagers"
-            url += "?player_id=" + this.props.player_id
-            url += "&round_id=" + this.props.round_id
+            url += "?round_id=" + this.props.round_id
 
             console.log(url)
             sendData(url, "GET")

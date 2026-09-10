@@ -96,8 +96,15 @@ Verify: `cd server/go/src && go build ./...` succeeds.
   to HTTP statuses; don't hand-roll error JSON.
 - IDs are UUID strings (`models.NewId`); `NonexistentIdError`
   for missing records.
-- Authz split: editor endpoints behind `auth.AsUser` (Auth0); gameplay/session
-  endpoints are anonymous.
+- Authz split: editor endpoints behind `auth.AsUser` (Auth0). Gameplay auth is a
+  per-player **bearer capability**, not anonymous: a random token is issued once
+  at player/session create and sent in the `borttrivia-player-token` header
+  (`common.WithPlayer` verifies it and sets the server-verified player id).
+  `player_id` is a **public identifier and not a credential** — it may appear in
+  URLs and every roster/scoreboard read. The token never goes in a URL or query
+  string, and only its SHA-256 hash is stored (`player.token_hash`). Moderator
+  routes use `sessions.AsMod` / `sessions.AssertMod`, which compare the
+  server-verified player against `session.Moderator`.
 - The SQLite port is complete — new code uses `store` + the `common` helpers
   over `*sql.DB`; there is no mgo/Mongo dependency anymore.
 - Tests: `_test.go` beside the code; SQLite-backed integration tests in `test/`.

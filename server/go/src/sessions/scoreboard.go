@@ -10,7 +10,7 @@ import (
 
 func (e *Env) GetSessionScoreboard(c *gin.Context) {
 	sessionId := c.Param("id")
-	callerPlayerId := c.Query("player_id")
+	callerPlayerId := common.GetPlayerId(c)
 	scoreboard, err := getSessionScoreboard(e, sessionId, callerPlayerId)
 	common.Respond(c, scoreboard, err)
 }

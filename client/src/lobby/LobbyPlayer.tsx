@@ -8,6 +8,7 @@ import {Card, Input, Button, Tooltip} from 'antd';
 
 import SelectIcon from "./SelectIcon"
 import {InfoCircleOutlined} from "@ant-design/icons";
+import {setPlayerToken} from "../common/playerToken";
 
 const TEAM_NAME = "team_name"
 const REAL_NAME = "real_name"
@@ -115,7 +116,13 @@ class LobbyPlayer extends React.Component<Props, State> {
         const url = "/gameplay/session/" + session_id + "/add"
         return sendData(url, "POST", {player_id: player_id})
             .then((data) => {
-                window.location.href = window.location.href + "&player_id=" + player_id
+                // Persist the player credential in sessionStorage and keep
+                // player_id out of the URL (ticket #256). The URL already
+                // carries session_id, so reload explicitly to re-read
+                // sessionStorage (Homepage bootstraps player_id from there).
+                sessionStorage.setItem("player_id", player_id)
+                setPlayerToken(player.player_token)
+                window.location.reload()
             })
     }
 

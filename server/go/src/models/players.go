@@ -19,6 +19,12 @@ type Player struct {
 	// the global player table has no such column, so editor reads leave it false
 	// and omitempty keeps it off the wire.
 	Active bool `json:"active,omitempty"`
+	// PlayerToken is the player's one-time bearer credential, populated ONLY by
+	// the create handlers and returned exactly once. It is never set on any read
+	// path (roster / scoreboard / answers), so omitempty keeps it off the wire
+	// there. The persisted credential is token_hash, which is never on this
+	// struct at all — see common.CreatePlayerWithToken / PlayerIdFromToken.
+	PlayerToken string `json:"player_token,omitempty"`
 }
 
 func (p Player) SetCreateDate(createDate time.Time) Object {

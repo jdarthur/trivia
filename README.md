@@ -13,7 +13,7 @@ players answer from their own devices.
 | Client | React, Ant Design, Redux Toolkit, React Router |
 | Server | Go, Gin |
 | Database | SQLite (via `modernc.org/sqlite`, pure Go) |
-| Auth | Auth0 (editor endpoints only — gameplay is anonymous) |
+| Auth | Auth0 (editor endpoints); gameplay uses a per-player bearer capability |
 
 ## Layout
 

@@ -36,13 +36,26 @@ func (e *Env) AsMod(c *gin.Context) {
 
 	session := value.(models.Session)
 
-	playerId := models.PlayerId(c.Query("player_id"))
-	if playerId != session.Moderator {
-		common.Respond(c, session, UnauthorizedSessionActionError{SessionId: session.ID, ModeratorId: playerId})
+	if err := AssertMod(c, session); err != nil {
+		common.Respond(c, session, err)
 		c.Abort()
 		return
 	}
 	c.Next()
+}
+
+// AssertMod reports whether the authenticated caller (the server-verified
+// player in the gin context, set by common.WithPlayer) is the session's
+// moderator. It is the single shared moderator check — the old scattered
+// `requestBody.AdminId != session.Moderator` comparisons collapse into it.
+// The caller's player_id is never read from the request body/query: identity
+// comes from the context value, so a client can no longer claim to be the mod.
+func AssertMod(c *gin.Context, session models.Session) error {
+	playerId := models.PlayerId(common.GetPlayerId(c))
+	if playerId != session.Moderator {
+		return UnauthorizedSessionActionError{SessionId: session.ID, ModeratorId: playerId}
+	}
+	return nil
 }
 
 func checkValidRoundAndQuestionIndex(session models.Session, roundIndex int, questionIndex int) error {

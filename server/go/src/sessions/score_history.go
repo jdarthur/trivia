@@ -11,7 +11,7 @@ import (
 
 func (e *Env) GetSessionScoreHistory(c *gin.Context) {
 	sessionId := c.Param("id")
-	callerPlayerId := c.Query("player_id")
+	callerPlayerId := common.GetPlayerId(c)
 	history, err := getSessionScoreHistory(e, sessionId, callerPlayerId)
 	common.Respond(c, history, err)
 }

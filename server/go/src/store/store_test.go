@@ -36,8 +36,8 @@ func TestMigrateCreatesBaselineSchema(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Version: %v", err)
 	}
-	if v != 16 {
-		t.Fatalf("user_version = %d, want 16", v)
+	if v != 17 {
+		t.Fatalf("user_version = %d, want 17", v)
 	}
 
 	tables := []string{
@@ -119,6 +119,34 @@ func TestMigrateCreatesBaselineSchema(t *testing.T) {
 	}
 	if !found {
 		t.Error("answer.use_moneyball column missing after migration")
+	}
+
+	// migration 17 (ticket #256): player.token_hash, the SHA-256 of the
+	// per-player bearer credential. Legacy rows default to '' (no token) and
+	// can never authenticate under the hard-cutover decision.
+	rows, err = db.Query("PRAGMA table_info(player)")
+	if err != nil {
+		t.Fatalf("query table_info: %v", err)
+	}
+	defer rows.Close()
+	found = false
+	for rows.Next() {
+		var cid int
+		var name, typ string
+		var notnull, pk int
+		var dflt interface{}
+		if err := rows.Scan(&cid, &name, &typ, &notnull, &dflt, &pk); err != nil {
+			t.Fatalf("scan table_info row: %v", err)
+		}
+		if name == "token_hash" {
+			found = true
+		}
+	}
+	if err := rows.Err(); err != nil {
+		t.Fatalf("iterate table_info: %v", err)
+	}
+	if !found {
+		t.Error("player.token_hash column missing after migration")
 	}
 }
 
@@ -302,8 +330,8 @@ func TestMigrateIsIdempotent(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Version: %v", err)
 	}
-	if v != 16 {
-		t.Fatalf("user_version = %d after re-migrate, want 16", v)
+	if v != 17 {
+		t.Fatalf("user_version = %d after re-migrate, want 17", v)
 	}
 }
 

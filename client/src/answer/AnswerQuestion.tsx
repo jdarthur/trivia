@@ -7,6 +7,7 @@ import sendData from "../index"
 import { Card, Input, Button, Radio, Select, Checkbox, Popover } from 'antd';
 import { QuestionCircleOutlined } from '@ant-design/icons';
 import OrderedAnswerList from "./OrderedAnswerList";
+import {getPlayerToken} from "../common/playerToken";
 
 const { TextArea } = Input;
 
@@ -106,8 +107,8 @@ class AnswerQuestion extends React.Component<Props, State> {
     check_active = () => {
         this.activeCounter += 1
         const currentCheck = this.activeCounter
-        const url = "/gameplay/session/" + this.props.session_id + "/players?player_id=" + this.props.player_id
-        fetch(url)
+        const url = "/gameplay/session/" + this.props.session_id + "/players"
+        fetch(url, {headers: {'borttrivia-player-token': getPlayerToken()}})
             .then(response => {
                 if (!response.ok) {
                     throw new Error(`Request failed (${response.status} ${response.statusText})`)
@@ -180,10 +181,9 @@ class AnswerQuestion extends React.Component<Props, State> {
         this.fetchCounter += 1
         const currentFetch = this.fetchCounter
         const url = "/gameplay/session/" + this.props.session_id + "/answers"
-            + "?player_id=" + this.props.player_id
-            + "&round_id=" + this.props.round
+            + "?round_id=" + this.props.round
             + "&question_id=" + this.props.question
-        fetch(url)
+        fetch(url, {headers: {'borttrivia-player-token': getPlayerToken()}})
             .then(response => {
                 if (!response.ok) {
                     throw new Error(`Request failed (${response.status} ${response.statusText})`)

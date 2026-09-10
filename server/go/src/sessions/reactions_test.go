@@ -13,13 +13,19 @@ import (
 )
 
 // reactionRequest drives a reaction handler (SetReaction / RemoveReaction)
-// over an in-process HTTP request and returns the recorder.
+// over an in-process HTTP request and returns the recorder. The acting player
+// is derived from the body's player_id and set as the server-verified caller
+// in the gin context, mirroring what common.WithPlayer would have done (the
+// handlers no longer trust the body's player_id for identity).
 func reactionRequest(t *testing.T, env *Env, handler func(*gin.Context), method string, sessionId string, body interface{}) *httptest.ResponseRecorder {
 	t.Helper()
 	gin.SetMode(gin.TestMode)
 	recorder := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(recorder)
 	c.Params = gin.Params{{Key: "id", Value: sessionId}}
+	if caller := callerFromBody(body); caller != "" {
+		c.Set(common.PLAYER_ID, caller)
+	}
 	payload, err := json.Marshal(body)
 	if err != nil {
 		t.Fatal(err)
@@ -28,6 +34,21 @@ func reactionRequest(t *testing.T, env *Env, handler func(*gin.Context), method 
 	c.Request.Header.Set("Content-Type", "application/json")
 	handler(c)
 	return recorder
+}
+
+// callerFromBody extracts the acting player id from a request body so a test
+// can authenticate the caller the way the handler expects (the actor must be
+// the server-verified player, never a body-supplied id).
+func callerFromBody(body interface{}) string {
+	switch b := body.(type) {
+	case models.AnswerReaction:
+		return string(b.PlayerId)
+	case map[string]interface{}:
+		if v, ok := b["player_id"].(string); ok {
+			return v
+		}
+	}
+	return ""
 }
 
 // answerIdFor returns the answer ID of the given player for question (0,0) of

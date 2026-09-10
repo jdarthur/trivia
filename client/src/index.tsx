@@ -6,6 +6,7 @@ import App from './common/App';
 import {store, history} from './api/store';
 import {Provider} from "react-redux";
 import {AUDIENCE, SCOPE} from "./common/authConfig";
+import {getPlayerToken} from "./common/playerToken";
 
 function redirectCallBack(appState: any) {
     if (appState?.returnTo) {
@@ -56,7 +57,7 @@ const sendData = async function sendData(url: string, method: string, data?: any
 
     const response = await fetch(url, {
         method: method,
-        headers: {'Content-Type': 'application/json'},
+        headers: {'Content-Type': 'application/json', 'borttrivia-player-token': getPlayerToken()},
         body: body
     })
     if (!response.ok) {

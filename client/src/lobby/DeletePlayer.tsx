@@ -1,5 +1,6 @@
 import React from 'react';
 import DeleteConfirm from "../editor/DeleteConfirm"
+import {getPlayerToken} from "../common/playerToken";
 
 interface Props {
     session_id: string
@@ -9,24 +10,23 @@ interface Props {
 
 class ScorerLink extends React.Component<Props> {
     delete = () => {
-        console.log("Delete session " + this.props.session_id + " / user " + this.props.player_id + " as admin " + this.props.admin_id)
-        deletePlayer(this.props.session_id, this.props.player_id, this.props.admin_id)
+        console.log("Delete session " + this.props.session_id + " / user " + this.props.player_id)
+        deletePlayer(this.props.session_id, this.props.player_id)
     }
 
     render() { return <DeleteConfirm delete={this.delete} /> }
 }
 
-async function deletePlayer(session_id: string, player_id: string, admin_id: string) {
+async function deletePlayer(session_id: string, player_id: string) {
     const url = "/gameplay/session/" + session_id + "/remove"
 
     let body = JSON.stringify({
-        admin_id: admin_id,
         player_id: player_id,
     })
 
     const response = await fetch(url, {
         method: "POST",
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'borttrivia-player-token': getPlayerToken() },
         body: body
     })
     return response.json()

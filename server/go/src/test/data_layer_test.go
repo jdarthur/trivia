@@ -33,6 +33,17 @@ func createPlayer(t *testing.T, env *common.Env, teamName string) string {
 	return playerId
 }
 
+// createPlayerWithToken inserts a player record with its bearer-token
+// credential and returns the ID and the plaintext token (ticket #256).
+func createPlayerWithToken(t *testing.T, env *common.Env, teamName string) (string, string) {
+	t.Helper()
+	id, _, token, err := common.CreatePlayerWithToken(env, models.Player{TeamName: teamName})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return id, token
+}
+
 func TestQuestionCrud(t *testing.T) {
 	env := &questions.Env{Db: GetDb()}
 	userId := "user-1"

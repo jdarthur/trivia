@@ -335,23 +335,25 @@ async function seedStartableOrderingGame(request: APIRequestContext, prefix: str
   return { gameId, roundId, qids: [q1, q2] };
 }
 
-// Create a session for the game; the response carries the mod's player id.
+// Create a session for the game; the response carries the mod's player id and
+// one-time bearer credential (ticket #256).
 async function createSession(request: APIRequestContext, name: string, gameId: string) {
   const res = await request.post('/gameplay/session', { data: { name, game_id: gameId } });
   expect(res.ok()).toBeTruthy();
   const json = await res.json();
-  return { sessionId: json.id, modId: json.mod };
+  return { sessionId: json.id, modId: json.mod, modToken: json.player_token };
 }
 
 // Remove everything a test created so it doesn't leak into the shared dev DB.
 async function cleanup(
   request: APIRequestContext,
   seeded: { gameId: string; roundId: string; qids: string[] },
-  opts: { sessionId?: string; modId?: string; playerIds?: string[] },
+  opts: { sessionId?: string; modId?: string; modToken?: string; playerIds?: string[] },
 ) {
-  const { sessionId, modId, playerIds = [] } = opts;
-  if (sessionId && modId) {
-    await request.delete(`/gameplay/session/${sessionId}?mod=${modId}`);
+  const { sessionId, modId, modToken, playerIds = [] } = opts;
+  if (sessionId && modToken) {
+    // Session deletion is moderator-gated by the bearer token header now.
+    await request.delete(`/gameplay/session/${sessionId}`, { headers: { 'borttrivia-player-token': modToken } });
   }
   for (const pid of [modId, ...playerIds]) {
     if (pid) await request.delete(`/gameplay/player/${pid}`);
@@ -364,13 +366,20 @@ async function cleanup(
 
 // --- Actor helpers ---------------------------------------------------------
 
-// Open the mod's lobby from the invite URL plus its own player_id. Pass
-// mockUser to also log the mod page into the editor (dev-mode mock token), which
-// the hot-edit modal needs to load the user's categories (ticket #180).
-async function openModLobby(browser: { newContext: (o?: object) => Promise<BrowserContext> }, sessionId: string, modId: string, mockUser?: string) {
+// Open the mod's lobby from the invite URL (session_id only — player_id is no
+// longer a URL credential, ticket #256). The mod's player_id + bearer token are
+// seeded into sessionStorage before the page loads, since the app no longer
+// reads them from the URL. Pass mockUser to also log the mod page into the
+// editor (dev-mode mock token), which the hot-edit modal needs to load the
+// user's categories (ticket #180).
+async function openModLobby(browser: { newContext: (o?: object) => Promise<BrowserContext> }, sessionId: string, modId: string, modToken: string, mockUser?: string) {
   const context = await browser.newContext({ baseURL: BASE_URL });
   const page = await context.newPage();
-  const params = `session_id=${sessionId}&player_id=${modId}${mockUser ? `&mockUser=${mockUser}` : ''}`;
+  await page.addInitScript(([id, token]) => {
+    sessionStorage.setItem('player_id', id);
+    sessionStorage.setItem('player_token', token);
+  }, [modId, modToken]);
+  const params = `session_id=${sessionId}${mockUser ? `&mockUser=${mockUser}` : ''}`;
   await page.goto(`/?${params}`);
   await expect(page.locator('.invite-link')).toBeVisible();
   return { context, page };
@@ -403,13 +412,11 @@ async function joinPlayer(
   await expect(joinButton).toBeEnabled();
   await joinButton.click();
 
-  // Join triggers a full page reload that appends `&player_id=`.
-  await page.waitForURL(/[?&]player_id=/);
-  const playerId = new URL(page.url()).searchParams.get('player_id');
+  // Join reloads the page with the player credential in sessionStorage (no
+  // player_id in the URL, ticket #256), and the card flips to "Update".
+  await expect(page.getByRole('button', { name: 'Update', exact: true })).toBeVisible({ timeout: 30000 });
+  const playerId = await page.evaluate(() => sessionStorage.getItem('player_id'));
   expect(playerId).toBeTruthy();
-
-  // The reloaded card now shows "Update".
-  await expect(page.getByRole('button', { name: 'Update', exact: true })).toBeVisible();
 
   return { context, page, playerId };
 }
@@ -419,25 +426,25 @@ test.describe('gameplay lobby & session start', () => {
     test.setTimeout(60000);
     const prefix = unique();
     const seeded = await seedStartableGame(request, prefix);
-    const { sessionId, modId } = await createSession(request, `e2e-session-${prefix}`, seeded.gameId);
+    const { sessionId, modId, modToken } = await createSession(request, `e2e-session-${prefix}`, seeded.gameId);
 
-    const { context, page } = await openModLobby(browser, sessionId, modId);
+    const { context, page } = await openModLobby(browser, sessionId, modId, modToken);
 
     await expect(page.locator('.invite-link')).toHaveValue(`${BASE_URL}?session_id=${sessionId}`);
     await expect(page.locator('.start-button')).toBeVisible();
     await expect(page.getByText('Players:', { exact: true })).toBeVisible();
 
     await context.close();
-    await cleanup(request, seeded, { sessionId, modId });
+    await cleanup(request, seeded, { sessionId, modId, modToken });
   });
 
   test('player joins via invite link, edits team/icon and appears in mod roster', async ({ browser, request }) => {
     test.setTimeout(60000);
     const prefix = unique();
     const seeded = await seedStartableGame(request, prefix);
-    const { sessionId, modId } = await createSession(request, `e2e-session-${prefix}`, seeded.gameId);
+    const { sessionId, modId, modToken } = await createSession(request, `e2e-session-${prefix}`, seeded.gameId);
 
-    const { context: modContext, page: modPage } = await openModLobby(browser, sessionId, modId);
+    const { context: modContext, page: modPage } = await openModLobby(browser, sessionId, modId, modToken);
 
     const teamName = `Team ${prefix}`;
     const renamed = `Renamed ${prefix}`;
@@ -462,16 +469,16 @@ test.describe('gameplay lobby & session start', () => {
 
     await playerContext.close();
     await modContext.close();
-    await cleanup(request, seeded, { sessionId, modId, playerIds: [playerId] });
+    await cleanup(request, seeded, { sessionId, modId, modToken, playerIds: [playerId] });
   });
 
   test('session start flips both contexts to the active game and the mod can advance', async ({ browser, request }) => {
     test.setTimeout(90000);
     const prefix = unique();
     const seeded = await seedStartableGame(request, prefix);
-    const { sessionId, modId } = await createSession(request, `e2e-session-${prefix}`, seeded.gameId);
+    const { sessionId, modId, modToken } = await createSession(request, `e2e-session-${prefix}`, seeded.gameId);
 
-    const { context: modContext, page: modPage } = await openModLobby(browser, sessionId, modId);
+    const { context: modContext, page: modPage } = await openModLobby(browser, sessionId, modId, modToken);
     await expect(modPage.locator('.start-button')).toBeVisible();
 
     const { context: playerContext, page: playerPage, playerId } = await joinPlayer(
@@ -501,7 +508,7 @@ test.describe('gameplay lobby & session start', () => {
 
     await playerContext.close();
     await modContext.close();
-    await cleanup(request, seeded, { sessionId, modId, playerIds: [playerId] });
+    await cleanup(request, seeded, { sessionId, modId, modToken, playerIds: [playerId] });
   });
 });
 
@@ -539,16 +546,19 @@ async function reorderGridTo(card: Locator, target: string[]) {
   }
 }
 
-// Read the mod's view of answers for one question (round/question indices).
+// Read the mod's view of answers for one question (round/question indices),
+// authenticated as the mod via the bearer token header (ticket #256).
 async function getAnswersAsMod(
   request: APIRequestContext,
   sessionId: string,
   modId: string,
+  modToken: string,
   roundIndex: number,
   questionIndex: number,
 ): Promise<any> {
   const res = await request.get(
-    `/gameplay/session/${sessionId}/answers?player_id=${modId}&round_id=${roundIndex}&question_id=${questionIndex}`,
+    `/gameplay/session/${sessionId}/answers?round_id=${roundIndex}&question_id=${questionIndex}`,
+    { headers: { 'borttrivia-player-token': modToken } },
   );
   expect(res.ok()).toBeTruthy();
   return await res.json();
@@ -559,11 +569,12 @@ async function playerAnswers(
   request: APIRequestContext,
   sessionId: string,
   modId: string,
+  modToken: string,
   playerId: string,
   roundIndex: number,
   questionIndex: number,
 ): Promise<any[]> {
-  const data = await getAnswersAsMod(request, sessionId, modId, roundIndex, questionIndex);
+  const data = await getAnswersAsMod(request, sessionId, modId, modToken, roundIndex, questionIndex);
   const team = data.answers.find((a: any) => a.player_id === playerId);
   return team?.answers ?? [];
 }
@@ -576,9 +587,9 @@ test.describe('gameplay question flow, answering & wagering', () => {
     test.setTimeout(90000);
     const prefix = unique();
     const seeded = await seedStartableGame(request, prefix);
-    const { sessionId, modId } = await createSession(request, `e2e-session-${prefix}`, seeded.gameId);
+    const { sessionId, modId, modToken } = await createSession(request, `e2e-session-${prefix}`, seeded.gameId);
 
-    const { context: modContext, page: modPage } = await openModLobby(browser, sessionId, modId);
+    const { context: modContext, page: modPage } = await openModLobby(browser, sessionId, modId, modToken);
     const { context: playerContext, page: playerPage, playerId } = await joinPlayer(
       browser,
       sessionId,
@@ -614,9 +625,9 @@ test.describe('gameplay question flow, answering & wagering', () => {
     await answerButton.click();
 
     await expect
-      .poll(async () => (await playerAnswers(request, sessionId, modId, playerId, 0, 1)).length)
+      .poll(async () => (await playerAnswers(request, sessionId, modId, modToken, playerId, 0, 1)).length)
       .toBe(1);
-    expect((await playerAnswers(request, sessionId, modId, playerId, 0, 1))[0].answer).toBe('First answer');
+    expect((await playerAnswers(request, sessionId, modId, modToken, playerId, 0, 1))[0].answer).toBe('First answer');
 
     // Edit & resend: the submit button flips to "Update".
     await card.locator('textarea[placeholder="Your answer"]').fill('Edited answer');
@@ -625,14 +636,14 @@ test.describe('gameplay question flow, answering & wagering', () => {
     await updateButton.click();
 
     await expect
-      .poll(async () => (await playerAnswers(request, sessionId, modId, playerId, 0, 1)).length)
+      .poll(async () => (await playerAnswers(request, sessionId, modId, modToken, playerId, 0, 1)).length)
       .toBe(2);
-    const resent = await playerAnswers(request, sessionId, modId, playerId, 0, 1);
+    const resent = await playerAnswers(request, sessionId, modId, modToken, playerId, 0, 1);
     expect(resent[resent.length - 1].answer).toBe('Edited answer');
 
     await playerContext.close();
     await modContext.close();
-    await cleanup(request, seeded, { sessionId, modId, playerIds: [playerId] });
+    await cleanup(request, seeded, { sessionId, modId, modToken, playerIds: [playerId] });
   });
 
   test('wagering: a player picks a wager via WagerManager and it is recorded on the answer', async ({
@@ -642,9 +653,9 @@ test.describe('gameplay question flow, answering & wagering', () => {
     test.setTimeout(90000);
     const prefix = unique();
     const seeded = await seedStartableGame(request, prefix);
-    const { sessionId, modId } = await createSession(request, `e2e-session-${prefix}`, seeded.gameId);
+    const { sessionId, modId, modToken } = await createSession(request, `e2e-session-${prefix}`, seeded.gameId);
 
-    const { context: modContext, page: modPage } = await openModLobby(browser, sessionId, modId);
+    const { context: modContext, page: modPage } = await openModLobby(browser, sessionId, modId, modToken);
     const { context: playerContext, page: playerPage, playerId } = await joinPlayer(
       browser,
       sessionId,
@@ -674,14 +685,14 @@ test.describe('gameplay question flow, answering & wagering', () => {
     await answerButton.click();
 
     await expect
-      .poll(async () => (await playerAnswers(request, sessionId, modId, playerId, 0, 0)).length)
+      .poll(async () => (await playerAnswers(request, sessionId, modId, modToken, playerId, 0, 0)).length)
       .toBe(1);
-    const recorded = await playerAnswers(request, sessionId, modId, playerId, 0, 0);
+    const recorded = await playerAnswers(request, sessionId, modId, modToken, playerId, 0, 0);
     expect(recorded[0].wager).toBe(200);
 
     await playerContext.close();
     await modContext.close();
-    await cleanup(request, seeded, { sessionId, modId, playerIds: [playerId] });
+    await cleanup(request, seeded, { sessionId, modId, modToken, playerIds: [playerId] });
   });
 });
 
@@ -756,10 +767,10 @@ async function setupActiveGame(
   prefix: string,
 ) {
   const seeded = await seedStartableGame(request, prefix);
-  const { sessionId, modId } = await createSession(request, `e2e-session-${prefix}`, seeded.gameId);
+  const { sessionId, modId, modToken } = await createSession(request, `e2e-session-${prefix}`, seeded.gameId);
   // The mod page logs into the editor (dev-mode mock token) so the hot-edit
   // modal can load the user's categories (ticket #180).
-  const { context: modContext, page: modPage } = await openModLobby(browser, sessionId, modId, DEV_USER);
+  const { context: modContext, page: modPage } = await openModLobby(browser, sessionId, modId, modToken, DEV_USER);
   const { context: playerContext, page: playerPage, playerId } = await joinPlayer(
     browser,
     sessionId,
@@ -773,6 +784,7 @@ async function setupActiveGame(
     seeded,
     sessionId,
     modId,
+    modToken,
     modContext,
     modPage,
     playerContext,
@@ -840,7 +852,7 @@ test.describe('gameplay scoring, scoreboard & statuses', () => {
 
     await g.playerContext.close();
     await g.modContext.close();
-    await cleanup(request, g.seeded, { sessionId: g.sessionId, modId: g.modId, playerIds: [g.playerId] });
+    await cleanup(request, g.seeded, { sessionId: g.sessionId, modId: g.modId, modToken: g.modToken, playerIds: [g.playerId] });
   });
 
   test('an incorrect answer turns the player status red and awards no points', async ({ browser, request }) => {
@@ -870,7 +882,7 @@ test.describe('gameplay scoring, scoreboard & statuses', () => {
 
     await g.playerContext.close();
     await g.modContext.close();
-    await cleanup(request, g.seeded, { sessionId: g.sessionId, modId: g.modId, playerIds: [g.playerId] });
+    await cleanup(request, g.seeded, { sessionId: g.sessionId, modId: g.modId, modToken: g.modToken, playerIds: [g.playerId] });
   });
 
   test('the scorer clears between questions (regression #7/#8) and scores accumulate', async ({
@@ -913,7 +925,7 @@ test.describe('gameplay scoring, scoreboard & statuses', () => {
 
     await g.playerContext.close();
     await g.modContext.close();
-    await cleanup(request, g.seeded, { sessionId: g.sessionId, modId: g.modId, playerIds: [g.playerId] });
+    await cleanup(request, g.seeded, { sessionId: g.sessionId, modId: g.modId, modToken: g.modToken, playerIds: [g.playerId] });
   });
 
   test('emoji reactions: players and mod add, modify and remove reactions on a scored answer', async ({
@@ -1030,7 +1042,7 @@ test.describe('gameplay scoring, scoreboard & statuses', () => {
 
     await g.playerContext.close();
     await g.modContext.close();
-    await cleanup(request, g.seeded, { sessionId: g.sessionId, modId: g.modId, playerIds: [g.playerId] });
+    await cleanup(request, g.seeded, { sessionId: g.sessionId, modId: g.modId, modToken: g.modToken, playerIds: [g.playerId] });
   });
 
   // Ticket #239: the score graph modal (opened from the scoreboard title
@@ -1148,7 +1160,7 @@ test.describe('gameplay scoring, scoreboard & statuses', () => {
 
     await g.playerContext.close();
     await g.modContext.close();
-    await cleanup(request, g.seeded, { sessionId: g.sessionId, modId: g.modId, playerIds: [g.playerId] });
+    await cleanup(request, g.seeded, { sessionId: g.sessionId, modId: g.modId, modToken: g.modToken, playerIds: [g.playerId] });
   });
 
   // The score-graph team colors have to be tellable apart, not merely different
@@ -1164,9 +1176,9 @@ test.describe('gameplay scoring, scoreboard & statuses', () => {
     test.setTimeout(120000);
     const prefix = unique();
     const seeded = await seedStartableGame(request, prefix);
-    const { sessionId, modId } = await createSession(request, `e2e-session-${prefix}`, seeded.gameId);
+    const { sessionId, modId, modToken } = await createSession(request, `e2e-session-${prefix}`, seeded.gameId);
 
-    const { context: modContext, page: modPage } = await openModLobby(browser, sessionId, modId, DEV_USER);
+    const { context: modContext, page: modPage } = await openModLobby(browser, sessionId, modId, modToken, DEV_USER);
     // "Team N " is 7 chars and the prefix is 13, so each name is exactly 20 —
     // the maxLength ShortTextWithPopover truncates *above*. A longer name would
     // render as "Charlie 17884060…" in the scorer card and no filter on the
@@ -1232,6 +1244,7 @@ test.describe('gameplay scoring, scoreboard & statuses', () => {
     await cleanup(request, seeded, {
       sessionId,
       modId,
+      modToken,
       playerIds: joined.map(p => p.playerId),
     });
   });
@@ -1247,9 +1260,9 @@ test.describe('gameplay navigation, hot-edit, spectator & edge cases', () => {
     test.setTimeout(120000);
     const prefix = unique();
     const seeded = await seedNavGame(request, prefix);
-    const { sessionId, modId } = await createSession(request, `e2e-session-${prefix}`, seeded.gameId);
+    const { sessionId, modId, modToken } = await createSession(request, `e2e-session-${prefix}`, seeded.gameId);
 
-    const { context: modContext, page: modPage } = await openModLobby(browser, sessionId, modId);
+    const { context: modContext, page: modPage } = await openModLobby(browser, sessionId, modId, modToken);
     await modPage.locator('.start-button').click();
     await expect(modPage.locator('.active-game')).toBeVisible({ timeout: 30000 });
 
@@ -1285,7 +1298,7 @@ test.describe('gameplay navigation, hot-edit, spectator & edge cases', () => {
     await expect(modPage.locator('.ant-breadcrumb')).toContainText(`round-two-${prefix}`);
 
     await modContext.close();
-    await cleanup(request, seeded, { sessionId, modId });
+    await cleanup(request, seeded, { sessionId, modId, modToken });
   });
 
   // The hot-edit modal rewrites the session snapshot mid-game. It needs the
@@ -1323,7 +1336,7 @@ test.describe('gameplay navigation, hot-edit, spectator & edge cases', () => {
 
     await g.playerContext.close();
     await g.modContext.close();
-    await cleanup(request, g.seeded, { sessionId: g.sessionId, modId: g.modId, playerIds: [g.playerId] });
+    await cleanup(request, g.seeded, { sessionId: g.sessionId, modId: g.modId, modToken: g.modToken, playerIds: [g.playerId] });
   });
 
   // Ticket #184: the mod page is anonymous, so the hot-edit modal cannot load
@@ -1337,10 +1350,10 @@ test.describe('gameplay navigation, hot-edit, spectator & edge cases', () => {
     test.setTimeout(120000);
     const prefix = unique();
     const seeded = await seedStartableGame(request, prefix);
-    const { sessionId, modId } = await createSession(request, `e2e-session-${prefix}`, seeded.gameId);
+    const { sessionId, modId, modToken } = await createSession(request, `e2e-session-${prefix}`, seeded.gameId);
 
     // NO mockUser: the mod page is anonymous, so categories never load.
-    const { context: modContext, page: modPage } = await openModLobby(browser, sessionId, modId);
+    const { context: modContext, page: modPage } = await openModLobby(browser, sessionId, modId, modToken);
     await modPage.locator('.start-button').click();
     await expect(modPage.locator('.active-game')).toBeVisible({ timeout: 30000 });
     await expect(modPage.locator('.ant-breadcrumb')).toContainText(`e2e-cat-${prefix}`, { timeout: 30000 });
@@ -1362,7 +1375,7 @@ test.describe('gameplay navigation, hot-edit, spectator & edge cases', () => {
     await expect(modPage.locator('.ant-breadcrumb')).toContainText(`e2e-cat-${prefix}`);
 
     await modContext.close();
-    await cleanup(request, seeded, { sessionId, modId });
+    await cleanup(request, seeded, { sessionId, modId, modToken });
   });
 
   // Ticket #184: a question with NO category must still be hot-editable —
@@ -1381,8 +1394,8 @@ test.describe('gameplay navigation, hot-edit, spectator & edge cases', () => {
     const gameId = (await res.json()).id;
     const seeded = { gameId, roundId, qids: [q1, q2] };
 
-    const { sessionId, modId } = await createSession(request, `e2e-session-${prefix}`, gameId);
-    const { context: modContext, page: modPage } = await openModLobby(browser, sessionId, modId);
+    const { sessionId, modId, modToken } = await createSession(request, `e2e-session-${prefix}`, gameId);
+    const { context: modContext, page: modPage } = await openModLobby(browser, sessionId, modId, modToken);
     await modPage.locator('.start-button').click();
     await expect(modPage.locator('.active-game')).toBeVisible({ timeout: 30000 });
 
@@ -1397,7 +1410,7 @@ test.describe('gameplay navigation, hot-edit, spectator & edge cases', () => {
     await expect(modPage.locator('.active-question-box')).toContainText(newQuestion, { timeout: 30000 });
 
     await modContext.close();
-    await cleanup(request, seeded, { sessionId, modId });
+    await cleanup(request, seeded, { sessionId, modId, modToken });
   });
 
   test('a spectator context (no player_id) sees the game without the answer/wager UI', async ({
@@ -1407,9 +1420,9 @@ test.describe('gameplay navigation, hot-edit, spectator & edge cases', () => {
     test.setTimeout(90000);
     const prefix = unique();
     const seeded = await seedStartableGame(request, prefix);
-    const { sessionId, modId } = await createSession(request, `e2e-session-${prefix}`, seeded.gameId);
+    const { sessionId, modId, modToken } = await createSession(request, `e2e-session-${prefix}`, seeded.gameId);
 
-    const { context: modContext, page: modPage } = await openModLobby(browser, sessionId, modId);
+    const { context: modContext, page: modPage } = await openModLobby(browser, sessionId, modId, modToken);
     await modPage.locator('.start-button').click();
     await expect(modPage.locator('.active-game')).toBeVisible({ timeout: 30000 });
 
@@ -1430,7 +1443,7 @@ test.describe('gameplay navigation, hot-edit, spectator & edge cases', () => {
 
     await specContext.close();
     await modContext.close();
-    await cleanup(request, seeded, { sessionId, modId });
+    await cleanup(request, seeded, { sessionId, modId, modToken });
   });
 
   test('a player answers the current question after the mod advanced, and cannot submit after scoring', async ({
@@ -1451,7 +1464,7 @@ test.describe('gameplay navigation, hot-edit, spectator & edge cases', () => {
 
     await answerQuestion(g.playerPage, 200, 'Late answer');
     await expect
-      .poll(async () => (await playerAnswers(request, g.sessionId, g.modId, g.playerId, 0, 1)).length)
+      .poll(async () => (await playerAnswers(request, g.sessionId, g.modId, g.modToken, g.playerId, 0, 1)).length)
       .toBe(1);
 
     // Score the question; wait for the player to observe it scored (green).
@@ -1468,7 +1481,7 @@ test.describe('gameplay navigation, hot-edit, spectator & edge cases', () => {
 
     await g.playerContext.close();
     await g.modContext.close();
-    await cleanup(request, g.seeded, { sessionId: g.sessionId, modId: g.modId, playerIds: [g.playerId] });
+    await cleanup(request, g.seeded, { sessionId: g.sessionId, modId: g.modId, modToken: g.modToken, playerIds: [g.playerId] });
   });
 
   test('scoring a multiple-choice question bolds the correct answer and marks ✅/❌ options', async ({
@@ -1478,8 +1491,8 @@ test.describe('gameplay navigation, hot-edit, spectator & edge cases', () => {
     test.setTimeout(90000);
     const prefix = unique();
     const seeded = await seedStartableMCGame(request, prefix);
-    const { sessionId, modId } = await createSession(request, `e2e-session-${prefix}`, seeded.gameId);
-    const { context: modContext, page: modPage } = await openModLobby(browser, sessionId, modId);
+    const { sessionId, modId, modToken } = await createSession(request, `e2e-session-${prefix}`, seeded.gameId);
+    const { context: modContext, page: modPage } = await openModLobby(browser, sessionId, modId, modToken);
     const { context: playerContext, page: playerPage, playerId } = await joinPlayer(
       browser,
       sessionId,
@@ -1508,7 +1521,7 @@ test.describe('gameplay navigation, hot-edit, spectator & edge cases', () => {
 
     // Wait for the player's answer to be recorded server-side.
     await expect
-      .poll(async () => (await playerAnswers(request, sessionId, modId, playerId, 0, 0)).length)
+      .poll(async () => (await playerAnswers(request, sessionId, modId, modToken, playerId, 0, 0)).length)
       .toBe(1);
 
     // Multiple choice is auto-scored by the backend, so the mod's scorer has
@@ -1540,7 +1553,7 @@ test.describe('gameplay navigation, hot-edit, spectator & edge cases', () => {
 
     await playerContext.close();
     await modContext.close();
-    await cleanup(request, seeded, { sessionId, modId, playerIds: [playerId] });
+    await cleanup(request, seeded, { sessionId, modId, modToken, playerIds: [playerId] });
   });
 
   test('bucketing: a player sorts items into buckets and the answer is auto-scored', async ({
@@ -1550,8 +1563,8 @@ test.describe('gameplay navigation, hot-edit, spectator & edge cases', () => {
     test.setTimeout(90000);
     const prefix = unique();
     const seeded = await seedStartableBucketingGame(request, prefix);
-    const { sessionId, modId } = await createSession(request, `e2e-session-${prefix}`, seeded.gameId);
-    const { context: modContext, page: modPage } = await openModLobby(browser, sessionId, modId);
+    const { sessionId, modId, modToken } = await createSession(request, `e2e-session-${prefix}`, seeded.gameId);
+    const { context: modContext, page: modPage } = await openModLobby(browser, sessionId, modId, modToken);
     const { context: playerContext, page: playerPage, playerId } = await joinPlayer(
       browser,
       sessionId,
@@ -1598,9 +1611,9 @@ test.describe('gameplay navigation, hot-edit, spectator & edge cases', () => {
 
     // The stored answer is the item -> bucket JSON map.
     await expect
-      .poll(async () => (await playerAnswers(request, sessionId, modId, playerId, 0, 0)).length)
+      .poll(async () => (await playerAnswers(request, sessionId, modId, modToken, playerId, 0, 0)).length)
       .toBe(1);
-    const submitted = (await playerAnswers(request, sessionId, modId, playerId, 0, 0))[0].answer;
+    const submitted = (await playerAnswers(request, sessionId, modId, modToken, playerId, 0, 0))[0].answer;
     expect(JSON.parse(submitted)).toEqual({ frog: 'Amphibian', lion: 'Mammal', human: 'Mammal' });
 
     // Bucketing is auto-scored by the backend, so the mod's scorer has no
@@ -1612,7 +1625,7 @@ test.describe('gameplay navigation, hot-edit, spectator & edge cases', () => {
     // The complete correct mapping scores.
     await expect
       .poll(async () => {
-        const answers = await playerAnswers(request, sessionId, modId, playerId, 0, 0);
+        const answers = await playerAnswers(request, sessionId, modId, modToken, playerId, 0, 0);
         return answers[answers.length - 1]?.correct;
       })
       .toBe(true);
@@ -1630,7 +1643,7 @@ test.describe('gameplay navigation, hot-edit, spectator & edge cases', () => {
 
     await playerContext.close();
     await modContext.close();
-    await cleanup(request, seeded, { sessionId, modId, playerIds: [playerId] });
+    await cleanup(request, seeded, { sessionId, modId, modToken, playerIds: [playerId] });
   });
 
   test('ordering: a player reorders the shuffled items and the answer posts as a JSON array', async ({
@@ -1640,9 +1653,9 @@ test.describe('gameplay navigation, hot-edit, spectator & edge cases', () => {
     test.setTimeout(90000);
     const prefix = unique();
     const seeded = await seedStartableOrderingGame(request, prefix);
-    const { sessionId, modId } = await createSession(request, `e2e-session-${prefix}`, seeded.gameId);
+    const { sessionId, modId, modToken } = await createSession(request, `e2e-session-${prefix}`, seeded.gameId);
 
-    const { context: modContext, page: modPage } = await openModLobby(browser, sessionId, modId);
+    const { context: modContext, page: modPage } = await openModLobby(browser, sessionId, modId, modToken);
     const { context: playerContext, page: playerPage, playerId } = await joinPlayer(
       browser,
       sessionId,
@@ -1682,9 +1695,9 @@ test.describe('gameplay navigation, hot-edit, spectator & edge cases', () => {
 
     // The stored answer is the player's final order as a JSON array.
     await expect
-      .poll(async () => (await playerAnswers(request, sessionId, modId, playerId, 0, 0)).length)
+      .poll(async () => (await playerAnswers(request, sessionId, modId, modToken, playerId, 0, 0)).length)
       .toBe(1);
-    const submitted = (await playerAnswers(request, sessionId, modId, playerId, 0, 0))[0].answer;
+    const submitted = (await playerAnswers(request, sessionId, modId, modToken, playerId, 0, 0))[0].answer;
     expect(JSON.parse(submitted)).toEqual(afterSwap);
 
     // Re-submitting updates the answer: move the last row up, then Update.
@@ -1696,23 +1709,23 @@ test.describe('gameplay navigation, hot-edit, spectator & edge cases', () => {
     await updateButton.click();
 
     await expect
-      .poll(async () => (await playerAnswers(request, sessionId, modId, playerId, 0, 0)).length)
+      .poll(async () => (await playerAnswers(request, sessionId, modId, modToken, playerId, 0, 0)).length)
       .toBe(2);
-    const updated = (await playerAnswers(request, sessionId, modId, playerId, 0, 0))[1].answer;
+    const updated = (await playerAnswers(request, sessionId, modId, modToken, playerId, 0, 0))[1].answer;
     expect(JSON.parse(updated)).toEqual(reordered);
 
     await playerContext.close();
     await modContext.close();
-    await cleanup(request, seeded, { sessionId, modId, playerIds: [playerId] });
+    await cleanup(request, seeded, { sessionId, modId, modToken, playerIds: [playerId] });
   });
 
   test('ordering: canonical, reversed and wrong orders auto-score correctly', async ({ browser, request }) => {
     test.setTimeout(120000);
     const prefix = unique();
     const seeded = await seedStartableOrderingGame(request, prefix);
-    const { sessionId, modId } = await createSession(request, `e2e-session-${prefix}`, seeded.gameId);
+    const { sessionId, modId, modToken } = await createSession(request, `e2e-session-${prefix}`, seeded.gameId);
 
-    const { context: modContext, page: modPage } = await openModLobby(browser, sessionId, modId);
+    const { context: modContext, page: modPage } = await openModLobby(browser, sessionId, modId, modToken);
     const p1 = await joinPlayer(browser, sessionId, `Team A ${prefix}`, `Player A ${prefix}`);
     const p2 = await joinPlayer(browser, sessionId, `Team B ${prefix}`, `Player B ${prefix}`);
     const p3 = await joinPlayer(browser, sessionId, `Team C ${prefix}`, `Player C ${prefix}`);
@@ -1735,9 +1748,9 @@ test.describe('gameplay navigation, hot-edit, spectator & edge cases', () => {
       await answerButton.click();
 
       await expect
-        .poll(async () => (await playerAnswers(request, sessionId, modId, player.playerId, 0, 0)).length)
+        .poll(async () => (await playerAnswers(request, sessionId, modId, modToken, player.playerId, 0, 0)).length)
         .toBe(1);
-      const stored = (await playerAnswers(request, sessionId, modId, player.playerId, 0, 0))[0].answer;
+      const stored = (await playerAnswers(request, sessionId, modId, modToken, player.playerId, 0, 0))[0].answer;
       expect(JSON.parse(stored)).toEqual(order);
     };
 
@@ -1757,7 +1770,7 @@ test.describe('gameplay navigation, hot-edit, spectator & edge cases', () => {
     // (models.Answer), so correctness is asserted via the awarded points:
     // canonical and reversed orders score their wager, a wrong order scores 0.
     const latestPoints = async (playerId: string) => {
-      const answers = await playerAnswers(request, sessionId, modId, playerId, 0, 0);
+      const answers = await playerAnswers(request, sessionId, modId, modToken, playerId, 0, 0);
       const latest = answers[answers.length - 1];
       return latest ? (latest.points_awarded ?? 0) : undefined;
     };
@@ -1774,7 +1787,7 @@ test.describe('gameplay navigation, hot-edit, spectator & edge cases', () => {
     await p2.context.close();
     await p3.context.close();
     await modContext.close();
-    await cleanup(request, seeded, { sessionId, modId, playerIds: [p1.playerId, p2.playerId, p3.playerId] });
+    await cleanup(request, seeded, { sessionId, modId, modToken, playerIds: [p1.playerId, p2.playerId, p3.playerId] });
   });
 
   test('ordering: mod sees a shuffled list pre-score, canonical post-score, and numbered scorer answers', async ({
@@ -1784,9 +1797,9 @@ test.describe('gameplay navigation, hot-edit, spectator & edge cases', () => {
     test.setTimeout(90000);
     const prefix = unique();
     const seeded = await seedStartableOrderingGame(request, prefix);
-    const { sessionId, modId } = await createSession(request, `e2e-session-${prefix}`, seeded.gameId);
+    const { sessionId, modId, modToken } = await createSession(request, `e2e-session-${prefix}`, seeded.gameId);
 
-    const { context: modContext, page: modPage } = await openModLobby(browser, sessionId, modId);
+    const { context: modContext, page: modPage } = await openModLobby(browser, sessionId, modId, modToken);
     const { context: playerContext, page: playerPage, playerId } = await joinPlayer(
       browser,
       sessionId,
@@ -1815,7 +1828,7 @@ test.describe('gameplay navigation, hot-edit, spectator & edge cases', () => {
     await expect(answerButton).toBeEnabled();
     await answerButton.click();
     await expect
-      .poll(async () => (await playerAnswers(request, sessionId, modId, playerId, 0, 0)).length)
+      .poll(async () => (await playerAnswers(request, sessionId, modId, modToken, playerId, 0, 0)).length)
       .toBe(1);
 
     // The mod's scorer renders the submitted JSON array as a numbered list,
@@ -1831,7 +1844,7 @@ test.describe('gameplay navigation, hot-edit, spectator & edge cases', () => {
     await expect(scoreButton).toBeEnabled({ timeout: 30000 });
     await scoreButton.click();
     await expect.poll(async () => {
-      const answers = await playerAnswers(request, sessionId, modId, playerId, 0, 0);
+      const answers = await playerAnswers(request, sessionId, modId, modToken, playerId, 0, 0);
       return answers[answers.length - 1]?.correct;
     }).toBe(true);
 
@@ -1841,6 +1854,6 @@ test.describe('gameplay navigation, hot-edit, spectator & edge cases', () => {
 
     await playerContext.close();
     await modContext.close();
-    await cleanup(request, seeded, { sessionId, modId, playerIds: [playerId] });
+    await cleanup(request, seeded, { sessionId, modId, modToken, playerIds: [playerId] });
   });
 });

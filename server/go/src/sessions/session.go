@@ -16,7 +16,7 @@ func (e *Env) GetAllSessions(c *gin.Context) {
 
 func (e *Env) GetOneSession(c *gin.Context) {
 	sessionId := c.Param("id")
-	playerId := c.Query("player_id")
+	playerId := common.GetPlayerId(c)
 
 	var session models.Session
 
@@ -57,12 +57,13 @@ func (e *Env) CreateSession(c *gin.Context) {
 		return
 	}
 
-	//create a Player record for this session's moderator
+	//create a Player record for this session's moderator; it carries the
+	//moderator's bearer credential, returned once in the response
 	var moderator models.Player
 	moderator.TeamName = "mod"
 	moderator.RealName = "mod"
 
-	moderatorId, _, err := common.Create((*common.Env)(e), common.PlayerTable, &moderator)
+	moderatorId, _, moderatorToken, err := common.CreatePlayerWithToken((*common.Env)(e), moderator)
 	if err != nil {
 		common.Respond(c, nil, err)
 		return
@@ -77,6 +78,8 @@ func (e *Env) CreateSession(c *gin.Context) {
 
 	session.ID = sessionId
 	session.CreateDate = createDate
+	// the moderator's bearer credential is returned exactly once, on create only
+	session.PlayerToken = moderatorToken
 
 	err = common.IncrementState((*common.Env)(e), sessionId)
 	common.Respond(c, session, err)
@@ -101,11 +104,9 @@ func (e *Env) UpdateSession(c *gin.Context) {
 		return
 	}
 
-	//only moderator can do updates on a session
-	if requestBody.Moderator != session.Moderator {
-		common.Respond(c, nil, UnauthorizedSessionActionError{SessionId: sessionId, ModeratorId: requestBody.Moderator})
-		return
-	}
+	//only moderator can do updates on a session — enforced by the AsMod
+	//middleware (the caller's server-verified player id must equal
+	//session.Moderator); the body's Moderator field is no longer trusted.
 
 	err = checkLegalSetFields(requestBody)
 	if err != nil {
@@ -124,7 +125,6 @@ func (e *Env) UpdateSession(c *gin.Context) {
 
 func (e *Env) DeleteSession(c *gin.Context) {
 	sessionId := c.Param("id")
-	moderatorId := c.Query("mod")
 
 	var existingSession models.Session
 	err := common.GetOne((*common.Env)(e), common.SessionTable, sessionId, &existingSession)
@@ -133,10 +133,8 @@ func (e *Env) DeleteSession(c *gin.Context) {
 		return
 	}
 
-	if models.PlayerId(moderatorId) != existingSession.Moderator {
-		common.Respond(c, existingSession, UnauthorizedSessionActionError{SessionId: sessionId, ModeratorId: models.PlayerId(moderatorId)})
-		return
-	}
+	// Moderator authorization is enforced by the AsMod middleware; the
+	// ?mod= query param is no longer trusted.
 
 	err = common.Delete((*common.Env)(e), common.SessionTable, sessionId)
 	common.Respond(c, existingSession, err)
@@ -160,11 +158,6 @@ func (e *Env) StartSession(c *gin.Context) {
 	err = common.GetOne((*common.Env)(e), common.SessionTable, sessionId, &existingSession)
 	if err != nil {
 		common.Respond(c, existingSession, err)
-		return
-	}
-
-	if models.PlayerId(requestBody.ModeratorId) != existingSession.Moderator {
-		common.Respond(c, existingSession, UnauthorizedSessionActionError{SessionId: sessionId, ModeratorId: models.PlayerId(requestBody.ModeratorId)})
 		return
 	}
 
@@ -263,7 +256,7 @@ func checkLegalSetFields(requestBody models.Session) error {
 
 func (e *Env) GetPlayersInSession(c *gin.Context) {
 	sessionId := c.Param("id")
-	callerPlayerId := c.Query("player_id")
+	callerPlayerId := common.GetPlayerId(c)
 
 	var session models.Session
 	err := common.GetOne((*common.Env)(e), common.SessionTable, sessionId, &session)
@@ -274,7 +267,9 @@ func (e *Env) GetPlayersInSession(c *gin.Context) {
 
 	players, err := getPlayersInSession(e, sessionId)
 
-	//strip playerIds if called by non-mod
+	//strip playerIds if called by non-mod; the caller's identity comes from
+	//the server-verified context, so a client can't widen disclosure by
+	//claiming to be the mod.
 	if models.PlayerId(callerPlayerId) != session.Moderator {
 		for i := range players {
 			if callerPlayerId != players[i].ID {

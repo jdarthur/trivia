@@ -6,6 +6,7 @@ import GameNames from "./GameNames"
 
 import {PlusSquareOutlined} from "@ant-design/icons";
 import PageHeader from "../common/PageHeader";
+import {setPlayerToken} from "../common/playerToken";
 
 interface Props {
     token: string
@@ -60,8 +61,13 @@ class NewGameModal extends React.Component<Props, State> {
                     console.log(data)
                     const game_id = data.id
                     const player_id = data.mod
+                    // Persist the moderator credential in sessionStorage and keep
+                    // player_id out of the URL (ticket #256): the URL carries
+                    // session_id only, matching the invite link.
+                    sessionStorage.setItem("player_id", player_id)
+                    setPlayerToken(data.player_token)
                     //this.props?.start_game(game_id)
-                    window.location.href = window.location.href.split("?")[0] + "?session_id=" + game_id + "&player_id=" + player_id
+                    window.location.href = window.location.href.split("?")[0] + "?session_id=" + game_id
                     //this.close()
                 })
                 .catch((error) => {

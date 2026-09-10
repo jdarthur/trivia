@@ -26,9 +26,11 @@ func (e *Env) CreatePlayer(c *gin.Context) {
 		return
 	}
 
-	playerId, createDate, err := common.Create((*common.Env)(e), common.PlayerTable, &data)
+	playerId, createDate, token, err := common.CreatePlayerWithToken((*common.Env)(e), data)
 	data.ID = playerId
 	data.CreateDate = createDate
+	// the bearer credential is returned exactly once, on create only
+	data.PlayerToken = token
 
 	common.Respond(c, data, err)
 }
@@ -88,9 +90,8 @@ func (e *Env) AddPlayerToSession(c *gin.Context) {
 }
 
 type RemoveFromSession struct {
-	PlayerId  string          `json:"player_id"`
-	AdminId   models.PlayerId `json:"admin_id"`
-	SessionId string          `json:"session_id"`
+	PlayerId  string `json:"player_id"`
+	SessionId string `json:"session_id"`
 }
 
 func (e *Env) RemovePlayerFromSession(c *gin.Context) {
@@ -113,11 +114,9 @@ func (e *Env) RemovePlayerFromSession(c *gin.Context) {
 		return
 	}
 
-	//return error if caller didn't pass the correct admin_id for this session
-	if requestBody.AdminId != session.Moderator {
-		common.Respond(c, requestBody, sessions.UnauthorizedSessionActionError{ModeratorId: requestBody.AdminId})
-		return
-	}
+	// Moderator authorization is enforced by the AsMod middleware (the caller's
+	// server-verified player id must equal session.Moderator); the body no
+	// longer carries an admin_id to trust.
 
 	err = common.Pull((*common.Env)(e), common.SessionTable, sessionId, models.Players, requestBody.PlayerId)
 	if err == nil {
@@ -127,15 +126,20 @@ func (e *Env) RemovePlayerFromSession(c *gin.Context) {
 }
 
 type LeaveSession struct {
-	PlayerId  models.PlayerId `json:"player_id"`
-	SessionId string          `json:"session_id"`
+	SessionId string `json:"session_id"`
 }
 
 // LeaveSession sets the caller's own session_player.active to 0 (self-leave).
 // No moderator is required. The membership row (and any score / answers) is
 // kept; the player just stops being scored and can no longer submit.
+//
+// The player being deactivated is the server-verified caller (common.WithPlayer
+// puts it in the context), never a player_id from the body — so a caller cannot
+// force another player out by posting their id.
 func (e *Env) LeaveSession(c *gin.Context) {
 	sessionId := c.Param("id")
+
+	playerId := models.PlayerId(common.GetPlayerId(c))
 
 	var requestBody LeaveSession
 	requestBody.SessionId = sessionId
@@ -153,12 +157,12 @@ func (e *Env) LeaveSession(c *gin.Context) {
 		return
 	}
 
-	if !playerInSession(e, sessionId, requestBody.PlayerId) {
-		common.Respond(c, requestBody, sessions.PlayerNotInSessionError{PlayerId: requestBody.PlayerId, SessionId: sessionId})
+	if !playerInSession(e, sessionId, playerId) {
+		common.Respond(c, requestBody, sessions.PlayerNotInSessionError{PlayerId: playerId, SessionId: sessionId})
 		return
 	}
 
-	err = deactivatePlayer(e, sessionId, requestBody.PlayerId)
+	err = deactivatePlayer(e, sessionId, playerId)
 	if err == nil {
 		err = common.IncrementState((*common.Env)(e), sessionId)
 	}
@@ -167,7 +171,6 @@ func (e *Env) LeaveSession(c *gin.Context) {
 
 type InactivatePlayer struct {
 	PlayerId  models.PlayerId `json:"player_id"`
-	AdminId   models.PlayerId `json:"admin_id"`
 	SessionId string          `json:"session_id"`
 }
 
@@ -193,11 +196,9 @@ func (e *Env) InactivatePlayer(c *gin.Context) {
 		return
 	}
 
-	// moderator-only action
-	if requestBody.AdminId != session.Moderator {
-		common.Respond(c, requestBody, sessions.UnauthorizedSessionActionError{ModeratorId: requestBody.AdminId})
-		return
-	}
+	// Moderator authorization is enforced by the AsMod middleware (the caller's
+	// server-verified player id must equal session.Moderator); the body no
+	// longer carries an admin_id to trust.
 
 	if !playerInSession(e, sessionId, requestBody.PlayerId) {
 		common.Respond(c, requestBody, sessions.PlayerNotInSessionError{PlayerId: requestBody.PlayerId, SessionId: sessionId})

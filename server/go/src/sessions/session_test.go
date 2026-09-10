@@ -65,6 +65,13 @@ func createPlayer(t *testing.T, env *Env, teamName string) models.PlayerId {
 	return models.PlayerId(id)
 }
 
+// setPlayer marks the gin context's caller as player — the same value
+// common.WithPlayer would set from the token header. Direct-handler tests use
+// this to authenticate the caller the way production middleware does.
+func setPlayer(c *gin.Context, player models.PlayerId) {
+	c.Set(common.PLAYER_ID, string(player))
+}
+
 // newScoredFixture builds a session with one round of two questions (wagers
 // 100 and 200), two players, the (0,0) snapshot set, and one answer per
 // player for question 0 (player 1 wagers 100, player 2 wagers 200).
@@ -927,7 +934,8 @@ func TestStartSessionPersistsCurrentQuestion(t *testing.T) {
 	c, _ = gin.CreateTestContext(rec)
 	c.Params = gin.Params{{Key: "id", Value: created.ID}}
 	c.Request = httptest.NewRequest(http.MethodGet,
-		"/gameplay/session/"+created.ID+"/current-question?player_id="+created.Mod, nil)
+		"/gameplay/session/"+created.ID+"/current-question", nil)
+	setPlayer(c, models.PlayerId(created.Mod))
 	env.GetCurrentQuestion(c)
 	var q struct {
 		Question string `json:"question"`
@@ -1025,6 +1033,7 @@ func TestAnswerRejectsInactivePlayer(t *testing.T) {
 	}
 	c.Request = httptest.NewRequest(http.MethodPost, "/gameplay/session/"+session.ID+"/answer", bytes.NewReader(body))
 	c.Request.Header.Set("Content-Type", "application/json")
+	setPlayer(c, p1)
 
 	env.AnswerQuestion(c)
 
@@ -1078,6 +1087,7 @@ func TestAnswerRejectsNonOneToOneMatching(t *testing.T) {
 		}
 		c.Request = httptest.NewRequest(http.MethodPost, "/gameplay/session/"+session.ID+"/answer", bytes.NewReader(body))
 		c.Request.Header.Set("Content-Type", "application/json")
+		setPlayer(c, p1)
 		env.AnswerQuestion(c)
 		return recorder
 	}
@@ -1442,7 +1452,8 @@ func TestStructuredPlayerView(t *testing.T) {
 	c, _ := gin.CreateTestContext(recorder)
 	c.Params = gin.Params{{Key: "id", Value: session.ID}}
 	c.Request = httptest.NewRequest(http.MethodGet,
-		"/gameplay/session/"+session.ID+"/current-question?player_id="+string(p1), nil)
+		"/gameplay/session/"+session.ID+"/current-question", nil)
+	setPlayer(c, p1)
 	env.GetCurrentQuestion(c)
 	var q models.QuestionInRound
 	if err := json.Unmarshal(recorder.Body.Bytes(), &q); err != nil {
@@ -1462,7 +1473,8 @@ func TestStructuredPlayerView(t *testing.T) {
 	c, _ = gin.CreateTestContext(recorder)
 	c.Params = gin.Params{{Key: "id", Value: session2.ID}}
 	c.Request = httptest.NewRequest(http.MethodGet,
-		"/gameplay/session/"+session2.ID+"/current-question?player_id="+string(p2), nil)
+		"/gameplay/session/"+session2.ID+"/current-question", nil)
+	setPlayer(c, p2)
 	env.GetCurrentQuestion(c)
 	if err := json.Unmarshal(recorder.Body.Bytes(), &q); err != nil {
 		t.Fatalf("bad current-question response %q: %v", recorder.Body.String(), err)
@@ -1487,7 +1499,8 @@ func TestStructuredPlayerView(t *testing.T) {
 	c, _ = gin.CreateTestContext(recorder)
 	c.Params = gin.Params{{Key: "id", Value: session3.ID}}
 	c.Request = httptest.NewRequest(http.MethodGet,
-		"/gameplay/session/"+session3.ID+"/current-question?player_id="+string(p3), nil)
+		"/gameplay/session/"+session3.ID+"/current-question", nil)
+	setPlayer(c, p3)
 	env.GetCurrentQuestion(c)
 	if err := json.Unmarshal(recorder.Body.Bytes(), &q); err != nil {
 		t.Fatalf("bad current-question response %q: %v", recorder.Body.String(), err)
@@ -1508,7 +1521,8 @@ func TestStructuredPlayerView(t *testing.T) {
 	c, _ = gin.CreateTestContext(recorder)
 	c.Params = gin.Params{{Key: "id", Value: session3.ID}}
 	c.Request = httptest.NewRequest(http.MethodGet,
-		"/gameplay/session/"+session3.ID+"/current-question?player_id="+string(session3.Moderator), nil)
+		"/gameplay/session/"+session3.ID+"/current-question", nil)
+	setPlayer(c, session3.Moderator)
 	env.GetCurrentQuestion(c)
 	if err := json.Unmarshal(recorder.Body.Bytes(), &q); err != nil {
 		t.Fatalf("bad current-question response %q: %v", recorder.Body.String(), err)
@@ -1546,7 +1560,8 @@ func TestMatchingRightsShuffledForPlayers(t *testing.T) {
 		c, _ := gin.CreateTestContext(recorder)
 		c.Params = gin.Params{{Key: "id", Value: session.ID}}
 		c.Request = httptest.NewRequest(http.MethodGet,
-			"/gameplay/session/"+session.ID+"/current-question?player_id="+string(player), nil)
+			"/gameplay/session/"+session.ID+"/current-question", nil)
+		setPlayer(c, player)
 		env.GetCurrentQuestion(c)
 		var q models.QuestionInRound
 		if err := json.Unmarshal(recorder.Body.Bytes(), &q); err != nil {
@@ -1632,6 +1647,7 @@ func TestAnswerRejectsInvalidBucketing(t *testing.T) {
 		}
 		c.Request = httptest.NewRequest(http.MethodPost, "/gameplay/session/"+session.ID+"/answer", bytes.NewReader(body))
 		c.Request.Header.Set("Content-Type", "application/json")
+		setPlayer(c, p1)
 		env.AnswerQuestion(c)
 		return recorder
 	}
@@ -1705,6 +1721,7 @@ func TestAnswerRejectsInvalidOrdering(t *testing.T) {
 		}
 		c.Request = httptest.NewRequest(http.MethodPost, "/gameplay/session/"+session.ID+"/answer", bytes.NewReader(body))
 		c.Request.Header.Set("Content-Type", "application/json")
+		setPlayer(c, p1)
 		env.AnswerQuestion(c)
 		return recorder
 	}
@@ -1886,7 +1903,8 @@ func TestBucketsShuffledForPlayers(t *testing.T) {
 		c, _ := gin.CreateTestContext(recorder)
 		c.Params = gin.Params{{Key: "id", Value: session.ID}}
 		c.Request = httptest.NewRequest(http.MethodGet,
-			"/gameplay/session/"+session.ID+"/current-question?player_id="+string(player), nil)
+			"/gameplay/session/"+session.ID+"/current-question", nil)
+		setPlayer(c, player)
 		env.GetCurrentQuestion(c)
 		var q models.QuestionInRound
 		if err := json.Unmarshal(recorder.Body.Bytes(), &q); err != nil {
@@ -1968,7 +1986,8 @@ func TestOrderedShuffledForPlayers(t *testing.T) {
 		c, _ := gin.CreateTestContext(recorder)
 		c.Params = gin.Params{{Key: "id", Value: session.ID}}
 		c.Request = httptest.NewRequest(http.MethodGet,
-			"/gameplay/session/"+session.ID+"/current-question?player_id="+string(player), nil)
+			"/gameplay/session/"+session.ID+"/current-question", nil)
+		setPlayer(c, player)
 		env.GetCurrentQuestion(c)
 		var q models.QuestionInRound
 		if err := json.Unmarshal(recorder.Body.Bytes(), &q); err != nil {

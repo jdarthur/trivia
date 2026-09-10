@@ -1,5 +1,6 @@
 import React from 'react';
 import '../question/Question.css';
+import {getPlayerToken} from "../common/playerToken";
 
 interface Props {
     round_index: number | string
@@ -69,10 +70,10 @@ class HotEditRoundName extends React.Component<Props, State> {
 }
 
 async function save(session_id: string, player_id: string, body: any): Promise<any> {
-    const url = "/gameplay/session/" + session_id + "/hot-edit-round-name?player_id=" + player_id
+    const url = "/gameplay/session/" + session_id + "/hot-edit-round-name"
     const response = await fetch(url, {
         method: "PUT",
-        headers: {'Content-Type': 'application/json'},
+        headers: {'Content-Type': 'application/json', 'borttrivia-player-token': getPlayerToken()},
         body: JSON.stringify(body)
     })
     return response.json()

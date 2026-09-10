@@ -3,6 +3,7 @@ import './Lobby.css';
 
 import OtherPlayer from "./OtherPlayer"
 import { Empty } from "antd"
+import {getPlayerToken} from "../common/playerToken"
 
 interface Props {
   player_id: string
@@ -42,8 +43,8 @@ class OtherPlayers extends React.Component<Props, State> {
   get_players = () => {
     this.fetchCounter += 1
     const currentFetch = this.fetchCounter
-    let url = "/gameplay/session/" + this.props.session_id + "/players?player_id=" + this.props.player_id
-    fetch(url)
+    let url = "/gameplay/session/" + this.props.session_id + "/players"
+    fetch(url, {headers: {'borttrivia-player-token': getPlayerToken()}})
       .then(response => {
         if (!response.ok) {
           throw new Error(`Request failed (${response.status} ${response.statusText})`)

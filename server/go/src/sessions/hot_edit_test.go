@@ -329,9 +329,12 @@ func TestAsModRejectsWrongModerator(t *testing.T) {
 		c.JSON(http.StatusOK, gin.H{"ok": true})
 	}
 
-	// Seed the session in the context the way WithValidSession would.
+	// Seed the session in the context the way WithValidSession would, and the
+	// caller the way common.WithPlayer would (AsMod reads the context player,
+	// never a body/query id).
 	withSession := func(c *gin.Context) {
 		c.Set("session", session)
+		c.Set(common.PLAYER_ID, "wrong")
 		c.Next()
 	}
 
@@ -339,7 +342,7 @@ func TestAsModRejectsWrongModerator(t *testing.T) {
 	r.PUT("/gameplay/session/:id/hot-edit-question", withSession, env.AsMod, protected)
 
 	recorder := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPut, "/gameplay/session/s1/hot-edit-question?player_id=wrong", nil)
+	req := httptest.NewRequest(http.MethodPut, "/gameplay/session/s1/hot-edit-question", nil)
 	r.ServeHTTP(recorder, req)
 
 	if protectedRan {
@@ -365,6 +368,7 @@ func TestAsModAllowsCorrectModerator(t *testing.T) {
 
 	withSession := func(c *gin.Context) {
 		c.Set("session", session)
+		c.Set(common.PLAYER_ID, "mod")
 		c.Next()
 	}
 
@@ -372,7 +376,7 @@ func TestAsModAllowsCorrectModerator(t *testing.T) {
 	r.PUT("/gameplay/session/:id/hot-edit-question", withSession, env.AsMod, protected)
 
 	recorder := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPut, "/gameplay/session/s1/hot-edit-question?player_id=mod", nil)
+	req := httptest.NewRequest(http.MethodPut, "/gameplay/session/s1/hot-edit-question", nil)
 	r.ServeHTTP(recorder, req)
 
 	if !protectedRan {

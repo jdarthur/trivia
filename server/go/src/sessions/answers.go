@@ -22,6 +22,11 @@ func (e *Env) AnswerQuestion(c *gin.Context) {
 		return
 	}
 
+	// The actor is the server-verified caller, never the body's player_id — so
+	// a caller cannot submit or overwrite an answer (or choose a wager /
+	// moneyball) on behalf of another player.
+	answer.PlayerId = models.PlayerId(common.GetPlayerId(c))
+
 	if answer.Correct == true {
 		common.Respond(c, nil, models.AttemptedToSetError{IllegalField: models.Correct, Value: answer.Correct})
 		return
@@ -223,7 +228,7 @@ func validateOrderingAnswer(question models.QuestionInRound, answer string) erro
 
 func (e *Env) GetWagers(c *gin.Context) {
 	sessionId := c.Param("id")
-	playerId := c.Query("player_id")
+	playerId := common.GetPlayerId(c)
 	r := c.Query("round_id")
 
 	roundIndex, err := strconv.Atoi(r)
@@ -293,7 +298,7 @@ func (e *Env) GetAnswers(c *gin.Context) {
 
 func getAnswers(e *Env, c *gin.Context) (interface{}, error) {
 	sessionId := c.Param("id")
-	callerPlayerId := c.Query("player_id")
+	callerPlayerId := common.GetPlayerId(c)
 	roundIndex, questionIndex, err := parseRoundAndQuestion(c)
 	if err != nil {
 		return nil, err
