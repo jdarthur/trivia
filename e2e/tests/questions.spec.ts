@@ -22,6 +22,17 @@ async function createCategory(page: Page, name: string) {
   await expect(page.locator('.question-list')).toBeVisible();
 }
 
+// Narrow the list to rows whose text matches `text` via the filter bar. The
+// questions list is ordered oldest-first, so a freshly-created question (and
+// any question created by an earlier test) can sit on a later page; searching
+// brings the row we care about onto page 1 regardless of how many rows
+// accumulated.
+async function search(page: Page, text: string) {
+  const input = page.locator('.filter_holder input[placeholder="Search"]');
+  await input.fill(text);
+  await input.press('Enter');
+}
+
 // Open the "Add question" modal, walk the three-step flow, save, and wait for
 // the new row to appear in the list. (Ticket #166: multi-step form.) When a
 // category name is given, create it first and select it on step 1 (Basic
@@ -51,6 +62,7 @@ async function createQuestion(page: Page, question: string, answer: string, cate
   // Step 3: Preview — submit.
   await modal.getByRole('button', { name: 'Add', exact: true }).click();
   await expect(modal).toBeHidden();
+  await search(page, question);
   await expect(page.locator('.ant-table-tbody tr').filter({ hasText: question })).toBeVisible();
 }
 
@@ -108,6 +120,9 @@ editorTest.describe('questions CRUD', () => {
     await modal.getByRole('button', { name: 'Update', exact: true }).click();
     await expect(modal).toBeHidden();
 
+    // The question text changed, so re-search for the new text before asserting
+    // the row (the filter still holds the old text).
+    await search(editorPage, updated);
     await expect(editorPage.locator('.ant-table-tbody tr').filter({ hasText: updated })).toContainText(updated);
 
     await deleteQuestion(editorPage, updated);
@@ -339,7 +354,9 @@ editorTest.describe('ordering question type (ticket #213)', () => {
     await expect(modal).toBeHidden();
 
     // The list row shows the question and the derived answer (the ordered
-    // items, one per line).
+    // items, one per line). Search first: the list is oldest-first and paged,
+    // so the new row may not be on page 1.
+    await search(editorPage, question);
     const row = editorPage.locator('.ant-table-tbody tr').filter({ hasText: question });
     await expect(row).toBeVisible();
     await expect(row).toContainText('First');
@@ -457,6 +474,9 @@ editorTest.describe('bucketing question type (ticket #164)', () => {
     await modal.getByRole('button', { name: 'Add', exact: true }).click();
     await expect(modal).toBeHidden();
 
+    // Search first: the list is oldest-first and paged, so the new row may not
+    // be on page 1.
+    await search(editorPage, question);
     const row = editorPage.locator('.ant-table-tbody tr').filter({ hasText: question });
     await expect(row).toBeVisible();
 
