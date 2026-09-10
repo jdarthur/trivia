@@ -3,6 +3,7 @@ import './Question.css';
 
 import {CodeOutlined, PictureOutlined, SoundOutlined, UnorderedListOutlined} from '@ant-design/icons';
 import {Tooltip} from "antd";
+import {store} from "../api/store";
 
 interface Props {
     wrap: (text: string) => void
@@ -124,9 +125,11 @@ class EditorToolbar extends React.Component<Props> {
 async function uploadFile(file: File): Promise<any> {
     const formData = new FormData()
     formData.append("file", file)
+    const token = store.getState().auth.token
     const response = await fetch("/editor/file", {
         method: "POST",
-        body: formData
+        body: formData,
+        headers: token ? {"borttrivia-token": token} : {}
     })
 
     return response.json()

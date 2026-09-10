@@ -79,8 +79,24 @@ func clientHandler(root, index string) gin.HandlerFunc {
 			return
 		}
 
+		// A path that names a file (has an extension) but is not a real file is
+		// a 404, not a client-side route. This is what keeps bot and scraper
+		// probes like /phpunit/.../eval-stdin.php from answering 200 with the
+		// index page. Client routes never contain a file extension, so the
+		// index fallback below stays limited to extension-less deep links.
+		if hasFileExtension(c.Request.URL.Path) {
+			c.Status(http.StatusNotFound)
+			return
+		}
+
 		c.File(index)
 	}
+}
+
+// hasFileExtension reports whether the final segment of path looks like it
+// names a file, i.e. carries an extension after a dot.
+func hasFileExtension(urlPath string) bool {
+	return path.Ext(urlPath) != ""
 }
 
 // resolve maps a request path onto a regular file inside root, reporting false
