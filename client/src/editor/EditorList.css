@@ -8,6 +8,25 @@
     align-items: flex-start;
     margin: 5px;
     flex: 1 1 auto;
+    min-height: 0;
+}
+
+/* The list pages render their table through LoadingOrView, which wraps it in a
+   page-specific class (question-list / round_list / category-list). Those
+   wrappers default to a row flex layout, which gives the table no bounded
+   height — a tall table would push the pager off the bottom of the viewport.
+   When a wrapper contains a table_and_pager, let it hand the height down so the
+   table body scrolls and the pager stays visible (ticket #196). Scoped with
+   :has() so GameList / CollectionList (cards, no table) are unaffected. */
+.question-list:has(.table_and_pager),
+.round_list:has(.table_and_pager),
+.category-list:has(.table_and_pager) {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-height: 0;
+    align-items: stretch;
+    overflow: hidden;
 }
 
 /* Container for a table plus its ListPagination. The width cap keeps sparse
@@ -18,11 +37,32 @@
 .table_and_pager {
     max-width: 1200px;
     width: 100%;
+    /* Fill the remaining viewport height so the table body can scroll and the
+       pager always stays visible below it (ticket #196). The flex chain from
+       the page's .ql_and_filter gives this a bounded height; without it a page
+       full of rows would push the pager past the bottom of the viewport with
+       no way to reach the controls. */
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-height: 0;
 }
 
-/* The pager under a table: right-aligned by default, like antd tables. */
+/* The table scrolls inside the container; the pager sits below it, always
+   reachable. antd's Table needs its own wrapper to constrain the height, so we
+   let the whole table overflow rather than only the body (the sticky header
+   keeps column titles visible while rows scroll). */
+.table_and_pager .ant-table-wrapper {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: auto;
+}
+
+/* The pager under a table: right-aligned by default, like antd tables. It must
+   not shrink, so it stays visible even when the table above overflows. */
 .list-pagination {
     display: flex;
     justify-content: flex-end;
     padding: 10px 5px;
+    flex-shrink: 0;
 }

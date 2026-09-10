@@ -35,7 +35,7 @@ export default function CategoryList(props: Props) {
     const [modalOpen, setModalOpen] = useState(false)
     const [editing, setEditing] = useState<Category | null>(null)
 
-    const filters = useListFilters({page_size: 25})
+    const filters = useListFilters()
     const {data, isLoading} = useGetCategoriesQuery(filters.query)
     const categories = data?.categories
     useClampToFirstPage(data, filters.page, filters.setPage)

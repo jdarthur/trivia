@@ -32,7 +32,7 @@ export default function RoundList(props: Props) {
     const [modalOpen, setModalOpen] = useState(false)
     const [editing, setEditing] = useState<Round | null>(null)
 
-    const filters = useListFilters({unused_only: true, page_size: 25})
+    const filters = useListFilters({unused_only: true})
     const {data, isLoading} = useGetRoundsQuery(filters.query)
     const rounds = data?.rounds
     useClampToFirstPage(data, filters.page, filters.setPage)
