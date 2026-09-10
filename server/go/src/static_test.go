@@ -87,15 +87,40 @@ func TestServeClientServesRealFiles(t *testing.T) {
 func TestServeClientFallsBackToIndex(t *testing.T) {
 	router := testRouter(t, clientDir(t))
 
-	// The deep links react-router owns, plus the bare root, plus a path that
-	// looks like an asset but is not one.
-	for _, target := range []string{"/", "/game/abc", "/collections", "/assets", "/assets/missing.js"} {
+	// The deep links react-router owns, plus the bare root. Client routes never
+	// carry a file extension, so these all get the index.
+	for _, target := range []string{"/", "/game/abc", "/collections", "/assets"} {
 		w := get(t, router, http.MethodGet, target)
 		if w.Code != http.StatusOK {
 			t.Errorf("GET %s: status = %d, want 200", target, w.Code)
 		}
 		if w.Body.String() != "<!doctype html>index" {
 			t.Errorf("GET %s: body = %q, want the index", target, w.Body.String())
+		}
+	}
+}
+
+func TestServeClientRejectsFileLikePaths(t *testing.T) {
+	router := testRouter(t, clientDir(t))
+
+	// A path that looks like it names a file (it has an extension) but is not a
+	// real file is a 404, not a client-side route. Without this, bot and
+	// scraper probes like the phpunit eval-stdin.php ones answer 200 with the
+	// index page. Missing real assets (e.g. a stale hashed bundle) are also 404
+	// rather than being answered with HTML.
+	for _, target := range []string{
+		"/assets/missing.js",
+		"/phpunit/phpunit/Util/PHP/eval-stdin.php",
+		"/lib/phpunit/phpunit/src/Util/PHP/eval-stdin.php",
+		"/wp-config.php",
+		"/.env",
+	} {
+		w := get(t, router, http.MethodGet, target)
+		if w.Code != http.StatusNotFound {
+			t.Errorf("GET %s: status = %d, want 404", target, w.Code)
+		}
+		if w.Body.String() != "404 page not found" {
+			t.Errorf("GET %s: body = %q, want gin's default 404", target, w.Body.String())
 		}
 	}
 }

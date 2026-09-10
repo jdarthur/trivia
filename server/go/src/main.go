@@ -97,7 +97,7 @@ func main() {
 	router.POST("/editor/question", auth.AsUser, q.CreateQuestion)
 	router.PUT("/editor/question/:id", auth.AsUser, q.UpdateQuestion)
 	router.DELETE("/editor/question/:id", auth.AsUser, q.DeleteQuestion)
-	router.POST("/editor/file", q.UploadFile)
+	router.POST("/editor/file", auth.AsUser, q.UploadFile)
 
 	fmt.Println("\nRounds API:")
 	r := rounds.Env{Db: db}
