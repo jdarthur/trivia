@@ -1,5 +1,5 @@
 import React, {useState} from 'react';
-import {Table, Tag} from "antd";
+import {Table} from "antd";
 import {EditOutlined, OrderedListOutlined} from '@ant-design/icons';
 import LoadingOrView from "../editor/LoadingOrView";
 import NewButton from "../editor/NewButton";
@@ -7,8 +7,9 @@ import DeleteConfirm from "../editor/DeleteConfirm";
 import EditorFilter from "../editor/EditorFilter";
 import ListPagination from "../editor/ListPagination";
 import PageHeader from "../common/PageHeader";
+import QuestionsPreview from "../common/QuestionsPreview";
 import RoundModal from "./RoundModal";
-import {useDeleteRoundMutation, useGetRoundsQuery} from "../api/main";
+import {useAllQuestions, useDeleteRoundMutation, useGetRoundsQuery} from "../api/main";
 import {useClampToFirstPage, useListFilters} from "../editor/useListFilters";
 import '../editor/EditorList.css';
 import notify, {errorMessage} from "../common/notify";
@@ -36,6 +37,8 @@ export default function RoundList(props: Props) {
     const {data, isLoading} = useGetRoundsQuery(filters.query)
     const rounds = data?.rounds
     useClampToFirstPage(data, filters.page, filters.setPage)
+
+    const {data: allQuestions} = useAllQuestions()
 
     const [deleteRound] = useDeleteRoundMutation()
 
@@ -71,9 +74,13 @@ export default function RoundList(props: Props) {
         return values.length > 0 ? values.join(", ") : "—"
     }
 
-    const questions_tag = (text: any, round: Round) => <Tag color={round.questions?.length ? "blue" : undefined}>
-            {round.questions?.length === 1 ? "1 question" : `${round.questions?.length || 0} questions`}
-        </Tag>
+    // The clickable Tag (ticket #272) opens a popover of abbreviated question/
+    // answer previews, resolved from the full question list by the round's
+    // question IDs.
+    const questions_tag = (text: any, round: Round) => {
+        const questions = (allQuestions || []).filter(q => round.questions?.includes(q.id))
+        return <QuestionsPreview questions={questions} count={round.questions?.length || 0}/>
+    }
 
     const columns = [
         {title: "", render: delete_edit, width: '5em'},
