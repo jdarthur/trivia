@@ -26,6 +26,7 @@ func main() {
 	// (which hard-fails offline), and accepts unsigned mock JWTs. It is never
 	// turned on silently via the environment.
 	devMode := flag.Bool("dev-mode", false, "run against a transient SQLite DB with seeded mock users and no Auth0 verification")
+	slowMode := flag.Bool("slow-mode", false, "add ~200-1000ms of artificial latency to each API call, for local performance/UX testing")
 	addr := flag.String("addr", ":8080", "address to listen on (host:port), e.g. 127.0.0.1:8080")
 	tlsCert := flag.String("tls-cert", "", "path to an x509 TLS certificate file (PEM). When set, the server listens on HTTPS and --tls-key must also be set")
 	tlsKey := flag.String("tls-key", "", "path to the TLS private key file (PEM) matching --tls-cert. When set, --tls-cert must also be set")
@@ -86,6 +87,9 @@ func main() {
 	_ = os.Mkdir(imageDir, os.ModeDir)
 
 	router := gin.Default()
+	if *slowMode {
+		router.Use(common.SlowMode)
+	}
 	router.Static("/images", imageDir)
 
 	auth := common.Env{Db: db}
