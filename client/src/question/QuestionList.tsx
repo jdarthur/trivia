@@ -1,4 +1,4 @@
-import React, {useState} from 'react';
+import React, {useEffect, useState} from 'react';
 import './QuestionList.css';
 import '../editor/EditorList.css';
 
@@ -9,10 +9,11 @@ import EditQuestionController from './EditQuestionController';
 import NewButton from "../editor/NewButton"
 
 import {Table} from "antd"
+import {useSearchParams} from "react-router";
 
 import {EditOutlined, ReadOutlined} from '@ant-design/icons';
 import PageHeader from "../common/PageHeader";
-import {useDeleteQuestionMutation, useGetQuestionsQuery} from "../api/main";
+import {useDeleteQuestionMutation, useGetQuestionsQuery, useGetOneQuestionQuery} from "../api/main";
 import {useClampToFirstPage, useListFilters} from "../editor/useListFilters";
 import ListPagination from "../editor/ListPagination";
 import notify, {errorMessage} from "../common/notify";
@@ -27,6 +28,32 @@ export default function QuestionList(props: Props) {
 
     const [showModal, setShowModal] = useState(false)
     const [selected, setSelected] = useState<Partial<Question>>({})
+
+    // Ticket #274: a `?question=<id>` query param deep-links into the question
+    // editor (e.g. from the Categories page Popover). On load, if the param is
+    // present and resolves to a real question, open the form pre-filled — the
+    // same as clicking edit on that row. An invalid/empty ID leaves the page in
+    // its normal state.
+    const [params, setParams] = useSearchParams()
+    const questionId = params.get("question") || ""
+    const {data: linkedQuestion} = useGetOneQuestionQuery(questionId, {skip: !questionId})
+
+    const openLinkedQuestion = () => {
+        if (linkedQuestion) {
+            setSelected(linkedQuestion)
+            setShowModal(true)
+        }
+        // Drop the param once consumed so a reload doesn't re-open the modal.
+        setParams({}, {replace: true})
+    }
+
+    // Fetch the linked question before deciding whether to open the form, so
+    // we only auto-open for a valid ID.
+    useEffect(() => {
+        if (questionId && linkedQuestion) {
+            openLinkedQuestion()
+        }
+    }, [questionId, linkedQuestion])
 
     // Filter + pagination state (ticket #196): the server filters and slices the
     // list, so `questions` is one page and `meta.total` counts the whole
