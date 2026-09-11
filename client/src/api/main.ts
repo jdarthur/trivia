@@ -96,6 +96,11 @@ export const mainApi = createApi({
             }),
             providesTags: ["questions"]
         }),
+        getOneQuestion: builder.query<Question, string>({
+            query: (id) => ({
+                url: `editor/question/${id}`,
+            }),
+        }),
         createQuestion: builder.mutation<Question, Partial<Question>>({
             query: (body) => ({
                 url: `editor/question`,
@@ -224,6 +229,7 @@ export const {
     useDeleteCollectionMutation,
     useImportCollectionMutation,
     useGetQuestionsQuery,
+    useGetOneQuestionQuery,
     useCreateQuestionMutation,
     useUpdateQuestionMutation,
     useDeleteQuestionMutation,

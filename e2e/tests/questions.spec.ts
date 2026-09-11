@@ -1,6 +1,29 @@
 import { expect } from '@playwright/test';
 import { editorTest } from '../fixtures/editor';
 import type { Page } from '@playwright/test';
+import type { APIRequestContext } from '@playwright/test';
+
+// Rebuild the dev-mode mock JWT (see client/src/common/mockUser.ts) so tests can
+// call the editor API directly, e.g. to resolve a question's ID for a deep link.
+function mockToken(name: string): string {
+  const b64url = (obj: unknown) => Buffer.from(JSON.stringify(obj))
+    .toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  const header = b64url({ alg: 'none', typ: 'JWT' });
+  const payload = b64url({ sub: `dev|${name}`, exp: Math.floor(Date.now() / 1000) + 60 * 60 });
+  return `${header}.${payload}.`;
+}
+
+// Fetch a question's ID by matching its text, via the editor API.
+async function questionIdByText(request: APIRequestContext, text: string): Promise<string> {
+  const res = await request.get('/editor/questions', {
+    headers: { 'borttrivia-token': mockToken('alice') },
+  });
+  expect(res.ok()).toBeTruthy();
+  const body = await res.json();
+  const q = body.questions.find((q: { question: string }) => q.question === text);
+  expect(q, `expected a question with text "${text}"`).toBeTruthy();
+  return q.id;
+}
 
 // A unique-ish suffix keeps every test's data distinct from anything left in
 // the shared dev DB, so tests don't collide with each other or with leftovers.
@@ -481,5 +504,44 @@ editorTest.describe('bucketing question type (ticket #164)', () => {
     await expect(row).toBeVisible();
 
     await deleteQuestion(editorPage, question);
+  });
+});
+
+// Ticket #274: a `?question=<id>` query param deep-links into the question
+// editor. On load, a valid ID auto-opens the form pre-filled (same as clicking
+// edit on that row); an invalid/empty ID leaves the page in its normal state.
+editorTest.describe('question deep link (ticket #274)', () => {
+  editorTest('opens the editor pre-filled via ?question=<id>', async ({ editorPage, request }) => {
+    const question = `Deep link ${unique()}`;
+    await createQuestion(editorPage, question, 'Deep answer');
+
+    const id = await questionIdByText(request, question);
+
+    // Navigate to the deep link. The param is consumed on load and dropped from
+    // the URL once the modal opens.
+    await editorPage.goto(`/questions?question=${id}&mockUser=alice`);
+    const modal = editorPage.locator('.ant-modal:has(.ant-modal-title)');
+    await expect(modal).toBeVisible();
+    await expect(modal.locator('.ant-modal-title')).toHaveText('Edit question');
+
+    // Editing an existing question opens on step 2 (Question editor) with the
+    // text pre-filled.
+    await expect(modal.locator('#question')).toBeVisible();
+    await expect(modal.locator('#question')).toHaveValue(question);
+    await expect(modal.locator('#answer')).toHaveValue('Deep answer');
+
+    // The param is dropped so a reload doesn't re-open the modal.
+    await expect(editorPage).not.toHaveURL(/question=/);
+
+    await modal.locator('.ant-modal-close').click();
+    await expect(modal).toBeHidden();
+    await search(editorPage, question);
+    await deleteQuestion(editorPage, question);
+  });
+
+  editorTest('an invalid ?question=<id> does not open the editor', async ({ editorPage }) => {
+    await editorPage.goto('/questions?question=not-a-real-id&mockUser=alice');
+    await expect(editorPage.locator('.question-list')).toBeVisible();
+    await expect(editorPage.locator('.ant-modal:has(.ant-modal-title)')).toBeHidden();
   });
 });
