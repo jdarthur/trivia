@@ -1,5 +1,5 @@
 import React, {useState} from 'react';
-import {Table} from "antd";
+import {Spin, Table} from "antd";
 import {EditOutlined, FolderOpenOutlined} from '@ant-design/icons';
 import LoadingOrView from "../editor/LoadingOrView";
 import NewButton from "../editor/NewButton";
@@ -40,7 +40,7 @@ export default function CategoryList(props: Props) {
     const {data, isLoading} = useGetCategoriesQuery(filters.query)
     const categories = data?.categories
     useClampToFirstPage(data, filters.page, filters.setPage)
-    const {data: notes} = useGetScoringNotesQuery()
+    const {data: notes, isLoading: notesLoading} = useGetScoringNotesQuery()
 
     const {data: allQuestions} = useAllQuestions()
 
@@ -89,6 +89,11 @@ export default function CategoryList(props: Props) {
         {title: "", render: delete_edit, width: '5em'},
         {title: 'Name', dataIndex: 'name', ellipsis: {showTitle: false}},
         {title: 'Scoring note', render: (text: any, category: Category) => {
+            // The scoring notes list hasn't arrived yet — show a spinner rather
+            // than a misleading "No scoring note" placeholder.
+            if (notesLoading) {
+                return <Spin size="small"/>
+            }
             const note = noteText(category)
             return note || <span style={{color: "rgba(0, 0, 0, 0.25)", fontStyle: "italic"}}>No scoring note</span>
         }, ellipsis: {showTitle: false}},
