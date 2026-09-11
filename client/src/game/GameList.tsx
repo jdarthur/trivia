@@ -25,6 +25,7 @@ interface State {
     selected: string
     dirty: string
     game: any
+    loading: boolean
 }
 
 class GameList extends React.Component<Props, State> {
@@ -35,6 +36,7 @@ class GameList extends React.Component<Props, State> {
             selected: "",
             dirty: "",
             game: undefined,
+            loading: true,
         }
     }
 
@@ -54,7 +56,10 @@ class GameList extends React.Component<Props, State> {
             .then(state => {
                 console.log("got games")
                 console.log(state)
-                this.setState({games: state.games})
+                this.setState({games: state.games, loading: false})
+            })
+            .catch(() => {
+                this.setState({loading: false})
             })
     }
 
@@ -201,7 +206,7 @@ class GameList extends React.Component<Props, State> {
             <div className="round-and-open-question">
                 <div className="ql_and_filter">
                     <PageHeader breadcrumbs={["Editor", <><TrophyOutlined/> Games</>]} header={ngb} style={{marginBottom: 10}}/>
-                    <LoadingOrView loading={false} class_name="round_list"
+                    <LoadingOrView loading={this.state.loading} class_name="round_list"
                                    empty={this.state.games?.length === 0} loaded_view={games} />
                 </div>
                 {open_game}
