@@ -2,6 +2,8 @@
 #
 #   make build   # compile the Go server + build the React client (default)
 #   make run     # build both, then run the server serving the built client
+#   make slow    # like `make run`, but the server adds ~200-1000ms of artificial
+#                # latency to each API call (performance/UX testing)
 #   make prod    # like `make run`, but serving HTTPS (server-cert.pem/server-key.pem)
 #   make check   # go vet + go test + npm audit (mirrors CI)
 #   make e2e     # run the Playwright end-to-end suite (e2e/)
@@ -10,7 +12,7 @@
 # The server is a single Go binary that also serves the built client, so
 # "build the stack" is just these two steps. No Docker, no database service.
 
-.PHONY: build build-server build-client run prod check e2e clean
+.PHONY: build build-server build-client run prod slow check e2e clean
 
 # Default: compile both halves of the stack.
 build: build-server build-client
@@ -29,6 +31,12 @@ server-bin:
 # client on :8080 (DB_PATH/IMAGE_DIR default under server/go/src).
 run: build-client server-bin
 	cd server/go/src && CLIENT_DIR=../../../client/build ./trivia-server
+
+# Like `make run`, but with --slow-mode: the server adds ~200-1000ms of
+# artificial latency to each API call, so page-loading problems and places that
+# need skeleton loaders become visible during local performance/UX testing.
+slow: build-client server-bin
+	cd server/go/src && CLIENT_DIR=../../../client/build ./trivia-server --slow-mode
 
 # Like `make run`, but serving HTTPS: the server terminates TLS itself, using
 # the certificate and key files server-cert.pem / server-key.pem in the server
