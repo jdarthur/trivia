@@ -194,4 +194,38 @@ categoriesTest.describe('questions count popover', () => {
     await expect(popover).toContainText(question);
     await expect(popover).toContainText(answer);
   });
+
+  // Ticket #274: the question text in the preview popover links to the question
+  // editor, deep-linked to that question, so an editor can jump straight to it.
+  categoriesTest('popover question text links to the question editor', async ({ categoriesPage, request }) => {
+    const marker = `e2e-cat-link-${unique()}`;
+    const question = `Linked question ${marker}`;
+    const answer = `Linked answer ${marker}`;
+    const categoryId = await createCategoryViaAPI(request, `cat ${marker}`);
+    await createQuestion(request, categoryId, question, answer);
+
+    await categoriesPage.reload();
+    await expect(categoriesPage.locator('.category-list')).toBeVisible();
+
+    const input = categoriesPage.locator('input[placeholder="Search"]');
+    await input.fill(`cat ${marker}`);
+    await input.press('Enter');
+
+    const row = categoriesPage.locator('.category-list .ant-table-row').filter({ hasText: `cat ${marker}` });
+    await row.locator('.ant-tag').click();
+
+    // Click the question link inside the popover: it navigates to the questions
+    // page with the ?question=<id> param and opens the editor pre-filled.
+    const popover = categoriesPage.locator('.ant-popover:visible');
+    await expect(popover).toContainText(question);
+    await popover.getByRole('link', { name: question }).click();
+
+    const modal = categoriesPage.locator('.ant-modal:has(.ant-modal-title)');
+    await expect(modal).toBeVisible();
+    await expect(modal.locator('.ant-modal-title')).toHaveText('Edit question');
+    await expect(modal.locator('#question')).toHaveValue(question);
+
+    await modal.locator('.ant-modal-close').click();
+    await expect(modal).toBeHidden();
+  });
 });
