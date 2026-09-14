@@ -2,7 +2,7 @@ import React, {useEffect, useState} from 'react';
 import '../question/Question.css';
 import './OpenRound.css';
 
-import {Button, Input, Modal, Steps} from 'antd';
+import {Button, Input, Modal, Popconfirm, Steps} from 'antd';
 import TransferQuestions from "../collections/TransferQuestions";
 import Incrementer from "./Incrementer";
 import {
@@ -33,6 +33,10 @@ export default function RoundModal(props: Props) {
     const [wagers, setWagers] = useState<number[]>([])
     const [questions, setQuestions] = useState<string[]>([])
     const [step, setStep] = useState(STEP_DETAILS)
+    // Questions checked on the left (available) side of the Transfer that were
+    // never moved into the round — "unsaved" selections we warn about on Save.
+    const [leftSelected, setLeftSelected] = useState<string[]>([])
+    const [confirmDiscard, setConfirmDiscard] = useState(false)
 
     const {data: allQuestions} = useAllQuestions()
 
@@ -44,6 +48,8 @@ export default function RoundModal(props: Props) {
             setWagers(props.round?.wagers || [])
             setQuestions(props.round?.questions || [])
             setStep(STEP_DETAILS)
+            setLeftSelected([])
+            setConfirmDiscard(false)
         }
     }, [props.visible, props.round])
 
@@ -111,8 +117,23 @@ export default function RoundModal(props: Props) {
         <Button className="button" onClick={() => setStep(step - 1)}> Back </Button> : null
     const nextButton = step < lastStep ?
         <Button className="button" type="primary" onClick={() => setStep(step + 1)}> Next </Button> : null
+    const unsavedCount = leftSelected.length
     const submitButton = step === lastStep ?
-        <Button className="button" type="primary" onClick={save_self}> {id ? "Update" : "Add"} </Button> : null
+        <Popconfirm open={confirmDiscard && unsavedCount > 0}
+                    title={`You have ${unsavedCount} question${unsavedCount === 1 ? "" : "s"} selected ` +
+                        `but not added to the round. Discard them?`}
+                    okText="Discard & save" cancelText="Keep editing"
+                    onConfirm={() => {
+                        setConfirmDiscard(false)
+                        setLeftSelected([])
+                        save_self()
+                    }}
+                    onCancel={() => setConfirmDiscard(false)}>
+            <Button className="button" type="primary"
+                    onClick={() => unsavedCount > 0 ? setConfirmDiscard(true) : save_self()}>
+                {id ? "Update" : "Add"}
+            </Button>
+        </Popconfirm> : null
     const deleteButton = id ?
         <Button danger className="button" onClick={delete_self}> Delete </Button> : null
 
@@ -146,6 +167,8 @@ export default function RoundModal(props: Props) {
                                              setQuestionIds={onQuestionsChange}
                                              titles={["Available questions", "Questions in round"]}
                                              showFilters
+                                             defaultUnusedOnly
+                                             onSelectedChange={setLeftSelected}
                                              unusedFilter={(q) => !q.rounds_used?.some(r => r !== id)}/>
 
     const body = <div style={{display: "flex", flexDirection: "column"}}>

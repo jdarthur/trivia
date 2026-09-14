@@ -14,11 +14,30 @@ interface Props {
     showFilters?: boolean
     /** What "unused" means here; defaults to "not used by any round". */
     unusedFilter?: (item: Question) => boolean
+    /** Start with the "Unused only" toggle on. */
+    defaultUnusedOnly?: boolean
+    /** Reports the questions checked on the left (available) list, so the caller
+     *  can warn about selections that were never moved into the target list. */
+    onSelectedChange?: (leftSelected: string[]) => void
 }
 
 export default function TransferQuestions(props: Props) {
     const [textFilter, setTextFilter] = useState("")
-    const [unusedOnly, setUnusedOnly] = useState(false)
+    const [unusedOnly, setUnusedOnly] = useState(props.defaultUnusedOnly ?? false)
+    const [selectedKeys, setSelectedKeys] = useState<React.Key[]>([])
+
+    // Only left-side checks count as "unsaved" — anything already in the target
+    // list is part of the round, so report the checked keys that are not targets.
+    const reportLeft = (targetKeys: React.Key[], selected: React.Key[]) => {
+        const targetSet = new Set(targetKeys)
+        props.onSelectedChange?.(selected.filter(key => !targetSet.has(key)) as string[])
+    }
+
+    const onSelectChange = (sourceSelected: React.Key[], targetSelected: React.Key[]) => {
+        const next = [...sourceSelected, ...targetSelected]
+        setSelectedKeys(next)
+        props.onSelectedChange?.(sourceSelected as string[])
+    }
 
     // antd orders the new target list itself (it prepends each move, so a
     // 3-4-1-2 sequence comes back 2-1-4-3). The caller owns the order — a round
@@ -28,8 +47,12 @@ export default function TransferQuestions(props: Props) {
     const onChange = (_newTargetKeys: React.Key[], direction: string, moveKeys: React.Key[]) => {
         const moved = new Set(moveKeys)
         const kept = props.selected.filter(id => !moved.has(id))
-        const next = direction === 'right' ? [...kept, ...moveKeys] : kept
-        props.setQuestionIds(next as string[])
+        const nextTargets = direction === 'right' ? [...kept, ...moveKeys] : kept
+        props.setQuestionIds(nextTargets as string[])
+
+        const nextSelected = selectedKeys.filter(key => !moved.has(key))
+        setSelectedKeys(nextSelected)
+        reportLeft(nextTargets, nextSelected)
     };
 
     const isUnused = useMemo(
@@ -78,6 +101,8 @@ export default function TransferQuestions(props: Props) {
             pagination
             render={(item) => renderQuestion(item)}
             onChange={onChange}
+            selectedKeys={selectedKeys}
+            onSelectChange={onSelectChange}
             targetKeys={props.selected}
             titles={props.titles ?? ["Available questions", "Selected questions"]}>
         </Transfer>
