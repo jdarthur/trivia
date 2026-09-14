@@ -39,12 +39,20 @@ export default function TransferQuestions(props: Props) {
         props.onSelectedChange?.(sourceSelected as string[])
     }
 
-    const onChange = (newTargetKeys: React.Key[], _direction: string, moveKeys: React.Key[]) => {
-        props.setQuestionIds(newTargetKeys as string[])
+    // antd orders the new target list itself (it prepends each move, so a
+    // 3-4-1-2 sequence comes back 2-1-4-3). The caller owns the order — a round
+    // asks its questions in the order they were moved in — so rebuild it here:
+    // keep the current order, append what moved in (in move order) at the end,
+    // drop what moved out.
+    const onChange = (_newTargetKeys: React.Key[], direction: string, moveKeys: React.Key[]) => {
         const moved = new Set(moveKeys)
-        const next = selectedKeys.filter(key => !moved.has(key))
-        setSelectedKeys(next)
-        reportLeft(newTargetKeys, next)
+        const kept = props.selected.filter(id => !moved.has(id))
+        const nextTargets = direction === 'right' ? [...kept, ...moveKeys] : kept
+        props.setQuestionIds(nextTargets as string[])
+
+        const nextSelected = selectedKeys.filter(key => !moved.has(key))
+        setSelectedKeys(nextSelected)
+        reportLeft(nextTargets, nextSelected)
     };
 
     const isUnused = useMemo(

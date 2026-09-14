@@ -179,6 +179,49 @@ async function addQuestions(page: Page, questionTexts: string[]) {
   await expect(modal).toBeHidden();
 }
 
+// Narrow the Transfer to a handful of seeded questions by typing their shared
+// unique marker in the modal's search box. Questions already in the round stay
+// visible while filtered, so the target list is unaffected.
+async function filterTransfer(page: Page, marker: string) {
+  const modal = page.locator('.ant-modal:has(.ant-modal-title)');
+  await modal.locator('input[placeholder="Search"]').fill(marker);
+}
+
+// Move one question into the round's target list, by its unique text. The
+// Transfer must already be narrowed with filterTransfer so the item is on the
+// left list's first page.
+async function moveIn(page: Page, questionText: string) {
+  const modal = page.locator('.ant-modal:has(.ant-modal-title)');
+  const leftItem = modal
+    .locator('.ant-transfer-section')
+    .first()
+    .locator('.ant-transfer-list-content-item')
+    .filter({ hasText: questionText });
+  await expect(leftItem).toBeVisible();
+  await leftItem.locator('.ant-transfer-list-checkbox').click();
+  await modal.locator('.ant-transfer-actions button:has(.anticon-right)').click();
+  await expect(
+    targetList(page).locator('.ant-transfer-list-content-item').filter({ hasText: questionText }),
+  ).toBeVisible();
+}
+
+// The Transfer's RIGHT (target) list — the questions that will be saved, in
+// round order.
+function targetList(page: Page) {
+  return page.locator('.ant-modal:has(.ant-modal-title) .ant-transfer-section').last();
+}
+
+// The target list's rows, top to bottom, as plain text.
+async function targetOrder(page: Page): Promise<string[]> {
+  return targetList(page).locator('.ant-transfer-list-content-item').allInnerTexts();
+}
+
+// Map the rendered target rows to the index each one holds in `expected`, so a
+// failure prints the actual order instead of a wall of question text.
+function orderIndexes(rows: string[], expected: string[]): number[] {
+  return rows.map((row) => expected.findIndex((q) => row.includes(q)));
+}
+
 // Delete a round by name via the API (test cleanup). Safe no-op if not found.
 async function deleteRoundByName(request: APIRequestContext, name: string) {
   const res = await request.get('/editor/rounds', { headers: { 'borttrivia-token': token } });
@@ -296,6 +339,101 @@ roundsTest.describe('rounds CRUD', () => {
 
     await roundsPage.getByRole('button', { name: 'Delete', exact: true }).click();
     await expect(roundRow(roundsPage, name)).toHaveCount(0);
+  });
+});
+
+// Ticket #281: the order the admin moves questions across the Transfer is the
+// order they belong to the round — not the order they appear in the available
+// list, and not the order they were created.
+roundsTest.describe('question order', () => {
+  roundsTest('keeps the order questions were moved into the round', async ({ roundsPage, request }) => {
+    const marker = `e2e-ord-${unique()}`;
+    const name = `round ${marker}`;
+    const category = `qcat ${marker}`;
+    // Seeded in 1..4 order so the available list shows them 1,2,3,4; the test
+    // then moves them 3,4,1,2.
+    const seeded = [1, 2, 3, 4].map((i) => `Order question ${i} ${marker}`);
+    for (const q of seeded) {
+      await createQuestion(request, category, q, `Answer ${q}`);
+    }
+    const moved = [seeded[2], seeded[3], seeded[0], seeded[1]];
+
+    await createRoundViaUI(roundsPage, request, name);
+    await reloadRounds(roundsPage);
+    await openRound(roundsPage, name);
+
+    const modal = roundsPage.locator('.ant-modal:has(.ant-modal-title)');
+    await modal.getByRole('button', { name: 'Next', exact: true }).click();
+    await filterTransfer(roundsPage, marker);
+    for (const q of moved) {
+      await moveIn(roundsPage, q);
+    }
+
+    expect(orderIndexes(await targetOrder(roundsPage), moved)).toEqual([0, 1, 2, 3]);
+
+    await modal.getByRole('button', { name: 'Update', exact: true }).click();
+    await expect(modal).toBeHidden();
+
+    // The saved round keeps the same order on a fresh load.
+    await reloadRounds(roundsPage);
+    await openRound(roundsPage, name);
+    await roundsPage.getByRole('button', { name: 'Next', exact: true }).click();
+    expect(orderIndexes(await targetOrder(roundsPage), moved)).toEqual([0, 1, 2, 3]);
+
+    await deleteRoundByName(request, name);
+  });
+
+  roundsTest('keeps the order when questions are moved back out and re-added', async ({
+    roundsPage,
+    request,
+  }) => {
+    const marker = `e2e-ord2-${unique()}`;
+    const name = `round ${marker}`;
+    const category = `qcat ${marker}`;
+    const seeded = [1, 2, 3].map((i) => `Reorder question ${i} ${marker}`);
+    for (const q of seeded) {
+      await createQuestion(request, category, q, `Answer ${q}`);
+    }
+
+    await createRoundViaUI(roundsPage, request, name);
+    await reloadRounds(roundsPage);
+    await openRound(roundsPage, name);
+    const modal = roundsPage.locator('.ant-modal:has(.ant-modal-title)');
+    await modal.getByRole('button', { name: 'Next', exact: true }).click();
+    await filterTransfer(roundsPage, marker);
+    for (const q of seeded) {
+      await moveIn(roundsPage, q);
+    }
+    await modal.getByRole('button', { name: 'Update', exact: true }).click();
+    await expect(modal).toBeHidden();
+
+    // Reopen and move the first question out, then back in: it should land at
+    // the END of the round, not back in its old slot.
+    await reloadRounds(roundsPage);
+    await openRound(roundsPage, name);
+    await modal.getByRole('button', { name: 'Next', exact: true }).click();
+    await filterTransfer(roundsPage, marker);
+
+    const first = targetList(roundsPage)
+      .locator('.ant-transfer-list-content-item')
+      .filter({ hasText: seeded[0] });
+    await expect(first).toBeVisible();
+    await first.locator('.ant-transfer-list-checkbox').click();
+    await modal.locator('.ant-transfer-actions button:has(.anticon-left)').click();
+    await moveIn(roundsPage, seeded[0]);
+
+    const expected = [seeded[1], seeded[2], seeded[0]];
+    expect(orderIndexes(await targetOrder(roundsPage), expected)).toEqual([0, 1, 2]);
+
+    await modal.getByRole('button', { name: 'Update', exact: true }).click();
+    await expect(modal).toBeHidden();
+
+    await reloadRounds(roundsPage);
+    await openRound(roundsPage, name);
+    await roundsPage.getByRole('button', { name: 'Next', exact: true }).click();
+    expect(orderIndexes(await targetOrder(roundsPage), expected)).toEqual([0, 1, 2]);
+
+    await deleteRoundByName(request, name);
   });
 });
 
