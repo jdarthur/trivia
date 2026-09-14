@@ -1,5 +1,6 @@
 import React, {useMemo, useState} from "react";
-import {Checkbox, Input, Transfer} from "antd";
+import {Button, Checkbox, Input, Transfer} from "antd";
+import {ArrowDownOutlined, ArrowUpOutlined} from "@ant-design/icons";
 import "./TransferQuestions.css";
 import type {Question} from "../types/models";
 import CategoryName from "../category/CategoryName";
@@ -19,6 +20,10 @@ interface Props {
     /** Reports the questions checked on the left (available) list, so the caller
      *  can warn about selections that were never moved into the target list. */
     onSelectedChange?: (leftSelected: string[]) => void
+    /** Give each row in the target list up/down buttons that move it one slot
+     *  within the list. Order is reported through setQuestionIds like any
+     *  other change, so the caller keeps owning it. */
+    reorderable?: boolean
 }
 
 export default function TransferQuestions(props: Props) {
@@ -54,6 +59,41 @@ export default function TransferQuestions(props: Props) {
         setSelectedKeys(nextSelected)
         reportLeft(nextTargets, nextSelected)
     };
+
+    // Swap a question in the target list with its neighbor. The index is the
+    // question's position in the whole target list, not on the current page of
+    // the (paginated) list, so a move across a page boundary works too.
+    const move = (index: number, direction: -1 | 1) => {
+        const next = [...props.selected]
+        const target = index + direction
+        ;[next[index], next[target]] = [next[target], next[index]]
+        props.setQuestionIds(next)
+    }
+
+    // antd's <Transfer/> renders both lists through one `render`, so the target
+    // side is identified by the item being one of the target keys. Only those
+    // rows get reorder buttons; the available list has no order to speak of.
+    const renderItem = (item: any) => {
+        const index = props.reorderable ? props.selected.indexOf(item.key) : -1
+        if (index === -1) {
+            return renderQuestion(item)
+        }
+        // The row itself toggles the checkbox on click, so the buttons have to
+        // stop the click from bubbling up to it.
+        const onMove = (direction: -1 | 1) => (event: React.MouseEvent) => {
+            event.stopPropagation()
+            move(index, direction)
+        }
+        return <span className="transfer-question-row">
+            <span className="transfer-question-text">{renderQuestion(item)}</span>
+            <span className="transfer-question-controls">
+                <Button size="small" icon={<ArrowUpOutlined/>} aria-label="Move question up"
+                        disabled={index === 0} onClick={onMove(-1)}/>
+                <Button size="small" icon={<ArrowDownOutlined/>} aria-label="Move question down"
+                        disabled={index === props.selected.length - 1} onClick={onMove(1)}/>
+            </span>
+        </span>
+    }
 
     const isUnused = useMemo(
         () => props.unusedFilter ?? ((item: Question) => !item.rounds_used || item.rounds_used.length === 0),
@@ -99,7 +139,7 @@ export default function TransferQuestions(props: Props) {
             className="transfer-questions"
             dataSource={data}
             pagination
-            render={(item) => renderQuestion(item)}
+            render={(item) => renderItem(item)}
             onChange={onChange}
             selectedKeys={selectedKeys}
             onSelectChange={onSelectChange}

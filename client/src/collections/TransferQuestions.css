@@ -37,3 +37,27 @@
         width: 100% !important;
     }
 }
+
+/* Reorderable target rows: the question text takes the room that's left and
+   ellipsizes, the up/down buttons keep their size at the end of the row. The
+   antd item already ellipsizes its text span, so the truncation moves onto the
+   text half here to keep the buttons out of the clipped region. */
+.transfer-questions .transfer-question-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.transfer-questions .transfer-question-text {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.transfer-questions .transfer-question-controls {
+    display: flex;
+    flex: none;
+    gap: 4px;
+}
