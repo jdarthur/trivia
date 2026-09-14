@@ -218,50 +218,27 @@ func count(questionId string, updateBody models.Round) int {
 	return idCount
 }
 
-//is questionId found in this models.Round.Questions array?
-func questionInRound(questionId string, existingQuestionIds []string) bool {
-	for _, id := range existingQuestionIds {
-		if id == questionId {
-			return true
-		}
-	}
-	return false
-}
-
-//Merge update body into existing round. The question list is merged in
-//place; common.Set then rewrites the round_question join wholesale, so no
-//rounds_used mirror bookkeeping is needed (ticket #83).
+//Merge update body into existing round. The question list is adopted wholesale
+//so the editor owns the order (ticket #281); common.Set then rewrites the
+//round_question join wholesale, so no rounds_used mirror bookkeeping is needed
+//(ticket #83).
 func (e *Env) merge(update *models.Round, original *models.Round) {
 	if update.Name != "" {
 		original.Name = update.Name
 	}
-	if len(update.Wagers) != 0 {
+	if update.Wagers != nil {
 		original.Wagers = update.Wagers
 	}
 	mergeQuestions(update.Questions, original)
 }
 
-//mergeQuestions reconciles original.Questions with newQuestionIds: add any
-//id missing from the round, drop any id no longer present in the update.
+//mergeQuestions replaces original.Questions with the update's list verbatim:
+//the update is the authoritative order, so ids are added, removed and reordered
+//exactly as the editor sent them. A nil list means the field was absent from
+//the request and leaves the round untouched; an empty list clears it.
 func mergeQuestions(newQuestionIds []string, original *models.Round) {
-	for _, updateId := range newQuestionIds {
-		if !questionInRound(updateId, original.Questions) {
-			original.Questions = append(original.Questions, updateId)
-		}
+	if newQuestionIds == nil {
+		return
 	}
-	for _, existingId := range original.Questions {
-		if !questionInRound(existingId, newQuestionIds) {
-			original.Questions = remove(original.Questions, existingId)
-		}
-	}
-}
-
-//remove something from slice by value
-func remove(slice []string, valueToRemove string) []string {
-	for i, value := range slice {
-		if value == valueToRemove {
-			return append(slice[:i], slice[i+1:]...)
-		}
-	}
-	return slice
+	original.Questions = newQuestionIds
 }
