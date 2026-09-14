@@ -14,14 +14,37 @@ interface Props {
     showFilters?: boolean
     /** What "unused" means here; defaults to "not used by any round". */
     unusedFilter?: (item: Question) => boolean
+    /** Start with the "Unused only" toggle on. */
+    defaultUnusedOnly?: boolean
+    /** Reports the questions checked on the left (available) list, so the caller
+     *  can warn about selections that were never moved into the target list. */
+    onSelectedChange?: (leftSelected: string[]) => void
 }
 
 export default function TransferQuestions(props: Props) {
     const [textFilter, setTextFilter] = useState("")
-    const [unusedOnly, setUnusedOnly] = useState(false)
+    const [unusedOnly, setUnusedOnly] = useState(props.defaultUnusedOnly ?? false)
+    const [selectedKeys, setSelectedKeys] = useState<React.Key[]>([])
 
-    const onChange = (newTargetKeys: React.Key[]) => {
+    // Only left-side checks count as "unsaved" — anything already in the target
+    // list is part of the round, so report the checked keys that are not targets.
+    const reportLeft = (targetKeys: React.Key[], selected: React.Key[]) => {
+        const targetSet = new Set(targetKeys)
+        props.onSelectedChange?.(selected.filter(key => !targetSet.has(key)) as string[])
+    }
+
+    const onSelectChange = (sourceSelected: React.Key[], targetSelected: React.Key[]) => {
+        const next = [...sourceSelected, ...targetSelected]
+        setSelectedKeys(next)
+        props.onSelectedChange?.(sourceSelected as string[])
+    }
+
+    const onChange = (newTargetKeys: React.Key[], _direction: string, moveKeys: React.Key[]) => {
         props.setQuestionIds(newTargetKeys as string[])
+        const moved = new Set(moveKeys)
+        const next = selectedKeys.filter(key => !moved.has(key))
+        setSelectedKeys(next)
+        reportLeft(newTargetKeys, next)
     };
 
     const isUnused = useMemo(
@@ -70,6 +93,8 @@ export default function TransferQuestions(props: Props) {
             pagination
             render={(item) => renderQuestion(item)}
             onChange={onChange}
+            selectedKeys={selectedKeys}
+            onSelectChange={onSelectChange}
             targetKeys={props.selected}
             titles={props.titles ?? ["Available questions", "Selected questions"]}>
         </Transfer>
