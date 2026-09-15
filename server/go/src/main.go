@@ -49,10 +49,11 @@ func main() {
 		fmt.Println("Unable to load .env")
 	}
 
-	// Dev mode uses a scratch database file, distinct from the standard one.
+	// Dev mode defaults to a scratch database file, distinct from the standard
+	// one, but still honors an explicit DB_PATH.
 	var dbPath = store.DBPath()
 	if *devMode {
-		dbPath = store.DefaultDevDBPath
+		dbPath = store.DevDBPath()
 	}
 	db, err := store.Open(dbPath)
 	if err != nil {

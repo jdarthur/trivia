@@ -409,6 +409,29 @@ func TestDBPathUsesEnvOrDefault(t *testing.T) {
 	}
 }
 
+func TestDevDBPathUsesEnvOrScratchDefault(t *testing.T) {
+	old, had := os.LookupEnv("DB_PATH")
+	t.Cleanup(func() {
+		if had {
+			os.Setenv("DB_PATH", old)
+		} else {
+			os.Unsetenv("DB_PATH")
+		}
+	})
+
+	// Unset, a dev server lands on the scratch file rather than trivia.db.
+	os.Unsetenv("DB_PATH")
+	if got := DevDBPath(); got != DefaultDevDBPath {
+		t.Errorf("DevDBPath() = %q, want dev default %q", got, DefaultDevDBPath)
+	}
+
+	// Set, it wins — several dev servers can run against a database each.
+	os.Setenv("DB_PATH", "/tmp/trivia-worker-2.db")
+	if got := DevDBPath(); got != "/tmp/trivia-worker-2.db" {
+		t.Errorf("DevDBPath() = %q, want /tmp/trivia-worker-2.db", got)
+	}
+}
+
 // TestQuestionTypeCheckConstraint verifies the CHECK constraint on
 // question.question_type and session_question.question_type rejects values
 // outside freeform / multiple_choice / matching / bucketing / ordering
