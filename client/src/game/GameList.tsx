@@ -2,12 +2,14 @@ import React from 'react';
 import '../round/RoundList.css';
 import '../editor/EditorList.css';
 
-import Game from "./Game"
+import {Table, Tag} from 'antd';
+import {EditOutlined, TrophyOutlined} from '@ant-design/icons';
 import OpenGame from "./OpenGame"
 import NewButton from '../editor/NewButton';
 import PageHeader from "../common/PageHeader";
 import LoadingOrView from "../editor/LoadingOrView";
-import {TrophyOutlined} from '@ant-design/icons';
+import EditorFilter from "../editor/EditorFilter";
+import DeleteConfirm from "../editor/DeleteConfirm";
 
 //JSON keys
 const NAME = "name"
@@ -26,6 +28,7 @@ interface State {
     dirty: string
     game: any
     loading: boolean
+    text_filter: string
 }
 
 class GameList extends React.Component<Props, State> {
@@ -37,6 +40,7 @@ class GameList extends React.Component<Props, State> {
             dirty: "",
             game: undefined,
             loading: true,
+            text_filter: "",
         }
     }
 
@@ -61,6 +65,24 @@ class GameList extends React.Component<Props, State> {
             .catch(() => {
                 this.setState({loading: false})
             })
+    }
+
+    set_text_filter = (value: string) => {
+        this.setState({text_filter: value})
+    }
+
+    /**
+     * client-side name filter for the table. The list is fetched whole (the
+     * inline OpenGame editor needs the full game object, so the row set can't
+     * be a filtered server page), so filtering happens here on the full list
+     * while `games` stays intact for the editor.
+     */
+    filter_games = (games: any[], text: string) => {
+        if (!text) {
+            return games
+        }
+        const needle = text.toLowerCase()
+        return games.filter((game) => (game.name || "").toLowerCase().includes(needle))
     }
 
     set_selected = (game_id: string) => {
@@ -184,14 +206,43 @@ class GameList extends React.Component<Props, State> {
 
 
     render() {
-        const games = this.state.games?.map((game, index) => (
-            <Game key={game.id} id={game.id} name={game.name} create_date={game.create_date}
-                  rounds={game.rounds} round_names={game.round_names}
-                  selected={(this.state.selected === game.id)}
-                  set_selected={this.set_selected} delete={this.delete}/>))
+        const displayed_games = this.filter_games(this.state.games || [], this.state.text_filter)
 
         const ngb = this.add_newgame_button() ?
             <NewButton on_click={this.add_new_game}/> : null
+
+        const columns = [
+            {title: "", width: '5em', render: (_: any, game: any) => (
+                <span style={{fontSize: '1.2em'}}>
+                    <DeleteConfirm delete={() => this.delete(game.id)} style={{paddingRight: 10}}/>
+                    <EditOutlined onClick={() => this.set_selected(game.id)}/>
+                </span>
+            )},
+            {title: 'Name', dataIndex: 'name', ellipsis: {showTitle: false},
+             render: (name: string, game: any) => (
+                 <span onClick={() => this.set_selected(game.id)}>
+                     {name === '' ? '[unnamed game]' : name}
+                 </span>
+             )},
+            {title: 'Rounds', dataIndex: 'rounds', render: (rounds: string[]) => rounds?.length || 0},
+            {title: 'Used in active sessions', dataIndex: 'active_sessions',
+             render: (active_sessions: number) => (
+                 <Tag color={active_sessions > 0 ? 'green' : 'default'}>
+                     {active_sessions > 0 ? active_sessions : "No"}
+                 </Tag>
+             )},
+        ]
+
+        const table = <div className="table_and_pager">
+            <Table columns={columns} dataSource={displayed_games} pagination={false}
+                   size="small" rowKey="id"/>
+        </div>
+
+        const header = <EditorFilter set_text_filter={this.set_text_filter}
+                                     set_unused_only={() => {}} data_type="games"
+                                     text_filter={this.state.text_filter}
+                                     unused_only={false} add_button={ngb}
+                                     show_unused_only={false}/>
 
         let open_game = null
         if (this.state.selected !== "") {
@@ -205,9 +256,9 @@ class GameList extends React.Component<Props, State> {
         return (
             <div className="round-and-open-question">
                 <div className="ql_and_filter">
-                    <PageHeader breadcrumbs={["Editor", <><TrophyOutlined/> Games</>]} header={ngb} style={{marginBottom: 10}}/>
+                    <PageHeader breadcrumbs={["Editor", <><TrophyOutlined/> Games</>]} header={header} style={{marginBottom: 10}}/>
                     <LoadingOrView loading={this.state.loading} class_name="round_list"
-                                   empty={this.state.games?.length === 0} loaded_view={games} />
+                                   empty={this.state.games?.length === 0} loaded_view={table} />
                 </div>
                 {open_game}
             </div>

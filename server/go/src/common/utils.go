@@ -1590,7 +1590,12 @@ func scanTable(objectType string) (string, bool) {
 	case RoundTable:
 		return `SELECT id, create_date, name, user_id FROM round`, true
 	case GameTable:
-		return `SELECT id, create_date, name, user_id FROM game`, true
+		// active_sessions is derived in the same pass (how many sessions
+		// currently reference the game), so the editor's "used in active
+		// sessions" column needs no second request per game.
+		return `SELECT id, create_date, name, user_id,
+			(SELECT count(*) FROM session s WHERE s.game_id = game.id) AS active_sessions
+			FROM game`, true
 	case SessionTable:
 		return `SELECT id, create_date, name, game_id, moderator_id, started,
 			current_round, current_question FROM session`, true
@@ -1644,7 +1649,7 @@ func (e *Env) scanRow(objectType string, s rowScanner) (interface{}, error) {
 	case GameTable:
 		var m models.Game
 		var createDate string
-		if err := s.Scan(&m.ID, &createDate, &m.Name, &m.UserId); err != nil {
+		if err := s.Scan(&m.ID, &createDate, &m.Name, &m.UserId, &m.ActiveSessions); err != nil {
 			return nil, err
 		}
 		m.CreateDate = ParseTime(createDate)

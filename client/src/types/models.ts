@@ -75,6 +75,8 @@ export interface Game {
   rounds: string[];
   round_names: Record<string, string>;
   user_id: string;
+  /** Derived server-side: how many sessions currently reference this game. */
+  active_sessions: number;
 }
 
 /** models.Collection */
