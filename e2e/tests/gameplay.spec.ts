@@ -337,6 +337,32 @@ async function seedStartableOrderingGame(request: APIRequestContext, prefix: str
   return { gameId, roundId, qids: [q1, q2] };
 }
 
+// Create a numeric question (ticket #285): the answer is a single correct
+// number, and every player submits a number.
+async function createNumericQuestion(request: APIRequestContext, category: string, question: string, answer: string): Promise<string> {
+  const categoryId = await createCategory(request, category);
+  const res = await request.post('/editor/question', {
+    headers: { 'borttrivia-token': token },
+    data: {
+      category: categoryId,
+      question,
+      answer,
+      question_type: 'numeric',
+    },
+  });
+  expect(res.ok()).toBeTruthy();
+  return (await res.json()).id;
+}
+
+// Seed a startable game whose first question is numeric (ticket #285).
+async function seedStartableNumericGame(request: APIRequestContext, prefix: string) {
+  const q1 = await createNumericQuestion(request, `e2e-cat-${prefix}`, `Numeric question ${prefix}`, '100');
+  const q2 = await createQuestion(request, `e2e-cat-${prefix}`, `Second question ${prefix}`, 'Answer two');
+  const roundId = await createRound(request, `e2e-round-${prefix}`, [q1, q2], [100, 200]);
+  const gameId = await createGame(request, `e2e-game-${prefix}`, roundId);
+  return { gameId, roundId, qids: [q1, q2] };
+}
+
 // Create a session for the game; the response carries the mod's player id and
 // one-time bearer credential (ticket #256).
 async function createSession(request: APIRequestContext, name: string, gameId: string) {
@@ -1853,6 +1879,70 @@ test.describe('gameplay navigation, hot-edit, spectator & edge cases', () => {
     await expect
       .poll(async () => (await modBox.locator('ul li').allTextContents()).map((t) => t.trim()), { timeout: 30000 })
       .toEqual(['First', 'Second', 'Third']);
+
+    await playerContext.close();
+    await modContext.close();
+    await cleanup(request, seeded, { sessionId, modId, modToken, playerIds: [playerId] });
+  });
+
+  test('numeric: a player submits a number, the mod sees the off-by amount and scores manually', async ({ browser, request }) => {
+    test.setTimeout(90000);
+    const prefix = unique();
+    const seeded = await seedStartableNumericGame(request, prefix);
+    const { sessionId, modId, modToken } = await createSession(request, `e2e-session-${prefix}`, seeded.gameId);
+
+    const { context: modContext, page: modPage } = await openModLobby(browser, sessionId, modId, modToken);
+    const { context: playerContext, page: playerPage, playerId } = await joinPlayer(
+      browser,
+      sessionId,
+      `Team ${prefix}`,
+      `Player ${prefix}`,
+    );
+    await modPage.locator('.start-button').click();
+    await expect(modPage.locator('.active-game')).toBeVisible({ timeout: 30000 });
+    await expect(playerPage.locator('.active-game')).toBeVisible({ timeout: 30000 });
+
+    // The player's answer card shows an InputNumber (not a free-text box).
+    const card = playerPage.locator('.answer-card');
+    const numericInput = card.locator('.ant-input-number input');
+    await expect(numericInput).toBeVisible({ timeout: 30000 });
+
+    // Enter an off-by-one answer, pick a wager and submit.
+    await numericInput.fill('101');
+    await card.locator('.ant-radio-button-wrapper').filter({ hasText: '100' }).click();
+    const answerButton = card.getByRole('button', { name: 'Answer', exact: true });
+    await expect(answerButton).toBeEnabled();
+    await answerButton.click();
+
+    // The stored answer is the plain number string (the correct answer is 100).
+    await expect
+      .poll(async () => (await playerAnswers(request, sessionId, modId, modToken, playerId, 0, 0)).length)
+      .toBe(1);
+    const stored = (await playerAnswers(request, sessionId, modId, modToken, playerId, 0, 0))[0].answer;
+    expect(stored).toBe('101');
+
+    // The mod's scorer shows the off-by amount for the numeric answer.
+    const scorerTag = modPage.locator('.player-scorer .ant-card .ant-tag');
+    await expect(scorerTag).toHaveText('off by 1', { timeout: 30000 });
+
+    // Numeric is scored manually (like freeform): the mod sees the
+    // correct/incorrect buttons, and the Score button enables once judged.
+    const teamCard = modPage.locator('.player-scorer .ant-card').filter({ hasText: `Team ${prefix}` });
+    const correctButton = teamCard.locator('.answer-scorer button').nth(1);
+    await expect(correctButton).toBeVisible({ timeout: 30000 });
+    await correctButton.click();
+    const scoreButton = modPage.locator('.game-control-card').getByRole('button', { name: 'Score', exact: true });
+    await expect(scoreButton).toBeEnabled({ timeout: 30000 });
+    await scoreButton.click();
+
+    // The mod's manual judgment is honored: the player scores the wager.
+    await expect.poll(async () => {
+      const answers = await playerAnswers(request, sessionId, modId, modToken, playerId, 0, 0);
+      return answers[answers.length - 1]?.correct;
+    }).toBe(true);
+
+    // The off-by amount still shows on the post-scoring answers view.
+    await expect(scorerTag).toHaveText('off by 1', { timeout: 30000 });
 
     await playerContext.close();
     await modContext.close();

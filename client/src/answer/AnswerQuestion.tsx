@@ -4,7 +4,7 @@ import WagerManager from "./WagerManager"
 import LeaveGame from "../lobby/LeaveGame"
 import sendData from "../index"
 
-import { Card, Input, Button, Radio, Select, Checkbox, Popover } from 'antd';
+import { Card, Input, Button, Radio, Select, Checkbox, Popover, InputNumber } from 'antd';
 import { QuestionCircleOutlined } from '@ant-design/icons';
 import OrderedAnswerList from "./OrderedAnswerList";
 import {getPlayerToken} from "../common/playerToken";
@@ -16,6 +16,7 @@ const MULTIPLE_CHOICE = "multiple_choice"
 const MATCHING = "matching"
 const BUCKETING = "bucketing"
 const ORDERING = "ordering"
+const NUMERIC = "numeric"
 
 interface Props {
     question: number | string
@@ -170,6 +171,12 @@ class AnswerQuestion extends React.Component<Props, State> {
     }
     set_moneyball = (checked: boolean) => { this.setState({ moneyball: checked, dirty: true }) }
     set_order = (order: string[]) => { this.setState({ order, dirty: true }) }
+    // Ticket #285: a numeric answer is entered via <InputNumber/>, whose value
+    // is a number (or null when cleared); store it as a string so the answer
+    // payload stays a plain string like every other type.
+    set_numeric_answer = (value: number | null) => {
+        this.setState({answer: value === null || value === undefined ? "" : String(value), dirty: true})
+    }
 
     // fetch the player's own scored answer for this question; the Moneyball
     // outcome indicator is derived from it (the flag + points the backend
@@ -348,6 +355,12 @@ class AnswerQuestion extends React.Component<Props, State> {
             </div>
         ) : type === ORDERING ? (
             <OrderedAnswerList items={this.state.order} onChange={this.set_order}/>
+        ) : type === NUMERIC ? (
+            <InputNumber value={this.state.answer === "" ? null : Number(this.state.answer)}
+                         onChange={this.set_numeric_answer}
+                         onPressEnter={this.handleKeyPress}
+                         placeholder="Your answer"
+                         style={{width: "100%", fontSize: 16}}/>
         ) : (
             <TextArea placeholder="Your answer" value={this.state.answer}
                 onChange={this.set_answer} autoSize={{ minRows: 3 }}

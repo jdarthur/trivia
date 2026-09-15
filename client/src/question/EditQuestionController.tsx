@@ -75,7 +75,7 @@ export default function EditQuestionController(props: Props) {
         const body = {
             category: category,
             question: question,
-            answer: question_type === "freeform" ? answer : "",
+            answer: question_type === "freeform" || question_type === "numeric" ? answer : "",
             question_type: question_type,
             choices: choices,
             pairs: pairs,
@@ -116,6 +116,11 @@ export default function EditQuestionController(props: Props) {
         // Ticket #213: the server requires at least two ordered items.
         if (question_type === "ordering" && ordered.length < 2) {
             return "Please add at least two ordered items"
+        }
+        // Ticket #285: the server requires a numeric answer for a numeric
+        // question.
+        if (question_type === "numeric" && (answer.trim() === "" || isNaN(Number(answer)))) {
+            return "Please enter a numeric answer"
         }
         return ""
     }

@@ -1,7 +1,7 @@
 import React from 'react';
 import "../players/Players.css"
 
-import {Empty} from "antd"
+import {Empty, Tag} from "antd"
 import ShortTextWithPopover from "../common/ShortTextWithPopover";
 
 interface AnswerLike {
@@ -20,6 +20,10 @@ interface Props {
     // render as "1 → A · 2 → B", and an ordering answer is a JSON array
     // string like ["a","b","c"] that we render as "1. a · 2. b · 3. c".
     question_type?: string
+    // Ticket #285: the question's correct numeric answer, used to compute and
+    // show how far every numeric answer is off (the mod judges correctness
+    // from the off-by amount).
+    correct_answer?: string
 }
 
 class PlayerAnswer extends React.Component<Props> {
@@ -75,6 +79,37 @@ class PlayerAnswer extends React.Component<Props> {
         return this.props.question_type === 'ordering'
     }
 
+    // a numeric answer is a plain number string (ticket #285).
+    isNumeric = (): boolean => {
+        return this.props.question_type === 'numeric'
+    }
+
+    // offBy returns the absolute distance between a player's numeric answer and
+    // the question's correct answer, or null when either is not a number.
+    offBy = (answer: string): number | null => {
+        const correct = parseFloat(this.props.correct_answer || "")
+        const value = parseFloat(answer)
+        if (isNaN(correct) || isNaN(value)) {
+            return null
+        }
+        return Math.abs(value - correct)
+    }
+
+    // numericOffBy renders the off-by amount for a numeric answer: a green
+    // "exact" tag when the answer is the correct number, else an orange
+    // "off by X" tag (rounded to 6 decimals to avoid float artifacts).
+    numericOffBy = (answer: string): React.ReactNode => {
+        const off = this.offBy(answer)
+        if (off === null) {
+            return null
+        }
+        const rounded = Number(off.toFixed(6))
+        if (rounded === 0) {
+            return <Tag color="green" style={{marginTop: 2}}>exact</Tag>
+        }
+        return <Tag color="orange" style={{marginTop: 2}}>off by {rounded}</Tag>
+    }
+
     render() {
         const answers = this.props.answers || []
         const last_answer = answers.length > 0 ? answers[answers.length - 1] : null
@@ -101,6 +136,10 @@ class PlayerAnswer extends React.Component<Props> {
                         : <ShortTextWithPopover text={realAnswerText} maxLength={50}/>}
                 {(isMapping || isOrdering) && !this.props.omitWager ?
                     <div style={{fontSize: 12, marginTop: 2}}>(wager: {last_answer.wager})</div> : null}
+                {/* Ticket #285: for a numeric answer, show how far the answer
+                    is from the correct number so the mod can judge who is
+                    closest / exactly right. */}
+                {this.isNumeric() && last_answer ? this.numericOffBy(last_answer.answer) : null}
             </div> :
             <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="No answer"
                    style={{margin: 0}}/>

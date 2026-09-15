@@ -1,8 +1,8 @@
 import React, {useEffect, useState} from 'react';
 import './Question.css';
 
-import {Input, Modal, Radio, Button, Select, Steps, Popconfirm, Tooltip} from 'antd';
-import {ContainerOutlined, EditOutlined, ExclamationCircleOutlined, MinusCircleOutlined, OrderedListOutlined, SortAscendingOutlined, SwapOutlined} from '@ant-design/icons';
+import {Input, Modal, Radio, Button, Select, Steps, Popconfirm, Tooltip, InputNumber} from 'antd';
+import {ContainerOutlined, EditOutlined, ExclamationCircleOutlined, MinusCircleOutlined, NumberOutlined, OrderedListOutlined, SortAscendingOutlined, SwapOutlined} from '@ant-design/icons';
 import QuestionBody from "./QuestionBody"
 import EditorToolbar from "./EditorToolbar";
 import {ANSWER, CATEGORY, QUESTION} from "./EditQuestionController";
@@ -20,6 +20,7 @@ const MULTIPLE_CHOICE = "multiple_choice"
 const MATCHING = "matching"
 const BUCKETING = "bucketing"
 const ORDERING = "ordering"
+const NUMERIC = "numeric"
 
 // Ticket #166: the three steps of the multi-step question editor.
 const STEP_BASIC = 0
@@ -39,6 +40,8 @@ const QUESTION_TYPES = [
      description: "Players sort each item into the bucket it belongs to."},
     {value: ORDERING, icon: <SortAscendingOutlined/>, label: "Ordering",
      description: "Players put the items in the correct order; the order you list them is the answer key."},
+    {value: NUMERIC, icon: <NumberOutlined/>, label: "Numeric",
+     description: "Players type a number; the closest / exact answers are scored correct."},
 ]
 
 interface Props {
@@ -415,10 +418,29 @@ export default function EditQuestionModal(props: Props) {
         </div>
     </div>
 
+    // numeric (ticket #285): the answer is a single correct number, entered
+    // via an InputNumber (like the player-facing answer box).
+    const numericView = <div>
+        <TextArea autoFocus={!!props.category} placeholder="Question" value={props.question}
+                  style={{marginBottom: 10}} id={QUESTION} onClick={() => setFocusedInput(QUESTION)}
+                  onChange={(event) => props.set_question(event.target.value)} autoSize={{minRows: 4}}
+                  onPressEnter={null as any}/>
+
+        {structuredNote}
+        <div style={{marginBottom: 10}}>
+            <div style={{fontWeight: 600, marginBottom: 4}}>Correct number</div>
+            <InputNumber value={props.answer === "" ? null : Number(props.answer)}
+                         onChange={(value) => props.set_answer(value === null || value === undefined ? "" : String(value))}
+                         placeholder="Answer" disabled={props.disabled}
+                         style={{width: "100%"}}/>
+        </div>
+    </div>
+
     const editView = questionType === MULTIPLE_CHOICE ? choicesView :
         questionType === MATCHING ? pairsView :
         questionType === BUCKETING ? bucketsView :
-        questionType === ORDERING ? orderedView : freeformView
+        questionType === ORDERING ? orderedView :
+        questionType === NUMERIC ? numericView : freeformView
 
     // The preview shows the question as it will appear to players (no answer,
     // no grading), with a "Show answer" toggle that reveals the scored in-game

@@ -654,6 +654,64 @@ var migrations = []migration{
 			`ALTER TABLE player ADD COLUMN token_hash TEXT NOT NULL DEFAULT ''`,
 		},
 	},
+	{
+		version: 18,
+		name:    "numeric question type",
+		// ticket #285: questions gain a "numeric" type — the answer is a single
+		// number and every player submits a number. The mod judges correctness
+		// against the off-by amount (the closest / right answers win), so there
+		// is no structured child table; the correct number rides the question's
+		// `answer` column like freeform.
+		//
+		// Adding a value to the question_type CHECK requires rebuilding the
+		// question and session_question tables (SQLite cannot alter a CHECK
+		// constraint). The rebuild drops the old table, so it runs with
+		// foreign_keys off — otherwise the implicit DELETE would cascade
+		// through round_question / session_question_choice / _match / _bucket
+		// and wipe live data. The index on session_question is recreated after
+		// the rename (DROP TABLE removes it with the table).
+		//
+		// The rebuilt question keeps the post-migration-14 columns
+		// (category_id, no legacy category/scoring_note_id text columns).
+		disableForeignKeys: true,
+		statements: []string{
+			`CREATE TABLE question_numeric_new (
+				id              TEXT PRIMARY KEY,
+				create_date     TEXT NOT NULL,
+				category_id     TEXT REFERENCES category(id) ON DELETE SET NULL,
+				question        TEXT NOT NULL DEFAULT '',
+				answer          TEXT NOT NULL DEFAULT '',
+				user_id         TEXT NOT NULL DEFAULT '',
+				question_type   TEXT NOT NULL DEFAULT 'freeform'
+					CHECK (question_type IN ('freeform', 'multiple_choice', 'matching', 'bucketing', 'ordering', 'numeric'))
+			)`,
+			`INSERT INTO question_numeric_new (id, create_date, category_id, question, answer, user_id, question_type)
+				SELECT id, create_date, category_id, question, answer, user_id, question_type FROM question`,
+			`DROP TABLE question`,
+			`ALTER TABLE question_numeric_new RENAME TO question`,
+
+			`CREATE TABLE session_question_numeric_new (
+				session_id      TEXT NOT NULL REFERENCES session(id) ON DELETE CASCADE,
+				round_index     INTEGER NOT NULL,
+				question_index  INTEGER NOT NULL,
+				question_id     TEXT NOT NULL DEFAULT '',
+				category        TEXT NOT NULL DEFAULT '',
+				question        TEXT NOT NULL DEFAULT '',
+				answer          TEXT NOT NULL DEFAULT '',
+				scoring_note_id TEXT NOT NULL DEFAULT '',
+				scored          INTEGER NOT NULL DEFAULT 0,
+				scoring_note    TEXT NOT NULL DEFAULT '',
+				question_type   TEXT NOT NULL DEFAULT 'freeform'
+					CHECK (question_type IN ('freeform', 'multiple_choice', 'matching', 'bucketing', 'ordering', 'numeric')),
+				PRIMARY KEY (session_id, round_index, question_index)
+			)`,
+			`INSERT INTO session_question_numeric_new (session_id, round_index, question_index, question_id, category, question, answer, scoring_note_id, scored, scoring_note, question_type)
+				SELECT session_id, round_index, question_index, question_id, category, question, answer, scoring_note_id, scored, scoring_note, question_type FROM session_question`,
+			`DROP TABLE session_question`,
+			`ALTER TABLE session_question_numeric_new RENAME TO session_question`,
+			`CREATE INDEX idx_session_question_session ON session_question(session_id)`,
+		},
+	},
 }
 
 // Migrate brings db up to the latest schema version, applying each pending

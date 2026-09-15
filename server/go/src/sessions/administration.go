@@ -583,10 +583,12 @@ func scoreQuestionTx(e *Env, session models.Session, requestBody models.ScoreReq
 			}
 			score.useMoneyball = useMoneyball == 1
 
-			// freeform keeps the mod's correct flag; structured types are
+			// freeform keeps the mod's correct flag; numeric is judged by the
+			// mod too (the mod sees each answer's off-by amount and marks the
+			// closest/right ones correct, ticket #285). Structured types are
 			// auto-scored against the snapshot answer key.
 			score.isCorrect = correctOrNot.Correct
-			if questionType != "freeform" {
+			if questionType != "freeform" && questionType != "numeric" {
 				score.isCorrect = autoScoredCorrect(questionType, latestAnswer, correctChoiceText, matchLefts, matchRights, bucketItems, bucketBuckets, orderedItems)
 			}
 

@@ -22,7 +22,7 @@ type Question struct {
 	RoundsUsed []string  `json:"rounds_used" form:"rounds_used"`
 	UserId     string    `json:"user_id"`
 
-	QuestionType string                `json:"question_type" form:"question_type"` // freeform|multiple_choice|matching|bucketing|ordering
+	QuestionType string                `json:"question_type" form:"question_type"` // freeform|multiple_choice|matching|bucketing|ordering|numeric
 	Choices      []QuestionChoice      `json:"choices,omitempty"`                  // multiple_choice
 	Pairs        []QuestionPair        `json:"pairs,omitempty"`                    // matching
 	Buckets      []QuestionBucket      `json:"buckets,omitempty"`                  // bucketing

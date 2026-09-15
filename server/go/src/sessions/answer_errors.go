@@ -109,3 +109,21 @@ func (e InvalidOrderingAnswerError) Field() string {
 func (e InvalidOrderingAnswerError) Data() interface{} {
 	return e.Answer
 }
+
+// InvalidNumericAnswerError is returned when a numeric answer is not a number
+// (ticket #285): the player must submit a numeric value for a numeric question.
+// A non-numeric answer is rejected at submit time instead of being stored as a
+// certain miss.
+type InvalidNumericAnswerError struct {
+	Answer string
+	Reason string
+}
+func (e InvalidNumericAnswerError) Error() string {
+	return "invalid numeric answer: " + e.Reason
+}
+func (e InvalidNumericAnswerError) Field() string {
+	return "answer"
+}
+func (e InvalidNumericAnswerError) Data() interface{} {
+	return e.Answer
+}

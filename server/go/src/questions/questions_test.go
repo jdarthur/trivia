@@ -324,6 +324,79 @@ func TestCreateQuestionValidationMatrix(t *testing.T) {
 		t.Fatalf("ordering create: %v", err)
 	}
 
+	// numeric: missing answer rejected
+	if _, err := CreateOneQuestion(env, userId, models.Question{
+		Question: "q?", QuestionType: "numeric",
+	}); err == nil {
+		t.Error("expected MissingNumericAnswerError for numeric without answer")
+	} else if _, ok := err.(MissingNumericAnswerError); !ok {
+		t.Errorf("expected MissingNumericAnswerError, got %T: %v", err, err)
+	}
+	// numeric: non-numeric answer rejected
+	if _, err := CreateOneQuestion(env, userId, models.Question{
+		Question: "q?", Answer: "not a number", QuestionType: "numeric",
+	}); err == nil {
+		t.Error("expected InvalidNumericAnswerError for non-numeric answer")
+	} else if _, ok := err.(InvalidNumericAnswerError); !ok {
+		t.Errorf("expected InvalidNumericAnswerError, got %T: %v", err, err)
+	}
+	// numeric: choices rejected (mutually exclusive payloads)
+	if _, err := CreateOneQuestion(env, userId, models.Question{
+		Question: "q?", Answer: "12", QuestionType: "numeric",
+		Choices: []models.QuestionChoice{{Text: "A", IsCorrect: true}},
+	}); err == nil {
+		t.Error("expected NumericWithChoicesError")
+	} else if _, ok := err.(NumericWithChoicesError); !ok {
+		t.Errorf("expected NumericWithChoicesError, got %T: %v", err, err)
+	}
+	// numeric: pairs rejected (mutually exclusive payloads)
+	if _, err := CreateOneQuestion(env, userId, models.Question{
+		Question: "q?", Answer: "12", QuestionType: "numeric",
+		Pairs: []models.QuestionPair{{Left: "L", Right: "R"}},
+	}); err == nil {
+		t.Error("expected NumericWithPairsError")
+	} else if _, ok := err.(NumericWithPairsError); !ok {
+		t.Errorf("expected NumericWithPairsError, got %T: %v", err, err)
+	}
+	// numeric: buckets rejected (mutually exclusive payloads)
+	if _, err := CreateOneQuestion(env, userId, models.Question{
+		Question: "q?", Answer: "12", QuestionType: "numeric",
+		Buckets: []models.QuestionBucket{{Text: "B1"}, {Text: "B2"}},
+	}); err == nil {
+		t.Error("expected NumericWithBucketsError for buckets")
+	} else if _, ok := err.(NumericWithBucketsError); !ok {
+		t.Errorf("expected NumericWithBucketsError, got %T: %v", err, err)
+	}
+	// numeric: items rejected (mutually exclusive payloads)
+	if _, err := CreateOneQuestion(env, userId, models.Question{
+		Question: "q?", Answer: "12", QuestionType: "numeric",
+		Items: []models.QuestionBucketItem{{Text: "I", Bucket: "B1"}},
+	}); err == nil {
+		t.Error("expected NumericWithBucketsError for items")
+	} else if _, ok := err.(NumericWithBucketsError); !ok {
+		t.Errorf("expected NumericWithBucketsError, got %T: %v", err, err)
+	}
+	// numeric: ordered rejected (mutually exclusive payloads)
+	if _, err := CreateOneQuestion(env, userId, models.Question{
+		Question: "q?", Answer: "12", QuestionType: "numeric",
+		Ordered: []models.QuestionOrderedItem{{Text: "A"}, {Text: "B"}},
+	}); err == nil {
+		t.Error("expected NumericWithBucketsError for ordered")
+	} else if _, ok := err.(NumericWithBucketsError); !ok {
+		t.Errorf("expected NumericWithBucketsError, got %T: %v", err, err)
+	}
+	// numeric: valid (decimal + negative accepted)
+	if _, err := CreateOneQuestion(env, userId, models.Question{
+		Question: "q?", Answer: "12.5", QuestionType: "numeric",
+	}); err != nil {
+		t.Fatalf("numeric create: %v", err)
+	}
+	if _, err := CreateOneQuestion(env, userId, models.Question{
+		Question: "q?", Answer: "-3", QuestionType: "numeric",
+	}); err != nil {
+		t.Fatalf("numeric negative create: %v", err)
+	}
+
 	// matching: buckets rejected (mutually exclusive payloads)
 	if _, err := CreateOneQuestion(env, userId, models.Question{
 		Question: "q?", QuestionType: "matching",
