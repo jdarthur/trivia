@@ -32,6 +32,18 @@ func DBPath() string {
 	return DefaultDBPath
 }
 
+// DevDBPath is DBPath for a --dev-mode server: DB_PATH when it is set,
+// otherwise the scratch DefaultDevDBPath rather than the standard trivia.db.
+// Honoring DB_PATH here is what lets several dev servers run side by side
+// against a database each — the e2e suite gives every Playwright worker its
+// own file so the workers cannot see each other's rows.
+func DevDBPath() string {
+	if p := os.Getenv("DB_PATH"); p != "" {
+		return p
+	}
+	return DefaultDevDBPath
+}
+
 // Open opens (creating if necessary) the SQLite database at path, creating any
 // missing parent directories. The connection is configured for the server's
 // workload:

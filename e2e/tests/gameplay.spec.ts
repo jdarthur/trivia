@@ -1,6 +1,7 @@
 import { expect, test, type APIRequestContext, type BrowserContext, type Locator, type Page } from '@playwright/test';
 import fs from 'fs';
 import zlib from 'zlib';
+import { workerBaseURL } from '../fixtures/servers';
 
 // Gameplay e2e (ticket #109): lobby + session start, first slice of the
 // single-session suite. Unlike the editor suites, gameplay is anonymous and
@@ -8,11 +9,12 @@ import zlib from 'zlib';
 // actor (mod + players) through the real invite-link/join flow, instead of the
 // editorTest/editorPage fixtures.
 
-// The dev DB is one shared SQLite file for the whole `playwright test` run, so
-// every test uses a unique prefix and cleans up what it created.
+// Each worker has its own SQLite file (fixtures/servers.ts), but tests within a
+// worker still share one, so every test uses a unique prefix and cleans up what
+// it created.
 const unique = () => String(Date.now());
 
-const BASE_URL = 'http://localhost:8081/';
+const BASE_URL = workerBaseURL();
 const DEV_USER = 'alice';
 
 // Build the same unsigned (alg "none") dev-mode mock JWT the client produces

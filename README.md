@@ -88,7 +88,12 @@ go run . --dev-mode --addr 127.0.0.1:8080
 
 It prints a loud `WARNING: running in dev mode, Auth0 verification disabled`
 banner on boot. The dev database is a scratch file — safe to delete, and it
-never touches the standard `trivia.db`.
+never touches the standard `trivia.db`. Setting `DB_PATH` overrides it, which
+is how the e2e suite gives each Playwright worker a database of its own:
+
+```sh
+DB_PATH=data/trivia-dev-2.db go run . --dev-mode --addr 127.0.0.1:8082
+```
 
 **Security guardrail:** dev mode is only allowed on the loopback interface.
 Because it disables Auth0 verification and accepts unsigned mock JWTs, the API

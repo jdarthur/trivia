@@ -310,11 +310,21 @@ func getPlayersInSession(e *Env, sessionId string) ([]models.Player, error) {
 	return sessionPlayers, rows.Err()
 }
 
+// firstPollThrottle is how long a session-state poll that carries no `current`
+// state is held before answering. See GetSessionState.
+const firstPollThrottle = 3 * time.Second
+
 func (e *Env) GetSessionState(c *gin.Context) {
 	sessionId := c.Param("id")
 	requestState := c.Query("current")
-	if requestState == "" {
-		time.Sleep(3 * time.Second)
+	// A client that sends no `current` has nothing to compare against, so the
+	// loop below would return on its first pass; the throttle keeps a caller
+	// that never sends one from hot-looping the endpoint. Dev mode skips it:
+	// it is a flat 3s on the first poll of every gameplay page, which is the
+	// single biggest cost in the e2e suite, and no dev server faces the open
+	// internet.
+	if requestState == "" && !common.DevMode {
+		time.Sleep(firstPollThrottle)
 	}
 
 	sleepTime := 500 * time.Millisecond

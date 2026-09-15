@@ -83,7 +83,12 @@ jobs:
         with:
           node-version: 22
           cache: npm
-          cache-dependency-path: e2e/package-lock.json
+          # The webServer step installs the client as well as e2e's own deps, so
+          # both lockfiles belong in the cache key — otherwise the client install
+          # downloads everything cold on every run.
+          cache-dependency-path: |
+            e2e/package-lock.json
+            client/package-lock.json
 
       - uses: actions/setup-go@v5
         with:
@@ -103,8 +108,10 @@ jobs:
       - name: Install Playwright browsers
         run: npx playwright install --with-deps chromium
 
-      # The webServer config builds the client and boots the Go API against a
-      # temp SQLite DB, so the test command alone drives the whole harness.
+      # The webServer config builds the client and boots one Go API per worker,
+      # each against its own temp SQLite DB, so the test command alone drives the
+      # whole harness. Workers default to 2 here (see e2e/fixtures/servers.ts):
+      # each one costs a browser and a server, and the runner has 4 vCPUs.
       - name: Run e2e tests
         run: npx playwright test
 

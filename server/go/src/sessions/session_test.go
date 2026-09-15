@@ -9,6 +9,7 @@ import (
 	"sort"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/jdarthur/trivia/common"
@@ -834,6 +835,52 @@ func TestGetSessionStateHandlerReturnsNewToken(t *testing.T) {
 	}
 	if resp.State == old {
 		t.Fatalf("handler returned the stale token %q instead of the new one", resp.State)
+	}
+}
+
+// A poll that carries no `current` is throttled so a client that never sends
+// one cannot hot-loop the endpoint — except in dev mode, where the flat 3s on
+// the first poll of every gameplay page is the e2e suite's biggest single cost.
+func TestGetSessionStateFirstPollThrottleSkippedInDevMode(t *testing.T) {
+	env := openSessionTestDB(t)
+	gameId := createStartableGame(t, env)
+
+	gin.SetMode(gin.TestMode)
+	recorder := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(recorder)
+	body, err := json.Marshal(map[string]string{"name": "S", "game_id": gameId})
+	if err != nil {
+		t.Fatal(err)
+	}
+	c.Request = httptest.NewRequest(http.MethodPost, "/gameplay/session", bytes.NewReader(body))
+	c.Request.Header.Set("Content-Type", "application/json")
+	env.CreateSession(c)
+	var created struct {
+		ID string `json:"id"`
+	}
+	if err := json.Unmarshal(recorder.Body.Bytes(), &created); err != nil {
+		t.Fatalf("bad create response %q: %v", recorder.Body.String(), err)
+	}
+
+	previous := common.DevMode
+	common.DevMode = true
+	t.Cleanup(func() { common.DevMode = previous })
+
+	recorder = httptest.NewRecorder()
+	c, _ = gin.CreateTestContext(recorder)
+	c.Params = gin.Params{{Key: "id", Value: created.ID}}
+	c.Request = httptest.NewRequest(http.MethodGet, "/gameplay/session/"+created.ID+"/state?current=", nil)
+
+	start := time.Now()
+	env.GetSessionState(c)
+	elapsed := time.Since(start)
+
+	if c.IsAborted() {
+		t.Fatalf("GetSessionState aborted: %s", recorder.Body.String())
+	}
+	// Well under the throttle, but loose enough not to flake on a slow box.
+	if elapsed >= firstPollThrottle {
+		t.Fatalf("first poll took %s in dev mode, want less than the %s throttle", elapsed, firstPollThrottle)
 	}
 }
 
