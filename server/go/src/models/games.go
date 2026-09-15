@@ -15,6 +15,12 @@ type Game struct {
 	Rounds     []string          `json:"rounds"`
 	RoundNames map[string]string `json:"round_names"`
 	UserId     string            `json:"user_id"`
+
+	// ActiveSessions is derived from session.game_id (never settable): how many
+	// sessions currently reference this game. It backs the editor's "used in
+	// active sessions" column so the list shows it without a second request per
+	// game.
+	ActiveSessions int `json:"active_sessions"`
 }
 
 func (g Game) SetCreateDate(createDate time.Time) Object {

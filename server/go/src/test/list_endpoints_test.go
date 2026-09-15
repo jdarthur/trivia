@@ -40,6 +40,9 @@ type listResponse struct {
 type listNamed struct {
 	ID   string `json:"id"`
 	Name string `json:"name"`
+	// active_sessions is the derived session-usage count on the games list
+	// (ticket: Games table). Zero when the game isn't used in any session.
+	ActiveSessions int `json:"active_sessions"`
 }
 
 type listQuestion struct {
@@ -173,7 +176,8 @@ func TestRoundsCategoriesGamesEndpointsEnvelope(t *testing.T) {
 	}
 	game := models.Game{Name: "Game 1", UserId: "user-1", Rounds: []string{roundId},
 		RoundNames: map[string]string{roundId: "Round A"}}
-	if _, _, err := common.Create(env, common.GameTable, &game); err != nil {
+	gameId, _, err := common.Create(env, common.GameTable, &game)
+	if err != nil {
 		t.Fatal(err)
 	}
 	cat := models.Category{UserId: "user-1", Name: "Category 1"}
@@ -221,6 +225,21 @@ func TestRoundsCategoriesGamesEndpointsEnvelope(t *testing.T) {
 	if body.Total != 1 || len(body.Games) != 1 {
 		t.Fatalf("games = %+v, want 1 game", body)
 	}
+	if body.Games[0].ActiveSessions != 0 {
+		t.Fatalf("active_sessions = %d, want 0 (no session yet)", body.Games[0].ActiveSessions)
+	}
+
+	// a session referencing the game makes active_sessions count it
+	if _, _, err := common.Create(env, common.SessionTable, &models.Session{
+		Name: "Session 1", GameId: gameId,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	_, body = getList(t, router, "/editor/games?page=0&page_size=1")
+	if body.Games[0].ActiveSessions != 1 {
+		t.Fatalf("active_sessions = %d, want 1", body.Games[0].ActiveSessions)
+	}
+
 	_, body = getList(t, router, "/editor/collections")
 	if body.Total != 1 {
 		t.Fatalf("collections total = %d, want 1", body.Total)

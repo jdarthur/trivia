@@ -39,20 +39,38 @@ async function createRound(request: APIRequestContext, name: string): Promise<st
 
 // Create a game through the UI: click New, rename it in the Edit Game modal (the
 // default name is today's date, so we always rename to a unique name), click
-// Save, and wait for the game card to appear in the list.
+// Save, then search for it and wait for its table row to appear. Search is
+// needed because the list is ordered oldest-first, so a freshly-created game
+// (and any game created by an earlier test) can sit below the fold; searching
+// brings the row we care about into view regardless of how many rows accumulated.
 async function createGameViaUI(page: Page, name: string) {
   await page.getByRole('button', { name: /New/ }).first().click();
   await expect(page.locator('.round-name')).toBeVisible();
   await page.locator('.round-name').fill(name);
   await page.getByRole('button', { name: 'Save', exact: true }).click();
   await expect(page.locator('.round-name')).toBeHidden();
-  await expect(page.locator('.ant-card').filter({ hasText: name })).toBeVisible();
+  await search(page, name);
+  await expect(gameRow(page, name)).toBeVisible();
 }
 
-// Open a game's Edit Game modal by clicking its card's Edit icon.
+// Narrow the list to rows whose text matches `text` via the filter bar.
+async function search(page: Page, text: string) {
+  const input = page.locator('.filter_holder input[placeholder="Search"]');
+  await input.fill(text);
+  await input.press('Enter');
+}
+
+// The table row for a game whose row text matches `name`.
+function gameRow(page: Page, name: string) {
+  return page.locator('.round_list .ant-table-row').filter({ hasText: name });
+}
+
+// Open a game's Edit Game modal by clicking its table row's Edit icon.
 async function openGame(page: Page, name: string) {
-  const card = page.locator('.ant-card').filter({ hasText: name });
-  await card.locator('.anticon-edit').click();
+  await search(page, name);
+  const row = gameRow(page, name);
+  await expect(row).toBeVisible();
+  await row.locator('.anticon-edit').click();
   await expect(page.locator('.ant-modal:has(.ant-modal-title)')).toBeVisible();
   await expect(page.locator('.ant-modal-title')).toHaveText('Edit Game');
   await expect(page.locator('.round-name')).toBeVisible();
@@ -91,7 +109,7 @@ gamesTest.describe('games CRUD', () => {
     const name = `e2e-game-create-${unique()}`;
     await createGameViaUI(gamesPage, name);
 
-    await expect(gamesPage.locator('.ant-card').filter({ hasText: name })).toContainText('0 Rounds');
+    await expect(gameRow(gamesPage, name).locator('.ant-table-cell').nth(2)).toContainText('0');
 
     await deleteGameByName(request, name);
   });
@@ -140,6 +158,6 @@ gamesTest.describe('games CRUD', () => {
     await openGame(gamesPage, name);
 
     await gamesPage.getByRole('button', { name: /Delete game/ }).click();
-    await expect(gamesPage.locator('.ant-card').filter({ hasText: name })).toBeHidden();
+    await expect(gameRow(gamesPage, name)).toHaveCount(0);
   });
 });
