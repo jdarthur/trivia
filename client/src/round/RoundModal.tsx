@@ -168,6 +168,7 @@ export default function RoundModal(props: Props) {
                                              titles={["Available questions", "Questions in round"]}
                                              showFilters
                                              defaultUnusedOnly
+                                             reorderable
                                              onSelectedChange={setLeftSelected}
                                              unusedFilter={(q) => !q.rounds_used?.some(r => r !== id)}/>
 

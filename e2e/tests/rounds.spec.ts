@@ -222,6 +222,16 @@ function orderIndexes(rows: string[], expected: string[]): number[] {
   return rows.map((row) => expected.findIndex((q) => row.includes(q)));
 }
 
+// A target-list row's reorder button (see TransferQuestions' `reorderable`).
+// The row is matched by its unique question text; `label` is the button's
+// aria-label ("Move question up" / "Move question down").
+function reorderButton(page: Page, questionText: string, label: string) {
+  return targetList(page)
+    .locator('.ant-transfer-list-content-item')
+    .filter({ hasText: questionText })
+    .getByRole('button', { name: label });
+}
+
 // Delete a round by name via the API (test cleanup). Safe no-op if not found.
 async function deleteRoundByName(request: APIRequestContext, name: string) {
   const res = await request.get('/editor/rounds', { headers: { 'borttrivia-token': token } });
@@ -428,6 +438,77 @@ roundsTest.describe('question order', () => {
     await modal.getByRole('button', { name: 'Update', exact: true }).click();
     await expect(modal).toBeHidden();
 
+    await reloadRounds(roundsPage);
+    await openRound(roundsPage, name);
+    await roundsPage.getByRole('button', { name: 'Next', exact: true }).click();
+    expect(orderIndexes(await targetOrder(roundsPage), expected)).toEqual([0, 1, 2]);
+
+    await deleteRoundByName(request, name);
+  });
+
+  roundsTest('moves a question up and down within the round', async ({
+    roundsPage,
+    request,
+  }) => {
+    const marker = `e2e-ord3-${unique()}`;
+    const name = `round ${marker}`;
+    const category = `qcat ${marker}`;
+    const seeded = [1, 2, 3].map((i) => `Move question ${i} ${marker}`);
+    for (const q of seeded) {
+      await createQuestion(request, category, q, `Answer ${q}`);
+    }
+
+    await createRoundViaUI(roundsPage, request, name);
+    await reloadRounds(roundsPage);
+    await openRound(roundsPage, name);
+    const modal = roundsPage.locator('.ant-modal:has(.ant-modal-title)');
+    await modal.getByRole('button', { name: 'Next', exact: true }).click();
+    await filterTransfer(roundsPage, marker);
+    for (const q of seeded) {
+      await moveIn(roundsPage, q);
+    }
+    expect(orderIndexes(await targetOrder(roundsPage), seeded)).toEqual([0, 1, 2]);
+
+    // The ends of the round can't move any further out of it.
+    await expect(reorderButton(roundsPage, seeded[0], 'Move question up')).toBeDisabled();
+    await expect(reorderButton(roundsPage, seeded[2], 'Move question down')).toBeDisabled();
+
+    // Move the last question up twice: 1,2,3 -> 1,3,2 -> 3,1,2.
+    await reorderButton(roundsPage, seeded[2], 'Move question up').click();
+    expect(orderIndexes(await targetOrder(roundsPage), seeded)).toEqual([0, 2, 1]);
+    await reorderButton(roundsPage, seeded[2], 'Move question up').click();
+    expect(orderIndexes(await targetOrder(roundsPage), seeded)).toEqual([2, 0, 1]);
+
+    // Now at the top, its "up" is disabled and the question it displaced can
+    // move back down: 3,1,2 -> 3,2,1.
+    await expect(reorderButton(roundsPage, seeded[2], 'Move question up')).toBeDisabled();
+    await reorderButton(roundsPage, seeded[0], 'Move question down').click();
+    const expected = [seeded[2], seeded[1], seeded[0]];
+    expect(orderIndexes(await targetOrder(roundsPage), expected)).toEqual([0, 1, 2]);
+
+    // The row click handler selects the row, so a reorder click must not bubble
+    // up to it: the moved rows stay unchecked.
+    for (const q of seeded) {
+      await expect(
+        targetList(roundsPage)
+          .locator('.ant-transfer-list-content-item')
+          .filter({ hasText: q })
+          .locator('.ant-transfer-list-checkbox'),
+      ).not.toHaveClass(/ant-checkbox-wrapper-checked/);
+    }
+
+    // The available list has no order of its own, so its rows carry no buttons.
+    await expect(
+      modal
+        .locator('.ant-transfer-section')
+        .first()
+        .getByRole('button', { name: /^Move question (up|down)$/ }),
+    ).toHaveCount(0);
+
+    await modal.getByRole('button', { name: 'Update', exact: true }).click();
+    await expect(modal).toBeHidden();
+
+    // The new order survives a fresh load.
     await reloadRounds(roundsPage);
     await openRound(roundsPage, name);
     await roundsPage.getByRole('button', { name: 'Next', exact: true }).click();
