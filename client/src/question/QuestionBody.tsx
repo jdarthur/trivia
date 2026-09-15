@@ -44,7 +44,7 @@ export default function QuestionBody(props: Props) {
 
     const mcScored = props.scored && props.question_type === "multiple_choice"
     const answerVisible = props.show_answer && !mcScored
-        && (!props.question_type || props.question_type === "freeform")
+        && (!props.question_type || props.question_type === "freeform" || props.question_type === "numeric")
 
     return (
         <div>

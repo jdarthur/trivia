@@ -252,6 +252,7 @@ class ActiveGame extends React.Component<Props, State> {
                                   player_id={this.props.player_id} session_state={this.props.session_state}
                                   scored={this.state.scored as boolean}
                                   question_type={this.state.question_type}
+                                  correct_answer={this.state.answer}
                                   on_scorable={this.set_scorable}/> : null}
 
                 {!this.props.is_mod ?

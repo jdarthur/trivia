@@ -87,6 +87,12 @@ func (e *Env) AnswerQuestion(c *gin.Context) {
 			return
 		}
 	}
+	if question.QuestionType == "numeric" {
+		if err := validateNumericAnswer(question, answer.Answer); err != nil {
+			common.Respond(c, nil, err)
+			return
+		}
+	}
 
 	availableWagers, err := getWagers(e, session, *answer.RoundIndex, answer.PlayerId)
 	if err != nil {
@@ -222,6 +228,20 @@ func validateOrderingAnswer(question models.QuestionInRound, answer string) erro
 			return InvalidOrderingAnswerError{Answer: answer, Reason: "each item may appear only once"}
 		}
 		seen[item] = true
+	}
+	return nil
+}
+
+// validateNumericAnswer enforces the numeric shape of a numeric answer
+// (ticket #285): the answer must be a valid number. Empty and non-numeric
+// answers are rejected with InvalidNumericAnswerError instead of being stored
+// as a certain miss.
+func validateNumericAnswer(question models.QuestionInRound, answer string) error {
+	if answer == "" {
+		return InvalidNumericAnswerError{Answer: answer, Reason: "answer must be a number"}
+	}
+	if _, err := strconv.ParseFloat(answer, 64); err != nil {
+		return InvalidNumericAnswerError{Answer: answer, Reason: "answer must be a number"}
 	}
 	return nil
 }

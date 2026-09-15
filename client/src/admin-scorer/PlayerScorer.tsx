@@ -16,6 +16,9 @@ interface Props {
     session_state: any
     scored: boolean
     question_type?: string
+    // Ticket #285: the question's correct numeric answer, so the off-by amount
+    // can be shown on each numeric answer in the scorer.
+    correct_answer?: string
     /**
      * Reports whether every active player has been judged, i.e. whether
      * score() would do anything. The Score button lives in the moderator's
@@ -310,6 +313,7 @@ class PlayerScorer extends React.Component<Props, State> {
                                        set_override={this.set_override} override_value={override_value as number}
                                        auto_scored={this.auto_scored()}
                                        question_type={this.props.question_type}
+                                       correct_answer={this.props.correct_answer}
                                        moneyball={this.get_moneyball(player.player_id)}
                                        scored={this.props.scored}
                                        current_player={this.props.player_id}/>

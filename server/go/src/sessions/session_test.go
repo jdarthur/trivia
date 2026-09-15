@@ -1224,6 +1224,17 @@ func createOrderingQuestion(t *testing.T, env *Env, ordered []models.QuestionOrd
 	return q.ID
 }
 
+func createNumericQuestion(t *testing.T, env *Env, answer string) string {
+	t.Helper()
+	q, err := questions.CreateOneQuestion((*questions.Env)(env), "user-1", models.Question{
+		Question: "N?", Answer: answer, QuestionType: "numeric",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return q.ID
+}
+
 // newStructuredSession builds a session around a single given question, two
 // players, and the (0,0) snapshot set.
 func newStructuredSession(t *testing.T, env *Env, questionId string) (session models.Session, p1 models.PlayerId, p2 models.PlayerId) {
@@ -1922,6 +1933,120 @@ func TestAutoScoreOrdering(t *testing.T) {
 	}
 	if got[p5].Correct || got[p5].PointsAwarded != 0 {
 		t.Errorf("p5 = correct:%v points:%v, want incorrect (malformed JSON)", got[p5].Correct, got[p5].PointsAwarded)
+	}
+}
+
+// TestAnswerRejectsInvalidNumeric verifies ticket #285: a numeric question
+// only accepts a numeric answer; empty and non-numeric answers are rejected
+// with 400 and not stored, while a valid number (decimal or negative) is
+// accepted.
+func TestAnswerRejectsInvalidNumeric(t *testing.T) {
+	env := openSessionTestDB(t)
+	gin.SetMode(gin.TestMode)
+
+	qid := createNumericQuestion(t, env, "12.5")
+	session, p1, _ := newStructuredSession(t, env, qid)
+
+	post := func(answer string) *httptest.ResponseRecorder {
+		t.Helper()
+		recorder := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(recorder)
+		c.Params = gin.Params{{Key: "id", Value: session.ID}}
+		body, err := json.Marshal(map[string]interface{}{
+			"player_id": string(p1), "answer": answer, "wager": 100,
+			"round_id": 0, "question_id": 0,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		c.Request = httptest.NewRequest(http.MethodPost, "/gameplay/session/"+session.ID+"/answer", bytes.NewReader(body))
+		c.Request.Header.Set("Content-Type", "application/json")
+		setPlayer(c, p1)
+		env.AnswerQuestion(c)
+		return recorder
+	}
+
+	invalid := map[string]string{
+		"letters": "twelve",
+		"mixed":   "12abc",
+		"symbols": "$12",
+	}
+	for name, answer := range invalid {
+		rec := post(answer)
+		if rec.Code != http.StatusBadRequest {
+			t.Errorf("%s: status = %d, want 400: %s", name, rec.Code, rec.Body.String())
+		}
+		var resp struct {
+			Errors string `json:"errors"`
+		}
+		if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+			t.Fatalf("%s: bad error response %q: %v", name, rec.Body.String(), err)
+		}
+		if resp.Errors == "" {
+			t.Errorf("%s: expected an error, got %s", name, rec.Body.String())
+		}
+	}
+
+	// none of the rejected answers were stored
+	var n int
+	if err := env.Db.QueryRow(`SELECT count(*) FROM answer
+		WHERE session_id = ? AND player_id = ?`, session.ID, string(p1)).Scan(&n); err != nil {
+		t.Fatal(err)
+	}
+	if n != 0 {
+		t.Fatalf("rejected numeric answers were stored: %d rows", n)
+	}
+
+	// a valid decimal answer is accepted
+	if rec := post("12.5"); rec.Code != http.StatusOK {
+		t.Fatalf("valid numeric answer status = %d, want 200: %s", rec.Code, rec.Body.String())
+	}
+	// a negative answer is accepted
+	if rec := post("-3"); rec.Code != http.StatusOK {
+		t.Fatalf("negative numeric answer status = %d, want 200: %s", rec.Code, rec.Body.String())
+	}
+}
+
+// TestScoreQuestionNumericManual verifies ticket #285: a numeric question is
+// scored manually by the mod (like freeform), NOT auto-scored. The mod's
+// correct flags are honored — a player marked correct gets the wager even if
+// their number is off, and a player marked incorrect gets 0 even if their
+// number is exact. The off-by amount is only a display aid for the mod.
+func TestScoreQuestionNumericManual(t *testing.T) {
+	env := openSessionTestDB(t)
+	qid := createNumericQuestion(t, env, "100")
+	session, p1, p2 := newStructuredSession(t, env, qid)
+	p3 := addPlayerToSession(t, env, session.ID, "team-3")
+
+	addAnswer(t, env, session.ID, p1, "100", 100) // exact, but the mod marks it incorrect
+	addAnswer(t, env, session.ID, p2, "101", 200) // off-by-1, the mod marks it correct
+	addAnswer(t, env, session.ID, p3, "500", 300) // far off, the mod marks it correct
+
+	req := models.ScoreRequest{RoundIndex: 0, QuestionIndex: 0, Players: map[models.PlayerId]models.CorrectorNot{
+		p1: {Correct: false},
+		p2: {Correct: true},
+		p3: {Correct: true},
+	}}
+	if err := scoreQuestionTx(env, session, req, 0, 0); err != nil {
+		t.Fatal(err)
+	}
+
+	answers, err := latestAnswersForQuestion(env, session.ID, 0, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := map[models.PlayerId]models.Answer{}
+	for _, a := range answers {
+		got[a.PlayerId] = a
+	}
+	if got[p1].Correct || got[p1].PointsAwarded != 0 {
+		t.Errorf("p1 = correct:%v points:%v, want incorrect with 0 (mod marked off)", got[p1].Correct, got[p1].PointsAwarded)
+	}
+	if !got[p2].Correct || got[p2].PointsAwarded != 200 {
+		t.Errorf("p2 = correct:%v points:%v, want correct with 200 (mod marked correct)", got[p2].Correct, got[p2].PointsAwarded)
+	}
+	if !got[p3].Correct || got[p3].PointsAwarded != 300 {
+		t.Errorf("p3 = correct:%v points:%v, want correct with 300 (mod marked correct)", got[p3].Correct, got[p3].PointsAwarded)
 	}
 }
 

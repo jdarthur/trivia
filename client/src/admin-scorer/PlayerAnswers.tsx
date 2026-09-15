@@ -34,6 +34,9 @@ interface Props {
     clear?: (player_id: string) => void
     auto_scored?: boolean
     question_type?: string
+    // Ticket #285: the question's correct numeric answer, so the off-by amount
+    // can be shown on each numeric answer.
+    correct_answer?: string
     // moneyball: the latest answer opted into the Moneyball mechanic, so its
     // points are computed by the backend (ticket #3) and the override slider
     // is disabled.
@@ -58,6 +61,7 @@ export default function PlayerAnswers({
                                           player_name,
                                           auto_scored,
                                           question_type,
+                                          correct_answer,
                                           moneyball,
                                           scored,
                                           current_player
@@ -80,7 +84,7 @@ export default function PlayerAnswers({
     const incorrectButtonStyle = correct === false ? {background: "#ffccc7"} : {}
     const correctButtonStyle = correct === true ? {background: "#d9f7be"} : {}
 
-    let answer_text = <MultiAnswer answers={answers} question_type={question_type}/>
+    let answer_text = <MultiAnswer answers={answers} question_type={question_type} correct_answer={correct_answer}/>
 
     let override = correct === false ? 0 : override_value
     const wager = <div style={{paddingLeft: '10px', fontSize: '1.3em', fontWeight: 'bold'}}>

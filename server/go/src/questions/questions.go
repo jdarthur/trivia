@@ -7,6 +7,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jdarthur/trivia/common"
 	"github.com/jdarthur/trivia/models"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -178,13 +179,13 @@ func (e AttemptedToSetRoundsUsedError) Data() interface{} {
 }
 
 // InvalidQuestionTypeError is returned when question_type is not one of
-// freeform / multiple_choice / matching / bucketing.
+// freeform / multiple_choice / matching / bucketing / ordering / numeric.
 type InvalidQuestionTypeError struct {
 	QuestionType string
 }
 
 func (e InvalidQuestionTypeError) Error() string {
-	return "Invalid question type: '" + e.QuestionType + "' (expected freeform, multiple_choice, matching, or bucketing)"
+	return "Invalid question type: '" + e.QuestionType + "' (expected freeform, multiple_choice, matching, bucketing, ordering, or numeric)"
 }
 
 func (e InvalidQuestionTypeError) Field() string {
@@ -633,6 +634,98 @@ func (e OrderingWithBucketsError) Data() interface{} {
 	return e.Rows
 }
 
+// MissingNumericAnswerError is returned when a numeric question has no answer.
+// numeric keeps the mod-written answer as the correct number (like freeform).
+type MissingNumericAnswerError struct {
+	Question string
+}
+
+func (e MissingNumericAnswerError) Error() string {
+	return "numeric question requires an answer"
+}
+
+func (e MissingNumericAnswerError) Field() string {
+	return "answer"
+}
+
+func (e MissingNumericAnswerError) Data() interface{} {
+	return e.Question
+}
+
+// InvalidNumericAnswerError is returned when a numeric question's answer (or a
+// player's numeric answer) is not a number.
+type InvalidNumericAnswerError struct {
+	Answer string
+}
+
+func (e InvalidNumericAnswerError) Error() string {
+	return "numeric answer must be a number"
+}
+
+func (e InvalidNumericAnswerError) Field() string {
+	return "answer"
+}
+
+func (e InvalidNumericAnswerError) Data() interface{} {
+	return e.Answer
+}
+
+// NumericWithChoicesError is returned when a numeric question carries
+// multiple_choice options (the structured payloads are mutually exclusive).
+type NumericWithChoicesError struct {
+	Choices []models.QuestionChoice
+}
+
+func (e NumericWithChoicesError) Error() string {
+	return "numeric question cannot have choices"
+}
+
+func (e NumericWithChoicesError) Field() string {
+	return models.Choices
+}
+
+func (e NumericWithChoicesError) Data() interface{} {
+	return e.Choices
+}
+
+// NumericWithPairsError is returned when a numeric question carries matching
+// pairs (the structured payloads are mutually exclusive).
+type NumericWithPairsError struct {
+	Pairs []models.QuestionPair
+}
+
+func (e NumericWithPairsError) Error() string {
+	return "numeric question cannot have pairs"
+}
+
+func (e NumericWithPairsError) Field() string {
+	return models.Pairs
+}
+
+func (e NumericWithPairsError) Data() interface{} {
+	return e.Pairs
+}
+
+// NumericWithBucketsError is returned when a numeric question carries
+// bucketing/ordering child rows (the structured payloads are mutually
+// exclusive).
+type NumericWithBucketsError struct {
+	Rows      interface{}
+	FieldName string
+}
+
+func (e NumericWithBucketsError) Error() string {
+	return "numeric question cannot have " + e.FieldName
+}
+
+func (e NumericWithBucketsError) Field() string {
+	return e.FieldName
+}
+
+func (e NumericWithBucketsError) Data() interface{} {
+	return e.Rows
+}
+
 // validateQuestionType enforces the per-type payload rules before the row and
 // its children are written. The matrix (tickets #99, #164):
 //
@@ -648,6 +741,8 @@ func (e OrderingWithBucketsError) Data() interface{} {
 //	                 declared bucket; choices/pairs empty
 //	ordering         derived answer; prompt required; 2+ items; item texts
 //	                 unique; choices/pairs/buckets/items empty
+//	numeric          answer required + numeric; choices/pairs/buckets/items/
+//	                 ordered empty
 func validateQuestionType(data models.Question) error {
 	switch data.QuestionType {
 	case "freeform":
@@ -777,6 +872,29 @@ func validateQuestionType(data models.Question) error {
 				return DuplicateOrderedItemTextError{Text: item.Text}
 			}
 			seen[text] = true
+		}
+		return nil
+	case "numeric":
+		if data.Answer == "" {
+			return MissingNumericAnswerError{Question: data.Question}
+		}
+		if _, err := strconv.ParseFloat(strings.TrimSpace(data.Answer), 64); err != nil {
+			return InvalidNumericAnswerError{Answer: data.Answer}
+		}
+		if len(data.Choices) != 0 {
+			return NumericWithChoicesError{Choices: data.Choices}
+		}
+		if len(data.Pairs) != 0 {
+			return NumericWithPairsError{Pairs: data.Pairs}
+		}
+		if len(data.Buckets) != 0 {
+			return NumericWithBucketsError{FieldName: models.Buckets, Rows: data.Buckets}
+		}
+		if len(data.Items) != 0 {
+			return NumericWithBucketsError{FieldName: models.Items, Rows: data.Items}
+		}
+		if len(data.Ordered) != 0 {
+			return NumericWithBucketsError{FieldName: models.Ordered, Rows: data.Ordered}
 		}
 		return nil
 	default:

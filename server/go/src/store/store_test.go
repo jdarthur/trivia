@@ -36,8 +36,8 @@ func TestMigrateCreatesBaselineSchema(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Version: %v", err)
 	}
-	if v != 17 {
-		t.Fatalf("user_version = %d, want 17", v)
+	if v != 18 {
+		t.Fatalf("user_version = %d, want 18", v)
 	}
 
 	tables := []string{
@@ -330,8 +330,8 @@ func TestMigrateIsIdempotent(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Version: %v", err)
 	}
-	if v != 17 {
-		t.Fatalf("user_version = %d after re-migrate, want 17", v)
+	if v != 18 {
+		t.Fatalf("user_version = %d after re-migrate, want 18", v)
 	}
 }
 
@@ -633,6 +633,86 @@ func TestMigrateAddsOrderingQuestionType(t *testing.T) {
 	}
 	if _, err := db.Exec(`INSERT INTO question_ordered (question_id, position, text) VALUES ('nope', 0, 'x')`); err == nil {
 		t.Error("expected FK violation on question_ordered.question_id after rebuild")
+	}
+}
+
+// TestMigrateAddsNumericQuestionType verifies migration 18 (ticket #285): the
+// numeric question type is added to the question / session_question
+// question_type CHECK without losing existing rows or their referencing
+// children, and the widened CHECK accepts 'numeric' on both tables. It
+// migrates a scratch DB to version 17, seeds v17-era data, then migrates to 18.
+func TestMigrateAddsNumericQuestionType(t *testing.T) {
+	db, err := Open(filepath.Join(t.TempDir(), "trivia.db"))
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+	t.Cleanup(func() { db.Close() })
+
+	// forward-only Migrate can't stop at 17, so apply migrations 1..17
+	// directly (the test is in the store package and can see the list).
+	for _, m := range migrations {
+		if m.version > 17 {
+			break
+		}
+		if err := apply(db, m); err != nil {
+			t.Fatalf("apply migration %d: %v", m.version, err)
+		}
+	}
+
+	// v17-era data: a category, a question attached to it (category_id is the
+	// post-#178 wiring), its referencing children, and a session snapshot.
+	mustExec(t, db, `INSERT INTO category (id, user_id, create_date, name)
+		VALUES ('c1', 'u1', '2026-01-01T00:00:00.000000', 'Cat')`)
+	mustExec(t, db, `INSERT INTO question (id, create_date, category_id, question, answer, user_id, question_type)
+		VALUES ('q1', '2026-01-01T00:00:00.000000', 'c1', 'q?', 'a', 'u1', 'matching')`)
+	mustExec(t, db, `INSERT INTO round (id, create_date, name, user_id)
+		VALUES ('r1', '2026-01-01T00:00:00.000000', 'R', 'u1')`)
+	mustExec(t, db, `INSERT INTO round_question (round_id, question_id, position) VALUES ('r1', 'q1', 0)`)
+	mustExec(t, db, `INSERT INTO question_match (question_id, position, left_text, right_text)
+		VALUES ('q1', 0, 'L', 'R')`)
+	mustExec(t, db, `INSERT INTO session (id, create_date) VALUES ('s1', '2026-01-01T00:00:00.000000')`)
+	mustExec(t, db, `INSERT INTO session_question (session_id, round_index, question_index, question_type)
+		VALUES ('s1', 0, 0, 'matching')`)
+
+	if err := Migrate(db); err != nil {
+		t.Fatalf("Migrate to 18: %v", err)
+	}
+
+	var n int
+	for _, tc := range []struct {
+		name  string
+		query string
+	}{
+		{"question", `SELECT count(*) FROM question WHERE id = 'q1'`},
+		{"round_question", `SELECT count(*) FROM round_question WHERE question_id = 'q1'`},
+		{"question_match", `SELECT count(*) FROM question_match WHERE question_id = 'q1'`},
+		{"session_question", `SELECT count(*) FROM session_question WHERE session_id = 's1'`},
+	} {
+		if err := db.QueryRow(tc.query).Scan(&n); err != nil {
+			t.Fatal(err)
+		}
+		if n != 1 {
+			t.Errorf("%s rows lost by migration 18 rebuild: %d", tc.name, n)
+		}
+	}
+
+	// the rebuilt question kept its category_id wiring
+	var categoryId sql.NullString
+	if err := db.QueryRow(`SELECT category_id FROM question WHERE id = 'q1'`).Scan(&categoryId); err != nil {
+		t.Fatal(err)
+	}
+	if !categoryId.Valid || categoryId.String != "c1" {
+		t.Errorf("category_id = %v after rebuild, want c1", categoryId)
+	}
+
+	// the widened CHECK accepts numeric on the rebuilt tables
+	mustExec(t, db, `INSERT INTO question (id, create_date, question_type) VALUES ('q2', '2026-01-01T00:00:00.000000', 'numeric')`)
+	mustExec(t, db, `INSERT INTO session_question (session_id, round_index, question_index, question_type)
+		VALUES ('s1', 1, 0, 'numeric')`)
+
+	// foreign keys still enforced against the rebuilt tables
+	if _, err := db.Exec(`INSERT INTO round_question (round_id, question_id, position) VALUES ('r1', 'nope', 0)`); err == nil {
+		t.Error("expected FK violation on round_question.question_id after rebuild")
 	}
 }
 
