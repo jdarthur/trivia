@@ -1,5 +1,5 @@
 import { expect, type APIRequestContext, type Page } from '@playwright/test';
-import { gamesTest } from '../fixtures/editor';
+import { gamesTest, loginToGamesEditor } from '../fixtures/editor';
 
 // A unique-ish suffix keeps every test's data distinct from anything left in
 // the shared dev DB, so tests don't collide with each other or with leftovers.
@@ -74,6 +74,17 @@ async function openGame(page: Page, name: string) {
   await expect(page.locator('.ant-modal:has(.ant-modal-title)')).toBeVisible();
   await expect(page.locator('.ant-modal-title')).toHaveText('Edit Game');
   await expect(page.locator('.round-name')).toBeVisible();
+}
+
+// Create a game directly through the API (faster than the UI when a test just
+// needs a known number of rows to exist). Returns the created game's id.
+async function createGameViaApi(request: APIRequestContext, name: string): Promise<string> {
+  const res = await request.post('/editor/game', {
+    headers: { 'borttrivia-token': token },
+    data: { name },
+  });
+  expect(res.ok()).toBeTruthy();
+  return (await res.json()).id;
 }
 
 // Delete a game by name via the API (test cleanup). Safe no-op if not found.
@@ -159,5 +170,38 @@ gamesTest.describe('games CRUD', () => {
 
     await gamesPage.getByRole('button', { name: /Delete game/ }).click();
     await expect(gameRow(gamesPage, name)).toHaveCount(0);
+  });
+
+  // Ticket #288: a games list longer than one page must show the shared footer
+  // pager and cap the rendered rows at the page size (the table scrolls inside
+  // its container), instead of sprawling past the bottom of the viewport. The
+  // other games tests always search down to a single row, so none of them
+  // exercised the multi-page path.
+  gamesTest('paginates a long games list with a footer pager', async ({ gamesPage, request }) => {
+    const marker = unique();
+    const created: string[] = [];
+    for (let i = 0; i < 12; i++) {
+      created.push(await createGameViaApi(request, `e2e-pager-${marker}-${i}`));
+    }
+
+    try {
+      // Remount GameList so it refetches and sees the freshly seeded games.
+      await loginToGamesEditor(gamesPage);
+      await search(gamesPage, `e2e-pager-${marker}`);
+
+      const pager = gamesPage.locator('.list-pagination');
+      await expect(pager).toBeVisible();
+      await expect(pager).toContainText('1-10 of 12');
+      await expect(gamesPage.locator('.round_list .ant-table-row')).toHaveCount(10);
+
+      // Page 2 holds the remainder.
+      await pager.locator('.ant-pagination-item-2').click();
+      await expect(gamesPage.locator('.round_list .ant-table-row')).toHaveCount(2);
+      await expect(pager).toContainText('11-12 of 12');
+    } finally {
+      for (const id of created) {
+        await request.delete(`/editor/game/${id}`, { headers: { 'borttrivia-token': token } });
+      }
+    }
   });
 });

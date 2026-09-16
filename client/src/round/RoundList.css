@@ -14,5 +14,13 @@
     flex-direction: row;
     justify-content: space-between;
     flex-grow: 1;
+    /* min-height: 0 so this flex item (a child of the page's column flex
+       container) can shrink below its content height. Without it the item grows
+       to fit a tall table and the app shell clips the overflow, so the Games
+       table runs past the viewport instead of scrolling internally — the shared
+       scroll chain in EditorList.css (.ql_and_filter → .round_list →
+       .table_and_pager → .ant-table-wrapper) needs a bounded height at every
+       link to hand the height down (ticket #288). */
+    min-height: 0;
     overflow-y: clip;
 }
