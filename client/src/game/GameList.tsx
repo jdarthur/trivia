@@ -69,7 +69,13 @@ class GameList extends React.Component<Props, State> {
             .then(state => {
                 console.log("got games")
                 console.log(state)
-                this.setState({games: state.games, loading: false})
+                // Newest first: create_date is a fixed-width UTC string, so a
+                // plain string compare orders it chronologically. Sort once at
+                // fetch so the inline editor's full list and the paged view
+                // agree.
+                const games = (state.games || []).slice().sort((a: any, b: any) =>
+                    (b.create_date || "").localeCompare(a.create_date || ""))
+                this.setState({games, loading: false})
             })
             .catch(() => {
                 this.setState({loading: false})
