@@ -10,6 +10,11 @@ import PageHeader from "../common/PageHeader";
 import LoadingOrView from "../editor/LoadingOrView";
 import EditorFilter from "../editor/EditorFilter";
 import DeleteConfirm from "../editor/DeleteConfirm";
+import ListPagination from "../editor/ListPagination";
+import type {ListMeta} from "../api/listParams";
+
+// Default rows per page for the table pager, matching the other editor lists.
+const PAGE_SIZE = 10
 
 //JSON keys
 const NAME = "name"
@@ -29,6 +34,8 @@ interface State {
     game: any
     loading: boolean
     text_filter: string
+    page: number
+    page_size: number
 }
 
 class GameList extends React.Component<Props, State> {
@@ -41,6 +48,8 @@ class GameList extends React.Component<Props, State> {
             game: undefined,
             loading: true,
             text_filter: "",
+            page: 0,
+            page_size: PAGE_SIZE,
         }
     }
 
@@ -68,7 +77,17 @@ class GameList extends React.Component<Props, State> {
     }
 
     set_text_filter = (value: string) => {
-        this.setState({text_filter: value})
+        // A different filter is a different row set, so the current page may not
+        // exist any more — start back at the top (same as the other lists).
+        this.setState({text_filter: value, page: 0})
+    }
+
+    set_page = (page: number) => {
+        this.setState({page})
+    }
+
+    set_page_size = (page_size: number) => {
+        this.setState({page_size, page: 0})
     }
 
     /**
@@ -208,6 +227,20 @@ class GameList extends React.Component<Props, State> {
     render() {
         const displayed_games = this.filter_games(this.state.games || [], this.state.text_filter)
 
+        // Client-side paging (ticket #288): the inline OpenGame editor needs the
+        // full game objects, so the whole list stays in state and we only slice
+        // for display. The pager is the shared ListPagination footer, and the
+        // table body scrolls inside .table_and_pager (see EditorList.css), so the
+        // footer always stays reachable below a tall list.
+        const total = displayed_games.length
+        const total_pages = Math.max(1, Math.ceil(total / this.state.page_size))
+        // Clamp so deleting the last rows on a later page can't leave us on an
+        // empty page with no way back.
+        const page = Math.min(this.state.page, total_pages - 1)
+        const paged_games = displayed_games.slice(page * this.state.page_size,
+            page * this.state.page_size + this.state.page_size)
+        const meta: ListMeta = {total, page, page_size: this.state.page_size, total_pages}
+
         const ngb = this.add_newgame_button() ?
             <NewButton on_click={this.add_new_game}/> : null
 
@@ -234,8 +267,10 @@ class GameList extends React.Component<Props, State> {
         ]
 
         const table = <div className="table_and_pager">
-            <Table columns={columns} dataSource={displayed_games} pagination={false}
+            <Table columns={columns} dataSource={paged_games} pagination={false}
                    size="small" rowKey="id"/>
+            <ListPagination meta={meta} page={page} pageSize={this.state.page_size}
+                            set_page={this.set_page} set_page_size={this.set_page_size}/>
         </div>
 
         const header = <EditorFilter set_text_filter={this.set_text_filter}
