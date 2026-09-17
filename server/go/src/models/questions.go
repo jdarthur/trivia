@@ -28,6 +28,14 @@ type Question struct {
 	Buckets      []QuestionBucket      `json:"buckets,omitempty"`                  // bucketing
 	Items        []QuestionBucketItem  `json:"items,omitempty"`                    // bucketing
 	Ordered      []QuestionOrderedItem `json:"ordered,omitempty"`                  // ordering
+
+	// PointsPerCorrect is the per-item score for a partial-credit question
+	// (ticket #292): bucketing and matching award points for each correctly
+	// placed item/pair instead of all-or-nothing. 0 (the default) keeps the
+	// historical all-or-nothing behavior. The maximum a player can earn is
+	// len(items) * PointsPerCorrect (or len(pairs) for matching); the round
+	// wager is ignored when this is set.
+	PointsPerCorrect int `json:"points_per_correct" form:"points_per_correct"`
 }
 
 type QuestionChoice struct {

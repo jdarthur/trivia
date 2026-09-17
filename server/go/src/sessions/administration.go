@@ -111,7 +111,7 @@ func _setCurrentQuestion(e *Env, session *models.Session, roundIndex int, questi
 
 	err = upsertSessionQuestion(e, session.ID, roundIndex, questionIndex, questionId,
 		categoryName, questionObject.Question, questionObject.Answer,
-		scoringNoteId, scoringNote, questionObject.QuestionType)
+		scoringNoteId, scoringNote, questionObject.QuestionType, questionObject.PointsPerCorrect)
 	if err != nil {
 		return err
 	}
@@ -121,13 +121,14 @@ func _setCurrentQuestion(e *Env, session *models.Session, roundIndex int, questi
 }
 
 // upsertSessionQuestion writes (or refreshes) one session_question snapshot
-// row, including the question_type and the canonical choice/match child rows
-// copied into the snapshot child tables. scored is deliberately not updated on
-// conflict — re-navigating to a scored question keeps it scored.
-func upsertSessionQuestion(e *Env, sessionId string, roundIndex int, questionIndex int, questionId string, category string, question string, answer string, scoringNoteId string, scoringNote string, questionType string) error {
+// row, including the question_type, points_per_correct, and the canonical
+// choice/match child rows copied into the snapshot child tables. scored is
+// deliberately not updated on conflict — re-navigating to a scored question
+// keeps it scored.
+func upsertSessionQuestion(e *Env, sessionId string, roundIndex int, questionIndex int, questionId string, category string, question string, answer string, scoringNoteId string, scoringNote string, questionType string, pointsPerCorrect int) error {
 	_, err := e.Db.Exec(`INSERT INTO session_question
-		(session_id, round_index, question_index, question_id, category, question, answer, scoring_note_id, scoring_note, scored, question_type)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?)
+		(session_id, round_index, question_index, question_id, category, question, answer, scoring_note_id, scoring_note, scored, question_type, points_per_correct)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)
 		ON CONFLICT(session_id, round_index, question_index) DO UPDATE SET
 			question_id = excluded.question_id,
 			category = excluded.category,
@@ -135,8 +136,9 @@ func upsertSessionQuestion(e *Env, sessionId string, roundIndex int, questionInd
 			answer = excluded.answer,
 			scoring_note_id = excluded.scoring_note_id,
 			scoring_note = excluded.scoring_note,
-			question_type = excluded.question_type`,
-		sessionId, roundIndex, questionIndex, questionId, category, question, answer, scoringNoteId, scoringNote, questionType)
+			question_type = excluded.question_type,
+			points_per_correct = excluded.points_per_correct`,
+		sessionId, roundIndex, questionIndex, questionId, category, question, answer, scoringNoteId, scoringNote, questionType, pointsPerCorrect)
 	if err != nil {
 		return err
 	}
@@ -460,10 +462,10 @@ func scoreQuestionTx(e *Env, session models.Session, requestBody models.ScoreReq
 		//read the question snapshot inside the transaction, so the scored
 		//check and the scored write cannot race
 		var questionId, snapshotAnswer, questionType string
-		var scored int
-		err := q.QueryRowContext(ctx, `SELECT question_id, answer, scored, question_type FROM session_question
+		var scored, pointsPerCorrect int
+		err := q.QueryRowContext(ctx, `SELECT question_id, answer, scored, question_type, points_per_correct FROM session_question
 			WHERE session_id = ? AND round_index = ? AND question_index = ?`,
-			session.ID, roundIndex, questionIndex).Scan(&questionId, &snapshotAnswer, &scored, &questionType)
+			session.ID, roundIndex, questionIndex).Scan(&questionId, &snapshotAnswer, &scored, &questionType, &pointsPerCorrect)
 		if errors.Is(err, sql.ErrNoRows) {
 			return InvalidQuestionIndexError{QuestionIndex: questionIndex}
 		}
@@ -560,6 +562,7 @@ func scoreQuestionTx(e *Env, session models.Session, requestBody models.ScoreReq
 			wager        int
 			useMoneyball bool
 			isCorrect    bool
+			correctItems int
 			override     *float64
 		}
 		scores := make([]playerScore, 0, len(requestBody.Players))
@@ -586,10 +589,12 @@ func scoreQuestionTx(e *Env, session models.Session, requestBody models.ScoreReq
 			// freeform keeps the mod's correct flag; numeric is judged by the
 			// mod too (the mod sees each answer's off-by amount and marks the
 			// closest/right ones correct, ticket #285). Structured types are
-			// auto-scored against the snapshot answer key.
+			// auto-scored against the snapshot answer key; correctItems is the
+			// count of individually-correct entries (used only when the
+			// question awards points per correct answer).
 			score.isCorrect = correctOrNot.Correct
 			if questionType != "freeform" && questionType != "numeric" {
-				score.isCorrect = autoScoredCorrect(questionType, latestAnswer, correctChoiceText, matchLefts, matchRights, bucketItems, bucketBuckets, orderedItems)
+				score.isCorrect, score.correctItems = autoScoredCorrectness(questionType, latestAnswer, correctChoiceText, matchLefts, matchRights, bucketItems, bucketBuckets, orderedItems)
 			}
 
 			scores = append(scores, score)
@@ -609,7 +614,15 @@ func scoreQuestionTx(e *Env, session models.Session, requestBody models.ScoreReq
 
 		for _, score := range scores {
 			var pointsToAward float64
-			if score.useMoneyball {
+			if pointsPerCorrect > 0 {
+				// Partial credit (ticket #292): each individually-correct
+				// item/pair earns pointsPerCorrect points, up to
+				// correctItems * pointsPerCorrect. The round wager, moneyball,
+				// and any score override are ignored — the question defines a
+				// fixed per-item value, and a partial answer is neither "fully
+				// correct" for moneyball nor mod-judged.
+				pointsToAward = float64(score.correctItems * pointsPerCorrect)
+			} else if score.useMoneyball {
 				switch {
 				case !score.isCorrect:
 					pointsToAward = -float64(score.wager)
@@ -681,59 +694,67 @@ func scoreQuestionTx(e *Env, session models.Session, requestBody models.ScoreReq
 	})
 }
 
-// autoScoredCorrect determines a player's correctness against the snapshot
-// answer key for a structured question type. multiple_choice: the trimmed
-// answer text equals the snapshot's correct option. matching: the answer is a
-// JSON map of left text -> chosen right text; it is correct only if the map has
-// exactly one entry per snapshot pair and every left maps to its right
-// (all-or-nothing). bucketing: the answer is a JSON map of item text -> chosen
-// bucket text; it is correct only if the map has exactly one entry per
-// snapshot item and every item maps to its bucket (all-or-nothing). ordering:
-// the answer is a JSON array of item texts in the player's final order; it is
-// correct only if the array equals the canonical order or the canonical order
-// reversed (all-or-nothing — players commonly trip over ascending/descending
-// but still reach the "correct" answer, per ticket #207). The stored answer
-// stays whatever the player submitted; reversed correctness is decided here at
-// score time.
-func autoScoredCorrect(questionType string, latestAnswer string, correctChoiceText string, matchLefts []string, matchRights []string, bucketItems []string, bucketBuckets []string, orderedItems []string) bool {
+// autoScoredCorrectness determines a player's correctness against the snapshot
+// answer key for a structured question type, along with how many individual
+// entries were correct. multiple_choice: the trimmed answer text equals the
+// snapshot's correct option. matching: the answer is a JSON map of left text ->
+// chosen right text; correctItems is the number of lefts that map to their
+// canonical right, and it is fully correct only when every pair matches
+// (correctItems == len(matchLefts)). bucketing: the answer is a JSON map of
+// item text -> chosen bucket text; correctItems is the number of items that map
+// to their canonical bucket, and it is fully correct only when every item
+// matches (correctItems == len(bucketItems)). ordering: the answer is a JSON
+// array of item texts in the player's final order; it is fully correct only if
+// the array equals the canonical order or the canonical order reversed
+// (all-or-nothing — players commonly trip over ascending/descending but still
+// reach the "correct" answer, per ticket #207); correctItems is 1 when fully
+// correct, else 0. The stored answer stays whatever the player submitted;
+// reversed correctness is decided here at score time.
+//
+// correctItems is used only by scoreQuestionTx when the question sets a
+// points-per-correct-answer value (ticket #292); the boolean drives the
+// all-or-nothing and moneyball paths.
+func autoScoredCorrectness(questionType string, latestAnswer string, correctChoiceText string, matchLefts []string, matchRights []string, bucketItems []string, bucketBuckets []string, orderedItems []string) (bool, int) {
 	switch questionType {
 	case "multiple_choice":
-		return strings.TrimSpace(latestAnswer) == correctChoiceText
+		return strings.TrimSpace(latestAnswer) == correctChoiceText, 0
 	case "matching":
 		var mapping map[string]string
 		if err := json.Unmarshal([]byte(latestAnswer), &mapping); err != nil {
-			return false
+			return false, 0
 		}
 		if len(mapping) != len(matchLefts) {
-			return false
+			return false, 0
 		}
+		correct := 0
 		for i, left := range matchLefts {
-			if mapping[left] != matchRights[i] {
-				return false
+			if mapping[left] == matchRights[i] {
+				correct++
 			}
 		}
-		return true
+		return correct == len(matchLefts), correct
 	case "bucketing":
 		var mapping map[string]string
 		if err := json.Unmarshal([]byte(latestAnswer), &mapping); err != nil {
-			return false
+			return false, 0
 		}
 		if len(mapping) != len(bucketItems) {
-			return false
+			return false, 0
 		}
+		correct := 0
 		for i, item := range bucketItems {
-			if mapping[item] != bucketBuckets[i] {
-				return false
+			if mapping[item] == bucketBuckets[i] {
+				correct++
 			}
 		}
-		return true
+		return correct == len(bucketItems), correct
 	case "ordering":
 		var order []string
 		if err := json.Unmarshal([]byte(latestAnswer), &order); err != nil {
-			return false
+			return false, 0
 		}
 		if len(order) != len(orderedItems) {
-			return false
+			return false, 0
 		}
 		canonical := true
 		reversed := true
@@ -745,8 +766,11 @@ func autoScoredCorrect(questionType string, latestAnswer string, correctChoiceTe
 				reversed = false
 			}
 		}
-		return canonical || reversed
+		if canonical || reversed {
+			return true, 1
+		}
+		return false, 0
 	default:
-		return false
+		return false, 0
 	}
 }

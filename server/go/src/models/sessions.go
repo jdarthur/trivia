@@ -86,6 +86,11 @@ type QuestionInRound struct {
 	// (like Answer), served to the mod and to everyone once scored.
 	ItemBuckets []string `json:"item_buckets,omitempty"`
 	Ordered     []string `json:"ordered,omitempty"` // ordering: canonical order (shuffled pre-score)
+
+	// PointsPerCorrect is the per-item score for a partial-credit question
+	// (ticket #292); 0 means all-or-nothing. Snapshot-copied so scoring reads
+	// the value as of when the question was set.
+	PointsPerCorrect int `json:"points_per_correct,omitempty"`
 }
 
 type ScoreRequest struct {

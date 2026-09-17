@@ -72,6 +72,10 @@ interface Props {
     // Ticket #213: ordering — the author's entry order is the correct order.
     ordered?: QuestionOrderedItem[]
     set_ordered?: (ordered: QuestionOrderedItem[]) => void
+    // Ticket #292: points awarded per correct item for a partial-credit
+    // bucketing/matching question; 0 = all-or-nothing.
+    points_per_correct?: number
+    set_points_per_correct?: (value: number) => void
     disabled?: boolean
     // Ticket #166: opt into the three-step <Steps /> flow. When false/omitted
     // (e.g. the live in-game hot-edit), the legacy single-view modal renders.
@@ -436,11 +440,28 @@ export default function EditQuestionModal(props: Props) {
         </div>
     </div>
 
-    const editView = questionType === MULTIPLE_CHOICE ? choicesView :
-        questionType === MATCHING ? pairsView :
-        questionType === BUCKETING ? bucketsView :
-        questionType === ORDERING ? orderedView :
-        questionType === NUMERIC ? numericView : freeformView
+    // Ticket #292: points per correct item, editable only for the per-item
+    // types (bucketing, matching). 0 = all-or-nothing (historical behavior).
+    const pointsPerCorrectField = (questionType === BUCKETING || questionType === MATCHING) ? (
+        <div style={{marginBottom: 10}}>
+            <div style={{fontWeight: 600, marginBottom: 4}}>Points per correct answer</div>
+            <InputNumber min={0} value={props.points_per_correct || 0} disabled={props.disabled}
+                         onChange={(value) => props.set_points_per_correct?.(value || 0)}
+                         placeholder="0 = all-or-nothing" style={{width: "100%"}}/>
+            <div style={{fontSize: 12, color: "#888", marginTop: 4}}>
+                Each correctly placed item/pair earns this many points (max = items × this). Leave 0 for all-or-nothing.
+            </div>
+        </div>
+    ) : null
+
+    const editView = <div>
+        {questionType === MULTIPLE_CHOICE ? choicesView :
+            questionType === MATCHING ? pairsView :
+            questionType === BUCKETING ? bucketsView :
+            questionType === ORDERING ? orderedView :
+            questionType === NUMERIC ? numericView : freeformView}
+        {pointsPerCorrectField}
+    </div>
 
     // The preview shows the question as it will appear to players (no answer,
     // no grading), with a "Show answer" toggle that reveals the scored in-game
@@ -459,6 +480,7 @@ export default function EditQuestionModal(props: Props) {
                           buckets={props.buckets}
                           items={props.items}
                           ordered={props.ordered}
+                          points_per_correct={props.points_per_correct}
                           max_width={425}
                           scored={showAnswer}
                           show_answer={showAnswer}

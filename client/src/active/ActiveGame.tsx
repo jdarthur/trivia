@@ -45,6 +45,8 @@ interface State {
     items: string[]
     item_buckets: string[]
     ordered: string[]
+    // Ticket #292: points awarded per correct item (bucketing/matching partial credit).
+    points_per_correct: number
     // Mirrored from PlayerScorer (see its on_scorable prop): the Score button
     // lives in this component's control card, not in the scorer.
     scorable: boolean
@@ -76,6 +78,7 @@ class ActiveGame extends React.Component<Props, State> {
             items: [],
             item_buckets: [],
             ordered: [],
+            points_per_correct: 0,
             scorable: false
         }
     }
@@ -155,7 +158,8 @@ class ActiveGame extends React.Component<Props, State> {
                 question: string, answer: string, category: string, id: number,
                 scored: boolean, scoring_note: string, scoring_note_id: string,
                 question_type: string, choices: string[], lefts: string[], rights: string[],
-                buckets: string[], items: string[], item_buckets: string[], ordered: string[]
+                buckets: string[], items: string[], item_buckets: string[], ordered: string[],
+                points_per_correct?: number
             }) => {
                 console.log(q)
                 if (this.currentFetch !== this.fetchCounter) {
@@ -177,6 +181,7 @@ class ActiveGame extends React.Component<Props, State> {
                     items: q.items || [],
                     item_buckets: q.item_buckets || [],
                     ordered: q.ordered || [],
+                    points_per_correct: q.points_per_correct || 0,
                 })
             })
             .catch((error) => {
@@ -219,6 +224,7 @@ class ActiveGame extends React.Component<Props, State> {
                                             items={this.state.items}
                                             item_buckets={this.state.item_buckets}
                                             ordered={this.state.ordered}
+                                            points_per_correct={this.state.points_per_correct}
                             />
                         </div>
 

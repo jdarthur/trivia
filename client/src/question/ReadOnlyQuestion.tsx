@@ -26,6 +26,7 @@ interface Props {
     buckets?: { text: string }[]
     items?: { text: string, bucket: string }[]
     ordered?: { text: string }[]
+    points_per_correct?: number
 }
 
 class ReadOnlyQuestion extends React.Component<Props> {
@@ -59,6 +60,7 @@ class ReadOnlyQuestion extends React.Component<Props> {
                               buckets={this.props.buckets}
                               items={this.props.items}
                               ordered={this.props.ordered}
+                              points_per_correct={this.props.points_per_correct}
                               max_width={200}
                               show_answer/>
             </Card>

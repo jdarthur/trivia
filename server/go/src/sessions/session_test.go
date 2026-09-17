@@ -1495,6 +1495,74 @@ func TestAutoScoreMatching(t *testing.T) {
 	}
 }
 
+// TestScoreQuestionBucketingPartialCredit verifies that a bucketing question
+// with a points-per-correct-answer value awards partial credit (ticket #292):
+// each correctly bucketed item earns PointsPerCorrect points, the round wager
+// is ignored, and only a fully-correct answer is marked correct.
+func TestScoreQuestionBucketingPartialCredit(t *testing.T) {
+	env := openSessionTestDB(t)
+
+	// 4 items, 2 buckets, 2 points per correct item (max 8).
+	q, err := questions.CreateOneQuestion((*questions.Env)(env), "user-1", models.Question{
+		Question: "Capital?", QuestionType: "bucketing",
+		Buckets: []models.QuestionBucket{{Text: "yes"}, {Text: "no"}},
+		Items: []models.QuestionBucketItem{
+			{Text: "Atlanta", Bucket: "yes"},
+			{Text: "Orlando", Bucket: "no"},
+			{Text: "Dallas", Bucket: "no"},
+			{Text: "Charleston", Bucket: "yes"},
+		},
+		PointsPerCorrect: 2,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	session, p1, p2 := newStructuredSession(t, env, q.ID)
+	p3 := addPlayerToSession(t, env, session.ID, "team-3")
+	p4 := addPlayerToSession(t, env, session.ID, "team-4")
+
+	// p1: 3 of 4 correct (Charleston wrong) -> 6 points.
+	addAnswer(t, env, session.ID, p1, `{"Atlanta":"yes","Orlando":"no","Dallas":"no","Charleston":"no"}`, 100)
+	// p2: all 4 correct -> 8 points.
+	addAnswer(t, env, session.ID, p2, `{"Atlanta":"yes","Orlando":"no","Dallas":"no","Charleston":"yes"}`, 200)
+	// p3: all wrong -> 0 points.
+	addAnswer(t, env, session.ID, p3, `{"Atlanta":"no","Orlando":"yes","Dallas":"yes","Charleston":"no"}`, 300)
+	// p4: 1 of 4 correct -> 2 points.
+	addAnswer(t, env, session.ID, p4, `{"Atlanta":"yes","Orlando":"yes","Dallas":"yes","Charleston":"no"}`, 400)
+
+	req := models.ScoreRequest{RoundIndex: 0, QuestionIndex: 0, Players: map[models.PlayerId]models.CorrectorNot{
+		p1: {Correct: false},
+		p2: {Correct: false},
+		p3: {Correct: false},
+		p4: {Correct: false},
+	}}
+	if err := scoreQuestionTx(env, session, req, 0, 0); err != nil {
+		t.Fatal(err)
+	}
+
+	answers, err := latestAnswersForQuestion(env, session.ID, 0, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := map[models.PlayerId]models.Answer{}
+	for _, a := range answers {
+		got[a.PlayerId] = a
+	}
+	if got[p1].PointsAwarded != 6 || got[p1].Correct {
+		t.Errorf("p1 points=%v correct=%v, want 6 (3 correct * 2) and not fully correct", got[p1].PointsAwarded, got[p1].Correct)
+	}
+	if got[p2].PointsAwarded != 8 || !got[p2].Correct {
+		t.Errorf("p2 points=%v correct=%v, want 8 (all 4) and correct", got[p2].PointsAwarded, got[p2].Correct)
+	}
+	if got[p3].PointsAwarded != 0 || got[p3].Correct {
+		t.Errorf("p3 points=%v correct=%v, want 0", got[p3].PointsAwarded, got[p3].Correct)
+	}
+	if got[p4].PointsAwarded != 2 || got[p4].Correct {
+		t.Errorf("p4 points=%v correct=%v, want 2 (1 correct * 2)", got[p4].PointsAwarded, got[p4].Correct)
+	}
+}
+
 // TestStructuredPlayerView verifies the player-facing current-question view
 // exposes the structured payload (choices / lefts / rights) but blanks the
 // answer key pre-score — nothing reveals the correct option or pairing.

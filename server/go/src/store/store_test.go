@@ -36,8 +36,8 @@ func TestMigrateCreatesBaselineSchema(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Version: %v", err)
 	}
-	if v != 18 {
-		t.Fatalf("user_version = %d, want 18", v)
+	if v != 19 {
+		t.Fatalf("user_version = %d, want 19", v)
 	}
 
 	tables := []string{
@@ -330,8 +330,8 @@ func TestMigrateIsIdempotent(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Version: %v", err)
 	}
-	if v != 18 {
-		t.Fatalf("user_version = %d after re-migrate, want 18", v)
+	if v != 19 {
+		t.Fatalf("user_version = %d after re-migrate, want 19", v)
 	}
 }
 

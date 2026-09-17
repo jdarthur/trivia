@@ -29,6 +29,9 @@ export default function EditQuestionController(props: Props) {
     const [buckets, setBuckets] = useState<QuestionBucket[]>([])
     const [items, setItems] = useState<QuestionBucketItem[]>([])
     const [ordered, setOrdered] = useState<QuestionOrderedItem[]>([])
+    // Ticket #292: points awarded per correct item for a partial-credit
+    // bucketing/matching question; 0 = all-or-nothing.
+    const [points_per_correct, setPointsPerCorrect] = useState<number>(0)
     // Ticket #166: the current step of the multi-step question editor.
     const [step, setStep] = useState(0)
     // Set when Next is attempted on the Question step so the validation error
@@ -47,6 +50,7 @@ export default function EditQuestionController(props: Props) {
         setBuckets(props.selected?.buckets || [])
         setItems(props.selected?.items || [])
         setOrdered(props.selected?.ordered || [])
+        setPointsPerCorrect(props.selected?.points_per_correct || 0)
         // Ticket #166: a new question starts at the first step; an existing
         // one opens on the Question step, since editing usually means changing
         // the question text rather than the type/category info.
@@ -81,7 +85,8 @@ export default function EditQuestionController(props: Props) {
             pairs: pairs,
             buckets: buckets,
             items: items,
-            ordered: ordered
+            ordered: ordered,
+            points_per_correct: points_per_correct,
         }
 
         const response = !!id
@@ -181,6 +186,7 @@ export default function EditQuestionController(props: Props) {
                            buckets={buckets} set_buckets={setBuckets}
                            items={items} set_items={setItems}
                            ordered={ordered} set_ordered={setOrdered}
+                           points_per_correct={points_per_correct} set_points_per_correct={setPointsPerCorrect}
                            steps step={step} step_error={step_error}
                            visible={props.visible}/>
     );

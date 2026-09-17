@@ -132,6 +132,10 @@ type QuestionUpdate struct {
 	Buckets      []models.QuestionBucket      `json:"buckets"`
 	Items        []models.QuestionBucketItem  `json:"items"`
 	Ordered      []models.QuestionOrderedItem `json:"ordered"`
+	// PointsPerCorrect is a *int so the editor can distinguish "field absent"
+	// (nil = leave the question's value unchanged) from an explicit clear
+	// (0 = disable partial credit, all-or-nothing) — ticket #292.
+	PointsPerCorrect *int `json:"points_per_correct"`
 }
 
 // Merge update body into existing question
@@ -154,6 +158,10 @@ func merge(update *QuestionUpdate, original *models.Question) {
 	// rows via the replace-wholesale write below).
 	if update.QuestionType != "" {
 		original.QuestionType = update.QuestionType
+	}
+	// nil = field absent (leave unchanged); 0 = explicit disable.
+	if update.PointsPerCorrect != nil {
+		original.PointsPerCorrect = *update.PointsPerCorrect
 	}
 	original.Choices = update.Choices
 	original.Pairs = update.Pairs
@@ -194,6 +202,27 @@ func (e InvalidQuestionTypeError) Field() string {
 
 func (e InvalidQuestionTypeError) Data() interface{} {
 	return e.QuestionType
+}
+
+// PointsPerCorrectOnInvalidTypeError is returned when a question sets a
+// points-per-correct-answer value on a type that doesn't support partial
+// credit. Only bucketing and matching award per-item points (ticket #292); the
+// other types are all-or-nothing and would silently ignore the value.
+type PointsPerCorrectOnInvalidTypeError struct {
+	QuestionType string
+	Points       int
+}
+
+func (e PointsPerCorrectOnInvalidTypeError) Error() string {
+	return "points_per_correct is only valid for bucketing and matching questions (question_type: '" + e.QuestionType + "')"
+}
+
+func (e PointsPerCorrectOnInvalidTypeError) Field() string {
+	return "points_per_correct"
+}
+
+func (e PointsPerCorrectOnInvalidTypeError) Data() interface{} {
+	return e.Points
 }
 
 // MissingCorrectChoiceError is returned when a multiple_choice question has no
@@ -744,6 +773,11 @@ func (e NumericWithBucketsError) Data() interface{} {
 //	numeric          answer required + numeric; choices/pairs/buckets/items/
 //	                 ordered empty
 func validateQuestionType(data models.Question) error {
+	// points_per_correct (partial credit, ticket #292) is only meaningful for
+	// the per-item types; reject it elsewhere so it can't be silently ignored.
+	if data.PointsPerCorrect > 0 && data.QuestionType != "bucketing" && data.QuestionType != "matching" {
+		return PointsPerCorrectOnInvalidTypeError{QuestionType: data.QuestionType, Points: data.PointsPerCorrect}
+	}
 	switch data.QuestionType {
 	case "freeform":
 		if data.Answer == "" {
@@ -1118,10 +1152,10 @@ func CreateOneQuestion(e *Env, userId string, data models.Question) (models.Ques
 	err := common.WithWriteTx(e.Db, func(q common.Queryer) error {
 		ctx := context.Background()
 		if _, err := q.ExecContext(ctx,
-			`INSERT INTO question (id, create_date, category_id, question, answer, user_id, question_type)
-			VALUES (?, ?, ?, ?, ?, ?, ?)`,
+			`INSERT INTO question (id, create_date, category_id, question, answer, user_id, question_type, points_per_correct)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
 			id, common.FormatTime(createDate), nilOrEmpty(data.Category), data.Question, derivedAnswer(data),
-			data.UserId, data.QuestionType); err != nil {
+			data.UserId, data.QuestionType, data.PointsPerCorrect); err != nil {
 			return err
 		}
 		return replaceQuestionChildren(q, ctx, data)
@@ -1190,9 +1224,9 @@ func UpdateOneQuestion(e *Env, userId, questionId string, data QuestionUpdate) (
 		ctx := context.Background()
 		if _, err := q.ExecContext(ctx,
 			`UPDATE question SET category_id = ?, question = ?, answer = ?, user_id = ?,
-				question_type = ? WHERE id = ?`,
+				question_type = ?, points_per_correct = ? WHERE id = ?`,
 			nilOrEmpty(question.Category), question.Question, derivedAnswer(question), question.UserId,
-			question.QuestionType, questionId); err != nil {
+			question.QuestionType, question.PointsPerCorrect, questionId); err != nil {
 			return err
 		}
 		return replaceQuestionChildren(q, ctx, question)

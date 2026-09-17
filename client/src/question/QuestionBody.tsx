@@ -15,6 +15,10 @@ interface Props {
     items?: QuestionBucketItem[]
     ordered?: QuestionOrderedItem[]
     max_width?: number
+    // Ticket #292: points awarded per correct item (bucketing/matching partial
+    // credit). Shown as a note so players/preview understand the question is
+    // not all-or-nothing; 0/undefined = all-or-nothing.
+    points_per_correct?: number
     // Graded rendering mirroring the in-game question box after scoring: the
     // multiple-choice option list marks the correct choice (✅ + bold) and the
     // standalone answer line is hidden for multiple choice (it would duplicate
@@ -52,6 +56,11 @@ export default function QuestionBody(props: Props) {
                                answer={answerVisible ? props.answer : ""}
                                max_width={props.max_width}
                                scored={props.scored && answerVisible}/>
+            {props.points_per_correct ? (
+                <div style={{fontSize: 12, color: "#888", marginTop: 6}}>
+                    {props.points_per_correct} points per correct answer
+                </div>
+            ) : null}
             {props.question_type === "multiple_choice" && (props.choices || []).length > 0 ?
                 <ol style={{marginTop: 10, paddingLeft: 20}}>
                     {(props.choices || []).map((choice, index) => {
