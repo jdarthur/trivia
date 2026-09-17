@@ -712,6 +712,22 @@ var migrations = []migration{
 			`CREATE INDEX idx_session_question_session ON session_question(session_id)`,
 		},
 	},
+	{
+		version: 19,
+		name:    "points per correct answer",
+		// ticket #292: a question can award partial credit per correct item
+		// (bucketing/matching) instead of all-or-nothing. 0 (the default) keeps
+		// the historical all-or-nothing behavior; a positive value awards
+		// correct_items * points_per_correct points and ignores the round wager.
+		// The column is snapshot-copied into session_question so scoring reads
+		// the value as of when the question was set, like the other snapshot
+		// fields. Purely additive (no CHECK constraint change), so plain ALTER
+		// TABLE suffices — no table rebuild needed.
+		statements: []string{
+			`ALTER TABLE question ADD COLUMN points_per_correct INTEGER NOT NULL DEFAULT 0`,
+			`ALTER TABLE session_question ADD COLUMN points_per_correct INTEGER NOT NULL DEFAULT 0`,
+		},
+	},
 }
 
 // Migrate brings db up to the latest schema version, applying each pending

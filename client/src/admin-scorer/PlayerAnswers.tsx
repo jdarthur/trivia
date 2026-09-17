@@ -103,6 +103,14 @@ export default function PlayerAnswers({
         <span style={{fontSize: "1.3em"}}>🤑 {moneyballAward}</span>
     </Tooltip>
 
+    // Ticket #292: an auto-scored question (matching/bucketing/ordering) with a
+    // points-per-correct-answer value awards partial credit the mod never
+    // judged, so once scored show the backend's awarded points instead of the
+    // wager/override slider.
+    const autoScoredAward = scored && auto_scored && lastAnswer && lastAnswer.points_awarded !== undefined
+        ? lastAnswer.points_awarded
+        : null
+
     const modalContent = <div style={{width: 200, display: "flex", flexDirection: "column"}}>
         <Slider min={-10} max={10} step={0.5} value={override} onChange={setOverride} style={{flexGrow: 1}}/>
         <InputNumber value={override} onChange={setOverride} step={0.5}
@@ -150,7 +158,7 @@ export default function PlayerAnswers({
         // 200px leaves once the button takes its share. At 200px the answer
         // wrapped and the card grew ~22px; 228 keeps one line at the original
         // card height.
-        <Card size="small" title={title} extra={moneyball ? moneyballBadge : (correct === true ? sliderMiniModal : wager)}
+        <Card size="small" title={title} extra={moneyball ? moneyballBadge : (autoScoredAward !== null ? autoScoredAward : (correct === true ? sliderMiniModal : wager))}
               className={reaction_props ? "reaction-host" : undefined}
               style={{'width': 228, position: 'relative'}} bodyStyle={{padding: 0}}>
             <div className={reaction_props ? "answered-or-not reaction-anchor" : "answered-or-not"}>

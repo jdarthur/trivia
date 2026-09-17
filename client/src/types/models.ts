@@ -25,6 +25,8 @@ export interface Question {
   buckets?: QuestionBucket[];
   items?: QuestionBucketItem[];
   ordered?: QuestionOrderedItem[];
+  /** ticket #292: per-correct-item points for partial credit (bucketing/matching); 0 = all-or-nothing. */
+  points_per_correct?: number;
 }
 
 export interface QuestionChoice {
@@ -146,6 +148,8 @@ export interface QuestionInRound {
   /** bucketing: item -> bucket mapping, parallel to `items` (the answer key). */
   item_buckets?: string[];
   ordered?: string[];
+  /** ticket #292: per-correct-item points for partial credit; 0 = all-or-nothing. */
+  points_per_correct?: number;
 }
 
 /** models.RoundInGame */

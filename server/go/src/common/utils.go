@@ -218,7 +218,7 @@ func scanQuestion(s rowScanner) (models.Question, error) {
 	var m models.Question
 	var createDate string
 	var categoryId sql.NullString
-	err := s.Scan(&m.ID, &createDate, &categoryId, &m.Question, &m.Answer, &m.UserId, &m.QuestionType)
+	err := s.Scan(&m.ID, &createDate, &categoryId, &m.Question, &m.Answer, &m.UserId, &m.QuestionType, &m.PointsPerCorrect)
 	if err != nil {
 		return m, err
 	}
@@ -258,7 +258,7 @@ func loadQuestionRoundsUsed(db *sql.DB, m *models.Question) error {
 }
 
 func getQuestion(db *sql.DB, id string, m *models.Question) error {
-	row := db.QueryRow(`SELECT id, create_date, category_id, question, answer, user_id, question_type
+	row := db.QueryRow(`SELECT id, create_date, category_id, question, answer, user_id, question_type, points_per_correct
 		FROM question WHERE id = ?`, id)
 	got, err := scanQuestion(row)
 	if errors.Is(err, sql.ErrNoRows) {
@@ -618,7 +618,7 @@ func loadSessionRounds(db *sql.DB, m *models.Session) error {
 
 	// Overlay the per-question snapshots taken at set/score/hot-edit time.
 	rows, err := db.Query(`SELECT round_index, question_index, question_id, category,
-		question, answer, scoring_note_id, scoring_note, scored, question_type
+		question, answer, scoring_note_id, scoring_note, scored, question_type, points_per_correct
 		FROM session_question WHERE session_id = ?`, m.ID)
 	if err != nil {
 		return err
@@ -627,9 +627,9 @@ func loadSessionRounds(db *sql.DB, m *models.Session) error {
 	for rows.Next() {
 		var roundIndex, questionIndex int
 		var questionId, category, question, answer, scoringNoteId, scoringNote, questionType string
-		var scored int
+		var scored, pointsPerCorrect int
 		if err := rows.Scan(&roundIndex, &questionIndex, &questionId, &category,
-			&question, &answer, &scoringNoteId, &scoringNote, &scored, &questionType); err != nil {
+			&question, &answer, &scoringNoteId, &scoringNote, &scored, &questionType, &pointsPerCorrect); err != nil {
 			return err
 		}
 		if roundIndex >= len(m.Rounds) || questionIndex >= len(m.Rounds[roundIndex].Questions) {
@@ -644,6 +644,7 @@ func loadSessionRounds(db *sql.DB, m *models.Session) error {
 		q.ScoringNote = scoringNote
 		q.Scored = scored == 1
 		q.QuestionType = questionType
+		q.PointsPerCorrect = pointsPerCorrect
 	}
 	if err := rows.Err(); err != nil {
 		return err
@@ -1585,7 +1586,7 @@ func WithWriteTx(db *sql.DB, fn func(q Queryer) error) error {
 func scanTable(objectType string) (string, bool) {
 	switch objectType {
 	case QuestionTable:
-		return `SELECT id, create_date, category_id, question, answer, user_id, question_type
+		return `SELECT id, create_date, category_id, question, answer, user_id, question_type, points_per_correct
 			FROM question`, true
 	case RoundTable:
 		return `SELECT id, create_date, name, user_id FROM round`, true

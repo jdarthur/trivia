@@ -33,6 +33,9 @@ interface Props {
     // key, served to the mod (and to everyone once the question is scored).
     item_buckets?: string[]
     ordered?: string[]
+    // Ticket #292: points awarded per correct item (bucketing/matching partial
+    // credit); shown as a note so players know the question is not all-or-nothing.
+    points_per_correct?: number
 }
 
 interface State {
@@ -163,6 +166,11 @@ class ActiveQuestion extends React.Component<Props, State> {
                                            answer={hideAnswerLine ? "" : this.props.answer} max_width={350}
                                            scored={hideAnswerLine ? false : this.props.scored}
                     />
+                    {this.props.points_per_correct ? (
+                        <div style={{fontSize: 12, color: "#888", marginTop: 6}}>
+                            {this.props.points_per_correct} points per correct answer
+                        </div>
+                    ) : null}
                     {this.props.question_type === "multiple_choice" && (this.props.choices || []).length > 0 ?
                         <ol style={{marginTop: 10, paddingLeft: 20}}>
                             {(this.props.choices || []).map((choice, index) => {
