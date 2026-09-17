@@ -154,7 +154,7 @@ function buildLegend(entries: LegendEntry[], width: number): LegendLayout {
         const row = Math.floor(i / cols)
         const x0 = col * colW
         const cy = pad + rowH * (row + 0.5)
-        const rowNode = el('g', {opacity: e.active === false ? 0.5 : 1})
+        const rowNode = el('g', {opacity: e.active !== true ? 0.5 : 1})
         rowNode.appendChild(el('circle', {
             cx: x0 + dotR + 2, cy, r: dotR, fill: e.color,
         }))

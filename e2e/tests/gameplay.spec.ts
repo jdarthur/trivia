@@ -1949,3 +1949,138 @@ test.describe('gameplay navigation, hot-edit, spectator & edge cases', () => {
     await cleanup(request, seeded, { sessionId, modId, modToken, playerIds: [playerId] });
   });
 });
+
+// --- Ticket #291: add / remove a player after the game has started --------
+
+// Join a player after the game has already started (ticket #291). Unlike the
+// pre-start joinPlayer, the invite link lands in the active game where a
+// late-join card (a LobbyPlayer) is shown, and after joining the reload routes
+// straight to the gameplay view — there is no "Update" button to wait for, so
+// we wait for the answer card instead.
+async function joinPlayerMidGame(
+  browser: { newContext: (o?: object) => Promise<BrowserContext> },
+  sessionId: string,
+  teamName: string,
+  realName: string,
+) {
+  const context = await browser.newContext({ baseURL: BASE_URL });
+  const page = await context.newPage();
+  await page.goto(`/?session_id=${sessionId}`);
+
+  const teamInput = page.locator('input[placeholder="e.g. TriviaLover69"]');
+  const realInput = page.locator('input[placeholder="e.g. Jim Bibby"]');
+  await expect(teamInput).toBeVisible({ timeout: 30000 });
+  await teamInput.fill(teamName);
+  await realInput.fill(realName);
+
+  // Pick an icon via the SelectIcon dropdown.
+  await page.locator('.ant-select').click();
+  await page.locator('.ant-select-dropdown:visible .ant-select-item-option').first().click();
+
+  const joinButton = page.getByRole('button', { name: 'Join game', exact: true });
+  await expect(joinButton).toBeEnabled();
+  await joinButton.click();
+
+  // The join reloads and the player becomes a member, so the answer card
+  // (AnswerQuestion) appears once the current question has loaded.
+  await expect(page.locator('.answer-card')).toBeVisible({ timeout: 30000 });
+  const playerId = await page.evaluate(() => sessionStorage.getItem('player_id'));
+  expect(playerId).toBeTruthy();
+
+  return { context, page, playerId };
+}
+
+test.describe('gameplay: add & remove a player after the game has started', () => {
+  test('a brand-new player can join an already-started game and answer the current question', async ({
+    browser,
+    request,
+  }) => {
+    test.setTimeout(120000);
+    const prefix = unique();
+    const g = await setupActiveGame(browser, request, prefix);
+
+    // Advance to the second question so the new player is joining mid-game.
+    await g.modPage.getByRole('button', { name: 'Next Question', exact: true }).click();
+    await expect(g.modPage.locator('.active-question-box')).toContainText(`Second question ${prefix}`, {
+      timeout: 30000,
+    });
+    await expect(g.playerPage.locator('.active-question-box')).toContainText(`Second question ${prefix}`, {
+      timeout: 30000,
+    });
+
+    const lateTeam = `Late Team ${prefix}`;
+    const { context: lateContext, page: latePage, playerId: lateId } = await joinPlayerMidGame(
+      browser,
+      g.sessionId,
+      lateTeam,
+      `Late Player ${prefix}`,
+    );
+
+    // The late joiner appears in the mod's mid-game roster.
+    await expect(g.modPage.locator('.game-lobby .ant-card').filter({ hasText: lateTeam })).toBeVisible({
+      timeout: 30000,
+    });
+
+    // The late joiner answers the current (second) question.
+    await answerQuestion(latePage, 200, 'Late answer');
+    await expect
+      .poll(async () => (await playerAnswers(request, g.sessionId, g.modId, g.modToken, lateId, 0, 1)).length)
+      .toBe(1);
+
+    await lateContext.close();
+    await g.playerContext.close();
+    await g.modContext.close();
+    await cleanup(request, g.seeded, {
+      sessionId: g.sessionId,
+      modId: g.modId,
+      modToken: g.modToken,
+      playerIds: [g.playerId, lateId],
+    });
+  });
+
+  test('the mod can boot (inactivate) a player mid-game and they are greyed out', async ({
+    browser,
+    request,
+  }) => {
+    test.setTimeout(120000);
+    const prefix = unique();
+    const g = await setupActiveGame(browser, request, prefix);
+
+    // The mod boots the joined player via the mid-game roster's per-player
+    // action (InactivatePlayer -> DeleteConfirm -> POST /inactivate).
+    const roster = g.modPage.locator('.game-lobby');
+    const playerCard = roster.locator('.ant-card').filter({ hasText: g.teamName });
+    await expect(playerCard).toBeVisible({ timeout: 30000 });
+    await playerCard.locator('.anticon-delete').click();
+    await g.modPage.locator('.ant-popover:visible').getByRole('button', { name: 'Delete', exact: true }).click();
+
+    // The inactivate is persisted server-side. Player.Active is
+    // `json:"active,omitempty"`, so an inactive player's active is omitted
+    // (undefined) rather than false — assert the player is not active.
+    await expect
+      .poll(async () => {
+        const data = await request.get(`/gameplay/session/${g.sessionId}/players`, {
+          headers: { 'borttrivia-player-token': g.modToken },
+        });
+        const players = (await data.json()).players ?? [];
+        const target = players.find((p: any) => p.id === g.playerId);
+        return target ? target.active !== true : false;
+      })
+      .toBe(true);
+
+    // The roster card greys out once the state bump refetches the roster.
+    await expect(playerCard).toHaveCSS('opacity', '0.5', { timeout: 30000 });
+
+    // The booted player's own answer card flips to "You left the game".
+    await expect(g.playerPage.getByText('You left the game', { exact: true })).toBeVisible({ timeout: 30000 });
+
+    await g.playerContext.close();
+    await g.modContext.close();
+    await cleanup(request, g.seeded, {
+      sessionId: g.sessionId,
+      modId: g.modId,
+      modToken: g.modToken,
+      playerIds: [g.playerId],
+    });
+  });
+});

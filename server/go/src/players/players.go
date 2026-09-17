@@ -49,6 +49,12 @@ type AddToSession struct {
 	SessionId string          `json:"session_id"`
 }
 
+// AddPlayerToSession adds an existing player to a session as a new member.
+// A session that has already started (mid-game) is allowed: the late joiner is
+// scored from the current question onward — they have no answer rows for earlier
+// questions, so the scoreboard / score history zero-fill them (ticket #291).
+// Membership is still idempotence-checked (already-in-session) and the player
+// id must exist.
 func (e *Env) AddPlayerToSession(c *gin.Context) {
 	sessionId := c.Param("id")
 
@@ -65,12 +71,6 @@ func (e *Env) AddPlayerToSession(c *gin.Context) {
 	err = common.GetOne((*common.Env)(e), common.SessionTable, sessionId, &session)
 	if err != nil {
 		common.Respond(c, requestBody, err)
-		return
-	}
-
-	//can't add a player to an already-started session
-	if session.Started {
-		common.Respond(c, requestBody, SessionAlreadyStartedError{SessionId: sessionId})
 		return
 	}
 

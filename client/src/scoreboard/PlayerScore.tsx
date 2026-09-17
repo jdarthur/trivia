@@ -21,7 +21,9 @@ class PlayerScore extends React.Component<Props> {
             <PlayerIcon icon_name={this.props.icon_name}/>
         </div>
         const is_self = this.props.player_id === this.props.current_player
-        const inactive = this.props.active === false
+        // Player.Active is `json:"active,omitempty"`, so an inactive player's
+        // active is omitted (undefined) rather than false.
+        const inactive = this.props.active !== true
         // A single-line row: the team (icon + self indicator + name) in the
         // title and the score on the right. No card body, so each player is
         // one short line rather than a tall block. The self indicator sits

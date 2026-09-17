@@ -121,8 +121,14 @@ class AnswerQuestion extends React.Component<Props, State> {
                     return
                 }
                 const players = data.players || []
-                const self = players.find((p: any) => p.player_id === this.props.player_id)
-                if (self && self.active === false) {
+                // The /players roster returns each Player with `id` (the model's
+                // json tag), not `player_id` — that field only appears on the
+                // /answers response. Look the caller up by `id` so an inactive
+                // (booted / left) player is detected (ticket #291).
+                const self = players.find((p: any) => p.id === this.props.player_id)
+                // Player.Active is `json:"active,omitempty"`, so an inactive
+                // player's active is omitted (undefined) rather than false.
+                if (self && self.active !== true) {
                     this.setState({active: false})
                 }
             })

@@ -89,6 +89,7 @@ func newPlayerRouter(env *Env, s *sessions.Env) *gin.Engine {
 	t.PUT("/gameplay/player/:id", auth.WithPlayer, env.UpdatePlayer)
 	t.POST("/gameplay/session/:id/leave", auth.WithPlayer, env.LeaveSession)
 	t.POST("/gameplay/session/:id/inactivate", s.WithValidSession, auth.WithPlayer, s.AsMod, env.InactivatePlayer)
+	t.POST("/gameplay/session/:id/add", env.AddPlayerToSession)
 	return t
 }
 
@@ -182,6 +183,38 @@ func TestLeaveSessionRejectsImpersonation(t *testing.T) {
 	}
 	if got := membershipActive(t, env, sessionId, member); got != 0 {
 		t.Fatalf("member active = %d, want 0", got)
+	}
+}
+
+// TestAddPlayerToStartedSession verifies a brand-new player can join a session
+// that has already started (ticket #291): membership is created (active=1), the
+// state token bumps, and the late joiner is not rejected.
+func TestAddPlayerToStartedSession(t *testing.T) {
+	env := openPlayersTestDB(t)
+	router := newPlayerRouter(env, &sessions.Env{Db: env.Db})
+	sessionId, _, _, _, _ := newSessionWithPlayers(t, env)
+
+	late, _ := createPlayerRowWithToken(t, env, "late")
+
+	stateBefore, err := common.GetState((*common.Env)(env), sessionId)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	rec := post(t, router, "/gameplay/session/"+sessionId+"/add", "",
+		map[string]string{"player_id": string(late)})
+	if rec.Code != http.StatusOK {
+		t.Fatalf("AddPlayerToSession on started session failed with %d: %s", rec.Code, rec.Body.String())
+	}
+	if got := membershipActive(t, env, sessionId, late); got != 1 {
+		t.Fatalf("late joiner active = %d, want 1", got)
+	}
+	stateAfter, err := common.GetState((*common.Env)(env), sessionId)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if stateBefore == stateAfter {
+		t.Fatal("state token did not change on add")
 	}
 }
 
