@@ -262,7 +262,9 @@ class ScoreGraphModal extends React.Component<Props, State> {
             <div className="score-graph-legend" role="list">
                 {series.map((s, i) => {
                     const total = s.values.length > 0 ? fmtTotal(s.values[s.values.length - 1]) : "0"
-                    const inactive = s.active === false
+                    // Player.Active is `json:"active,omitempty"`, so an inactive
+                    // player's active is omitted (undefined) rather than false.
+                    const inactive = s.active !== true
                     const pressed = isolated === s.name
                     return (
                         <button key={i} type="button" role="listitem"

@@ -7,6 +7,9 @@ import AnswerQuestion from "../answer/AnswerQuestion"
 import PlayerScorer from "../admin-scorer/PlayerScorer"
 import PlayerStatus from "../players/PlayerStatus"
 import Scoreboard from '../scoreboard/Scoreboard';
+import InvitePlayers from "./InvitePlayers"
+import OtherPlayers from "../lobby/OtherPlayers"
+import LobbyPlayer from "../lobby/LobbyPlayer"
 import type {RoundInGame} from "../types/models"
 import {getPlayerToken} from "../common/playerToken"
 
@@ -187,6 +190,13 @@ class ActiveGame extends React.Component<Props, State> {
 
         return (
             <div style={{flexGrow: 1, display: 'flex', flexDirection: 'column', maxWidth: '100%', padding: 5}}>
+                {/* A brand-new visitor (no player_id) can join an already-started
+                    game (ticket #291): show the join form above the spectator view. */}
+                {!this.props.player_id ? (
+                    <div style={{display: 'flex', justifyContent: 'center', marginBottom: 8}}>
+                        <LobbyPlayer session_id={this.props.session_id} player_id="" excluded_icons={[]}/>
+                    </div>
+                ) : null}
                 <div className="game-and-scoreboard">
                     <div className='active-game'>
                         <div className="round-and-question">
@@ -254,6 +264,17 @@ class ActiveGame extends React.Component<Props, State> {
                                   question_type={this.state.question_type}
                                   correct_answer={this.state.answer}
                                   on_scorable={this.set_scorable}/> : null}
+
+                {/* Mid-game player management (ticket #291): the mod can share the
+                    invite link so a new player can join, and boot (inactivate) an
+                    existing player via the roster's per-player action. */}
+                {this.props.is_mod ?
+                    <div style={{display: 'flex', alignItems: 'flex-start', gap: 8, marginTop: 8}}>
+                        <InvitePlayers session_id={this.props.session_id}/>
+                        <OtherPlayers player_id={this.props.player_id} session_id={this.props.session_id}
+                                      session_state={this.props.session_state} started={true}
+                                      set_excluded_icons={() => {}}/>
+                    </div> : null}
 
                 {!this.props.is_mod ?
                     <PlayerStatus question_id={this.state.active_question}

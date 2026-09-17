@@ -24,7 +24,10 @@ class OtherPlayer extends React.Component<Props> {
   render() {
     const date = new Date(this.props.create_date);
     const dateString = date.toLocaleTimeString('en-US')
-    const inactive = this.props.active === false
+    // Player.Active is `json:"active,omitempty"`, so an inactive player's active
+    // is omitted (undefined) on the wire rather than false — treat anything that
+    // is not exactly true as inactive (ticket #291).
+    const inactive = this.props.active !== true
     const title = this.props.player_id ? <span >
       <span style={{ marginRight: 5 }}>
         <ScorerLink session_id={this.props.session_id} player_id={this.props.player_id} />
