@@ -96,8 +96,9 @@ export default function PlayerAnswers({
     let answer_text = <MultiAnswer answers={answers} question_type={question_type} correct_answer={correct_answer}/>
 
     let override = correct === false ? 0 : override_value
+    const wagerValue = answers && answers.length > 0 ? answers[answers.length - 1].wager : null
     const wager = <div style={{paddingLeft: '10px', fontSize: '1.3em', fontWeight: 'bold'}}>
-        {answers && answers.length > 0 ? answers[answers.length - 1].wager : null}
+        {wagerValue}
     </div>
 
     // Moneyball answers are scored by the backend formula (ticket #3), so the
@@ -149,12 +150,12 @@ export default function PlayerAnswers({
     if (correct === true) {
         // moneyball players have no meaningful override; show the wager before
         // scoring and the awarded points after
-        correctButtonText = moneyball ? moneyballAward : (risky_wager ? "+" + wager : (override === 0 ? wager : override))
+        correctButtonText = moneyball ? moneyballAward : (risky_wager ? "+" + wagerValue : (override === 0 ? wager : override))
     }
     // Ticket #295: show what a wrong risky-wager answer costs (−wager).
     let incorrectButtonText: React.ReactNode = ""
     if (correct === false && risky_wager) {
-        incorrectButtonText = "-" + wager
+        incorrectButtonText = "-" + wagerValue
     }
 
     // Reactions only exist once the question is scored. The stickers are a
