@@ -47,6 +47,9 @@ interface State {
     ordered: string[]
     // Ticket #292: points awarded per correct item (bucketing/matching partial credit).
     points_per_correct: number
+    // Ticket #295: risky-wager mode — players bet 0..max_wager at answer time.
+    risky_wager: boolean
+    max_wager: number
     // Ticket #293: emoji reactions on the question itself.
     reactions: Record<string, ReactionSummary>
     my_reaction: string
@@ -82,6 +85,8 @@ class ActiveGame extends React.Component<Props, State> {
             item_buckets: [],
             ordered: [],
             points_per_correct: 0,
+            risky_wager: false,
+            max_wager: 0,
             reactions: {},
             my_reaction: "",
             scorable: false
@@ -165,6 +170,7 @@ class ActiveGame extends React.Component<Props, State> {
                 question_type: string, choices: string[], lefts: string[], rights: string[],
                 buckets: string[], items: string[], item_buckets: string[], ordered: string[],
                 points_per_correct?: number,
+                risky_wager?: boolean, max_wager?: number,
                 reactions?: Record<string, ReactionSummary>,
                 my_reaction?: string
             }) => {
@@ -189,6 +195,8 @@ class ActiveGame extends React.Component<Props, State> {
                     item_buckets: q.item_buckets || [],
                     ordered: q.ordered || [],
                     points_per_correct: q.points_per_correct || 0,
+                    risky_wager: q.risky_wager === true,
+                    max_wager: q.max_wager || 0,
                     reactions: q.reactions || {},
                     my_reaction: q.my_reaction || "",
                 })
@@ -252,7 +260,9 @@ class ActiveGame extends React.Component<Props, State> {
                                                               rights={this.state.rights}
                                                               buckets={this.state.buckets}
                                                               items={this.state.items}
-                                                              ordered={this.state.ordered}/> : null}
+                                                              ordered={this.state.ordered}
+                                                              risky_wager={this.state.risky_wager}
+                                                              max_wager={this.state.max_wager}/> : null}
 
                         {this.props.is_mod ?
                             <GameControlCard questions={question_indices} rounds={this.props.rounds}
@@ -280,6 +290,8 @@ class ActiveGame extends React.Component<Props, State> {
                                   scored={this.state.scored as boolean}
                                   question_type={this.state.question_type}
                                   correct_answer={this.state.answer}
+                                  risky_wager={this.state.risky_wager}
+                                  max_wager={this.state.max_wager}
                                   on_scorable={this.set_scorable}/> : null}
 
                 {/* Mid-game player management (ticket #291): the mod can share the
@@ -298,7 +310,8 @@ class ActiveGame extends React.Component<Props, State> {
                                   round_id={this.state.active_round} session_id={this.props.session_id}
                                   player_id={this.props.player_id} session_state={this.props.session_state}
                                   scored={this.state.scored as boolean} is_mobile={this.props.is_mobile}
-                                  question_type={this.state.question_type}/> : null}
+                                  question_type={this.state.question_type}
+                                  risky_wager={this.state.risky_wager}/> : null}
             </div>
         );
     }

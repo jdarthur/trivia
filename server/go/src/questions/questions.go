@@ -136,6 +136,11 @@ type QuestionUpdate struct {
 	// (nil = leave the question's value unchanged) from an explicit clear
 	// (0 = disable partial credit, all-or-nothing) — ticket #292.
 	PointsPerCorrect *int `json:"points_per_correct"`
+	// RiskyWager/MaxWager (ticket #295) are *bool / *float64 so the editor can
+	// distinguish "field absent" (nil = leave unchanged) from an explicit
+	// off / 0.
+	RiskyWager *bool    `json:"risky_wager"`
+	MaxWager   *float64 `json:"max_wager"`
 }
 
 // Merge update body into existing question
@@ -162,6 +167,13 @@ func merge(update *QuestionUpdate, original *models.Question) {
 	// nil = field absent (leave unchanged); 0 = explicit disable.
 	if update.PointsPerCorrect != nil {
 		original.PointsPerCorrect = *update.PointsPerCorrect
+	}
+	// nil = field absent (leave unchanged); false / 0 = explicit off.
+	if update.RiskyWager != nil {
+		original.RiskyWager = *update.RiskyWager
+	}
+	if update.MaxWager != nil {
+		original.MaxWager = *update.MaxWager
 	}
 	original.Choices = update.Choices
 	original.Pairs = update.Pairs
@@ -222,6 +234,45 @@ func (e PointsPerCorrectOnInvalidTypeError) Field() string {
 }
 
 func (e PointsPerCorrectOnInvalidTypeError) Data() interface{} {
+	return e.Points
+}
+
+// RiskyWagerRequiresMaxError is returned when a question opts into risky-wager
+// mode (ticket #295) without a positive max wager. A risky-wager question
+// needs a ceiling so players know what they can bet.
+type RiskyWagerRequiresMaxError struct {
+	MaxWager float64
+}
+
+func (e RiskyWagerRequiresMaxError) Error() string {
+	return "risky_wager questions require a max_wager greater than 0"
+}
+
+func (e RiskyWagerRequiresMaxError) Field() string {
+	return "max_wager"
+}
+
+func (e RiskyWagerRequiresMaxError) Data() interface{} {
+	return e.MaxWager
+}
+
+// RiskyWagerWithPartialCreditError is returned when a question combines
+// risky-wager mode (ticket #295) with points-per-correct-answer partial credit
+// (ticket #292). The two scoring modes are mutually exclusive — partial credit
+// would silently win while the UI shows ±wager — so reject the combination.
+type RiskyWagerWithPartialCreditError struct {
+	Points int
+}
+
+func (e RiskyWagerWithPartialCreditError) Error() string {
+	return "risky_wager cannot be combined with points_per_correct"
+}
+
+func (e RiskyWagerWithPartialCreditError) Field() string {
+	return "points_per_correct"
+}
+
+func (e RiskyWagerWithPartialCreditError) Data() interface{} {
 	return e.Points
 }
 
@@ -778,6 +829,16 @@ func validateQuestionType(data models.Question) error {
 	if data.PointsPerCorrect > 0 && data.QuestionType != "bucketing" && data.QuestionType != "matching" {
 		return PointsPerCorrectOnInvalidTypeError{QuestionType: data.QuestionType, Points: data.PointsPerCorrect}
 	}
+	// risky wager (ticket #295) requires a positive max wager as the ceiling;
+	// a non-risky question ignores max_wager. It also cannot combine with
+	// points-per-correct-answer partial credit (ticket #292) — the two scoring
+	// modes are mutually exclusive.
+	if data.RiskyWager && data.MaxWager <= 0 {
+		return RiskyWagerRequiresMaxError{MaxWager: data.MaxWager}
+	}
+	if data.RiskyWager && data.PointsPerCorrect > 0 {
+		return RiskyWagerWithPartialCreditError{Points: data.PointsPerCorrect}
+	}
 	switch data.QuestionType {
 	case "freeform":
 		if data.Answer == "" {
@@ -1152,10 +1213,10 @@ func CreateOneQuestion(e *Env, userId string, data models.Question) (models.Ques
 	err := common.WithWriteTx(e.Db, func(q common.Queryer) error {
 		ctx := context.Background()
 		if _, err := q.ExecContext(ctx,
-			`INSERT INTO question (id, create_date, category_id, question, answer, user_id, question_type, points_per_correct)
-			VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+			`INSERT INTO question (id, create_date, category_id, question, answer, user_id, question_type, points_per_correct, risky_wager, max_wager)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 			id, common.FormatTime(createDate), nilOrEmpty(data.Category), data.Question, derivedAnswer(data),
-			data.UserId, data.QuestionType, data.PointsPerCorrect); err != nil {
+			data.UserId, data.QuestionType, data.PointsPerCorrect, data.RiskyWager, data.MaxWager); err != nil {
 			return err
 		}
 		return replaceQuestionChildren(q, ctx, data)
@@ -1224,9 +1285,9 @@ func UpdateOneQuestion(e *Env, userId, questionId string, data QuestionUpdate) (
 		ctx := context.Background()
 		if _, err := q.ExecContext(ctx,
 			`UPDATE question SET category_id = ?, question = ?, answer = ?, user_id = ?,
-				question_type = ?, points_per_correct = ? WHERE id = ?`,
+				question_type = ?, points_per_correct = ?, risky_wager = ?, max_wager = ? WHERE id = ?`,
 			nilOrEmpty(question.Category), question.Question, derivedAnswer(question), question.UserId,
-			question.QuestionType, question.PointsPerCorrect, questionId); err != nil {
+			question.QuestionType, question.PointsPerCorrect, question.RiskyWager, question.MaxWager, questionId); err != nil {
 			return err
 		}
 		return replaceQuestionChildren(q, ctx, question)

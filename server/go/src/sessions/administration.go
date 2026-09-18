@@ -111,7 +111,8 @@ func _setCurrentQuestion(e *Env, session *models.Session, roundIndex int, questi
 
 	err = upsertSessionQuestion(e, session.ID, roundIndex, questionIndex, questionId,
 		categoryName, questionObject.Question, questionObject.Answer,
-		scoringNoteId, scoringNote, questionObject.QuestionType, questionObject.PointsPerCorrect)
+		scoringNoteId, scoringNote, questionObject.QuestionType, questionObject.PointsPerCorrect,
+		questionObject.RiskyWager, questionObject.MaxWager)
 	if err != nil {
 		return err
 	}
@@ -121,14 +122,14 @@ func _setCurrentQuestion(e *Env, session *models.Session, roundIndex int, questi
 }
 
 // upsertSessionQuestion writes (or refreshes) one session_question snapshot
-// row, including the question_type, points_per_correct, and the canonical
-// choice/match child rows copied into the snapshot child tables. scored is
-// deliberately not updated on conflict — re-navigating to a scored question
-// keeps it scored.
-func upsertSessionQuestion(e *Env, sessionId string, roundIndex int, questionIndex int, questionId string, category string, question string, answer string, scoringNoteId string, scoringNote string, questionType string, pointsPerCorrect int) error {
+// row, including the question_type, points_per_correct, risky_wager/max_wager,
+// and the canonical choice/match child rows copied into the snapshot child
+// tables. scored is deliberately not updated on conflict — re-navigating to a
+// scored question keeps it scored.
+func upsertSessionQuestion(e *Env, sessionId string, roundIndex int, questionIndex int, questionId string, category string, question string, answer string, scoringNoteId string, scoringNote string, questionType string, pointsPerCorrect int, riskyWager bool, maxWager float64) error {
 	_, err := e.Db.Exec(`INSERT INTO session_question
-		(session_id, round_index, question_index, question_id, category, question, answer, scoring_note_id, scoring_note, scored, question_type, points_per_correct)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)
+		(session_id, round_index, question_index, question_id, category, question, answer, scoring_note_id, scoring_note, scored, question_type, points_per_correct, risky_wager, max_wager)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?)
 		ON CONFLICT(session_id, round_index, question_index) DO UPDATE SET
 			question_id = excluded.question_id,
 			category = excluded.category,
@@ -137,8 +138,10 @@ func upsertSessionQuestion(e *Env, sessionId string, roundIndex int, questionInd
 			scoring_note_id = excluded.scoring_note_id,
 			scoring_note = excluded.scoring_note,
 			question_type = excluded.question_type,
-			points_per_correct = excluded.points_per_correct`,
-		sessionId, roundIndex, questionIndex, questionId, category, question, answer, scoringNoteId, scoringNote, questionType, pointsPerCorrect)
+			points_per_correct = excluded.points_per_correct,
+			risky_wager = excluded.risky_wager,
+			max_wager = excluded.max_wager`,
+		sessionId, roundIndex, questionIndex, questionId, category, question, answer, scoringNoteId, scoringNote, questionType, pointsPerCorrect, riskyWager, maxWager)
 	if err != nil {
 		return err
 	}
@@ -474,10 +477,11 @@ func scoreQuestionTx(e *Env, session models.Session, requestBody models.ScoreReq
 		//read the question snapshot inside the transaction, so the scored
 		//check and the scored write cannot race
 		var questionId, snapshotAnswer, questionType string
-		var scored, pointsPerCorrect int
-		err := q.QueryRowContext(ctx, `SELECT question_id, answer, scored, question_type, points_per_correct FROM session_question
+		var scored, pointsPerCorrect, riskyWager int
+		var maxWager float64
+		err := q.QueryRowContext(ctx, `SELECT question_id, answer, scored, question_type, points_per_correct, risky_wager, max_wager FROM session_question
 			WHERE session_id = ? AND round_index = ? AND question_index = ?`,
-			session.ID, roundIndex, questionIndex).Scan(&questionId, &snapshotAnswer, &scored, &questionType, &pointsPerCorrect)
+			session.ID, roundIndex, questionIndex).Scan(&questionId, &snapshotAnswer, &scored, &questionType, &pointsPerCorrect, &riskyWager, &maxWager)
 		if errors.Is(err, sql.ErrNoRows) {
 			return InvalidQuestionIndexError{QuestionIndex: questionIndex}
 		}
@@ -571,7 +575,7 @@ func scoreQuestionTx(e *Env, session models.Session, requestBody models.ScoreReq
 			playerId     models.PlayerId
 			answerId     string
 			oldPoints    float64
-			wager        int
+			wager        float64
 			useMoneyball bool
 			isCorrect    bool
 			correctItems int
@@ -634,6 +638,18 @@ func scoreQuestionTx(e *Env, session models.Session, requestBody models.ScoreReq
 				// fixed per-item value, and a partial answer is neither "fully
 				// correct" for moneyball nor mod-judged.
 				pointsToAward = float64(score.correctItems * pointsPerCorrect)
+			} else if riskyWager == 1 {
+				// Risky wager (ticket #295): the player's bet is the answer's
+				// own wager (chosen 0..max_wager at answer time), and scoring
+				// awards +wager for a correct answer and -wager for a wrong
+				// one, instead of the historical wager-or-zero. The mod's
+				// score override is ignored — the bet is the player's, and
+				// correctness alone drives the sign.
+				if score.isCorrect {
+					pointsToAward = score.wager
+				} else {
+					pointsToAward = -score.wager
+				}
 			} else if score.useMoneyball {
 				switch {
 				case !score.isCorrect:

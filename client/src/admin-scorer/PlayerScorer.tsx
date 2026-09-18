@@ -19,6 +19,11 @@ interface Props {
     // Ticket #285: the question's correct numeric answer, so the off-by amount
     // can be shown on each numeric answer in the scorer.
     correct_answer?: string
+    // Ticket #295: risky-wager question — scoring is driven by the player's own
+    // bet, so the override slider is replaced by the bet and the mod just
+    // judges correctness.
+    risky_wager?: boolean
+    max_wager?: number
     /**
      * Reports whether every active player has been judged, i.e. whether
      * score() would do anything. The Score button lives in the moderator's
@@ -316,6 +321,7 @@ class PlayerScorer extends React.Component<Props, State> {
                                        correct_answer={this.props.correct_answer}
                                        moneyball={this.get_moneyball(player.player_id)}
                                        scored={this.props.scored}
+                                       risky_wager={this.props.risky_wager}
                                        current_player={this.props.player_id}/>
             if (!active) {
                 return <div key={player.player_id} className="player-scorer-inactive"

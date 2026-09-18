@@ -73,7 +73,8 @@ func (e *Env) HotEditQuestion(c *gin.Context) {
 
 		err = updateSessionQuestionSnapshot(e, sessionId, request.RoundIndex, request.QuestionIndex,
 			questionId, categoryName, request.Question.Question, request.Question.Answer,
-			scoringNoteId, scoringNote, request.Question.QuestionType)
+			scoringNoteId, scoringNote, request.Question.QuestionType,
+			questionInRound.RiskyWager, questionInRound.MaxWager)
 		if err != nil {
 			common.Respond(c, request, err)
 			return
@@ -110,17 +111,18 @@ func (e *Env) HotEditQuestion(c *gin.Context) {
 // (round, question) with the hot-edited text, including the question_type and
 // the canonical choice/match child rows copied into the snapshot child tables.
 // A missing row (question never set) is created as a safety net. The scored
-// flag is preserved.
-func updateSessionQuestionSnapshot(e *Env, sessionId string, roundIndex int, questionIndex int, questionId string, category string, question string, answer string, scoringNoteId string, scoringNote string, questionType string) error {
+// flag and the risky-wager settings (ticket #295) are preserved from the
+// existing snapshot — the hot-edit UI does not expose them.
+func updateSessionQuestionSnapshot(e *Env, sessionId string, roundIndex int, questionIndex int, questionId string, category string, question string, answer string, scoringNoteId string, scoringNote string, questionType string, riskyWager bool, maxWager float64) error {
 	// empty question_type defaults to freeform (the column's CHECK constraint
 	// rejects anything else).
 	if questionType == "" {
 		questionType = "freeform"
 	}
 	res, err := e.Db.Exec(`UPDATE session_question SET question = ?, answer = ?, category = ?,
-		scoring_note_id = ?, scoring_note = ?, question_type = ?
+		scoring_note_id = ?, scoring_note = ?, question_type = ?, risky_wager = ?, max_wager = ?
 		WHERE session_id = ? AND round_index = ? AND question_index = ?`,
-		question, answer, category, scoringNoteId, scoringNote, questionType, sessionId, roundIndex, questionIndex)
+		question, answer, category, scoringNoteId, scoringNote, questionType, riskyWager, maxWager, sessionId, roundIndex, questionIndex)
 	if err != nil {
 		return err
 	}
@@ -138,9 +140,9 @@ func updateSessionQuestionSnapshot(e *Env, sessionId string, roundIndex int, que
 	}
 
 	_, err = e.Db.Exec(`INSERT INTO session_question
-		(session_id, round_index, question_index, question_id, category, question, answer, scoring_note_id, scoring_note, scored, question_type)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?)`,
-		sessionId, roundIndex, questionIndex, questionId, category, question, answer, scoringNoteId, scoringNote, questionType)
+		(session_id, round_index, question_index, question_id, category, question, answer, scoring_note_id, scoring_note, scored, question_type, risky_wager, max_wager)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?)`,
+		sessionId, roundIndex, questionIndex, questionId, category, question, answer, scoringNoteId, scoringNote, questionType, riskyWager, maxWager)
 	return err
 }
 

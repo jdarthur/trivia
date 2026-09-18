@@ -92,6 +92,12 @@ type QuestionInRound struct {
 	// the value as of when the question was set.
 	PointsPerCorrect int `json:"points_per_correct,omitempty"`
 
+	// RiskyWager/MaxWager are the risky-wager settings (ticket #295),
+	// snapshot-copied so the player-facing answer range and scoring read the
+	// values as of when the question was set.
+	RiskyWager bool    `json:"risky_wager,omitempty"`
+	MaxWager   float64 `json:"max_wager,omitempty"`
+
 	// Reactions/MyReaction are the emoji reactions on the question itself
 	// (ticket #293): aggregated per-emoji counts + reacting team names, and
 	// the caller's own reaction so the UI can highlight their selection.

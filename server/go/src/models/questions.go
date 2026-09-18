@@ -36,6 +36,15 @@ type Question struct {
 	// len(items) * PointsPerCorrect (or len(pairs) for matching); the round
 	// wager is ignored when this is set.
 	PointsPerCorrect int `json:"points_per_correct" form:"points_per_correct"`
+
+	// RiskyWager marks a finale-style "risky wager" question (ticket #295):
+	// instead of the round's fixed wager, each player bets any amount from 0
+	// up to MaxWager (in 0.5-point steps) at answer time, and scoring awards
+	// +wager for a correct answer and -wager for a wrong one (rather than
+	// wager-or-zero). MaxWager is the ceiling the editor sets (0 means "not a
+	// risky wager question").
+	RiskyWager bool    `json:"risky_wager" form:"risky_wager"`
+	MaxWager   float64 `json:"max_wager" form:"max_wager"`
 }
 
 type QuestionChoice struct {

@@ -277,6 +277,33 @@ async function seedStartableMCGame(request: APIRequestContext, prefix: string) {
   return { gameId, roundId, qids: [q1, q2] };
 }
 
+// Create a risky-wager question (ticket #295): players bet any amount from 0
+// up to maxWager (0.5 steps) at answer time, scoring +wager / -wager.
+async function createRiskyQuestion(
+  request: APIRequestContext,
+  category: string,
+  question: string,
+  maxWager: number,
+): Promise<string> {
+  const categoryId = await createCategory(request, category);
+  const res = await request.post('/editor/question', {
+    headers: { 'borttrivia-token': token },
+    data: { category: categoryId, question, answer: 'Risky answer', risky_wager: true, max_wager: maxWager },
+  });
+  expect(res.ok()).toBeTruthy();
+  return (await res.json()).id;
+}
+
+// Seed a startable game whose first question is a risky-wager question (max
+// wager 10).
+async function seedStartableRiskyGame(request: APIRequestContext, prefix: string) {
+  const q1 = await createRiskyQuestion(request, `e2e-cat-${prefix}`, `Risky question ${prefix}`, 10);
+  const q2 = await createQuestion(request, `e2e-cat-${prefix}`, `Second question ${prefix}`, 'Answer two');
+  const roundId = await createRound(request, `e2e-round-${prefix}`, [q1, q2], [100, 200]);
+  const gameId = await createGame(request, `e2e-game-${prefix}`, roundId);
+  return { gameId, roundId, qids: [q1, q2] };
+}
+
 // Create a bucketing question (ticket #164): items sorted into buckets, e.g.
 // frog/lion/human into Amphibian/Mammal.
 async function createBucketingQuestion(request: APIRequestContext, category: string, question: string): Promise<string> {
@@ -2147,5 +2174,117 @@ test.describe('gameplay: add & remove a player after the game has started', () =
       modToken: g.modToken,
       playerIds: [g.playerId],
     });
+  });
+});
+
+// --- Ticket #295: risky-wager (finale) questions --------------------------
+
+test.describe('gameplay risky-wager (finale) questions', () => {
+  test('a player bets 0..max via a slider and scores +wager when correct', async ({
+    browser,
+    request,
+  }) => {
+    test.setTimeout(90000);
+    const prefix = unique();
+    const seeded = await seedStartableRiskyGame(request, prefix);
+    const { sessionId, modId, modToken } = await createSession(request, `e2e-session-${prefix}`, seeded.gameId);
+
+    const { context: modContext, page: modPage } = await openModLobby(browser, sessionId, modId, modToken, DEV_USER);
+    const { context: playerContext, page: playerPage, playerId } = await joinPlayer(
+      browser,
+      sessionId,
+      `Team ${prefix}`,
+      `Player ${prefix}`,
+    );
+
+    await modPage.locator('.start-button').click();
+    await expect(modPage.locator('.active-game')).toBeVisible({ timeout: 30000 });
+    await expect(playerPage.locator('.active-game')).toBeVisible({ timeout: 30000 });
+
+    const card = playerAnswerCard(playerPage);
+
+    // A risky-wager question shows the 0..max slider (no fixed-wager radio
+    // buttons), defaulting to the full max (10).
+    await expect(card.locator('.ant-slider')).toBeVisible({ timeout: 30000 });
+    await expect(card.locator('.ant-radio-button-wrapper')).toHaveCount(0);
+
+    // Bet a half-point amount (7.5) and answer.
+    const slider = card.locator('.ant-slider');
+    const sliderWidth = (await slider.boundingBox())!.width;
+    // 7.5 / 10 -> 75% of the way across.
+    await slider.click({ position: { x: sliderWidth * 0.75, y: 8 } });
+    await card.locator('textarea[placeholder="Your answer"]').fill('Risky answer');
+    const answerButton = card.getByRole('button', { name: 'Answer', exact: true });
+    await expect(answerButton).toBeEnabled();
+    await answerButton.click();
+
+    // The wager is recorded (0.5-step fractional bets are legal).
+    await expect
+      .poll(async () => (await playerAnswers(request, sessionId, modId, modToken, playerId, 0, 0)).length)
+      .toBe(1);
+    const recorded = await playerAnswers(request, sessionId, modId, modToken, playerId, 0, 0);
+    expect(recorded[0].wager).toBe(7.5);
+
+    // Mod marks it correct and scores: the player gains their wager (+7.5).
+    await scoreCurrentQuestion(modPage, true);
+    await expect(
+      modPage.locator('.scoreboard .ant-card').filter({ hasText: `Team ${prefix}` }),
+    ).toContainText('7.5', { timeout: 30000 });
+
+    await playerContext.close();
+    await modContext.close();
+    await cleanup(request, seeded, { sessionId, modId, modToken, playerIds: [playerId] });
+  });
+
+  test('a wrong risky-wager answer deducts the wager (negative points)', async ({
+    browser,
+    request,
+  }) => {
+    test.setTimeout(90000);
+    const prefix = unique();
+    const seeded = await seedStartableRiskyGame(request, prefix);
+    const { sessionId, modId, modToken } = await createSession(request, `e2e-session-${prefix}`, seeded.gameId);
+
+    const { context: modContext, page: modPage } = await openModLobby(browser, sessionId, modId, modToken, DEV_USER);
+    const { context: playerContext, page: playerPage, playerId } = await joinPlayer(
+      browser,
+      sessionId,
+      `Team ${prefix}`,
+      `Player ${prefix}`,
+    );
+
+    await modPage.locator('.start-button').click();
+    await expect(playerPage.locator('.active-game')).toBeVisible({ timeout: 30000 });
+
+    const card = playerAnswerCard(playerPage);
+    await expect(card.locator('.ant-slider')).toBeVisible({ timeout: 30000 });
+
+    // Bet 5 (halfway across the 0..10 slider) and answer wrong.
+    const slider = card.locator('.ant-slider');
+    const sliderWidth = (await slider.boundingBox())!.width;
+    await slider.click({ position: { x: sliderWidth * 0.5, y: 8 } });
+    await card.locator('textarea[placeholder="Your answer"]').fill('Wrong risky answer');
+    const answerButton = card.getByRole('button', { name: 'Answer', exact: true });
+    await expect(answerButton).toBeEnabled();
+    await answerButton.click();
+
+    await expect
+      .poll(async () => (await playerAnswers(request, sessionId, modId, modToken, playerId, 0, 0)).length)
+      .toBe(1);
+
+    // Mod marks it incorrect and scores: the player loses their wager (−5).
+    await scoreCurrentQuestion(modPage, false);
+    await expect(
+      modPage.locator('.scoreboard .ant-card').filter({ hasText: `Team ${prefix}` }),
+    ).toContainText('-5', { timeout: 30000 });
+
+    // The player's status card shows the negative points awarded.
+    await expect(playerPage.locator('.player-status-bar .anticon-close-square')).toBeVisible({
+      timeout: 30000,
+    });
+
+    await playerContext.close();
+    await modContext.close();
+    await cleanup(request, seeded, { sessionId, modId, modToken, playerIds: [playerId] });
   });
 });

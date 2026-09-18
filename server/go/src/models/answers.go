@@ -18,8 +18,16 @@ type Answer struct {
 	RoundIndex    *int      `json:"round_id,omitempty" binding:"required"`
 	PlayerId      PlayerId  `json:"player_id" binding:"required"`
 	Answer        string    `json:"answer" binding:"required"`
-	Wager         int       `json:"wager" binding:"required"`
-	UseMoneyball  bool      `json:"use_moneyball,omitempty"`
+	// Wager is the player's bet: the round's fixed wager for a normal question,
+	// or the player's chosen amount (0..max, 0.5 steps) for a risky-wager
+	// question (ticket #295). float64 so a half-point bet like 2.5 is legal.
+	//
+	// No binding:"required": the validator would reject the zero value, but 0
+	// is a legal risky-wager bet. Legality is enforced by wagerIsLegal /
+	// wagerIsLegalRisky in the AnswerQuestion handler, which reject a missing
+	// or out-of-range bet anyway.
+	Wager        float64   `json:"wager"`
+	UseMoneyball bool      `json:"use_moneyball,omitempty"`
 	Correct       bool      `json:"correct,omitempty"`
 	PointsAwarded float64   `json:"points_awarded,omitempty"`
 	// SessionId is set server-side on create; it is not part of the API.
@@ -92,7 +100,7 @@ type ScoredTeam struct {
 }
 
 type ScoredAnswer struct {
-	Wager         int            `json:"wager"`
+	Wager         float64        `json:"wager"`
 	UseMoneyball  bool           `json:"use_moneyball"`
 	Correct       bool           `json:"correct"`
 	PointsAwarded float64        `json:"points_awarded"`

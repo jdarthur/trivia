@@ -27,6 +27,10 @@ export interface Question {
   ordered?: QuestionOrderedItem[];
   /** ticket #292: per-correct-item points for partial credit (bucketing/matching); 0 = all-or-nothing. */
   points_per_correct?: number;
+  /** ticket #295: finale-style risky wager — players bet 0..max_wager at answer time (+wager correct / -wager wrong). */
+  risky_wager?: boolean;
+  /** ticket #295: the ceiling on a risky-wager bet (0.5-point steps). */
+  max_wager?: number;
 }
 
 export interface QuestionChoice {
@@ -150,6 +154,10 @@ export interface QuestionInRound {
   ordered?: string[];
   /** ticket #292: per-correct-item points for partial credit; 0 = all-or-nothing. */
   points_per_correct?: number;
+  /** ticket #295: risky-wager mode — players bet 0..max_wager at answer time. */
+  risky_wager?: boolean;
+  /** ticket #295: the ceiling on a risky-wager bet (0.5-point steps). */
+  max_wager?: number;
   /** ticket #293: emoji reactions on the question itself (counts + team names). */
   reactions?: Record<string, ReactionSummary>;
   /** ticket #293: the caller's own reaction on the question, if any. */
