@@ -28,6 +28,9 @@ interface Props {
     set_override: (player_id: string, value: number | string | null) => void
     correct?: boolean
     override_value: number
+    // Ticket #294: upper bound for the manual score-override slider (the
+    // override replaces the awarded points, so it must cover realistic wagers).
+    override_max?: number
     answers?: AnswerLike[]
     session_id: string
     player_name: string
@@ -60,6 +63,7 @@ export default function PlayerAnswers({
                                           set_override,
                                           correct,
                                           override_value,
+                                          override_max,
                                           answers,
                                           session_id,
                                           player_name,
@@ -126,7 +130,7 @@ export default function PlayerAnswers({
         : null
 
     const modalContent = <div style={{width: 200, display: "flex", flexDirection: "column"}}>
-        <Slider min={-10} max={10} step={0.5} value={override} onChange={setOverride} style={{flexGrow: 1}}/>
+        <Slider min={-override_max} max={override_max} step={0.5} value={override} onChange={setOverride} style={{flexGrow: 1}}/>
         <InputNumber value={override} onChange={setOverride} step={0.5}
                      style={{flexGrow: 0, width: "5em", alignSelf: "flex-end"}}/>
     </div>

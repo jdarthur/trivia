@@ -1448,6 +1448,77 @@ func TestAutoScoreMultipleChoice(t *testing.T) {
 	}
 }
 
+// TestAutoScoreMultipleChoiceOverrideWins verifies ticket #294: on an
+// auto-scored question an explicit moderator override wins over the
+// auto-scored result — including for a player the auto-scorer judged wrong
+// (awarded the override and marked correct). An override of 0 marks the
+// answer incorrect, and a player with no override stays auto-scored (the
+// mod's correct flag is ignored).
+func TestAutoScoreMultipleChoiceOverrideWins(t *testing.T) {
+	env := openSessionTestDB(t)
+	qid := createMCQuestion(t, env, []models.QuestionChoice{{Text: "Rome"}, {Text: "Paris", IsCorrect: true}, {Text: "Tokyo"}})
+	session, p1, p2 := newStructuredSession(t, env, qid)
+
+	addAnswer(t, env, session.ID, p1, "Paris", 100) // auto-correct
+	addAnswer(t, env, session.ID, p2, "Rome", 200)  // auto-wrong
+
+	// p1: override nonzero on an auto-correct answer; p2: override nonzero on
+	// an auto-wrong answer — the override wins for both.
+	fifty := 50.0
+	seventyfive := 75.0
+	if err := scoreQuestionTx(env, session, models.ScoreRequest{
+		RoundIndex: 0, QuestionIndex: 0,
+		Players: map[models.PlayerId]models.CorrectorNot{
+			p1: {Correct: false, ScoreOverride: &fifty},
+			p2: {Correct: false, ScoreOverride: &seventyfive},
+		},
+	}, 0, 0); err != nil {
+		t.Fatal(err)
+	}
+	answers, err := latestAnswersForQuestion(env, session.ID, 0, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := map[models.PlayerId]models.Answer{}
+	for _, a := range answers {
+		got[a.PlayerId] = a
+	}
+	if !got[p1].Correct || got[p1].PointsAwarded != 50 {
+		t.Errorf("p1 = correct:%v points:%v, want correct with 50 (override on auto-correct)", got[p1].Correct, got[p1].PointsAwarded)
+	}
+	if !got[p2].Correct || got[p2].PointsAwarded != 75 {
+		t.Errorf("p2 = correct:%v points:%v, want correct with 75 (override wins over auto-wrong)", got[p2].Correct, got[p2].PointsAwarded)
+	}
+
+	// rescore: override 0 on an auto-correct answer -> incorrect with 0; no
+	// override on an auto-wrong answer -> stays auto-scored (incorrect, 0),
+	// the mod's correct flag is ignored.
+	zero := 0.0
+	if err := scoreQuestionTx(env, session, models.ScoreRequest{
+		RoundIndex: 0, QuestionIndex: 0,
+		Players: map[models.PlayerId]models.CorrectorNot{
+			p1: {Correct: true, ScoreOverride: &zero},
+			p2: {Correct: true},
+		},
+	}, 0, 0); err != nil {
+		t.Fatal(err)
+	}
+	answers, err = latestAnswersForQuestion(env, session.ID, 0, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got = map[models.PlayerId]models.Answer{}
+	for _, a := range answers {
+		got[a.PlayerId] = a
+	}
+	if got[p1].Correct || got[p1].PointsAwarded != 0 {
+		t.Errorf("p1 = correct:%v points:%v, want incorrect with 0 (override 0)", got[p1].Correct, got[p1].PointsAwarded)
+	}
+	if got[p2].Correct || got[p2].PointsAwarded != 0 {
+		t.Errorf("p2 = correct:%v points:%v, want incorrect with 0 (no override, auto-wrong)", got[p2].Correct, got[p2].PointsAwarded)
+	}
+}
+
 // TestAutoScoreMatching verifies matching auto-scoring: only a complete and
 // correct left->right mapping scores; partial, wrong, or malformed-JSON answers
 // are incorrect (not an error).
@@ -1560,6 +1631,70 @@ func TestScoreQuestionBucketingPartialCredit(t *testing.T) {
 	}
 	if got[p4].PointsAwarded != 2 || got[p4].Correct {
 		t.Errorf("p4 points=%v correct=%v, want 2 (1 correct * 2)", got[p4].PointsAwarded, got[p4].Correct)
+	}
+}
+
+// TestScoreQuestionBucketingPartialCreditOverrideWins verifies ticket #294 on a
+// points-per-correct question: an explicit override wins over the per-item
+// partial credit (and over an auto-wrong answer), while a player with no
+// override keeps the partial-credit award.
+func TestScoreQuestionBucketingPartialCreditOverrideWins(t *testing.T) {
+	env := openSessionTestDB(t)
+
+	q, err := questions.CreateOneQuestion((*questions.Env)(env), "user-1", models.Question{
+		Question: "Capital?", QuestionType: "bucketing",
+		Buckets: []models.QuestionBucket{{Text: "yes"}, {Text: "no"}},
+		Items: []models.QuestionBucketItem{
+			{Text: "Atlanta", Bucket: "yes"},
+			{Text: "Orlando", Bucket: "no"},
+			{Text: "Dallas", Bucket: "no"},
+			{Text: "Charleston", Bucket: "yes"},
+		},
+		PointsPerCorrect: 2,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	session, p1, p2 := newStructuredSession(t, env, q.ID)
+	p3 := addPlayerToSession(t, env, session.ID, "team-3")
+
+	// p1: partial (3 of 4 correct -> 6); p2: all correct (8); p3: all wrong (0).
+	addAnswer(t, env, session.ID, p1, `{"Atlanta":"yes","Orlando":"no","Dallas":"no","Charleston":"no"}`, 100)
+	addAnswer(t, env, session.ID, p2, `{"Atlanta":"yes","Orlando":"no","Dallas":"no","Charleston":"yes"}`, 200)
+	addAnswer(t, env, session.ID, p3, `{"Atlanta":"no","Orlando":"yes","Dallas":"yes","Charleston":"no"}`, 300)
+
+	// override 50 on the partial player (would be 6) and 25 on the auto-wrong
+	// player (would be 0) — the override wins for both; p2 has no override so
+	// keeps the partial-credit 8.
+	fifty := 50.0
+	twentyfive := 25.0
+	if err := scoreQuestionTx(env, session, models.ScoreRequest{
+		RoundIndex: 0, QuestionIndex: 0,
+		Players: map[models.PlayerId]models.CorrectorNot{
+			p1: {Correct: false, ScoreOverride: &fifty},
+			p2: {Correct: false},
+			p3: {Correct: false, ScoreOverride: &twentyfive},
+		},
+	}, 0, 0); err != nil {
+		t.Fatal(err)
+	}
+	answers, err := latestAnswersForQuestion(env, session.ID, 0, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := map[models.PlayerId]models.Answer{}
+	for _, a := range answers {
+		got[a.PlayerId] = a
+	}
+	if got[p1].PointsAwarded != 50 || !got[p1].Correct {
+		t.Errorf("p1 points=%v correct=%v, want 50 and correct (override wins over partial 6)", got[p1].PointsAwarded, got[p1].Correct)
+	}
+	if got[p3].PointsAwarded != 25 || !got[p3].Correct {
+		t.Errorf("p3 points=%v correct=%v, want 25 and correct (override wins over auto-wrong 0)", got[p3].PointsAwarded, got[p3].Correct)
+	}
+	if got[p2].PointsAwarded != 8 || !got[p2].Correct {
+		t.Errorf("p2 points=%v correct=%v, want 8 and correct (no override, partial credit)", got[p2].PointsAwarded, got[p2].Correct)
 	}
 }
 
