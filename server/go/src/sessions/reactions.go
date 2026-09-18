@@ -12,11 +12,20 @@ import (
 	"github.com/jdarthur/trivia/models"
 )
 
-// ReactionRequest is the body for creating/updating or removing a reaction.
-// Emoji is validated by the handlers: must be a single emoji on set, ignored
-// on remove.
+// ReactionRequest is the body for creating/updating or removing a reaction on
+// an answer. Emoji is validated by the handlers: must be a single emoji on
+// set, ignored on remove.
 type ReactionRequest struct {
 	AnswerId string          `json:"answer_id" binding:"required"`
+	PlayerId models.PlayerId `json:"player_id" binding:"required"`
+	Emoji    string          `json:"emoji"`
+}
+
+// QuestionReactionRequest is the body for creating/updating or removing a
+// reaction on the question itself (ticket #293). The target is implicitly the
+// session's current question, so no round/question indexes are carried; the
+// actor is the server-verified caller. Emoji is validated on set.
+type QuestionReactionRequest struct {
 	PlayerId models.PlayerId `json:"player_id" binding:"required"`
 	Emoji    string          `json:"emoji"`
 }
@@ -119,6 +128,106 @@ func (e *Env) RemoveReaction(c *gin.Context) {
 	common.Respond(c, nil, nil)
 }
 
+// SetQuestionReaction creates or updates one player's reaction on the current
+// question (PUT). Because question_reaction has a UNIQUE(session_id,
+// round_index, question_index, player_id) constraint, a second reaction from
+// the same player on the same question updates the emoji in place instead of
+// inserting a duplicate. Unlike answer reactions, question reactions are
+// allowed both before and after the question is scored (ticket #293).
+func (e *Env) SetQuestionReaction(c *gin.Context) {
+	sessionId := c.Param("id")
+
+	var req QuestionReactionRequest
+	if err := c.ShouldBind(&req); err != nil {
+		common.Respond(c, nil, err)
+		return
+	}
+	// The actor is the server-verified caller, never the body's player_id — so
+	// a caller cannot react as another player.
+	req.PlayerId = models.PlayerId(common.GetPlayerId(c))
+	req.Emoji = strings.TrimSpace(req.Emoji)
+	if !isSingleEmoji(req.Emoji) {
+		common.Respond(c, nil, InvalidEmojiError{Emoji: req.Emoji})
+		return
+	}
+
+	roundIndex, questionIndex, err := validateQuestionReactionTarget(e, sessionId, req)
+	if err != nil {
+		common.Respond(c, nil, err)
+		return
+	}
+
+	now := time.Now()
+	_, err = e.Db.Exec(`INSERT INTO question_reaction
+		(id, create_date, session_id, round_index, question_index, player_id, emoji)
+		VALUES (?, ?, ?, ?, ?, ?, ?)
+		ON CONFLICT(session_id, round_index, question_index, player_id)
+			DO UPDATE SET emoji = excluded.emoji`,
+		uuid.New().String(), common.FormatTime(now), sessionId, roundIndex, questionIndex,
+		string(req.PlayerId), req.Emoji)
+	if err != nil {
+		common.Respond(c, nil, err)
+		return
+	}
+
+	if err := common.IncrementState((*common.Env)(e), sessionId); err != nil {
+		common.Respond(c, nil, err)
+		return
+	}
+
+	reaction, err := getQuestionReaction(e, sessionId, roundIndex, questionIndex, req.PlayerId)
+	if err != nil {
+		common.Respond(c, nil, err)
+		return
+	}
+	common.Respond(c, reaction, nil)
+}
+
+// RemoveQuestionReaction deletes a player's reaction on the current question
+// (DELETE). Only the owner can remove their own reaction. The same target
+// validation as SetQuestionReaction applies, so removal is not possible on
+// another session's question or once the question has moved on.
+func (e *Env) RemoveQuestionReaction(c *gin.Context) {
+	sessionId := c.Param("id")
+
+	var req QuestionReactionRequest
+	if err := c.ShouldBind(&req); err != nil {
+		common.Respond(c, nil, err)
+		return
+	}
+	// The actor is the server-verified caller, never the body's player_id — so
+	// a caller cannot remove another player's reaction.
+	req.PlayerId = models.PlayerId(common.GetPlayerId(c))
+
+	roundIndex, questionIndex, err := validateQuestionReactionTarget(e, sessionId, req)
+	if err != nil {
+		common.Respond(c, nil, err)
+		return
+	}
+
+	res, err := e.Db.Exec(`DELETE FROM question_reaction
+		WHERE session_id = ? AND round_index = ? AND question_index = ? AND player_id = ?`,
+		sessionId, roundIndex, questionIndex, string(req.PlayerId))
+	if err != nil {
+		common.Respond(c, nil, err)
+		return
+	}
+	if n, err := res.RowsAffected(); err != nil {
+		common.Respond(c, nil, err)
+		return
+	} else if n == 0 {
+		common.Respond(c, nil, QuestionReactionNotFoundError{SessionId: sessionId, PlayerId: req.PlayerId})
+		return
+	}
+
+	if err := common.IncrementState((*common.Env)(e), sessionId); err != nil {
+		common.Respond(c, nil, err)
+		return
+	}
+
+	common.Respond(c, nil, nil)
+}
+
 // answerRow is the subset of the answer table the reactions handlers need.
 type answerRow struct {
 	ID            string
@@ -158,24 +267,8 @@ func validateReactionTarget(e *Env, sessionId string, req ReactionRequest) (answ
 		return answerRow{}, err
 	}
 
-	// The moderator created the session but — unlike joined players — has no
-	// session_player row; they are still an active member and may react to
-	// scored answers like any other player (ticket #156).
-	var session models.Session
-	if err := common.GetOne((*common.Env)(e), common.SessionTable, sessionId, &session); err != nil {
+	if _, err := validateReactionActor(e, sessionId, req.PlayerId); err != nil {
 		return answerRow{}, err
-	}
-	if req.PlayerId != session.Moderator {
-		if !playerInSession(e, sessionId, req.PlayerId) {
-			return answerRow{}, PlayerNotInSessionError{PlayerId: req.PlayerId, SessionId: sessionId}
-		}
-		active, err := playerIsActive(e, sessionId, req.PlayerId)
-		if err != nil {
-			return answerRow{}, err
-		}
-		if !active {
-			return answerRow{}, PlayerInactiveError{PlayerId: req.PlayerId, SessionId: sessionId}
-		}
 	}
 
 	snapshot, err := sessionQuestionSnapshot(e, sessionId, answer.RoundIndex, answer.QuestionIndex)
@@ -195,6 +288,52 @@ func validateReactionTarget(e *Env, sessionId string, req ReactionRequest) (answ
 	}
 
 	return answer, nil
+}
+
+// validateReactionActor enforces the shared membership rules for setting and
+// removing a reaction (on an answer or on the question): the player is the
+// moderator (who created the session but — unlike joined players — has no
+// session_player row; still an active member, ticket #156) or a joined, active
+// member. Returns the session row.
+func validateReactionActor(e *Env, sessionId string, playerId models.PlayerId) (models.Session, error) {
+	var session models.Session
+	if err := common.GetOne((*common.Env)(e), common.SessionTable, sessionId, &session); err != nil {
+		return session, err
+	}
+	if playerId != session.Moderator {
+		if !playerInSession(e, sessionId, playerId) {
+			return session, PlayerNotInSessionError{PlayerId: playerId, SessionId: sessionId}
+		}
+		active, err := playerIsActive(e, sessionId, playerId)
+		if err != nil {
+			return session, err
+		}
+		if !active {
+			return session, PlayerInactiveError{PlayerId: playerId, SessionId: sessionId}
+		}
+	}
+	return session, nil
+}
+
+// validateQuestionReactionTarget enforces the shared rules for setting and
+// removing a reaction on the question itself (ticket #293): the session is
+// started (has a current question), the player is an active member (or the
+// moderator), and the target is the session's current question. Unlike answer
+// reactions, question reactions are allowed before the question is scored. It
+// returns the current (round, question) indexes.
+func validateQuestionReactionTarget(e *Env, sessionId string, req QuestionReactionRequest) (roundIndex int, questionIndex int, err error) {
+	if _, err := validateReactionActor(e, sessionId, req.PlayerId); err != nil {
+		return 0, 0, err
+	}
+
+	curRound, curQuestion, ok, err := currentQuestionIndexes(e, sessionId)
+	if err != nil {
+		return 0, 0, err
+	}
+	if !ok {
+		return 0, 0, SessionNotStartedError{SessionId: sessionId}
+	}
+	return curRound, curQuestion, nil
 }
 
 // currentQuestionIndexes returns the session's current round/question and
@@ -229,6 +368,24 @@ func getReaction(e *Env, answerId string, playerId models.PlayerId) (models.Answ
 	return m, nil
 }
 
+// getQuestionReaction reads back one player's reaction row on a question.
+func getQuestionReaction(e *Env, sessionId string, roundIndex int, questionIndex int, playerId models.PlayerId) (models.QuestionReaction, error) {
+	var m models.QuestionReaction
+	var createDate string
+	var scannedPlayerId string
+	err := e.Db.QueryRow(`SELECT id, create_date, session_id, round_index, question_index, player_id, emoji
+		FROM question_reaction
+		WHERE session_id = ? AND round_index = ? AND question_index = ? AND player_id = ?`,
+		sessionId, roundIndex, questionIndex, string(playerId)).
+		Scan(&m.ID, &createDate, &m.SessionId, &m.RoundIndex, &m.QuestionIndex, &scannedPlayerId, &m.Emoji)
+	if err != nil {
+		return m, err
+	}
+	m.CreateDate = common.ParseTime(createDate)
+	m.PlayerId = models.PlayerId(scannedPlayerId)
+	return m, nil
+}
+
 // reactionsByAnswer is the aggregated reaction state of one answer: per-emoji
 // counts and reacting team names, plus the caller's own reaction.
 type reactionsByAnswer struct {
@@ -237,12 +394,12 @@ type reactionsByAnswer struct {
 	myReaction string
 }
 
-// reactionsForQuestion loads every reaction on the question's answers, keyed
-// by answer ID, aggregated per emoji (count + the reacting players' team
+// answerReactionsForQuestion loads every reaction on the question's answers,
+// keyed by answer ID, aggregated per emoji (count + the reacting players' team
 // names, so clients can show who reacted on hover), with the caller's own
 // reaction flagged so the UI can highlight their selection without exposing
 // player ids.
-func reactionsForQuestion(e *Env, sessionId string, roundIndex int, questionIndex int, callerPlayerId models.PlayerId) (map[string]reactionsByAnswer, error) {
+func answerReactionsForQuestion(e *Env, sessionId string, roundIndex int, questionIndex int, callerPlayerId models.PlayerId) (map[string]reactionsByAnswer, error) {
 	rows, err := e.Db.Query(`SELECT ar.answer_id, ar.player_id, p.team_name, ar.emoji
 		FROM answer_reaction ar
 		JOIN answer a ON a.id = ar.answer_id
@@ -270,6 +427,44 @@ func reactionsForQuestion(e *Env, sessionId string, roundIndex int, questionInde
 			ra.myReaction = emoji
 		}
 		result[answerId] = ra
+	}
+	return result, rows.Err()
+}
+
+// questionReactionsForQuestion loads every reaction on the question itself,
+// aggregated per emoji (count + the reacting players' team names, so clients
+// can show who reacted on hover), with the caller's own reaction flagged so
+// the UI can highlight their selection without exposing player ids. Unlike
+// answerReactionsForQuestion, these are keyed by (session, round, question)
+// rather than by answer, and are allowed before the question is scored
+// (ticket #293).
+func questionReactionsForQuestion(e *Env, sessionId string, roundIndex int, questionIndex int, callerPlayerId models.PlayerId) (map[string]reactionsByAnswer, error) {
+	rows, err := e.Db.Query(`SELECT qr.player_id, p.team_name, qr.emoji
+		FROM question_reaction qr
+		JOIN player p ON p.id = qr.player_id
+		WHERE qr.session_id = ? AND qr.round_index = ? AND qr.question_index = ?`,
+		sessionId, roundIndex, questionIndex)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	result := make(map[string]reactionsByAnswer)
+	for rows.Next() {
+		var playerId, teamName, emoji string
+		if err := rows.Scan(&playerId, &teamName, &emoji); err != nil {
+			return nil, err
+		}
+		ra := result[""]
+		if ra.counts == nil {
+			ra.counts = make(map[string]int)
+			ra.players = make(map[string][]string)
+		}
+		ra.counts[emoji]++
+		ra.players[emoji] = append(ra.players[emoji], teamName)
+		if playerId == string(callerPlayerId) {
+			ra.myReaction = emoji
+		}
+		result[""] = ra
 	}
 	return result, rows.Err()
 }

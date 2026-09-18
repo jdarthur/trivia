@@ -5,12 +5,20 @@ import sendData from "../index";
 import "./Players.css"
 import type {ReactionSummary} from "../types/models";
 
+// target selects which reaction surface this control drives: 'answer' (the
+// existing per-answer reaction, ticket #156) or 'question' (the question
+// itself, ticket #293). The two hit different endpoints and carry different
+// bodies; everything else (picker, stickers, add/remove/modify semantics) is
+// shared.
+type ReactionTarget = 'answer' | 'question'
+
 interface Props {
     session_id: string
     // current_player is the viewer's own player id (the person reacting) —
     // NOT the player the answer card belongs to.
     current_player: string
     answer_id?: string
+    target?: ReactionTarget
     reactions?: Record<string, ReactionSummary>
     my_reaction?: string
 }
@@ -44,31 +52,45 @@ interface Props {
 // PUT creates or modifies (upsert); DELETE removes. Fire-and-forget like the
 // other gameplay mutations — the state-token bump drives a refetch.
 // Failures are logged (and the picker still closes); the player can retry.
-function remove_reaction(session_id: string, answer_id: string, player_id: string) {
-    sendData("/gameplay/session/" + session_id + "/reaction", "DELETE", {answer_id, player_id})
+// The target selects the endpoint and body: an answer reaction carries
+// answer_id; a question reaction (ticket #293) targets the current question
+// implicitly, so only player_id is sent.
+function reaction_path(session_id: string, target: ReactionTarget) {
+    return "/gameplay/session/" + session_id + (target === 'question' ? "/question-reaction" : "/reaction")
+}
+
+function remove_reaction(session_id: string, target: ReactionTarget, answer_id: string | undefined,
+                         player_id: string) {
+    const body: Record<string, string> = {player_id}
+    if (answer_id) body.answer_id = answer_id
+    sendData(reaction_path(session_id, target), "DELETE", body)
         .catch((error) => console.error("Failed to remove reaction:", error))
 }
 
-function set_reaction(session_id: string, answer_id: string, player_id: string, emoji: string,
-                      my_reaction?: string) {
+function set_reaction(session_id: string, target: ReactionTarget, answer_id: string | undefined,
+                      player_id: string, emoji: string, my_reaction?: string) {
     if (emoji === my_reaction) {
-        remove_reaction(session_id, answer_id, player_id)
+        remove_reaction(session_id, target, answer_id, player_id)
     } else {
-        sendData("/gameplay/session/" + session_id + "/reaction", "PUT", {answer_id, player_id, emoji})
+        const body: Record<string, string> = {player_id, emoji}
+        if (answer_id) body.answer_id = answer_id
+        sendData(reaction_path(session_id, target), "PUT", body)
             .catch((error) => console.error("Failed to set reaction:", error))
     }
 }
 
-/** The "+"/picker button. Renders nothing until the answer can be reacted to. */
-export function ReactionAdd({session_id, current_player, answer_id}: Props) {
+/** The "+"/picker button. Renders nothing until there is a reaction target. */
+export function ReactionAdd({session_id, current_player, answer_id, target}: Props) {
     const [picker_open, set_picker_open] = React.useState(false)
-    if (!answer_id) return null
+    // A question reaction (ticket #293) targets the current question implicitly,
+    // so no answer_id is needed; an answer reaction always requires one.
+    if (target !== 'question' && !answer_id) return null
 
     const picker = (
         <EmojiPicker width={300} height={320} emojiStyle={EmojiStyle.NATIVE}
                      previewConfig={{showPreview: false}}
                      onEmojiClick={(data) => {
-                         set_reaction(session_id, answer_id, current_player, data.emoji);
+                         set_reaction(session_id, target || 'answer', answer_id, current_player, data.emoji);
                          set_picker_open(false)
                      }}/>
     )
@@ -84,7 +106,7 @@ export function ReactionAdd({session_id, current_player, answer_id}: Props) {
 }
 
 /** The sticker strip of existing reactions. Renders nothing when there are none. */
-export function ReactionStickers({session_id, current_player, answer_id, reactions, my_reaction}: Props) {
+export function ReactionStickers({session_id, current_player, answer_id, target, reactions, my_reaction}: Props) {
     const stickers = Object.entries(reactions || {})
         .sort((a, b) => b[1].count - a[1].count || a[0].localeCompare(b[0]))
         .map(([emoji, summary]) => {
@@ -94,16 +116,20 @@ export function ReactionStickers({session_id, current_player, answer_id, reactio
             const who = summary.players && summary.players.length > 0
                 ? summary.players.join(', ')
                 : undefined
-            // Every sticker is clickable: your own removes your reaction,
-            // someone else's quick-reacts the same emoji for your team (the
-            // PUT upserts on UNIQUE(answer_id, player_id), so it also replaces
-            // whatever you had reacted with).
-            const click = !answer_id ? undefined : () => mine
-                ? remove_reaction(session_id, answer_id, current_player)
-                : set_reaction(session_id, answer_id, current_player, emoji)
-            // The tooltip names who reacted and what the click will do.
-            const action = mine ? "click to remove" : "click to react the same"
-            const title = who ? who + " — " + action : action
+            // Every sticker is clickable for a reacting player: your own
+            // removes your reaction, someone else's quick-reacts the same
+            // emoji for your team (the PUT upserts on the unique key, so it
+            // also replaces whatever you had reacted with). A question
+            // reaction needs no answer_id. A spectator (no current_player)
+            // sees the counts but cannot react, so the chip is not clickable.
+            const click = !current_player || (target !== 'question' && !answer_id) ? undefined : () => mine
+                ? remove_reaction(session_id, target || 'answer', answer_id, current_player)
+                : set_reaction(session_id, target || 'answer', answer_id, current_player, emoji)
+            // The tooltip names who reacted and what the click will do. A
+            // spectator (no current_player) cannot react, so only the names
+            // are shown.
+            const action = !current_player ? undefined : (mine ? "click to remove" : "click to react the same")
+            const title = who ? who + (action ? " — " + action : "") : (action || "")
             const chip = (
                 <span key={emoji} className={"reaction-chip" + (mine ? " mine" : "")}
                       onClick={click}>

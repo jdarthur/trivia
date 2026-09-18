@@ -148,6 +148,8 @@ func main() {
 	fmt.Println("\nReaction API:")
 	router.PUT("/gameplay/session/:id/reaction", auth.WithPlayer, s.SetReaction)
 	router.DELETE("/gameplay/session/:id/reaction", auth.WithPlayer, s.RemoveReaction)
+	router.PUT("/gameplay/session/:id/question-reaction", auth.WithPlayer, s.SetQuestionReaction)
+	router.DELETE("/gameplay/session/:id/question-reaction", auth.WithPlayer, s.RemoveQuestionReaction)
 
 	fmt.Println("\nHot-edit API:")
 	router.PUT("/gameplay/session/:id/hot-edit-question", s.WithValidSession, auth.WithPlayer, s.AsMod, s.HotEditQuestion)

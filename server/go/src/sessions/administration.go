@@ -284,6 +284,18 @@ func getCurrentQuestion(e *Env, c *gin.Context) (models.QuestionInRound, error) 
 		question := session.Rounds[currentRound].Questions[currentQuestion]
 		question.Index = currentQuestion
 
+		// Ticket #293: reactions on the question itself. The caller is the
+		// server-verified player (or the moderator); the aggregated counts and
+		// their own reaction ride the question payload so every client can
+		// render the reaction strip. Unlike answer reactions, these are
+		// present before the question is scored.
+		if reactions, err := questionReactionsForQuestion(e, sessionId, currentRound, currentQuestion, models.PlayerId(playerId)); err == nil {
+			if ra, ok := reactions[""]; ok {
+				question.Reactions = ra.summary()
+				question.MyReaction = ra.myReaction
+			}
+		}
+
 		if models.PlayerId(playerId) != session.Moderator && !question.Scored {
 			question.Answer = ""
 			question.QuestionId = ""

@@ -90,3 +90,37 @@ func (e ReactionNotFoundError) Field() string {
 func (e ReactionNotFoundError) Data() interface{} {
 	return e.PlayerId
 }
+
+// Error when trying to remove a reaction the player does not have on a
+// question (ticket #293).
+type QuestionReactionNotFoundError struct {
+	SessionId string
+	PlayerId  models.PlayerId
+}
+
+func (e QuestionReactionNotFoundError) Error() string {
+	return fmt.Sprintf("Player %v has no reaction on the current question of session %v", e.PlayerId, e.SessionId)
+}
+func (e QuestionReactionNotFoundError) Field() string {
+	return models.PlayerIdParam
+}
+func (e QuestionReactionNotFoundError) Data() interface{} {
+	return e.PlayerId
+}
+
+// Error when reacting to a session's question before the session has been
+// started (no current question set) — there is no question to react to
+// (ticket #293).
+type SessionNotStartedError struct {
+	SessionId string
+}
+
+func (e SessionNotStartedError) Error() string {
+	return fmt.Sprintf("Session %v has not been started", e.SessionId)
+}
+func (e SessionNotStartedError) Field() string {
+	return models.QuestionIndex
+}
+func (e SessionNotStartedError) Data() interface{} {
+	return e.SessionId
+}

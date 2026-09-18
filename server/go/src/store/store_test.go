@@ -36,8 +36,8 @@ func TestMigrateCreatesBaselineSchema(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Version: %v", err)
 	}
-	if v != 19 {
-		t.Fatalf("user_version = %d, want 19", v)
+	if v != 20 {
+		t.Fatalf("user_version = %d, want 20", v)
 	}
 
 	tables := []string{
@@ -46,6 +46,8 @@ func TestMigrateCreatesBaselineSchema(t *testing.T) {
 		"collection", "collection_question",
 		"scoring_note", "player", "session", "session_player",
 		"session_question", "answer", "answer_reaction", "session_score", "session_state",
+		// migration 20 (ticket #293): question-level reactions
+		"question_reaction",
 		"user",
 		"question_choice", "question_match",
 		"session_question_choice", "session_question_match",
@@ -330,8 +332,8 @@ func TestMigrateIsIdempotent(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Version: %v", err)
 	}
-	if v != 19 {
-		t.Fatalf("user_version = %d after re-migrate, want 19", v)
+	if v != 20 {
+		t.Fatalf("user_version = %d after re-migrate, want 20", v)
 	}
 }
 
@@ -1173,5 +1175,91 @@ func TestAnswerReactionTable(t *testing.T) {
 	}
 	if n != 0 {
 		t.Errorf("answer_reaction rows survived player delete: %d", n)
+	}
+}
+
+// TestQuestionReactionTable verifies migration 20 (ticket #293): the
+// question_reaction table enforces one reaction per (session, round, question,
+// player) via a UNIQUE constraint, rejects unknown session/player FKs, and
+// cascades deletes from session and player.
+func TestQuestionReactionTable(t *testing.T) {
+	db := openTestDB(t)
+
+	// schema: the table exposes the expected columns
+	rows, err := db.Query("PRAGMA table_info(question_reaction)")
+	if err != nil {
+		t.Fatalf("query table_info: %v", err)
+	}
+	defer rows.Close()
+	cols := map[string]bool{}
+	for rows.Next() {
+		var cid int
+		var name, typ string
+		var notnull, pk int
+		var dflt interface{}
+		if err := rows.Scan(&cid, &name, &typ, &notnull, &dflt, &pk); err != nil {
+			t.Fatalf("scan table_info row: %v", err)
+		}
+		cols[name] = true
+	}
+	if err := rows.Err(); err != nil {
+		t.Fatalf("iterate table_info: %v", err)
+	}
+	for _, want := range []string{"id", "create_date", "session_id", "round_index", "question_index", "player_id", "emoji"} {
+		if !cols[want] {
+			t.Errorf("question_reaction missing column %q", want)
+		}
+	}
+
+	mustExec(t, db, `INSERT INTO session (id, create_date) VALUES ('s1', '2026-01-01T00:00:00.000000')`)
+	mustExec(t, db, `INSERT INTO player (id, create_date) VALUES ('p1', '2026-01-01T00:00:00.000000')`)
+	mustExec(t, db, `INSERT INTO player (id, create_date) VALUES ('p2', '2026-01-01T00:00:00.000000')`)
+
+	// a first reaction is fine
+	mustExec(t, db, `INSERT INTO question_reaction (id, create_date, session_id, round_index, question_index, player_id, emoji)
+		VALUES ('r1', '2026-01-01T00:00:00.000000', 's1', 0, 0, 'p2', '👍')`)
+
+	// a second reaction from the same player on the same question violates UNIQUE
+	if _, err := db.Exec(`INSERT INTO question_reaction (id, create_date, session_id, round_index, question_index, player_id, emoji)
+		VALUES ('r2', '2026-01-01T00:00:00.000000', 's1', 0, 0, 'p2', '❤️')`); err == nil {
+		t.Error("expected UNIQUE violation for a second reaction by the same player on the same question")
+	}
+	// a different player may react to the same question
+	mustExec(t, db, `INSERT INTO question_reaction (id, create_date, session_id, round_index, question_index, player_id, emoji)
+		VALUES ('r3', '2026-01-01T00:00:00.000000', 's1', 0, 0, 'p1', '😂')`)
+	// the same player may react to a different question in the same session
+	mustExec(t, db, `INSERT INTO question_reaction (id, create_date, session_id, round_index, question_index, player_id, emoji)
+		VALUES ('r4', '2026-01-01T00:00:00.000000', 's1', 0, 1, 'p2', '🔥')`)
+
+	// unknown session / player FKs are rejected
+	if _, err := db.Exec(`INSERT INTO question_reaction (id, create_date, session_id, round_index, question_index, player_id, emoji)
+		VALUES ('r5', '2026-01-01T00:00:00.000000', 'nope', 0, 0, 'p2', '👍')`); err == nil {
+		t.Error("expected FK violation for unknown session_id")
+	}
+	if _, err := db.Exec(`INSERT INTO question_reaction (id, create_date, session_id, round_index, question_index, player_id, emoji)
+		VALUES ('r6', '2026-01-01T00:00:00.000000', 's1', 0, 0, 'nope', '👍')`); err == nil {
+		t.Error("expected FK violation for unknown player_id")
+	}
+
+	// deleting the session cascades to its reactions
+	mustExec(t, db, `DELETE FROM session WHERE id = 's1'`)
+	var n int
+	if err := db.QueryRow(`SELECT count(*) FROM question_reaction WHERE session_id = 's1'`).Scan(&n); err != nil {
+		t.Fatal(err)
+	}
+	if n != 0 {
+		t.Errorf("question_reaction rows survived session delete: %d", n)
+	}
+
+	// deleting the player cascades to their reactions
+	mustExec(t, db, `INSERT INTO session (id, create_date) VALUES ('s2', '2026-01-01T00:00:00.000000')`)
+	mustExec(t, db, `INSERT INTO question_reaction (id, create_date, session_id, round_index, question_index, player_id, emoji)
+		VALUES ('r7', '2026-01-01T00:00:00.000000', 's2', 0, 0, 'p2', '😂')`)
+	mustExec(t, db, `DELETE FROM player WHERE id = 'p2'`)
+	if err := db.QueryRow(`SELECT count(*) FROM question_reaction WHERE player_id = 'p2'`).Scan(&n); err != nil {
+		t.Fatal(err)
+	}
+	if n != 0 {
+		t.Errorf("question_reaction rows survived player delete: %d", n)
 	}
 }

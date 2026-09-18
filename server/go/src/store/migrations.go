@@ -728,6 +728,32 @@ var migrations = []migration{
 			`ALTER TABLE session_question ADD COLUMN points_per_correct INTEGER NOT NULL DEFAULT 0`,
 		},
 	},
+	{
+		version: 20,
+		name:    "question reaction table",
+		// ticket #293: emoji reactions on the question itself (rather than on a
+		// player's answer, tickets #154/#156). One row is one reaction by one
+		// player to one live (session, round, question); UNIQUE(session_id,
+		// round_index, question_index, player_id) enforces "react once" per
+		// question at the DB level, so modifying is an UPDATE on the same row
+		// and removing is a DELETE. Keyed on the snapshot identity (session +
+		// round/question indexes) rather than question_id, because the same
+		// canonical question can be snapshotted into multiple sessions and
+		// reactions are per-live-session. Unlike answer_reaction, reactions are
+		// allowed both before and after the question is scored.
+		statements: []string{
+			`CREATE TABLE question_reaction (
+				id              TEXT PRIMARY KEY,
+				create_date     TEXT NOT NULL,
+				session_id      TEXT NOT NULL REFERENCES session(id) ON DELETE CASCADE,
+				round_index     INTEGER NOT NULL,
+				question_index  INTEGER NOT NULL,
+				player_id       TEXT NOT NULL REFERENCES player(id) ON DELETE CASCADE,
+				emoji           TEXT NOT NULL DEFAULT '',
+				UNIQUE (session_id, round_index, question_index, player_id)
+			)`,
+		},
+	},
 }
 
 // Migrate brings db up to the latest schema version, applying each pending

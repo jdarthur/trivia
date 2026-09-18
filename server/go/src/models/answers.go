@@ -120,6 +120,43 @@ type AnswerReaction struct {
 	Emoji      string    `json:"emoji"`
 }
 
+// QuestionReaction is one emoji reaction by one player to one live question
+// (ticket #293). The question_reaction table's UNIQUE(session_id,
+// round_index, question_index, player_id) constraint guarantees at most one
+// row per (session, question, player), so modifying is an UPDATE on the same
+// row and removing is a DELETE. Unlike AnswerReaction, reactions are allowed
+// both before and after the question is scored.
+type QuestionReaction struct {
+	ID            string    `json:"id"`
+	CreateDate    time.Time `json:"create_date"`
+	SessionId     string    `json:"session_id"`
+	RoundIndex    int       `json:"round_index"`
+	QuestionIndex int       `json:"question_index"`
+	PlayerId      PlayerId  `json:"player_id"`
+	Emoji         string    `json:"emoji"`
+}
+
+func (r QuestionReaction) SetCreateDate(createDate time.Time) Object {
+	r.CreateDate = createDate
+	return r
+}
+
+func (r QuestionReaction) SetId(objectId string) Object {
+	r.ID = objectId
+	return r
+}
+
+func (r QuestionReaction) MarshalJSON() ([]byte, error) {
+	type Alias QuestionReaction
+	return json.Marshal(&struct {
+		CreateDate string `json:"create_date"`
+		Alias
+	}{
+		CreateDate: dateFormat(r.CreateDate),
+		Alias:      Alias(r),
+	})
+}
+
 func (r AnswerReaction) SetCreateDate(createDate time.Time) Object {
 	r.CreateDate = createDate
 	return r

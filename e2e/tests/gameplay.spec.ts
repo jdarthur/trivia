@@ -1073,6 +1073,71 @@ test.describe('gameplay scoring, scoreboard & statuses', () => {
     await cleanup(request, g.seeded, { sessionId: g.sessionId, modId: g.modId, modToken: g.modToken, playerIds: [g.playerId] });
   });
 
+  // Ticket #293: reactions on the question itself, available while the question
+  // is live (before and after scoring), independent of the per-answer
+  // reactions. The player and the mod each react; the other side sees the
+  // counts after the session-state refetch; tapping the highlighted chip
+  // removes the player's own reaction; and the reaction survives scoring.
+  test('question reactions: react to the live question before scoring, toggle off, and survive scoring', async ({
+    browser,
+    request,
+  }) => {
+    test.setTimeout(120000);
+    const prefix = unique();
+    const g = await setupActiveGame(browser, request, prefix);
+
+    // The question reaction strip is on the question card for both the player
+    // and the mod, and it is available BEFORE the question is scored (unlike
+    // the per-answer reactions).
+    const playerReactions = g.playerPage.locator('.question-reactions');
+    const modReactions = g.modPage.locator('.question-reactions');
+    await expect(playerReactions).toBeVisible({ timeout: 30000 });
+    await expect(modReactions).toBeVisible({ timeout: 30000 });
+
+    // The player reacts 👍 to the live question.
+    await playerReactions.locator('.reaction-add-button').click();
+    await pickEmoji(g.playerPage, 'thumbs up', '1f44d');
+    await expect(playerReactions.locator('.reaction-chip.mine').filter({ hasText: '👍' })).toContainText('1', {
+      timeout: 30000,
+    });
+
+    // The mod sees the count after the session-state refetch.
+    await expect(modReactions.locator('.reaction-chip').filter({ hasText: '👍' })).toContainText('1', {
+      timeout: 30000,
+    });
+
+    // The mod reacts 😂 too.
+    await modReactions.locator('.reaction-add-button').click();
+    await pickEmoji(g.modPage, 'face with tears of joy', '1f602');
+    await expect(modReactions.locator('.reaction-chip.mine').filter({ hasText: '😂' })).toContainText('1', {
+      timeout: 30000,
+    });
+
+    // Both counts are visible on the player's page.
+    await expect(playerReactions.locator('.reaction-chip').filter({ hasText: '👍' })).toContainText('1');
+    await expect(playerReactions.locator('.reaction-chip').filter({ hasText: '😂' })).toContainText('1');
+
+    // Tapping the highlighted chip removes the player's own reaction; the mod's
+    // 😂 remains.
+    await playerReactions.locator('.reaction-chip.mine').filter({ hasText: '👍' }).click();
+    await expect(playerReactions.locator('.reaction-chip').filter({ hasText: '👍' })).toHaveCount(0, {
+      timeout: 30000,
+    });
+    await expect(playerReactions.locator('.reaction-chip').filter({ hasText: '😂' })).toContainText('1');
+
+    // The mod's question reaction survives scoring, and the question strip
+    // coexists with the per-answer reaction controls.
+    await answerQuestion(g.playerPage, 100, 'First answer');
+    await scoreCurrentQuestion(g.modPage, true);
+    await expect(modReactions.locator('.reaction-chip').filter({ hasText: '😂' })).toContainText('1', {
+      timeout: 30000,
+    });
+
+    await g.playerContext.close();
+    await g.modContext.close();
+    await cleanup(request, g.seeded, { sessionId: g.sessionId, modId: g.modId, modToken: g.modToken, playerIds: [g.playerId] });
+  });
+
   // Ticket #239: the score graph modal (opened from the scoreboard title
   // button) renders the chart + legend, tracks the live game while it stays
   // open, and dismisses with the scoreboard still updating behind it.

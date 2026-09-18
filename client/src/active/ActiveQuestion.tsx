@@ -7,6 +7,8 @@ import FormattedQuestion, {MemoFormattedQuestion} from "../question/FormattedQue
 import BucketedItems from "../question/BucketedItems"
 import HotEditQuestion from "./HotEditQuestion";
 import HotEditRoundName from "./HotEditRoundName";
+import {ReactionAdd, ReactionStickers} from "../players/ReactionControl";
+import type {ReactionSummary} from "../types/models";
 import {hashSeed, seededShuffle} from "../common/shuffle";
 
 interface Props {
@@ -36,6 +38,11 @@ interface Props {
     // Ticket #292: points awarded per correct item (bucketing/matching partial
     // credit); shown as a note so players know the question is not all-or-nothing.
     points_per_correct?: number
+    // Ticket #293: emoji reactions on the question itself. Counts are shown to
+    // everyone (players, spectators, mod); the + picker only renders when the
+    // viewer has a player_id (spectators see counts but cannot react).
+    reactions?: Record<string, ReactionSummary>
+    my_reaction?: string
 }
 
 interface State {
@@ -226,6 +233,21 @@ class ActiveQuestion extends React.Component<Props, State> {
                             {this.orderedItems().map((item, index) => <li key={index}>{item}</li>)}
                         </ul> : null}
                     {editQuestionModal}
+                </div>
+
+                {/* Ticket #293: react to the question itself. Available while the
+                    question is live (before and after scoring). Counts are shown to
+                    everyone; the picker needs the viewer's player id. */}
+                <div className="question-reactions">
+                    <ReactionStickers session_id={this.props.session_id}
+                                      current_player={this.props.player_id}
+                                      target="question"
+                                      reactions={this.props.reactions}
+                                      my_reaction={this.props.my_reaction}/>
+                    {this.props.player_id ?
+                        <ReactionAdd session_id={this.props.session_id}
+                                     current_player={this.props.player_id}
+                                     target="question"/> : null}
                 </div>
             </Card>
         );
