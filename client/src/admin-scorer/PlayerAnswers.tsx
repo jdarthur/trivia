@@ -44,6 +44,10 @@ interface Props {
     // scored: the question has been scored, so the answers carry the points
     // the backend actually awarded.
     scored?: boolean
+    // Ticket #295: risky-wager question — the player's own bet drives scoring
+    // (+wager correct / -wager wrong), so the mod only judges correctness and
+    // the override slider is replaced by the bet.
+    risky_wager?: boolean
     // current_player is the moderator's own player id, used for emoji
     // reactions on the scored answers (the mod is also a player in the
     // session, ticket #156).
@@ -64,6 +68,7 @@ export default function PlayerAnswers({
                                           correct_answer,
                                           moneyball,
                                           scored,
+                                          risky_wager,
                                           current_player
                                       }: Props) {
 
@@ -111,6 +116,15 @@ export default function PlayerAnswers({
         ? lastAnswer.points_awarded
         : null
 
+    // Ticket #295: a risky-wager question is scored from the player's own bet,
+    // so the override slider is replaced by the bet (the awarded ±wager once
+    // scored).
+    const riskyExtra = risky_wager
+        ? (scored && lastAnswer && lastAnswer.points_awarded !== undefined
+            ? lastAnswer.points_awarded
+            : (lastAnswer ? lastAnswer.wager : null))
+        : null
+
     const modalContent = <div style={{width: 200, display: "flex", flexDirection: "column"}}>
         <Slider min={-10} max={10} step={0.5} value={override} onChange={setOverride} style={{flexGrow: 1}}/>
         <InputNumber value={override} onChange={setOverride} step={0.5}
@@ -131,7 +145,12 @@ export default function PlayerAnswers({
     if (correct === true) {
         // moneyball players have no meaningful override; show the wager before
         // scoring and the awarded points after
-        correctButtonText = moneyball ? moneyballAward : (override === 0 ? wager : override)
+        correctButtonText = moneyball ? moneyballAward : (risky_wager ? "+" + wager : (override === 0 ? wager : override))
+    }
+    // Ticket #295: show what a wrong risky-wager answer costs (−wager).
+    let incorrectButtonText: React.ReactNode = ""
+    if (correct === false && risky_wager) {
+        incorrectButtonText = "-" + wager
     }
 
     // Reactions only exist once the question is scored. The stickers are a
@@ -158,7 +177,7 @@ export default function PlayerAnswers({
         // 200px leaves once the button takes its share. At 200px the answer
         // wrapped and the card grew ~22px; 228 keeps one line at the original
         // card height.
-        <Card size="small" title={title} extra={moneyball ? moneyballBadge : (autoScoredAward !== null ? autoScoredAward : (correct === true ? sliderMiniModal : wager))}
+        <Card size="small" title={title} extra={moneyball ? moneyballBadge : (risky_wager ? (riskyExtra !== null ? riskyExtra : wager) : (autoScoredAward !== null ? autoScoredAward : (correct === true ? sliderMiniModal : wager)))}
               className={reaction_props ? "reaction-host" : undefined}
               style={{'width': 228, position: 'relative'}} bodyStyle={{padding: 0}}>
             <div className={reaction_props ? "answered-or-not reaction-anchor" : "answered-or-not"}>
@@ -176,7 +195,8 @@ export default function PlayerAnswers({
 
                         <Space>
                             <Button size={"large"} onClick={setIncorrect} style={incorrectButtonStyle}>
-                                <CloseOutlined/>
+                                <CloseOutlined style={{marginRight: incorrectButtonText ? "0.5em" : 0}}/>
+                                {incorrectButtonText}
                             </Button>
 
                             <Button size={"large"} onClick={setCorrect} style={correctButtonStyle}>

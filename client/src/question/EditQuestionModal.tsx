@@ -1,7 +1,7 @@
 import React, {useEffect, useState} from 'react';
 import './Question.css';
 
-import {Input, Modal, Radio, Button, Select, Steps, Popconfirm, Tooltip, InputNumber} from 'antd';
+import {Input, Modal, Radio, Button, Select, Steps, Popconfirm, Tooltip, InputNumber, Space, Checkbox} from 'antd';
 import {ContainerOutlined, EditOutlined, ExclamationCircleOutlined, MinusCircleOutlined, NumberOutlined, OrderedListOutlined, SortAscendingOutlined, SwapOutlined} from '@ant-design/icons';
 import QuestionBody from "./QuestionBody"
 import EditorToolbar from "./EditorToolbar";
@@ -76,6 +76,12 @@ interface Props {
     // bucketing/matching question; 0 = all-or-nothing.
     points_per_correct?: number
     set_points_per_correct?: (value: number) => void
+    // Ticket #295: risky-wager mode — players bet any amount from 0 up to
+    // max_wager (in 0.5-point steps) at answer time, scoring +wager/-wager.
+    risky_wager?: boolean
+    set_risky_wager?: (value: boolean) => void
+    max_wager?: number
+    set_max_wager?: (value: number) => void
     disabled?: boolean
     // Ticket #166: opt into the three-step <Steps /> flow. When false/omitted
     // (e.g. the live in-game hot-edit), the legacy single-view modal renders.
@@ -454,6 +460,30 @@ export default function EditQuestionModal(props: Props) {
         </div>
     ) : null
 
+    // Ticket #295: risky-wager mode. Available for every question type. The
+    // author sets a max wager (the ceiling); players bet any amount from 0 up
+    // to it at answer time, and scoring awards +wager / -wager by correctness.
+    const riskyWagerField = (
+        <div style={{marginBottom: 10}}>
+            <div style={{fontWeight: 600, marginBottom: 4}}>Risky wager (finale)</div>
+            <Space>
+                <Checkbox checked={props.risky_wager === true} disabled={props.disabled}
+                          onChange={(event) => props.set_risky_wager?.(event.target.checked)}>
+                    Players bet their points — +wager if right, -wager if wrong
+                </Checkbox>
+                {props.risky_wager === true ? (
+                    <InputNumber min={0.5} step={0.5} value={props.max_wager || 10} disabled={props.disabled}
+                                 onChange={(value) => props.set_max_wager?.(value || 10)}
+                                 placeholder="Max wager" style={{width: 120}} addonBefore="Max"/>
+                ) : null}
+            </Space>
+            <div style={{fontSize: 12, color: "#888", marginTop: 4}}>
+                Instead of the round's fixed wager, each player bets any amount from 0 up to the max (in 0.5-point
+                steps). Correct answers gain their bet; wrong answers lose it.
+            </div>
+        </div>
+    )
+
     const editView = <div>
         {questionType === MULTIPLE_CHOICE ? choicesView :
             questionType === MATCHING ? pairsView :
@@ -461,6 +491,7 @@ export default function EditQuestionModal(props: Props) {
             questionType === ORDERING ? orderedView :
             questionType === NUMERIC ? numericView : freeformView}
         {pointsPerCorrectField}
+        {riskyWagerField}
     </div>
 
     // The preview shows the question as it will appear to players (no answer,

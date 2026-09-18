@@ -38,6 +38,10 @@ interface Props {
     // question_type lets the player-status view render structured answers
     // readably (matching answers are a JSON map string — ticket #162).
     question_type?: string
+    // Ticket #295: risky-wager question — scoring is ±wager, so show the
+    // awarded points (which go negative on a wrong answer) instead of the raw
+    // bet for a wrong answer.
+    risky_wager?: boolean
 }
 
 /**
@@ -89,8 +93,13 @@ class CorrectOrNot extends React.Component<Props> {
         //color by correctness: a correct moneyball answer that pays 0 (2+
         //others correct) is still a correct answer and gets the green card
         const class_name = "player-wager " + (last_answer.correct ? "" : "in") + "correct"
+        // Ticket #295: a risky-wager wrong answer awards -wager, so show the
+        // awarded points (which may be negative) rather than the raw bet.
+        const shown_points = this.props.risky_wager
+            ? last_answer.points_awarded
+            : (last_answer.correct ? last_answer.points_awarded : last_answer.wager)
         let correctness_and_wager = <div className={class_name}>
-            <div> {last_answer.correct ? last_answer.points_awarded : last_answer.wager} {this.moneyball_marker(last_answer)} </div>
+            <div> {shown_points} {this.moneyball_marker(last_answer)} </div>
             <div> {last_answer.correct ? <CheckSquareOutlined/> : <CloseSquareOutlined/>} </div>
         </div>
 

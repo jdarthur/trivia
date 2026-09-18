@@ -14,6 +14,8 @@ interface Props {
     scored: boolean
     is_mobile?: boolean
     question_type?: string
+    // Ticket #295: risky-wager question — show ±wager awarded points.
+    risky_wager?: boolean
 }
 
 interface State {
@@ -135,6 +137,7 @@ class PlayerStatus extends React.Component<Props, State> {
                                      current_player={this.props.player_id} player_id={player.player_id}
                                      session_id={this.props.session_id}
                                      question_type={this.props.question_type}
+                                     risky_wager={this.props.risky_wager}
                                      is_mobile={this.props.is_mobile}/>
             else return <AnsweredOrNot key={player.team_name} player_name={player.team_name}
                                        answered={player.answered} icon_name={player.icon}
@@ -149,6 +152,7 @@ class PlayerStatus extends React.Component<Props, State> {
                                  current_player={this.props.player_id} player_id={player.player_id}
                                  session_id={this.props.session_id}
                                  question_type={this.props.question_type}
+                                 risky_wager={this.props.risky_wager}
                                  is_mobile={false}/>
 
         })

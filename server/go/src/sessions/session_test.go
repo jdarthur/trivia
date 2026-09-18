@@ -125,7 +125,7 @@ func newScoredFixture(t *testing.T, env *Env) (session models.Session, p1 models
 		q := 0
 		if _, _, err := common.Create((*common.Env)(env), common.AnswerTable, &models.Answer{
 			SessionId: sessionId, RoundIndex: &r, QuestionIndex: &q, PlayerId: player,
-			Answer: "guess", Wager: w,
+			Answer: "guess", Wager: float64(w),
 		}); err != nil {
 			t.Fatal(err)
 		}
@@ -1296,7 +1296,7 @@ func addAnswer(t *testing.T, env *Env, sessionId string, player models.PlayerId,
 	q := 0
 	if _, _, err := common.Create((*common.Env)(env), common.AnswerTable, &models.Answer{
 		SessionId: sessionId, RoundIndex: &r, QuestionIndex: &q, PlayerId: player,
-		Answer: answer, Wager: wager,
+		Answer: answer, Wager: float64(wager),
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -2302,4 +2302,155 @@ func sameStrings(a, b []string) bool {
 	sort.Strings(ac)
 	sort.Strings(bc)
 	return sameOrder(ac, bc)
+}
+
+// newRiskyFixture builds a session with one round of a single risky-wager
+// question (max wager 10, ticket #295), two players, the (0,0) snapshot set,
+// and one answer per player — p1 bets 10, p2 bets 2.5 (a half-point wager).
+func newRiskyFixture(t *testing.T, env *Env) (session models.Session, p1 models.PlayerId, p2 models.PlayerId) {
+	t.Helper()
+
+	q1 := createQuestion(t, env, "risky?", "answer", "Cat A")
+	// mark the question as risky-wager with a 10-point ceiling
+	if err := common.Set((*common.Env)(env), common.QuestionTable, q1,
+		&models.Question{Question: "risky?", Answer: "answer", RiskyWager: true, MaxWager: 10}); err != nil {
+		t.Fatal(err)
+	}
+	round := models.Round{Name: "R", Questions: []string{q1}, Wagers: []int{0}}
+	roundId, _, err := common.Create((*common.Env)(env), common.RoundTable, &round)
+	if err != nil {
+		t.Fatal(err)
+	}
+	game := models.Game{Name: "G", Rounds: []string{roundId}, RoundNames: map[string]string{roundId: "R"}}
+	gameId, _, err := common.Create((*common.Env)(env), common.GameTable, &game)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	mod := createPlayer(t, env, "mod")
+	p1 = createPlayer(t, env, "team-1")
+	p2 = createPlayer(t, env, "team-2")
+
+	sessionId, _, err := common.Create((*common.Env)(env), common.SessionTable,
+		&models.Session{Name: "S", GameId: gameId, Moderator: mod})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := common.IncrementState((*common.Env)(env), sessionId); err != nil {
+		t.Fatal(err)
+	}
+	for _, p := range []models.PlayerId{p1, p2} {
+		if err := common.Push((*common.Env)(env), common.SessionTable, sessionId, models.Players, p); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	if err := common.GetOne((*common.Env)(env), common.SessionTable, sessionId, &session); err != nil {
+		t.Fatal(err)
+	}
+	if err := _setCurrentRound(env, &session, 0, 0); err != nil {
+		t.Fatal(err)
+	}
+
+	answer := func(player models.PlayerId, wager float64) {
+		r := 0
+		q := 0
+		if _, _, err := common.Create((*common.Env)(env), common.AnswerTable, &models.Answer{
+			SessionId: sessionId, RoundIndex: &r, QuestionIndex: &q, PlayerId: player,
+			Answer: "guess", Wager: wager,
+		}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	answer(p1, 10)
+	answer(p2, 2.5)
+
+	if err := common.GetOne((*common.Env)(env), common.SessionTable, sessionId, &session); err != nil {
+		t.Fatal(err)
+	}
+	return session, p1, p2
+}
+
+// TestScoreQuestionRiskyWager verifies ticket #295: a risky-wager question
+// awards +wager for a correct answer and -wager for a wrong one (instead of the
+// historical wager-or-zero), using each player's own bet.
+func TestScoreQuestionRiskyWager(t *testing.T) {
+	env := openSessionTestDB(t)
+	session, p1, p2 := newRiskyFixture(t, env)
+
+	req := models.ScoreRequest{
+		RoundIndex: 0, QuestionIndex: 0,
+		Players: map[models.PlayerId]models.CorrectorNot{
+			p1: {Correct: true}, // bets 10  -> +10
+			p2: {Correct: false}, // bets 2.5 -> -2.5
+		},
+	}
+	if err := scoreQuestionTx(env, session, req, 0, 0); err != nil {
+		t.Fatal(err)
+	}
+
+	scores := scoredAnswersByPlayer(t, env, session.ID)
+	if got := scores[p1].PointsAwarded; got != 10 {
+		t.Errorf("p1 points = %v, want +10", got)
+	}
+	if got := scores[p2].PointsAwarded; got != -2.5 {
+		t.Errorf("p2 points = %v, want -2.5", got)
+	}
+	if !scores[p1].Correct {
+		t.Errorf("p1 should be correct")
+	}
+	if scores[p2].Correct {
+		t.Errorf("p2 should be incorrect")
+	}
+}
+
+// TestScoreQuestionRiskyWagerIgnoresOverride verifies that the mod's score
+// override is ignored on a risky-wager question — the bet is the player's and
+// correctness alone drives the sign (ticket #295).
+func TestScoreQuestionRiskyWagerIgnoresOverride(t *testing.T) {
+	env := openSessionTestDB(t)
+	session, p1, p2 := newRiskyFixture(t, env)
+
+	ten := 99.0
+	req := models.ScoreRequest{
+		RoundIndex: 0, QuestionIndex: 0,
+		Players: map[models.PlayerId]models.CorrectorNot{
+			p1: {Correct: true, ScoreOverride: &ten},  // bets 10  -> +10, not +99
+			p2: {Correct: false, ScoreOverride: &ten}, // bets 2.5 -> -2.5, not +99
+		},
+	}
+	if err := scoreQuestionTx(env, session, req, 0, 0); err != nil {
+		t.Fatal(err)
+	}
+
+	scores := scoredAnswersByPlayer(t, env, session.ID)
+	if got := scores[p1].PointsAwarded; got != 10 {
+		t.Errorf("p1 points = %v, want +10 (override ignored)", got)
+	}
+	if got := scores[p2].PointsAwarded; got != -2.5 {
+		t.Errorf("p2 points = %v, want -2.5 (override ignored)", got)
+	}
+}
+
+// TestRiskyWagerRangeAndValidation verifies the half-point-step legality rule
+// for risky-wager bets (ticket #295).
+func TestRiskyWagerRangeAndValidation(t *testing.T) {
+	legal := []float64{0, 0.5, 1, 2.5, 10}
+	for _, w := range legal {
+		if !wagerIsLegalRisky(10, w) {
+			t.Errorf("wager %v should be legal for max 10", w)
+		}
+	}
+	illegal := []float64{-0.5, 10.5, 2.3, 0.75}
+	for _, w := range illegal {
+		if wagerIsLegalRisky(10, w) {
+			t.Errorf("wager %v should be illegal for max 10", w)
+		}
+	}
+	if !wagerIsLegalRisky(0, 0) {
+		t.Errorf("wager 0 should be legal for max 0")
+	}
+	if wagerIsLegalRisky(0, 0.5) {
+		t.Errorf("wager 0.5 should be illegal for max 0")
+	}
 }

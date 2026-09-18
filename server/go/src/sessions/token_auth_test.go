@@ -145,6 +145,29 @@ func addPlayerToSession(t *testing.T, db *sql.DB, sessionId, playerId string) {
 	}
 }
 
+// createRiskyStartableGame builds a startable game whose single question is a
+// risky-wager question with a 10-point max (ticket #295).
+func createRiskyStartableGame(t *testing.T, db *sql.DB) string {
+	t.Helper()
+	env := &common.Env{Db: db}
+	qid, _, err := common.Create(env, common.QuestionTable,
+		&models.Question{Question: "q?", Answer: "a", RiskyWager: true, MaxWager: 10})
+	if err != nil {
+		t.Fatal(err)
+	}
+	roundId, _, err := common.Create(env, common.RoundTable,
+		&models.Round{Name: "R", Questions: []string{qid}, Wagers: []int{100}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	gameId, _, err := common.Create(env, common.GameTable,
+		&models.Game{Name: "G", Rounds: []string{roundId}, RoundNames: map[string]string{roundId: "R"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return gameId
+}
+
 // TestPlayerTokenIssuedOnceAndOnlyHashPersisted verifies the token is returned
 // at create, only its hash is stored, and the plaintext token appears nowhere
 // in the player table.
@@ -252,6 +275,51 @@ func TestAnswerImpersonationRejected(t *testing.T) {
 	}
 	if playerId != nonModId {
 		t.Fatalf("answer attributed to %q, want caller %q", playerId, nonModId)
+	}
+}
+
+// TestAnswerZeroRiskyWagerAccepted verifies a risky-wager bet of 0 is accepted
+// (ticket #295): 0 is a legal bet, so the answer binding must not reject it as
+// a missing wager (the validator's `required` tag rejects a numeric zero).
+func TestAnswerZeroRiskyWagerAccepted(t *testing.T) {
+	db := newTokenTestDB(t)
+	r := newRouter(db)
+
+	gameId := createRiskyStartableGame(t, db)
+	rec := do(r, http.MethodPost, "/gameplay/session", "", map[string]string{"name": "S", "game_id": gameId})
+	if rec.Code != http.StatusOK {
+		t.Fatalf("create session = %d: %s", rec.Code, rec.Body.String())
+	}
+	var created struct {
+		ID          string `json:"id"`
+		PlayerToken string `json:"player_token"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &created); err != nil {
+		t.Fatal(err)
+	}
+	sessionId, modToken := created.ID, created.PlayerToken
+
+	playerId, playerToken := createPlayerViaHandler(t, r, "team-1")
+	addPlayerToSession(t, db, sessionId, playerId)
+	if rec := do(r, http.MethodPost, "/gameplay/session/"+sessionId+"/start", modToken, map[string]string{}); rec.Code != http.StatusOK {
+		t.Fatalf("start = %d: %s", rec.Code, rec.Body.String())
+	}
+
+	// wager 0 is a legal risky-wager bet; the answer must be accepted.
+	body := map[string]interface{}{
+		"answer": "guess", "wager": 0, "round_id": 0, "question_id": 0, "player_id": playerId,
+	}
+	rec = do(r, http.MethodPost, "/gameplay/session/"+sessionId+"/answer", playerToken, body)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("answer with wager 0 = %d: %s", rec.Code, rec.Body.String())
+	}
+
+	var wager float64
+	if err := db.QueryRow(`SELECT wager FROM answer WHERE session_id = ? ORDER BY rowid DESC LIMIT 1`, sessionId).Scan(&wager); err != nil {
+		t.Fatal(err)
+	}
+	if wager != 0 {
+		t.Fatalf("stored wager = %v, want 0", wager)
 	}
 }
 

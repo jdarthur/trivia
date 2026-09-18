@@ -32,6 +32,9 @@ export default function EditQuestionController(props: Props) {
     // Ticket #292: points awarded per correct item for a partial-credit
     // bucketing/matching question; 0 = all-or-nothing.
     const [points_per_correct, setPointsPerCorrect] = useState<number>(0)
+    // Ticket #295: risky-wager mode — players bet 0..max_wager at answer time.
+    const [risky_wager, setRiskyWager] = useState<boolean>(false)
+    const [max_wager, setMaxWager] = useState<number>(10)
     // Ticket #166: the current step of the multi-step question editor.
     const [step, setStep] = useState(0)
     // Set when Next is attempted on the Question step so the validation error
@@ -51,6 +54,8 @@ export default function EditQuestionController(props: Props) {
         setItems(props.selected?.items || [])
         setOrdered(props.selected?.ordered || [])
         setPointsPerCorrect(props.selected?.points_per_correct || 0)
+        setRiskyWager(props.selected?.risky_wager === true)
+        setMaxWager(props.selected?.max_wager || 10)
         // Ticket #166: a new question starts at the first step; an existing
         // one opens on the Question step, since editing usually means changing
         // the question text rather than the type/category info.
@@ -87,6 +92,8 @@ export default function EditQuestionController(props: Props) {
             items: items,
             ordered: ordered,
             points_per_correct: points_per_correct,
+            risky_wager: risky_wager,
+            max_wager: max_wager,
         }
 
         const response = !!id
@@ -187,6 +194,8 @@ export default function EditQuestionController(props: Props) {
                            items={items} set_items={setItems}
                            ordered={ordered} set_ordered={setOrdered}
                            points_per_correct={points_per_correct} set_points_per_correct={setPointsPerCorrect}
+                           risky_wager={risky_wager} set_risky_wager={setRiskyWager}
+                           max_wager={max_wager} set_max_wager={setMaxWager}
                            steps step={step} step_error={step_error}
                            visible={props.visible}/>
     );

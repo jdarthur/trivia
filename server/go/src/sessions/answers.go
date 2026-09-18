@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
@@ -94,15 +95,25 @@ func (e *Env) AnswerQuestion(c *gin.Context) {
 		}
 	}
 
-	availableWagers, err := getWagers(e, session, *answer.RoundIndex, answer.PlayerId)
-	if err != nil {
-		common.Respond(c, nil, err)
-		return
-	}
+	// Ticket #295: a risky-wager question lets the player bet any amount from
+	// 0 up to the question's max_wager (in 0.5-point steps), instead of
+	// choosing from the round's fixed wager list.
+	if question.RiskyWager {
+		if !wagerIsLegalRisky(question.MaxWager, answer.Wager) {
+			common.Respond(c, nil, IllegalWagerError{Wager: answer.Wager, PlayerId: answer.PlayerId, AvailableWagers: riskyWagerRange(question.MaxWager)})
+			return
+		}
+	} else {
+		availableWagers, err := getWagers(e, session, *answer.RoundIndex, answer.PlayerId)
+		if err != nil {
+			common.Respond(c, nil, err)
+			return
+		}
 
-	if !wagerIsLegal(availableWagers, answer.Wager) {
-		common.Respond(c, nil, IllegalWagerError{Wager: answer.Wager, PlayerId: answer.PlayerId, AvailableWagers: availableWagers})
-		return
+		if !wagerIsLegal(availableWagers, answer.Wager) {
+			common.Respond(c, nil, IllegalWagerError{Wager: answer.Wager, PlayerId: answer.PlayerId, AvailableWagers: intsToFloats(availableWagers)})
+			return
+		}
 	}
 
 	answer.SessionId = sessionId
@@ -647,13 +658,44 @@ func playerIsActive(e *Env, sessionId string, target models.PlayerId) (bool, err
 	return active == 1, nil
 }
 
-func wagerIsLegal(legalWagers []int, wager int) bool {
+func wagerIsLegal(legalWagers []int, wager float64) bool {
 	for _, legalWager := range legalWagers {
-		if legalWager == wager {
+		if float64(legalWager) == wager {
 			return true
 		}
 	}
 	return false
+}
+
+// wagerIsLegalRisky reports whether a risky-wager bet (ticket #295) is legal:
+// it must be within [0, maxWager] and a multiple of 0.5 (the half-point step
+// the client slider uses). A non-multiple (e.g. 2.3) is rejected.
+func wagerIsLegalRisky(maxWager float64, wager float64) bool {
+	if wager < 0 || wager > maxWager {
+		return false
+	}
+	return math.Mod(wager*2, 1) == 0
+}
+
+// riskyWagerRange is the ordered list of legal risky-wager bets (0 .. max, in
+// 0.5 steps), used to describe the allowed range in an IllegalWagerError.
+func riskyWagerRange(maxWager float64) []float64 {
+	values := make([]float64, 0, int(maxWager*2)+1)
+	for w := float64(0); w <= maxWager; w += 0.5 {
+		values = append(values, w)
+	}
+	return values
+}
+
+// intsToFloats converts the round's fixed-wager list ([]int) to the float64
+// slice IllegalWagerError carries, now that wagers may be fractional (ticket
+// #295).
+func intsToFloats(values []int) []float64 {
+	out := make([]float64, len(values))
+	for i, v := range values {
+		out[i] = float64(v)
+	}
+	return out
 }
 
 // remove wager from slice by value
@@ -675,16 +717,18 @@ type questionSnapshot struct {
 	ScoringNoteId string
 	ScoringNote   string
 	Scored        bool
+	RiskyWager    bool
+	MaxWager      float64
 }
 
 func sessionQuestionSnapshot(e *Env, sessionId string, roundIndex int, questionIndex int) (questionSnapshot, error) {
 	var s questionSnapshot
-	var scored int
+	var scored, riskyWager int
 	err := e.Db.QueryRow(`SELECT question_id, category, question, answer, scoring_note_id,
-		scoring_note, scored FROM session_question
+		scoring_note, scored, risky_wager, max_wager FROM session_question
 		WHERE session_id = ? AND round_index = ? AND question_index = ?`,
 		sessionId, roundIndex, questionIndex).Scan(
-		&s.QuestionId, &s.Category, &s.Question, &s.Answer, &s.ScoringNoteId, &s.ScoringNote, &scored)
+		&s.QuestionId, &s.Category, &s.Question, &s.Answer, &s.ScoringNoteId, &s.ScoringNote, &scored, &riskyWager, &s.MaxWager)
 	if errors.Is(err, sql.ErrNoRows) {
 		return s, InvalidQuestionIndexError{QuestionIndex: questionIndex}
 	}
@@ -692,5 +736,6 @@ func sessionQuestionSnapshot(e *Env, sessionId string, roundIndex int, questionI
 		return s, err
 	}
 	s.Scored = scored == 1
+	s.RiskyWager = riskyWager == 1
 	return s, nil
 }

@@ -875,3 +875,48 @@ func TestUpdateQuestionLastUsedBump(t *testing.T) {
 		t.Fatalf("category switch bumped the old note's last_used: %v -> %v", afterCreate.LastUsed, noteAStill.LastUsed)
 	}
 }
+
+// TestCreateQuestionRiskyWagerValidation verifies the risky-wager rules
+// (ticket #295): a risky question requires a positive max wager, and cannot be
+// combined with points-per-correct-answer partial credit (ticket #292).
+func TestCreateQuestionRiskyWagerValidation(t *testing.T) {
+	env := openQuestionsTestDB(t)
+	userId := "user-1"
+
+	// risky wager without a max is rejected.
+	if _, err := CreateOneQuestion(env, userId, models.Question{
+		Question: "q?", Answer: "a", RiskyWager: true,
+	}); err == nil {
+		t.Fatal("risky_wager without max_wager should be rejected")
+	} else if _, ok := err.(RiskyWagerRequiresMaxError); !ok {
+		t.Fatalf("want RiskyWagerRequiresMaxError, got %T: %v", err, err)
+	}
+
+	// risky wager with a positive max is accepted (and persisted).
+	q, err := CreateOneQuestion(env, userId, models.Question{
+		Question: "q?", Answer: "a", RiskyWager: true, MaxWager: 10,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := GetOneQuestion(env, userId, q.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !got.RiskyWager || got.MaxWager != 10 {
+		t.Fatalf("risky wager not persisted: %+v", got)
+	}
+
+	// risky wager + points_per_correct is rejected.
+	if _, err := CreateOneQuestion(env, userId, models.Question{
+		Question: "q?", Answer: "a", RiskyWager: true, MaxWager: 10,
+		QuestionType: "bucketing",
+		Buckets:      []models.QuestionBucket{{Text: "A"}, {Text: "B"}},
+		Items:        []models.QuestionBucketItem{{Text: "x", Bucket: "A"}},
+		PointsPerCorrect: 2,
+	}); err == nil {
+		t.Fatal("risky_wager + points_per_correct should be rejected")
+	} else if _, ok := err.(RiskyWagerWithPartialCreditError); !ok {
+		t.Fatalf("want RiskyWagerWithPartialCreditError, got %T: %v", err, err)
+	}
+}

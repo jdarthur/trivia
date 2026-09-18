@@ -4,7 +4,7 @@ import WagerManager from "./WagerManager"
 import LeaveGame from "../lobby/LeaveGame"
 import sendData from "../index"
 
-import { Card, Input, Button, Radio, Select, Checkbox, Popover, InputNumber } from 'antd';
+import { Card, Input, Button, Radio, Select, Checkbox, Popover, InputNumber, Slider } from 'antd';
 import { QuestionCircleOutlined } from '@ant-design/icons';
 import OrderedAnswerList from "./OrderedAnswerList";
 import {getPlayerToken} from "../common/playerToken";
@@ -33,6 +33,11 @@ interface Props {
     buckets?: string[]
     items?: string[]
     ordered?: string[]
+    // Ticket #295: risky-wager mode — the player bets any amount from 0 up to
+    // max_wager (in 0.5-point steps) via a slider instead of the round's
+    // fixed wager list.
+    risky_wager?: boolean
+    max_wager?: number
 }
 
 interface State {
@@ -88,11 +93,15 @@ class AnswerQuestion extends React.Component<Props, State> {
             this.check_active()
         }
         if (this.props.question !== prevProps.question || this.props.round !== prevProps.round) {
-            this.setState({ answer: "", wager: null, dirty: false, answered: false, selected_choice: null, matches: {}, moneyball: false, scored_result: null,
+            this.setState({ answer: "", dirty: false, answered: false, selected_choice: null, matches: {}, moneyball: false, scored_result: null,
                 // Ticket #214: seed the ordering grid from the (shuffled)
                 // ordered prop for the new question; a fresh question starts
                 // with an empty grid for every other type.
-                order: this.props.question_type === ORDERING ? (this.props.ordered || []) : [] })
+                order: this.props.question_type === ORDERING ? (this.props.ordered || []) : [],
+                // Ticket #295: a risky-wager question defaults to betting the
+                // full max (the typical finale "bet it all"); a normal
+                // question starts with no wager chosen.
+                wager: this.props.risky_wager ? this.props.max_wager : null })
             if (this.props.scored) {
                 this.fetch_scored_result()
             }
@@ -390,8 +399,10 @@ class AnswerQuestion extends React.Component<Props, State> {
             <Card className="answer-card" bodyStyle={{ padding: 15 }}  >
                 {answer_input}
 
-                {/* Moneyball opt-in (ticket #3): risk the wager for a 2X payout. */}
-                {!this.props.scored ? (
+                {/* Moneyball opt-in (ticket #3): risk the wager for a 2X payout.
+                    Risky-wager questions (ticket #295) already risk the bet, so
+                    the two mechanics are not combined. */}
+                {!this.props.scored && !this.props.risky_wager ? (
                     <div className="moneyball-row" style={{marginTop: 10}}>
                         <Checkbox checked={this.state.moneyball}
                                   onChange={(event) => this.set_moneyball(event.target.checked)}>
@@ -424,9 +435,24 @@ class AnswerQuestion extends React.Component<Props, State> {
                 ) : null}
 
                 <div className="answer-footer">
-                    <WagerManager session_id={this.props.session_id} player_id={this.props.player_id}
-                        round_id={this.props.round} wager={this.state.wager} select={this.set_wager}
-                        question_id={this.props.question} all_wagers={this.props.wagers}/>
+                    {/* Ticket #295: risky-wager — the player bets any amount from
+                        0 up to max_wager (0.5 steps) via a slider instead of the
+                        round's fixed wager list. */}
+                    {this.props.risky_wager ? (
+                        <div style={{flexGrow: 1, marginRight: 8}}>
+                            <Slider min={0} max={this.props.max_wager || 0} step={0.5}
+                                    value={typeof this.state.wager === "number" ? this.state.wager : 0}
+                                    onChange={(value) => this.setState({wager: value, dirty: true})}
+                                    marks={{0: "0", [(this.props.max_wager || 0)]: String(this.props.max_wager)}}/>
+                            <div style={{fontSize: 12, color: "#888", textAlign: "center"}}>
+                                Bet: {this.state.wager} — {this.state.wager >= 0 && this.props.max_wager !== 0 ? "+" : ""}{this.state.wager} if right, −{this.state.wager} if wrong
+                            </div>
+                        </div>
+                    ) : (
+                        <WagerManager session_id={this.props.session_id} player_id={this.props.player_id}
+                            round_id={this.props.round} wager={this.state.wager} select={this.set_wager}
+                            question_id={this.props.question} all_wagers={this.props.wagers}/>
+                    )}
                     <Button type="primary" className={button_class}
                         onClick={this.send} disabled={!this.sendable() || this.state.sending}> {send_text} </Button>
                 </div>

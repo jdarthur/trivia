@@ -218,10 +218,12 @@ func scanQuestion(s rowScanner) (models.Question, error) {
 	var m models.Question
 	var createDate string
 	var categoryId sql.NullString
-	err := s.Scan(&m.ID, &createDate, &categoryId, &m.Question, &m.Answer, &m.UserId, &m.QuestionType, &m.PointsPerCorrect)
+	var riskyWager int
+	err := s.Scan(&m.ID, &createDate, &categoryId, &m.Question, &m.Answer, &m.UserId, &m.QuestionType, &m.PointsPerCorrect, &riskyWager, &m.MaxWager)
 	if err != nil {
 		return m, err
 	}
+	m.RiskyWager = riskyWager == 1
 	m.CreateDate = ParseTime(createDate)
 	m.RoundsUsed = make([]string, 0)
 	// category_id is a nullable FK column (tickets #178/#179); NULL surfaces
@@ -258,7 +260,7 @@ func loadQuestionRoundsUsed(db *sql.DB, m *models.Question) error {
 }
 
 func getQuestion(db *sql.DB, id string, m *models.Question) error {
-	row := db.QueryRow(`SELECT id, create_date, category_id, question, answer, user_id, question_type, points_per_correct
+	row := db.QueryRow(`SELECT id, create_date, category_id, question, answer, user_id, question_type, points_per_correct, risky_wager, max_wager
 		FROM question WHERE id = ?`, id)
 	got, err := scanQuestion(row)
 	if errors.Is(err, sql.ErrNoRows) {
@@ -618,7 +620,8 @@ func loadSessionRounds(db *sql.DB, m *models.Session) error {
 
 	// Overlay the per-question snapshots taken at set/score/hot-edit time.
 	rows, err := db.Query(`SELECT round_index, question_index, question_id, category,
-		question, answer, scoring_note_id, scoring_note, scored, question_type, points_per_correct
+		question, answer, scoring_note_id, scoring_note, scored, question_type, points_per_correct,
+		risky_wager, max_wager
 		FROM session_question WHERE session_id = ?`, m.ID)
 	if err != nil {
 		return err
@@ -627,9 +630,11 @@ func loadSessionRounds(db *sql.DB, m *models.Session) error {
 	for rows.Next() {
 		var roundIndex, questionIndex int
 		var questionId, category, question, answer, scoringNoteId, scoringNote, questionType string
-		var scored, pointsPerCorrect int
+		var scored, pointsPerCorrect, riskyWager int
+		var maxWager float64
 		if err := rows.Scan(&roundIndex, &questionIndex, &questionId, &category,
-			&question, &answer, &scoringNoteId, &scoringNote, &scored, &questionType, &pointsPerCorrect); err != nil {
+			&question, &answer, &scoringNoteId, &scoringNote, &scored, &questionType, &pointsPerCorrect,
+			&riskyWager, &maxWager); err != nil {
 			return err
 		}
 		if roundIndex >= len(m.Rounds) || questionIndex >= len(m.Rounds[roundIndex].Questions) {
@@ -645,6 +650,8 @@ func loadSessionRounds(db *sql.DB, m *models.Session) error {
 		q.Scored = scored == 1
 		q.QuestionType = questionType
 		q.PointsPerCorrect = pointsPerCorrect
+		q.RiskyWager = riskyWager == 1
+		q.MaxWager = maxWager
 	}
 	if err := rows.Err(); err != nil {
 		return err
@@ -1055,9 +1062,10 @@ func insertQuestion(db *sql.DB, m models.Question) error {
 	if questionType == "" {
 		questionType = "freeform"
 	}
-	_, err := db.Exec(`INSERT INTO question (id, create_date, category_id, question, answer, user_id, question_type)
-		VALUES (?, ?, ?, ?, ?, ?, ?)`,
-		m.ID, formatTime(m.CreateDate), nilIfEmpty(m.Category), m.Question, m.Answer, m.UserId, questionType)
+	_, err := db.Exec(`INSERT INTO question (id, create_date, category_id, question, answer, user_id, question_type, points_per_correct, risky_wager, max_wager)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		m.ID, formatTime(m.CreateDate), nilIfEmpty(m.Category), m.Question, m.Answer, m.UserId, questionType,
+		m.PointsPerCorrect, m.RiskyWager, m.MaxWager)
 	return err
 }
 
@@ -1288,8 +1296,9 @@ func updateQuestion(db *sql.DB, id string, m models.Question) error {
 		questionType = "freeform"
 	}
 	res, err := db.Exec(`UPDATE question SET category_id = ?, question = ?, answer = ?, user_id = ?,
-		question_type = ? WHERE id = ?`,
-		nilIfEmpty(m.Category), m.Question, m.Answer, m.UserId, questionType, id)
+		question_type = ?, points_per_correct = ?, risky_wager = ?, max_wager = ? WHERE id = ?`,
+		nilIfEmpty(m.Category), m.Question, m.Answer, m.UserId, questionType,
+		m.PointsPerCorrect, m.RiskyWager, m.MaxWager, id)
 	return rowsAffected(res, err, QuestionTable, id)
 }
 
@@ -1586,7 +1595,7 @@ func WithWriteTx(db *sql.DB, fn func(q Queryer) error) error {
 func scanTable(objectType string) (string, bool) {
 	switch objectType {
 	case QuestionTable:
-		return `SELECT id, create_date, category_id, question, answer, user_id, question_type, points_per_correct
+		return `SELECT id, create_date, category_id, question, answer, user_id, question_type, points_per_correct, risky_wager, max_wager
 			FROM question`, true
 	case RoundTable:
 		return `SELECT id, create_date, name, user_id FROM round`, true

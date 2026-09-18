@@ -754,6 +754,48 @@ var migrations = []migration{
 			)`,
 		},
 	},
+	{
+		version: 21,
+		name:    "risky wager and fractional answer wagers",
+		// ticket #295: a question can opt into a "risky wager" mode — players
+		// bet any amount from 0 up to a per-question max (in 0.5-point steps)
+		// at answer time, and scoring awards +wager / -wager by correctness
+		// instead of wager-or-zero. The question and session_question snapshots
+		// carry risky_wager (0/1) and max_wager (REAL); the answer.wager column
+		// is widened INTEGER -> REAL so a half-point bet is stored exactly.
+		//
+		// answer is referenced by answer_reaction(answer_id), so rebuilding it
+		// runs with foreign_keys off (SQLite's DROP TABLE performs an implicit
+		// DELETE whose ON DELETE CASCADE would wipe live reactions). The index
+		// on answer is recreated after the rename (DROP TABLE removes it).
+		disableForeignKeys: true,
+		statements: []string{
+			`ALTER TABLE question ADD COLUMN risky_wager INTEGER NOT NULL DEFAULT 0`,
+			`ALTER TABLE question ADD COLUMN max_wager REAL NOT NULL DEFAULT 0`,
+
+			`ALTER TABLE session_question ADD COLUMN risky_wager INTEGER NOT NULL DEFAULT 0`,
+			`ALTER TABLE session_question ADD COLUMN max_wager REAL NOT NULL DEFAULT 0`,
+
+			`CREATE TABLE answer_new (
+				id             TEXT PRIMARY KEY,
+				create_date    TEXT NOT NULL,
+				session_id     TEXT NOT NULL REFERENCES session(id) ON DELETE CASCADE,
+				round_index    INTEGER NOT NULL,
+				question_index INTEGER NOT NULL,
+				player_id      TEXT NOT NULL REFERENCES player(id) ON DELETE CASCADE,
+				answer         TEXT NOT NULL DEFAULT '',
+				wager          REAL NOT NULL DEFAULT 0,
+				correct        INTEGER NOT NULL DEFAULT 0,
+				points_awarded REAL NOT NULL DEFAULT 0,
+				use_moneyball  INTEGER NOT NULL DEFAULT 0
+			)`,
+			`INSERT INTO answer_new (id, create_date, session_id, round_index, question_index, player_id, answer, wager, correct, points_awarded, use_moneyball)
+				SELECT id, create_date, session_id, round_index, question_index, player_id, answer, wager, correct, points_awarded, use_moneyball FROM answer`,
+			`DROP TABLE answer`,
+			`ALTER TABLE answer_new RENAME TO answer`,
+			`CREATE INDEX idx_answer_session ON answer(session_id, round_index, question_index)`,
+		},
+	},
 }
 
 // Migrate brings db up to the latest schema version, applying each pending
