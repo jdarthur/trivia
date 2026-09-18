@@ -10,7 +10,7 @@ import Scoreboard from '../scoreboard/Scoreboard';
 import InvitePlayers from "./InvitePlayers"
 import OtherPlayers from "../lobby/OtherPlayers"
 import LobbyPlayer from "../lobby/LobbyPlayer"
-import type {RoundInGame} from "../types/models"
+import type {RoundInGame, ReactionSummary} from "../types/models"
 import {getPlayerToken} from "../common/playerToken"
 
 interface Props {
@@ -47,6 +47,9 @@ interface State {
     ordered: string[]
     // Ticket #292: points awarded per correct item (bucketing/matching partial credit).
     points_per_correct: number
+    // Ticket #293: emoji reactions on the question itself.
+    reactions: Record<string, ReactionSummary>
+    my_reaction: string
     // Mirrored from PlayerScorer (see its on_scorable prop): the Score button
     // lives in this component's control card, not in the scorer.
     scorable: boolean
@@ -79,6 +82,8 @@ class ActiveGame extends React.Component<Props, State> {
             item_buckets: [],
             ordered: [],
             points_per_correct: 0,
+            reactions: {},
+            my_reaction: "",
             scorable: false
         }
     }
@@ -159,7 +164,9 @@ class ActiveGame extends React.Component<Props, State> {
                 scored: boolean, scoring_note: string, scoring_note_id: string,
                 question_type: string, choices: string[], lefts: string[], rights: string[],
                 buckets: string[], items: string[], item_buckets: string[], ordered: string[],
-                points_per_correct?: number
+                points_per_correct?: number,
+                reactions?: Record<string, ReactionSummary>,
+                my_reaction?: string
             }) => {
                 console.log(q)
                 if (this.currentFetch !== this.fetchCounter) {
@@ -182,6 +189,8 @@ class ActiveGame extends React.Component<Props, State> {
                     item_buckets: q.item_buckets || [],
                     ordered: q.ordered || [],
                     points_per_correct: q.points_per_correct || 0,
+                    reactions: q.reactions || {},
+                    my_reaction: q.my_reaction || "",
                 })
             })
             .catch((error) => {
@@ -225,6 +234,8 @@ class ActiveGame extends React.Component<Props, State> {
                                             item_buckets={this.state.item_buckets}
                                             ordered={this.state.ordered}
                                             points_per_correct={this.state.points_per_correct}
+                                            reactions={this.state.reactions}
+                                            my_reaction={this.state.my_reaction}
                             />
                         </div>
 

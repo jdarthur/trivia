@@ -91,6 +91,13 @@ type QuestionInRound struct {
 	// (ticket #292); 0 means all-or-nothing. Snapshot-copied so scoring reads
 	// the value as of when the question was set.
 	PointsPerCorrect int `json:"points_per_correct,omitempty"`
+
+	// Reactions/MyReaction are the emoji reactions on the question itself
+	// (ticket #293): aggregated per-emoji counts + reacting team names, and
+	// the caller's own reaction so the UI can highlight their selection.
+	// Populated by the current-question read; empty elsewhere.
+	Reactions  map[string]ReactionSummary `json:"reactions,omitempty"`
+	MyReaction string                     `json:"my_reaction,omitempty"`
 }
 
 type ScoreRequest struct {

@@ -507,7 +507,7 @@ func getAnswersScored(e *Env, session models.Session, roundIndex int, questionIn
 	if err != nil {
 		return models.AnswersResponseScored{}, err
 	}
-	reactions, err := reactionsForQuestion(e, session.ID, roundIndex, questionIndex, callerPlayerId)
+	reactions, err := answerReactionsForQuestion(e, session.ID, roundIndex, questionIndex, callerPlayerId)
 	if err != nil {
 		return models.AnswersResponseScored{}, err
 	}
@@ -588,7 +588,7 @@ func getAnswersAsMod(e *Env, session models.Session, roundIndex int, questionInd
 	// The mod is a player in the session too, so their view carries the same
 	// reaction data as the scored player view (ticket #156): the aggregated
 	// emoji counts plus the mod's own reaction, keyed by answer id.
-	reactions, err := reactionsForQuestion(e, session.ID, roundIndex, questionIndex, session.Moderator)
+	reactions, err := answerReactionsForQuestion(e, session.ID, roundIndex, questionIndex, session.Moderator)
 	if err != nil {
 		return answers, err
 	}

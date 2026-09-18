@@ -150,6 +150,10 @@ export interface QuestionInRound {
   ordered?: string[];
   /** ticket #292: per-correct-item points for partial credit; 0 = all-or-nothing. */
   points_per_correct?: number;
+  /** ticket #293: emoji reactions on the question itself (counts + team names). */
+  reactions?: Record<string, ReactionSummary>;
+  /** ticket #293: the caller's own reaction on the question, if any. */
+  my_reaction?: string;
 }
 
 /** models.RoundInGame */

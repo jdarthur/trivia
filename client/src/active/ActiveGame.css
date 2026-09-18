@@ -67,6 +67,26 @@
     margin-top: 10px;
 }
 
+/* Reactions on the question itself (ticket #293): a strip below the question,
+ * shown to players, spectators, and the mod. The chip styling is shared with
+ * the answer reactions (Players.css); here the strip sits in normal flow, so
+ * neutralize the sticker strip's absolute top-edge positioning and lay the
+ * stickers and "+" button out in a row. */
+.question-reactions {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-top: 12px;
+    padding: 0 10px 10px;
+}
+
+.question-reactions .reaction-stickers {
+    position: static;
+    transform: none;
+}
+
 .round-category {
     padding: 10px 15px 10px 15px;
     border-right: 1px solid #d9d9d9
