@@ -116,16 +116,20 @@ export function ReactionStickers({session_id, current_player, answer_id, target,
             const who = summary.players && summary.players.length > 0
                 ? summary.players.join(', ')
                 : undefined
-            // Every sticker is clickable: your own removes your reaction,
-            // someone else's quick-reacts the same emoji for your team (the
-            // PUT upserts on the unique key, so it also replaces whatever you
-            // had reacted with). A question reaction needs no answer_id.
-            const click = (target !== 'question' && !answer_id) ? undefined : () => mine
+            // Every sticker is clickable for a reacting player: your own
+            // removes your reaction, someone else's quick-reacts the same
+            // emoji for your team (the PUT upserts on the unique key, so it
+            // also replaces whatever you had reacted with). A question
+            // reaction needs no answer_id. A spectator (no current_player)
+            // sees the counts but cannot react, so the chip is not clickable.
+            const click = !current_player || (target !== 'question' && !answer_id) ? undefined : () => mine
                 ? remove_reaction(session_id, target || 'answer', answer_id, current_player)
                 : set_reaction(session_id, target || 'answer', answer_id, current_player, emoji)
-            // The tooltip names who reacted and what the click will do.
-            const action = mine ? "click to remove" : "click to react the same"
-            const title = who ? who + " — " + action : action
+            // The tooltip names who reacted and what the click will do. A
+            // spectator (no current_player) cannot react, so only the names
+            // are shown.
+            const action = !current_player ? undefined : (mine ? "click to remove" : "click to react the same")
+            const title = who ? who + (action ? " — " + action : "") : (action || "")
             const chip = (
                 <span key={emoji} className={"reaction-chip" + (mine ? " mine" : "")}
                       onClick={click}>
