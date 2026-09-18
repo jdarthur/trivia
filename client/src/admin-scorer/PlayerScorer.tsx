@@ -132,9 +132,10 @@ class PlayerScorer extends React.Component<Props, State> {
                             // Structured question types are auto-scored by the
                             // backend against the snapshot answer key, so the
                             // mod does not judge correctness. Pre-mark every
-                            // player correct (override = wager) so the backend
-                            // awards the wager to right answers and zeroes
-                            // wrong ones; the mod may still adjust an override.
+                            // player correct with no override so the backend
+                            // auto-scores them (awards the wager to right
+                            // answers and zeroes wrong ones); an explicit
+                            // override still wins (ticket #294).
                             if (this.auto_scored()) {
                                 this.auto_score()
                             }
@@ -164,11 +165,12 @@ class PlayerScorer extends React.Component<Props, State> {
 
     // Pre-populate scores so the Score button is ready and the backend's
     // auto-scoring decides correctness (the mod's correct flag is ignored for
-    // structured types; ScoreOverride is still honored).
+    // structured types). No override is pre-set, so a player the mod leaves
+    // alone is auto-scored; an explicit override still wins (ticket #294).
     auto_score = () => {
         const scores: Record<string, ScoreState> = {}
         for (const player of this.active_answers()) {
-            scores[player.player_id] = {correct: true, score_override: this.get_wager(player.player_id) ?? null}
+            scores[player.player_id] = {correct: true}
         }
         this.setState({scores: scores})
     }
@@ -263,6 +265,21 @@ class PlayerScorer extends React.Component<Props, State> {
         }
     }
 
+    // Upper bound for the manual score-override slider. The override replaces
+    // the awarded points (ticket #294), so the range must cover realistic
+    // wagers rather than the old fixed -10..10 bonus scale. Defaults to 10
+    // when no active answer carries a larger wager.
+    override_max = () => {
+        let max = 10
+        for (const player of this.active_answers()) {
+            const wager = this.get_wager(player.player_id)
+            if (typeof wager === "number" && wager > max) {
+                max = wager
+            }
+        }
+        return max
+    }
+
     // true when the player's latest answer opted into Moneyball (ticket #3).
     get_moneyball = (player_id: string): boolean => {
         for (let i = 0; i < this.state.answers.length; i++) {
@@ -316,6 +333,7 @@ class PlayerScorer extends React.Component<Props, State> {
                                        player_name={player.team_name} correct={status.correct}
                                        session_id={this.props.session_id}
                                        set_override={this.set_override} override_value={override_value as number}
+                                       override_max={this.override_max()}
                                        auto_scored={this.auto_scored()}
                                        question_type={this.props.question_type}
                                        correct_answer={this.props.correct_answer}

@@ -491,7 +491,8 @@ func scoreQuestionTx(e *Env, session models.Session, requestBody models.ScoreReq
 
 		// for structured types, load the answer key from the snapshot so each
 		// player's correctness is auto-computed against it (the mod's correct
-		// flags are ignored; ScoreOverride is still honored).
+		// flags are ignored; an explicit ScoreOverride still wins — see the
+		// points branch below, ticket #294).
 		correctChoiceText := ""
 		var matchLefts, matchRights []string
 		var bucketItems, bucketBuckets []string
@@ -630,7 +631,16 @@ func scoreQuestionTx(e *Env, session models.Session, requestBody models.ScoreReq
 
 		for _, score := range scores {
 			var pointsToAward float64
-			if pointsPerCorrect > 0 {
+			// Ticket #294: on an auto-scored question an explicit moderator
+			// override wins over the auto-scored result — award it and mark
+			// the answer correct iff nonzero. It is suppressed only where the
+			// scoring formula is enforced server-side: risky wager (#295) and
+			// moneyball (#3). Freeform/numeric keep the mod's correct flag and
+			// override as before.
+			if score.override != nil && questionType != "freeform" && questionType != "numeric" && riskyWager != 1 && !score.useMoneyball {
+				pointsToAward = *score.override
+				score.isCorrect = *score.override != 0
+			} else if pointsPerCorrect > 0 {
 				// Partial credit (ticket #292): each individually-correct
 				// item/pair earns pointsPerCorrect points, up to
 				// correctItems * pointsPerCorrect. The round wager, moneyball,
